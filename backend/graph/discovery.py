@@ -21,29 +21,127 @@ DISCOVERY_SYSTEM_PROMPT = """You are a real estate auction page parser for Brazi
 - baths: number of bathrooms/banheiros (int or null if not found)
 - parking: number of parking spots/vagas de garagem (int or null if not found)
 - floor: floor/andar (string or null if not found, e.g. "12º andar")
-- auction_price: 1ª praça bid price (valor de 1ª praça) as float
-- auction_price_2nd: 2ª praça bid price (valor de 2ª praça) as float, or 0 if not found
-- market_value_estimate: appraised value / valor de avaliação if available (float or null)
-- auction_date: 1ª praça auction date string
-- auction_date_2nd: 2ª praça auction date string, or empty if not found
+- auction_price: 1ª praça minimum bid price as float. Look for "1ª praça", "1ª data", "1º leilão", "Lance inicial" followed by a price. This is the starting bid, NOT the market value.
+- auction_price_2nd: 2ª praça minimum bid price as float, or 0 if not found. Look for "2ª praça", "2ª data", "2º leilão", "2ª Etapa" followed by a price. This is typically LOWER than 1ª praça. IMPORTANT: Many pages show both praças — always extract both.
+- market_value_estimate: appraised/avaliação value ONLY if explicitly labeled as "valor de avaliação", "avaliação", or "valor de mercado" separately from the auction price. If no separate appraised value is shown, set to null. Do NOT use the auction price (1ª praça) as the market value — they are different things.
+- auction_date: 1ª praça auction date string (e.g. "21/05/2026"). Look near "1ª praça", "1ª data", "1º leilão".
+- auction_date_2nd: 2ª praça auction date string, or empty if not found. Look near "2ª praça", "2ª data", "2º leilão".
 - auction_type: Judicial, Extrajudicial, Caixa, etc.
-- matricula: matrícula number if shown
-- process_number: lawsuit process number in CNJ format (NNNNNNN-DD.AAAA.J.TR.OOOO, e.g. 1024778-32.2024.8.26.0100). Look for "processo", "autos", "nº do processo". Must be 20 digits. Set to empty string if not found.
+- matricula: matrícula number if shown (e.g. "67.309", "87.412")
+- process_number: lawsuit process number. Look for "Processo:", "Número do Processo:", "processo nº". Format is CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO (e.g. 0000422-82.2022.8.16.0001). Must be 20 digits. Set to empty string if not found.
 - court_or_leiloeiro: court name or auctioneer (kept for backwards compatibility)
-- auctioneer_name: just the auctioneer name (person or company name only, NOT a description or paragraph). E.g. "Zukerman Leilões", "Mega Leilões"
-- court_name: court/vara name if judicial auction, e.g. "7ª Vara Cível SP". Empty if extrajudicial.
-- creditor: creditor/credor name (bank, institution, or person) if shown
-- debtor: debtor/devedor name if shown
+- auctioneer_name: ONLY the auctioneer person/company name. Look for "Leiloeiro:", "LEILOEIRO OFICIAL:", "Leiloeiro Oficial". E.g. "Helcio Kronberg", "Zukerman Leilões". Do NOT include the court name here.
+- court_name: ONLY the judicial court/vara name. Look for "Vara:", "Vara Cível", "Vara Federal". E.g. "13ª Vara Cível de Curitiba/PR". Empty if extrajudicial. The court and the auctioneer are DIFFERENT entities — never combine them.
+- creditor: the Autor/Exequente (who is owed). Look for "Autor:", "Exequente:", "Credor:".
+- debtor: the Réu/Executado (who owes). Look for "Réu:", "Executado:", "Devedor:".
 - city: city name
 - neighborhood: neighborhood/bairro
-- state: state abbreviation (SP, RJ, etc.)
+- state: state abbreviation (SP, RJ, PR, etc.)
 Set any field you cannot find to an empty string, 0 for numbers, or null for optional fields.
+
+CRITICAL RULES:
+1. Always extract BOTH 1ª and 2ª praça prices when shown. Many auction pages display them side by side.
+2. auction_price (1ª praça) and market_value_estimate (avaliação) are DIFFERENT. The auction price is the minimum bid; the market value is the appraised value. If only one price is shown, it's the auction price — set market_value_estimate to null.
+3. auctioneer_name and court_name are DIFFERENT. The auctioneer runs the auction (e.g. "Helcio Kronberg"). The court is the judicial vara (e.g. "13ª Vara Cível de Curitiba/PR"). Never combine them.
 
 Also identify the site type as one of: "caixa", "leiloeiro", "court", "aggregator", or "other"
 
 Respond ONLY with a JSON object containing "property_metadata" and "page_source_type" keys."""
 
 MAX_HTML_LENGTH = 30000
+
+
+def _preprocess_kron_text(text: str) -> str:
+    """Preprocess Kron Leiloes / Superbid page text to highlight key auction data.
+
+    Kron pages flatten structured data into a wall of text that LLMs often
+    fail to parse. This function extracts the key sections (pricing, process,
+    auctioneer, court) and prepends a structured summary so the LLM can't
+    miss them.
+
+    Returns the original text with a prepended summary if a Kron page is
+    detected, otherwise returns the text unchanged.
+    """
+    lower = text.lower()
+    if "kron leil" not in lower and "superbid" not in lower:
+        return text
+
+    summary_parts = ["[STRUCTURED DATA EXTRACTED FROM PAGE]"]
+
+    # Clean &nbsp; entities that may survive HTML stripping
+    clean = text.replace("&nbsp;", " ")
+
+    # Extract 1ª praça: look for "1ª praça DATE ... Lance inicial/atual: R$ PRICE"
+    match = re.search(r"1ª praça\s+(\d{2}/\d{2}(?:/\d{4})?).*?Lance (?:inicial|atual):\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if not match:
+        match = re.search(r"1ª data.*?Lance inicial:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if match:
+        groups = match.groups()
+        if len(groups) == 2 and "/" in groups[0]:
+            summary_parts.append(f"1ª praça date: {groups[0]}")
+            summary_parts.append(f"1ª praça price: R$ {groups[1]}")
+        elif len(groups) == 2:
+            summary_parts.append(f"1ª praça price: R$ {groups[1]}")
+        else:
+            summary_parts.append(f"1ª praça price: R$ {groups[0]}")
+
+    # Also extract "Lance atual" if separate
+    match = re.search(r"Lance atual:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"1ª praça lance atual: R$ {match.group(1)}")
+
+    # Extract 2ª praça: "2ª praça DATE ... Lance inicial: R$ PRICE"
+    match = re.search(r"2ª praça\s+(\d{2}/\d{2}(?:/\d{4})?).*?Lance inicial:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if not match:
+        match = re.search(r"2ª data.*?Lance inicial:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if not match:
+        match = re.search(r"2ª Etapa.*?R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if match:
+        groups = match.groups()
+        if len(groups) == 2 and "/" in groups[0]:
+            summary_parts.append(f"2ª praça date: {groups[0]}")
+            summary_parts.append(f"2ª praça price: R$ {groups[1]}")
+        elif len(groups) == 2:
+            summary_parts.append(f"2ª praça price: R$ {groups[1]}")
+        else:
+            summary_parts.append(f"2ª praça price: R$ {groups[0]}")
+
+    # Extract process number (CNJ format)
+    match = re.search(r"(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})", text)
+    if match:
+        summary_parts.append(f"Process number: {match.group(1)}")
+
+    # Extract auctioneer (Leiloeiro)
+    match = re.search(r"LEILOEIRO OFICIAL:\s*([A-ZÀ-Ú\s]+?)(?:\s+Sujeito|\s+$)", clean, re.IGNORECASE)
+    if not match:
+        match = re.search(r"Leiloeiro:\s*([A-ZÀ-Ú\s]+?)(?:\s+Vendedor|\s+Valor|\s+$)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"Auctioneer: {match.group(1).strip()}")
+
+    # Extract court/Vara (handles both "Vara Cível" and "VARA CIVEL")
+    match = re.search(r"(\d+ª\s+Vara\s+[A-ZÀ-Ú\s/]+?)(?:\s+Execução|\s+\d|\s+Leilão|\s+1ª)", clean, re.IGNORECASE)
+    if not match:
+        match = re.search(r"(\d+ª\s+VARA\s+[A-Z\s/]+?)(?:\s+Execu|\s+\d|\s+Leil|\s+1ª)", clean)
+    if match:
+        summary_parts.append(f"Court: {match.group(1).strip()}")
+
+    # Extract Autor (creditor) and Réu (debtor)
+    match = re.search(r"Autor:\s*([^\n]+?)(?:\s+Número|\s+Réu|\s+Ano)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"Creditor (Autor): {match.group(1).strip()}")
+    match = re.search(r"Réu:\s*([^\n]+?)(?:\s+Ano|\s+Tipo|\s+Comarca)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"Debtor (Réu): {match.group(1).strip()}")
+
+    # Extract matrícula
+    match = re.search(r"matrícula\s*n[ºo°]?\s*([\d.]+)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"Matrícula: {match.group(1)}")
+
+    summary_parts.append("[END STRUCTURED DATA]")
+    summary_parts.append("")
+
+    return "\n".join(summary_parts) + text
 
 
 def _extract_pdf_urls(html: str) -> list[str]:
@@ -174,6 +272,7 @@ def discovery_node(state: AuctionState) -> dict:
     # Step 3: LLM extracts property metadata from cleaned text
     logger.info("Discovery: parsing page content with LLM")
     cleaned = _clean_html(html)
+    cleaned = _preprocess_kron_text(cleaned)
     try:
         response = _call_discovery_llm(cleaned)
         response_text = response.choices[0].message.content

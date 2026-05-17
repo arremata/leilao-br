@@ -411,6 +411,10 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
     state_abbrev = metadata.state or ""
 
     market_value = metadata.market_value_estimate
+    # If the LLM set market_value_estimate to the auction price, it likely
+    # confused the two — treat as missing and use market research instead
+    if market_value and metadata.auction_price and abs(market_value - metadata.auction_price) < 1:
+        market_value = None
     if not market_value and market_result:
         market_value = (market_result.price_per_m2_neighborhood or 0.0) * (metadata.area_m2 or 0.0)
     if not market_value:
