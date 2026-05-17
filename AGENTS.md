@@ -1,0 +1,148 @@
+# Arremate — Project Vision & Architecture
+
+## Product Vision
+
+**Arremate** is a demo of a future Brazilian real estate auction intelligence platform. The goal is to map all real estate auctions in Brazil and provide AI-powered analysis that makes auction investing accessible and safer. Properties are sold at 30-70% below market value but carry complex legal risks — Arremate automates the research that today takes a full day and R$ 200-800 in legal fees into a 3-minute analysis.
+
+## Current Status: Demo Integration Phase
+
+The frontend UI is built with mock data and the AI pipeline is functional. We are now connecting the backend with the frontend — the FastAPI server exposes the LangGraph pipeline and the React SPA consumes it via the Vite proxy.
+
+```
+leilao/
+├── backend/                 # Python — API + AI pipeline
+│   ├── api.py               # FastAPI server (port 8001)
+│   ├── app.py               # Gradio UI (legacy)
+│   ├── analyze.py           # CLI entry point
+│   ├── config.py            # Settings (LiteLLM, Tavily keys)
+│   ├── graph/               # LangGraph agent pipeline
+│   ├── tools/               # Web scraper, PDF parser, search
+│   ├── tests/               # pytest suite
+│   ├── data/                # results.json persistence
+│   ├── requirements.txt
+│   └── .env
+├── frontend/                # React 19 SPA (Vite, port 5173)
+├── docs/                    # Design docs and plans
+├── .venv/                   # Python virtual environment
+└── Makefile, dev.sh         # Dev scripts
+```
+
+```
+┌─────────────────────────────────────────────┐
+│           Frontend (React SPA)               │
+│  Home · Feed · PropertyDetail                │
+│  Backend-driven data (seed + live analysis)   │
+└──────────────────────┬──────────────────────┘
+                       │  /api/* (Vite proxy → :8001)
+┌──────────────────────┴──────────────────────┐
+│           API Server (FastAPI)                │
+│  GET /properties  ·  POST /analyze           │
+│  JSON file persistence (data/results.json)    │
+│  Seed data loaded on startup (data/seed.json) │
+└──────────────────────┬──────────────────────┘
+                       │
+┌──────────────────────┴──────────────────────┐
+│         AI Agent Pipeline (LangGraph)         │
+│  Discovery → Planner → [Market, Legal]        │
+│  → Scoring → Output                          │
+└──────────────────────────────────────────────┘
+```
+
+## AI Agent Pipeline
+
+The core intelligence — currently a standalone script, will become the backend service.
+
+### Agents
+
+| Agent | Model (via litellm proxy) | Purpose |
+|-------|---------------------------|---------|
+| Discovery | `openai/claude-sonnet-4.6` | Scrape auction URL, extract metadata + PDF links, download + parse PDFs |
+| Planner | `openai/claude-opus-4.6` | Extract property metadata from PDFs, create research plan |
+| Market Analyst | `openai/gpt-5.4` | Research market prices, comparables, appreciation, liquidity, tendencies |
+| Legal Analyst | `openai/claude-sonnet-4.6` | Assess legal risks: liens, debts, judicial disputes, zoning, permits, occupation |
+| Scoring | (rule-based, no LLM) | Compute 0-100 score, risk flags (J/F/L/O), projected ROI |
+| Output | (rule-based, no LLM) | Build `AuctionPropertyResult` JSON for frontend consumption |
+
+### Workflow
+
+```
+URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scoring → Output → JSON
+```
+
+### Tools
+
+- **Web Scraper** (Playwright with stealth) — scrapes auction listing pages
+- **PDF Downloader** — downloads PDFs from extracted URLs
+- **PDF Parser** (PyMuPDF + pytesseract OCR fallback) — extracts text from edital PDFs
+- **Web Search** (Tavily API with retry logic) — market and legal research
+- **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables
+
+## Data Contract
+
+The `AuctionPropertyResult` Pydantic model (`backend/graph/contracts.py`) is the single source of truth for the frontend shape. It serializes to camelCase JSON matching what the React components expect.
+
+Key fields: `id`, `score` (0-100), `minBid`, `market`, `discount`, `roi`, `risk` (J/F/L/O flags), `occupancy`, `endsAt`, `auctionType`, `auctioneer`, `court`, plus optional detail objects: `viability` (risk dimensions, alerts, description, features), `marketDetail` (indicators, trend, comparables), `costs` (line items), `edital` (process, creditor, liens, payment terms).
+
+Frontend starts with an empty property list and populates exclusively from `GET /properties`. No fixture fallback. Seed data (`backend/data/seed.json`) loads into `results.json` on API startup when empty, providing 3 demo properties (p1, p3, p5).
+
+## Competitors
+
+- **ProLeilão** (proleilao.com.br): Auction aggregation, basic property data, no AI analysis
+- **SpyLeilões** (app.spyleiloes.com.br): Auction aggregation with map view, pricing data, no AI analysis
+- **Smart Leilões**: Auction aggregation, no AI analysis
+
+## Future Product (from general_context.md)
+
+The full platform will include:
+- **Feed**: 3-column grid with real photos, score badges, countdown, filters (praca, type, occupancy, score, city)
+- **Analysis Modal**: 4 tabs (Viabilidade, Mercado, Encargos, Juridico)
+- **Fiscal Tables**: ITBI by municipality (13 cities), emolumentos by state (IRIB table)
+- **Investor Profile**: Onboarding quiz, personalized feed
+- **Monetization**: Free (3/mo), Essencial R$97, Pro R$197, Expert R$490, Escritorio R$790/mo
+- **Legal Analysis**: Premium R$197 per property, lawyer review with ONR/DataJud
+
+## Roadmap
+
+### Phase 1 - Demo (Current)
+- AI agent pipeline with LangGraph
+- FastAPI backend with JSON file persistence
+- React SPA with backend-driven data (seed + live analysis)
+- URL input → full analysis → property card in feed
+
+### Phase 2 - Live Aggregation
+- Scheduled scraper for major auctioneers (Mega Leiloes, Zuk, Sold, CEF, BB, etc.)
+- Property images from listings
+- Database (PostgreSQL) replacing JSON file
+- User authentication
+
+### Phase 3 - Full Platform
+- Map view with Airbnb-style filters
+- Investor profile and onboarding
+- ITBI/emolumentos calculators per city/state
+- Watchlist, alerts, batch analysis
+- Subscription tiers and credit system
+
+## Tech Stack
+
+| Component | Current | Future |
+|-----------|---------|--------|
+| Language | Python 3.12+ | Python 3.12+ |
+| Agent Framework | LangGraph | LangGraph |
+| LLM Access | LiteLLM + Proxy | LiteLLM + Proxy |
+| LLM - Discovery | Claude Sonnet 4.6 | Claude Sonnet |
+| LLM - Planner | Claude Opus 4.6 | Claude Opus |
+| LLM - Legal | Claude Sonnet 4.6 | Claude Sonnet |
+| LLM - Market | GPT-5.4 | GPT-5.4 |
+| API | FastAPI | FastAPI |
+| Frontend | React 19 + Vite | React + Mapbox |
+| PDF Parsing | PyMuPDF | PyMuPDF |
+| Web Search | Tavily | Tavily |
+| Web Scraping | Playwright | Playwright + Scrapy |
+| Persistence | JSON file | PostgreSQL |
+| Deployment | Local | Docker + AWS/GCP |
+
+## Changelog
+
+Every meaningful change to the project should be recorded here with a brief description.
+
+- **2026-05-14** — Extended `AuctionPropertyResult` with detail objects (`viability`, `marketDetail`, `costs`, `edital`). Created seed data (`backend/data/seed.json`) with 3 demo properties. Frontend now reads all detail tab data from the property object instead of hardcoded values. Removed non-seeded fixture properties (p2, p4, p6, p7, p8). App starts with empty state and populates exclusively from the API. Backend port changed from 8000 to 8001 (port conflict).

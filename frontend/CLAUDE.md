@@ -1,0 +1,57 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**Arremate** — a Brazilian real estate auction intelligence app. Unified project with:
+- **Backend** (`../`): Python LangGraph AI agents + FastAPI API on port 8000
+- **Frontend** (`./`): React SPA (Vite + React 19) on port 5173
+
+## Commands
+
+### Backend (from project root)
+```bash
+./run-backend.sh       # start FastAPI on :8000
+.venv/bin/python api.py  # same, directly
+```
+
+### Frontend (from this folder)
+```bash
+npm run dev          # dev server with HMR (localhost:5173)
+npm run build        # production build to dist/
+npm run lint         # eslint
+npm run preview      # preview production build
+```
+
+### Both at once (from project root)
+```bash
+./dev.sh             # starts backend + frontend together
+```
+
+## Architecture
+
+- **ES module imports/exports** — no `window` globals
+- Components in `src/components/` with named exports
+- Entry point: `src/main.jsx` → `src/App.jsx`
+- React 19 + StrictMode
+- Three-screen SPA: `home`/`feed`/`detail`, driven by `go(screen, prop)` in `App.jsx`
+- Screen and watchlist persist to `localStorage` (keys: `arremate_screen`, `arremate_watched`)
+
+### Data model
+
+Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them; falls back to fixture data in `src/components/shared.jsx`. Each property: `id`, `score` (0-100), auction metadata (`auctionType`, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, and `risk` flags (`j`/`f`/`l`/`o`).
+
+### API integration
+
+- `GET /properties` → list of saved `AuctionPropertyResult` objects (proxied via Vite `/api`)
+- `POST /analyze` → run full pipeline, returns `AuctionPropertyResult` JSON
+- Vite proxy: `/api/*` → `http://localhost:8000/*` (strips `/api` prefix)
+
+## Key conventions
+
+- All monetary values are raw BRL numbers from backend; `fmtBRL()` formats at render time
+- `getEndsAtMs()` converts `endsAt` (ISO string or number) to epoch ms for `Countdown`
+- Color system uses oklch with CSS custom properties: `--good`/`--warn`/`--bad` for risk, `--accent` for primary actions
+- Styling is mostly inline `style` objects; `src/styles.css` handles layout primitives, typography, and reusable patterns
+- Language is Brazilian Portuguese (pt-BR) throughout the UI
