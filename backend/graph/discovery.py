@@ -51,21 +51,17 @@ Respond ONLY with a JSON object containing "property_metadata" and "page_source_
 MAX_HTML_LENGTH = 30000
 
 
-def _preprocess_kron_text(text: str) -> str:
-    """Preprocess Kron Leiloes / Superbid page text to highlight key auction data.
+def _preprocess_auction_text(text: str) -> str:
+    """Extract structured auction data from cleaned page text via regex.
 
-    Kron pages flatten structured data into a wall of text that LLMs often
-    fail to parse. This function extracts the key sections (pricing, process,
-    auctioneer, court) and prepends a structured summary so the LLM can't
-    miss them.
+    Auction pages often flatten structured data into a wall of text that LLMs
+    fail to parse reliably. This function extracts key sections (pricing,
+    process, auctioneer, court, parties) using common Brazilian auction
+    patterns and prepends a structured summary so the LLM can't miss them.
 
-    Returns the original text with a prepended summary if a Kron page is
-    detected, otherwise returns the text unchanged.
+    Runs on ALL pages — regexes simply won't match on sites that don't use
+    these patterns, leaving the text unchanged.
     """
-    lower = text.lower()
-    if "kron leil" not in lower and "superbid" not in lower:
-        return text
-
     summary_parts = ["[STRUCTURED DATA EXTRACTED FROM PAGE]"]
 
     # Clean &nbsp; entities that may survive HTML stripping
@@ -137,6 +133,10 @@ def _preprocess_kron_text(text: str) -> str:
     match = re.search(r"matrícula\s*n[ºo°]?\s*([\d.]+)", clean, re.IGNORECASE)
     if match:
         summary_parts.append(f"Matrícula: {match.group(1)}")
+
+    # If nothing was extracted, skip the summary — no point prepending an empty block
+    if len(summary_parts) <= 1:
+        return text
 
     summary_parts.append("[END STRUCTURED DATA]")
     summary_parts.append("")
@@ -272,7 +272,7 @@ def discovery_node(state: AuctionState) -> dict:
     # Step 3: LLM extracts property metadata from cleaned text
     logger.info("Discovery: parsing page content with LLM")
     cleaned = _clean_html(html)
-    cleaned = _preprocess_kron_text(cleaned)
+    cleaned = _preprocess_auction_text(cleaned)
     try:
         response = _call_discovery_llm(cleaned)
         response_text = response.choices[0].message.content
