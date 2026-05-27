@@ -13,6 +13,7 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/
@@ -29,3 +30,4 @@ build/
 
 # Data (generated at runtime)
 backend/data/results.json
+.vercel
