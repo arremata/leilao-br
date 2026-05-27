@@ -5,15 +5,14 @@ import { getEndsAtMs } from '../utils';
 export default function Feed({ go, watched, toggleWatch, properties, initialAddress = '', initialFilters = null }) {
   const [addressQuery, setAddressQuery] = useState(initialAddress);
   const [filters, setFilters] = useState({
-    auctionType: 'Todos',
+    judicial: initialFilters?.judicial || 'Todos',
+    praca: initialFilters?.praca || 'Todos',
+    modalidade: initialFilters?.modalidade || 'Todos',
     occupancy: initialFilters?.occupancy || 'Todos',
     propertyType: 'Todos',
     scoreMin: initialFilters?.scoreMin || 0,
     discountMin: initialFilters?.discountMin || 0,
     city: 'Todas',
-    judicial: initialFilters?.judicial || 'Todos',
-    praca: initialFilters?.praca || 'Todos',
-    modalidade: initialFilters?.modalidade || 'Todos',
   });
   const [sort, setSort] = useState('score');
   const [view, setView] = useState('grid');
@@ -30,7 +29,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         p.title?.toLowerCase().includes(q)
       );
     }
-    if (filters.auctionType !== 'Todos') list = list.filter(p => p.auctionType === filters.auctionType);
     if (filters.occupancy !== 'Todos') list = list.filter(p => p.occupancy === filters.occupancy);
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
     if (filters.scoreMin > 0) list = list.filter(p => p.score >= filters.scoreMin);
@@ -51,7 +49,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
   const activeFilterCount =
     (addressQuery.trim() ? 1 : 0) +
-    (filters.auctionType !== 'Todos' ? 1 : 0) +
     (filters.occupancy !== 'Todos' ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.scoreMin > 0 ? 1 : 0) +
@@ -64,9 +61,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
   const clearAll = () => {
     setAddressQuery('');
     setFilters({
-      auctionType: 'Todos', occupancy: 'Todos', propertyType: 'Todos',
-      scoreMin: 0, discountMin: 0, city: 'Todas',
       judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
+      occupancy: 'Todos', propertyType: 'Todos',
+      scoreMin: 0, discountMin: 0, city: 'Todas',
     });
   };
 
@@ -137,27 +134,24 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             )}
           </div>
 
-          <Filter label="Tipo de leilão" value={filters.auctionType}
-            options={['Todos', '1ª praça', '2ª praça', 'Judicial', 'Extrajudicial']}
-            onChange={(v) => setFilters({ ...filters, auctionType: v })} />
-          <Filter label="Imóvel" value={filters.propertyType}
-            options={['Todos', 'Apartamento', 'Casa', 'Cobertura', 'Comercial', 'Galpão', 'Terreno']}
-            onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-          <Filter label="Ocupação" value={filters.occupancy}
-            options={['Todos', 'desocupado', 'ocupado', 'disputado']}
-            onChange={(v) => setFilters({ ...filters, occupancy: v })} />
-          <Filter label="Cidade" value={filters.city}
-            options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
-            onChange={(v) => setFilters({ ...filters, city: v })} />
-          <Filter label="Judicial" value={filters.judicial}
+          <Filter label="Tipo de leilão" value={filters.judicial}
             options={['Todos', 'Judicial', 'Extrajudicial']}
             onChange={(v) => setFilters({ ...filters, judicial: v })} />
           <Filter label="Praça" value={filters.praca}
             options={['Todos', '1ª praça', '2ª praça']}
             onChange={(v) => setFilters({ ...filters, praca: v })} />
+          <Filter label="Imóvel" value={filters.propertyType}
+            options={['Todos', 'Apartamento', 'Casa', 'Comercial', 'Galpão', 'Terreno']}
+            onChange={(v) => setFilters({ ...filters, propertyType: v })} />
+          <Filter label="Ocupação" value={filters.occupancy}
+            options={['Todos', 'desocupado', 'ocupado']}
+            onChange={(v) => setFilters({ ...filters, occupancy: v })} />
           <Filter label="Modalidade" value={filters.modalidade}
             options={['Todos', 'Venda direta', 'Licitação aberta']}
             onChange={(v) => setFilters({ ...filters, modalidade: v })} />
+          <Filter label="Cidade" value={filters.city}
+            options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
+            onChange={(v) => setFilters({ ...filters, city: v })} />
           <RangeChip label="Score" suffix=" pts" value={filters.scoreMin}
             onChange={(v) => setFilters({ ...filters, scoreMin: v })} />
           <RangeChip label="Desconto" suffix="%" value={filters.discountMin}
