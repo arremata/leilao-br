@@ -30,7 +30,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
         </div>
 
         {/* KPI strip — only first 2 API KPIs + watchlist */}
-        <div className="card" style={{
+        <div className="card kpi-strip" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           overflow: 'hidden',
@@ -388,7 +388,7 @@ function CompactRow({ p, rank, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="card hov"
+      className="card hov compact-row"
       style={{
         display: 'grid',
         gridTemplateColumns: '24px 56px 1fr auto auto',

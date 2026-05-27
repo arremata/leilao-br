@@ -89,6 +89,7 @@ function HistoryRow({ entry, live, last, onClick }) {
 
   return (
     <div
+      className="history-row"
       onClick={live ? onClick : undefined}
       style={{
         display: 'grid',

@@ -559,7 +559,7 @@ function CostBreakdown({ p, sim }) {
         </div>
 
         {/* Sliders */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 24 }}>
+        <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 24 }}>
           <SliderField
             label="Nível de reforma"
             value={reno}
@@ -605,7 +605,7 @@ function CostBreakdown({ p, sim }) {
         </div>
 
         <div className="card">
-          <div style={{
+          <div className="cost-head" style={{
             display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14,
             padding: '10px 20px', background: 'var(--bg-2)',
             fontFamily: 'var(--f-mono)', fontSize: 10.5,
@@ -618,7 +618,7 @@ function CostBreakdown({ p, sim }) {
           {rows.map((r, i) => (
             <CostRow key={i} l={r.label} v={r.value} hint={r.hint} pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0} />
           ))}
-          <div style={{
+          <div className="cost-row" style={{
             display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14,
             padding: '20px 20px', background: 'var(--bg-2)',
             alignItems: 'baseline', borderTop: '2px solid var(--line-2)',
@@ -654,6 +654,7 @@ function CostRow({ l, v, hint, pct }) {
   const [open, setOpen] = useState(false);
   return (
     <div
+      className="cost-row"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       style={{
@@ -943,7 +944,7 @@ function Edital({ p }) {
   }
   return (
     <div className="card" style={{ padding: 24, fontSize: 13, lineHeight: 1.65 }}>
-      <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
+      <div className="row between edital-header" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
         <div>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · edital integral</span>
           <h3 className="h2" style={{ marginTop: 4 }}>Edital de Leilão Judicial Eletrônico</h3>
