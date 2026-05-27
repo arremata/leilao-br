@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { PropertyRow, ScoreBadge, Countdown, Sparkline, RiskDots } from './shared';
+import { PropertyRow, ScoreBadge, Countdown, Sparkline, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
 
 export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch }) {
@@ -422,7 +422,7 @@ function CompactRow({ p, rank, onClick }) {
       <div style={{ textAlign: 'right' }}>
         <Countdown until={p.endsAt} compact />
         <div style={{ marginTop: 6 }}>
-          <RiskDots flags={p.risk} />
+          <RiskSummary flags={p.risk} />
         </div>
       </div>
       <span className="mono" style={{ fontSize: 14, color: 'var(--fg-3)' }}>→</span>

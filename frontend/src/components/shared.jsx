@@ -112,7 +112,44 @@ export function Sparkline({ points = [9, 9.2, 9.1, 9.5, 9.4, 9.6, 9.9, 10.2, 10.
 }
 
 // ============================================================
-// Risk flag dots — J F L O
+// Risk summary — readable labels, highlights only issues
+// ============================================================
+export function RiskSummary({ flags }) {
+  const items = [
+    { k: 'j', label: 'Jurídico' },
+    { k: 'f', label: 'Financeiro' },
+    { k: 'l', label: 'Liquidez' },
+    { k: 'o', label: 'Ocupação' },
+  ];
+  const issues = items.filter(it => flags?.[it.k] && flags[it.k] !== 'good');
+  if (issues.length === 0) {
+    return (
+      <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, fontFamily: 'var(--f-mono)' }}>
+        ✓ Sem riscos
+      </span>
+    );
+  }
+  return (
+    <div className="row gap-2" style={{ alignItems: 'center' }}>
+      {issues.map(it => {
+        const state = flags[it.k];
+        const color = state === 'warn' ? 'var(--warn)' : 'var(--bad)';
+        const bg = state === 'warn' ? 'var(--warn-soft)' : 'var(--bad-soft)';
+        return (
+          <span key={it.k} style={{
+            fontSize: 11, padding: '2px 7px', borderRadius: 4,
+            background: bg, color, fontWeight: 500,
+          }}>
+            {state === 'warn' ? '⚠' : '✕'} {it.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// Risk flag dots — compact version for table rows
 // ============================================================
 export function RiskDots({ flags }) {
   const items = [
@@ -125,16 +162,11 @@ export function RiskDots({ flags }) {
   return (
     <div className="row gap-2" style={{ alignItems: 'center' }}>
       {items.map(it => (
-        <div key={it.k} className="row gap-1" title={it.label} style={{ alignItems: 'center' }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: color(flags?.[it.k]),
-            display: 'inline-block',
-          }}></span>
-          <span className="mono" style={{ fontSize: 10, color: 'var(--fg-2)', textTransform: 'uppercase' }}>
-            {it.k}
-          </span>
-        </div>
+        <span key={it.k} title={it.label} style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: color(flags?.[it.k]),
+          display: 'inline-block',
+        }} />
       ))}
     </div>
   );
@@ -145,10 +177,10 @@ export function RiskDots({ flags }) {
 // ============================================================
 export function Specs({ area, beds, baths, parking, floor, dense }) {
   const items = [
-    area && { v: area, l: 'm²', symbol: '⌗' },
-    beds != null && { v: beds, l: beds === 1 ? 'dorm' : 'dorms', symbol: '◐' },
-    baths != null && { v: baths, l: baths === 1 ? 'banho' : 'banhos', symbol: '◑' },
-    parking != null && { v: parking, l: parking === 1 ? 'vaga' : 'vagas', symbol: '⌑' },
+    area > 0 && { v: area, l: 'm²', symbol: '⌗' },
+    beds > 0 && { v: beds, l: beds === 1 ? 'dorm' : 'dorms', symbol: '◐' },
+    baths > 0 && { v: baths, l: baths === 1 ? 'banho' : 'banhos', symbol: '◑' },
+    parking > 0 && { v: parking, l: parking === 1 ? 'vaga' : 'vagas', symbol: '⌑' },
     floor && { v: floor, l: 'andar', symbol: '↑' },
   ].filter(Boolean);
   return (
@@ -260,9 +292,9 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
 
         <div className="divider" style={{ margin: '14px 0' }}></div>
 
-        {/* Bottom row: risk + leiloeiro */}
+        {/* Bottom row: risk summary + leiloeiro */}
         <div className="row between" style={{ alignItems: 'center' }}>
-          <RiskDots flags={p.risk} />
+          <RiskSummary flags={p.risk} />
           <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>
             {p.auctioneer}
           </span>
