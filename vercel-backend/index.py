@@ -14,8 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-SEED_FILE = ROOT_DIR / "backend" / "data" / "seed.json"
+SEED_FILE = Path(__file__).with_name("seed.json")
 
 app = FastAPI(title="Arremate Demo API")
 
