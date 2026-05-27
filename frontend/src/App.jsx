@@ -21,12 +21,12 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
   const [dashboard, setDashboard] = useState(null);
+  const [feedSearch, setFeedSearch] = useState({ address: '', filters: null });
+  const [feedKey, setFeedKey] = useState(0);
 
   useEffect(() => {
     fetchProperties().then(data => {
-      if (Array.isArray(data)) {
-        setProperties(data);
-      }
+      if (Array.isArray(data)) setProperties(data);
     }).catch(() => {});
     fetchDashboard().then(data => {
       if (data) setDashboard(data);
@@ -70,6 +70,12 @@ function App() {
     }
   }, []);
 
+  const handleSearch = useCallback((address, filters) => {
+    setFeedSearch({ address, filters });
+    setFeedKey(k => k + 1);
+    setScreen('feed');
+  }, []);
+
   const screenLabel =
     screen === 'home' ? '01 Dashboard' :
     screen === 'feed' ? '02 Feed' :
@@ -77,15 +83,15 @@ function App() {
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
-      <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} dashboard={dashboard} />
-      {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} />}
-      {screen === 'feed' && <Feed go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+      <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} />
+      {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} />}
+      {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
       {screen === 'detail' && <PropertyDetail property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
     </div>
   );
 }
 
-function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, dashboard }) {
+function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError }) {
   const [url, setUrl] = useState('');
 
   const handleSubmit = (e) => {
@@ -105,7 +111,6 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, d
           <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
           <a>Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}</a>
           <a>Histórico</a>
-          <a>Relatórios</a>
         </nav>
       </div>
 
@@ -133,13 +138,6 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, d
       )}
 
       <div className="row gap-2">
-        <div className="row gap-2 actions-secondary">
-          <button className="btn sm">
-            <span className="mono" style={{ color: 'var(--accent)' }}>◆</span>
-            3 análises
-          </button>
-          <button className="btn sm">Notificações <span className="mono" style={{ color: 'var(--accent)', marginLeft: 2 }}>{dashboard?.activity?.length || 0}</span></button>
-        </div>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
           background: 'oklch(0.75 0.06 60)',

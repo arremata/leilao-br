@@ -1,11 +1,8 @@
-import { useMemo } from 'react';
-import { PropertyCard, PropertyRow, ScoreBadge, Countdown, Sparkline, RiskDots } from './shared';
-import { fmtBRL, getEndsAtMs } from '../utils';
+import { useState, useMemo } from 'react';
+import { PropertyRow, ScoreBadge, Countdown, Sparkline, RiskDots } from './shared';
+import { fmtBRL } from '../utils';
 
-export default function Home({ go, watched, toggleWatch, properties, dashboard }) {
-  const endingToday = useMemo(() =>
-    [...properties].sort((a, b) => getEndsAtMs(a.endsAt) - getEndsAtMs(b.endsAt)).slice(0, 3),
-    [properties]);
+export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch }) {
   const topScored = useMemo(() =>
     [...properties].sort((a, b) => b.score - a.score).slice(0, 3),
     [properties]);
@@ -26,14 +23,13 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
             </p>
           </div>
           <div className="row gap-2 page-actions">
-            <button className="btn">Importar edital</button>
             <button className="btn primary" onClick={() => go('feed')}>
               Ver feed completo
             </button>
           </div>
         </div>
 
-        {/* KPI strip */}
+        {/* KPI strip — only first 2 API KPIs + watchlist */}
         <div className="card" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -42,63 +38,22 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
           {(dashboard?.kpis || []).slice(0, 2).map((kpi, i) => (
             <Kpi key={i} lbl={kpi.lbl} val={kpi.val} delta={kpi.delta} pos={kpi.pos} urgent={kpi.urgent} />
           ))}
-          <Kpi lbl="Sua watchlist" val={watchedItems.length.toString().padStart(2, '0')} delta={`${watchedItems.length === 0 ? 'nada salvo' : 'monitorando'}`} />
-          {(dashboard?.kpis || []).slice(2).map((kpi, i, arr) => (
-            <Kpi key={i + 2} lbl={kpi.lbl} val={kpi.val} delta={kpi.delta} pos={kpi.pos} urgent={kpi.urgent} last={i === arr.length - 1} />
-          ))}
-        </div>
-      </div>
-
-      {/* ========== Search command ========== */}
-      <div className="card command-card" style={{ padding: 18, marginBottom: 32 }}>
-        <div className="row gap-3" style={{ alignItems: 'center' }}>
-          <span className="mono" style={{ color: 'var(--fg-2)', fontSize: 14 }}>⌕</span>
-          <input
-            placeholder="Buscar por matrícula, endereço, processo, cidade ou edital..."
-            style={{
-              flex: 1, border: 0, outline: 'none', background: 'transparent',
-              fontSize: 15, color: 'var(--fg-0)',
-            }}
+          <Kpi
+            lbl="Sua watchlist"
+            val={watchedItems.length.toString().padStart(2, '0')}
+            delta={watchedItems.length === 0 ? 'nada salvo' : 'monitorando'}
+            last
           />
-          <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-            ⌘ K
-          </span>
-        </div>
-        <div className="divider" style={{ margin: '14px 0 12px' }}></div>
-        <div className="row gap-2 wrap" style={{ alignItems: 'center' }}>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>filtros rápidos</span>
-          <button className="tag">Apartamentos em SP</button>
-          <button className="tag">Desconto ≥ 40%</button>
-          <button className="tag">Desocupados</button>
-          <button className="tag">Score ≥ 80</button>
-          <button className="tag">Encerra em 48h</button>
         </div>
       </div>
 
-      {/* ========== Section 1 — Encerrando hoje ========== */}
-      <Section
-        ix="01"
-        title="Encerrando nas próximas 24h"
-        sub="Itens onde o tempo é o fator decisivo."
-        action={<button className="btn ghost sm" onClick={() => go('feed')}>Ver todos os {properties.length} →</button>}
-      >
-        <div className="property-grid home-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
-          {endingToday.map(p => (
-            <PropertyCard
-              key={p.id}
-              p={p}
-              onClick={() => go('detail', p)}
-              watched={watched.includes(p.id)}
-              onToggleWatch={toggleWatch}
-            />
-          ))}
-        </div>
-      </Section>
+      {/* ========== Search + Filters ========== */}
+      <SearchCommand onSearch={onSearch} />
 
-      {/* ========== Section 2 — Top score + Market signals split ========== */}
+      {/* ========== Section 01 — Top score + Market signals split ========== */}
       <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, marginBottom: 40 }}>
         <Section
-          ix="02"
+          ix="01"
           title="Top score disponível"
           sub="Os melhores ratings da IA, atualizados às 06:00."
           flush
@@ -111,7 +66,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
         </Section>
 
         <Section
-          ix="03"
+          ix="02"
           title="Sinais de mercado"
           sub="Movimento agregado por cidade · 30 dias."
           flush
@@ -127,10 +82,10 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
         </Section>
       </div>
 
-      {/* ========== Section 3 — Watchlist ========== */}
+      {/* ========== Section 03 — Watchlist ========== */}
       {watchedItems.length > 0 ? (
         <Section
-          ix="04"
+          ix="03"
           title="Sua watchlist"
           sub="Itens salvos · monitoramos preço, riscos e prazo automaticamente."
           action={<button className="btn ghost sm">Configurar alertas →</button>}
@@ -171,7 +126,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
         </Section>
       ) : (
         <Section
-          ix="04"
+          ix="03"
           title="Sua watchlist está vazia"
           sub="Salve imóveis com a estrela para acompanhar mudanças de preço, novos riscos detectados e proximidade do leilão."
         >
@@ -185,9 +140,9 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
         </Section>
       )}
 
-      {/* ========== Section 5 — Alerts feed ========== */}
+      {/* ========== Section 04 — Activity feed ========== */}
       <Section
-        ix="05"
+        ix="04"
         title="Atividade recente"
         sub="O que mudou nos imóveis que você analisou."
       >
@@ -210,6 +165,178 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
   );
 }
 
+// ============================================================
+// Search command bar with expandable filter panel
+// ============================================================
+function SearchCommand({ onSearch }) {
+  const [address, setAddress] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [sf, setSf] = useState({
+    scoreMin: 0,
+    occupancy: 'Todos',
+    discountMin: 0,
+    judicial: 'Todos',
+    praca: 'Todos',
+    modalidade: 'Todos',
+  });
+
+  const activeCount =
+    (sf.scoreMin > 0 ? 1 : 0) +
+    (sf.occupancy !== 'Todos' ? 1 : 0) +
+    (sf.discountMin > 0 ? 1 : 0) +
+    (sf.judicial !== 'Todos' ? 1 : 0) +
+    (sf.praca !== 'Todos' ? 1 : 0) +
+    (sf.modalidade !== 'Todos' ? 1 : 0);
+
+  const clearFilters = () => setSf({
+    scoreMin: 0, occupancy: 'Todos', discountMin: 0,
+    judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSearch(address, sf);
+  };
+
+  return (
+    <div className="card command-card" style={{ padding: 0, marginBottom: 32 }}>
+      <form onSubmit={handleSubmit}>
+        <div className="row gap-3" style={{ padding: '14px 18px', alignItems: 'center' }}>
+          <span className="mono" style={{ color: 'var(--fg-2)', fontSize: 14 }}>⌕</span>
+          <input
+            placeholder="Buscar por endereço, bairro ou cidade..."
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            style={{
+              flex: 1, border: 0, outline: 'none', background: 'transparent',
+              fontSize: 15, color: 'var(--fg-0)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowFilters(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 32, padding: '0 12px',
+              borderRadius: 8,
+              border: '1px solid ' + (activeCount > 0 ? 'var(--line-3)' : 'var(--line-1)'),
+              background: activeCount > 0 ? 'var(--bg-2)' : 'var(--bg-1)',
+              color: activeCount > 0 ? 'var(--fg-0)' : 'var(--fg-1)',
+              fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            Filtros
+            {activeCount > 0 && (
+              <span style={{
+                background: 'var(--accent)', color: 'var(--accent-ink)',
+                borderRadius: 10, padding: '1px 6px', fontSize: 11, fontWeight: 600,
+              }}>{activeCount}</span>
+            )}
+            <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>
+              {showFilters ? '▲' : '▾'}
+            </span>
+          </button>
+          <button type="submit" className="btn sm primary">
+            Buscar
+          </button>
+        </div>
+      </form>
+
+      {showFilters && (
+        <div style={{
+          borderTop: '1px solid var(--line-1)',
+          padding: '20px 18px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+          gap: '20px 28px',
+        }}>
+          <FilterGroup
+            label="Score mínimo"
+            options={[['Todos', 0], ['≥ 60', 60], ['≥ 70', 70], ['≥ 80', 80], ['≥ 90', 90]]}
+            value={sf.scoreMin}
+            onChange={(v) => setSf(s => ({ ...s, scoreMin: v }))}
+          />
+          <FilterGroup
+            label="Ocupação"
+            options={[['Todos', 'Todos'], ['Desocupado', 'desocupado'], ['Ocupado', 'ocupado']]}
+            value={sf.occupancy}
+            onChange={(v) => setSf(s => ({ ...s, occupancy: v }))}
+          />
+          <FilterGroup
+            label="Desconto mínimo"
+            options={[['Todos', 0], ['≥ 20%', 20], ['≥ 30%', 30], ['≥ 40%', 40], ['≥ 50%', 50]]}
+            value={sf.discountMin}
+            onChange={(v) => setSf(s => ({ ...s, discountMin: v }))}
+          />
+          <FilterGroup
+            label="Judicial / Extrajudicial"
+            options={[['Todos', 'Todos'], ['Judicial', 'Judicial'], ['Extrajudicial', 'Extrajudicial']]}
+            value={sf.judicial}
+            onChange={(v) => setSf(s => ({ ...s, judicial: v }))}
+          />
+          <FilterGroup
+            label="Praça"
+            options={[['Todos', 'Todos'], ['1ª praça', '1ª praça'], ['2ª praça', '2ª praça']]}
+            value={sf.praca}
+            onChange={(v) => setSf(s => ({ ...s, praca: v }))}
+          />
+          <FilterGroup
+            label="Modalidade"
+            options={[['Todos', 'Todos'], ['Venda direta', 'Venda direta'], ['Licitação aberta', 'Licitação aberta']]}
+            value={sf.modalidade}
+            onChange={(v) => setSf(s => ({ ...s, modalidade: v }))}
+          />
+          {activeCount > 0 && (
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button
+                type="button"
+                className="btn ghost sm"
+                style={{ color: 'var(--accent)' }}
+                onClick={clearFilters}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterGroup({ label, options, value, onChange }) {
+  return (
+    <div>
+      <div className="uppy" style={{ color: 'var(--fg-3)', marginBottom: 8 }}>{label}</div>
+      <div className="row gap-2 wrap">
+        {options.map(([lbl, val]) => {
+          const active = value === val;
+          return (
+            <button
+              key={lbl}
+              type="button"
+              onClick={() => onChange(val)}
+              style={{
+                padding: '4px 10px', borderRadius: 6,
+                border: '1px solid ' + (active ? 'var(--accent)' : 'var(--line-1)'),
+                background: active ? 'var(--accent-soft)' : 'var(--bg-1)',
+                color: active ? 'var(--accent-strong)' : 'var(--fg-1)',
+                fontSize: 12.5, fontWeight: active ? 500 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              {lbl}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// KPI tile
+// ============================================================
 function Kpi({ lbl, val, delta, pos, urgent, last }) {
   return (
     <div style={{
@@ -233,6 +360,9 @@ function Kpi({ lbl, val, delta, pos, urgent, last }) {
   );
 }
 
+// ============================================================
+// Section wrapper
+// ============================================================
 function Section({ ix, title, sub, action, children }) {
   return (
     <section className="content-section" style={{ marginBottom: 40 }}>
@@ -251,6 +381,9 @@ function Section({ ix, title, sub, action, children }) {
   );
 }
 
+// ============================================================
+// Compact ranked row for top-score list
+// ============================================================
 function CompactRow({ p, rank, onClick }) {
   return (
     <div
@@ -278,8 +411,12 @@ function CompactRow({ p, rank, onClick }) {
             <span style={{ color: 'var(--fg-2)' }}>lance </span>
             <span style={{ color: 'var(--fg-0)', fontWeight: 500 }}>R$ {fmtBRL(p.minBid)}</span>
           </span>
-          <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>{p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}</span>
-          <span className="mono" style={{ fontSize: 12, color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>{p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`} ROI</span>
+          <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
+            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}
+          </span>
+          <span className="mono" style={{ fontSize: 12, color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
+            {p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`} ROI
+          </span>
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>
@@ -293,6 +430,9 @@ function CompactRow({ p, rank, onClick }) {
   );
 }
 
+// ============================================================
+// City market signal row
+// ============================================================
 function CitySignal({ city, volume, delta, trend, pos }) {
   return (
     <div className="row between" style={{ alignItems: 'center' }}>
@@ -311,6 +451,9 @@ function CitySignal({ city, volume, delta, trend, pos }) {
   );
 }
 
+// ============================================================
+// Activity feed item
+// ============================================================
 function ActivityItem({ time, title, text, tone, last }) {
   const color = tone === 'good' ? 'var(--good)' :
                 tone === 'warn' ? 'var(--warn)' :

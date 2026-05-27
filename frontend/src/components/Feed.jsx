@@ -2,26 +2,44 @@ import { useState, useMemo } from 'react';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
-export default function Feed({ go, watched, toggleWatch, properties }) {
+export default function Feed({ go, watched, toggleWatch, properties, initialAddress = '', initialFilters = null }) {
+  const [addressQuery, setAddressQuery] = useState(initialAddress);
   const [filters, setFilters] = useState({
     auctionType: 'Todos',
-    occupancy: 'Todos',
+    occupancy: initialFilters?.occupancy || 'Todos',
     propertyType: 'Todos',
-    scoreMin: 0,
-    discountMin: 0,
+    scoreMin: initialFilters?.scoreMin || 0,
+    discountMin: initialFilters?.discountMin || 0,
     city: 'Todas',
+    judicial: initialFilters?.judicial || 'Todos',
+    praca: initialFilters?.praca || 'Todos',
+    modalidade: initialFilters?.modalidade || 'Todos',
   });
   const [sort, setSort] = useState('score');
-  const [view, setView] = useState('grid'); // grid | list
+  const [view, setView] = useState('grid');
 
   const filtered = useMemo(() => {
     let list = [...properties];
+
+    if (addressQuery.trim()) {
+      const q = addressQuery.toLowerCase();
+      list = list.filter(p =>
+        p.address?.toLowerCase().includes(q) ||
+        p.neighborhood?.toLowerCase().includes(q) ||
+        p.city?.toLowerCase().includes(q) ||
+        p.title?.toLowerCase().includes(q)
+      );
+    }
     if (filters.auctionType !== 'Todos') list = list.filter(p => p.auctionType === filters.auctionType);
     if (filters.occupancy !== 'Todos') list = list.filter(p => p.occupancy === filters.occupancy);
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
     if (filters.scoreMin > 0) list = list.filter(p => p.score >= filters.scoreMin);
     if (filters.discountMin > 0) list = list.filter(p => p.discount >= filters.discountMin);
     if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
+    if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
+    if (filters.praca !== 'Todos') list = list.filter(p => p.auctionType === filters.praca);
+    if (filters.modalidade !== 'Todos') list = list.filter(p => p.auctionType === filters.modalidade);
+
     if (sort === 'score') list.sort((a, b) => b.score - a.score);
     else if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
     else if (sort === 'roi') list.sort((a, b) => b.roi - a.roi);
@@ -29,15 +47,28 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [filters, sort, properties]);
+  }, [addressQuery, filters, sort, properties]);
 
   const activeFilterCount =
+    (addressQuery.trim() ? 1 : 0) +
     (filters.auctionType !== 'Todos' ? 1 : 0) +
     (filters.occupancy !== 'Todos' ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.scoreMin > 0 ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
-    (filters.city !== 'Todas' ? 1 : 0);
+    (filters.city !== 'Todas' ? 1 : 0) +
+    (filters.judicial !== 'Todos' ? 1 : 0) +
+    (filters.praca !== 'Todos' ? 1 : 0) +
+    (filters.modalidade !== 'Todos' ? 1 : 0);
+
+  const clearAll = () => {
+    setAddressQuery('');
+    setFilters({
+      auctionType: 'Todos', occupancy: 'Todos', propertyType: 'Todos',
+      scoreMin: 0, discountMin: 0, city: 'Todas',
+      judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
+    });
+  };
 
   return (
     <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
@@ -76,6 +107,36 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
         marginBottom: 20,
       }}>
         <div className="row gap-2 wrap filter-controls" style={{ alignItems: 'center' }}>
+
+          {/* Address text search */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            height: 32, padding: '0 10px',
+            borderRadius: 8,
+            border: '1px solid ' + (addressQuery ? 'var(--line-3)' : 'var(--line-1)'),
+            background: 'var(--bg-1)',
+            minWidth: 180,
+          }}>
+            <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>⌕</span>
+            <input
+              placeholder="Endereço, bairro..."
+              value={addressQuery}
+              onChange={(e) => setAddressQuery(e.target.value)}
+              style={{
+                border: 0, outline: 'none', background: 'transparent',
+                fontSize: 12.5, width: 130,
+              }}
+            />
+            {addressQuery && (
+              <button
+                onClick={() => setAddressQuery('')}
+                style={{ color: 'var(--fg-3)', fontSize: 14, lineHeight: 1 }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+
           <Filter label="Tipo de leilão" value={filters.auctionType}
             options={['Todos', '1ª praça', '2ª praça', 'Judicial', 'Extrajudicial']}
             onChange={(v) => setFilters({ ...filters, auctionType: v })} />
@@ -88,17 +149,24 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
           <Filter label="Cidade" value={filters.city}
             options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
             onChange={(v) => setFilters({ ...filters, city: v })} />
+          <Filter label="Judicial" value={filters.judicial}
+            options={['Todos', 'Judicial', 'Extrajudicial']}
+            onChange={(v) => setFilters({ ...filters, judicial: v })} />
+          <Filter label="Praça" value={filters.praca}
+            options={['Todos', '1ª praça', '2ª praça']}
+            onChange={(v) => setFilters({ ...filters, praca: v })} />
+          <Filter label="Modalidade" value={filters.modalidade}
+            options={['Todos', 'Venda direta', 'Licitação aberta']}
+            onChange={(v) => setFilters({ ...filters, modalidade: v })} />
           <RangeChip label="Score" suffix=" pts" value={filters.scoreMin}
             onChange={(v) => setFilters({ ...filters, scoreMin: v })} />
           <RangeChip label="Desconto" suffix="%" value={filters.discountMin}
             onChange={(v) => setFilters({ ...filters, discountMin: v })} />
+
           {activeFilterCount > 0 && (
             <button
               className="btn ghost sm"
-              onClick={() => setFilters({
-                auctionType: 'Todos', occupancy: 'Todos', propertyType: 'Todos',
-                scoreMin: 0, discountMin: 0, city: 'Todas',
-              })}
+              onClick={clearAll}
               style={{ color: 'var(--accent)' }}
             >
               Limpar {activeFilterCount}
