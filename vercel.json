@@ -15,7 +15,7 @@
       "framework": "vite"
     },
     "backend": {
-      "root": "backend",
+      "root": "vercel-backend",
       "routePrefix": "/api",
       "framework": "fastapi"
     }
