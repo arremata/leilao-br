@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { PropertyCard, PropertyRow, fmtBRL, getEndsAtMs } from './shared';
+import { PropertyCard, PropertyRow } from './shared';
+import { getEndsAtMs } from '../utils';
 
 export default function Feed({ go, watched, toggleWatch, properties }) {
   const [filters, setFilters] = useState({
@@ -39,10 +40,10 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
     (filters.city !== 'Todas' ? 1 : 0);
 
   return (
-    <div style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
+    <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
 
       {/* Header */}
-      <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
+      <div className="row between page-header" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ feed</span>
@@ -53,7 +54,7 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
             {properties.length} imóveis no portfólio
           </p>
         </div>
-        <div className="row gap-2">
+        <div className="row gap-2 page-actions">
           <button className="btn">
             <span className="mono" style={{ color: 'var(--fg-2)' }}>⌥</span>
             Salvar busca
@@ -66,7 +67,7 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
       </div>
 
       {/* Filter bar */}
-      <div style={{
+      <div className="filter-bar" style={{
         position: 'sticky', top: 60, zIndex: 20,
         background: 'color-mix(in oklab, var(--bg-0) 94%, transparent)',
         backdropFilter: 'blur(12px)',
@@ -74,7 +75,7 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
         borderBottom: '1px solid var(--line-1)',
         marginBottom: 20,
       }}>
-        <div className="row gap-2 wrap" style={{ alignItems: 'center' }}>
+        <div className="row gap-2 wrap filter-controls" style={{ alignItems: 'center' }}>
           <Filter label="Tipo de leilão" value={filters.auctionType}
             options={['Todos', '1ª praça', '2ª praça', 'Judicial', 'Extrajudicial']}
             onChange={(v) => setFilters({ ...filters, auctionType: v })} />
@@ -129,7 +130,7 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
       {filtered.length === 0 ? (
         <Empty />
       ) : view === 'grid' ? (
-        <div style={{
+        <div className="property-grid feed-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
           gap: 18,
@@ -145,8 +146,8 @@ export default function Feed({ go, watched, toggleWatch, properties }) {
           ))}
         </div>
       ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div style={{
+        <div className="card responsive-table" style={{ overflow: 'hidden' }}>
+          <div className="property-row table-head" style={{
             display: 'grid',
             gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
             gap: 14,

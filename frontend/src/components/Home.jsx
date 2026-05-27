@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { PropertyCard, PropertyRow, ScoreBadge, Countdown, Sparkline, RiskDots, fmtBRL, getEndsAtMs } from './shared';
+import { PropertyCard, PropertyRow, ScoreBadge, Countdown, Sparkline, RiskDots } from './shared';
+import { fmtBRL, getEndsAtMs } from '../utils';
 
 export default function Home({ go, watched, toggleWatch, properties, dashboard }) {
   const endingToday = useMemo(() =>
@@ -13,18 +14,18 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
     [watched, properties]);
 
   return (
-    <div style={{ padding: '24px 24px 80px', maxWidth: 1480, margin: '0 auto' }}>
+    <div className="page home-page" style={{ padding: '24px 24px 80px', maxWidth: 1480, margin: '0 auto' }}>
 
       {/* ========== Greeting + KPI strip ========== */}
       <div style={{ marginBottom: 32 }}>
-        <div className="row between baseline" style={{ marginBottom: 18 }}>
+        <div className="row between baseline page-header" style={{ marginBottom: 18 }}>
           <div>
             <h1 className="h1">Bom dia, {dashboard?.greeting?.name || 'Investidor'}.</h1>
             <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
               {dashboard?.greeting?.subtitle || `${properties.length} imóveis no portfólio.`}
             </p>
           </div>
-          <div className="row gap-2">
+          <div className="row gap-2 page-actions">
             <button className="btn">Importar edital</button>
             <button className="btn primary" onClick={() => go('feed')}>
               Ver feed completo
@@ -49,7 +50,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
       </div>
 
       {/* ========== Search command ========== */}
-      <div className="card" style={{ padding: 18, marginBottom: 32 }}>
+      <div className="card command-card" style={{ padding: 18, marginBottom: 32 }}>
         <div className="row gap-3" style={{ alignItems: 'center' }}>
           <span className="mono" style={{ color: 'var(--fg-2)', fontSize: 14 }}>⌕</span>
           <input
@@ -81,7 +82,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
         sub="Itens onde o tempo é o fator decisivo."
         action={<button className="btn ghost sm" onClick={() => go('feed')}>Ver todos os {properties.length} →</button>}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+        <div className="property-grid home-card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
           {endingToday.map(p => (
             <PropertyCard
               key={p.id}
@@ -95,7 +96,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
       </Section>
 
       {/* ========== Section 2 — Top score + Market signals split ========== */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, marginBottom: 40 }}>
+      <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, marginBottom: 40 }}>
         <Section
           ix="02"
           title="Top score disponível"
@@ -116,7 +117,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
           flush
         >
           <div className="card" style={{ padding: 18 }}>
-            {(dashboard?.citySignals || []).map((cs, i, arr) => (
+            {(dashboard?.citySignals || []).map((cs, i) => (
               <div key={cs.city}>
                 {i > 0 && <div className="divider" style={{ margin: '14px 0' }}></div>}
                 <CitySignal city={cs.city} volume={cs.volume} delta={cs.delta} trend={cs.trend} pos={cs.pos} />
@@ -134,8 +135,8 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard }
           sub="Itens salvos · monitoramos preço, riscos e prazo automaticamente."
           action={<button className="btn ghost sm">Configurar alertas →</button>}
         >
-          <div className="card" style={{ overflow: 'hidden' }}>
-            <div style={{
+          <div className="card responsive-table" style={{ overflow: 'hidden' }}>
+            <div className="property-row table-head" style={{
               display: 'grid',
               gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
               gap: 14,
@@ -234,8 +235,8 @@ function Kpi({ lbl, val, delta, pos, urgent, last }) {
 
 function Section({ ix, title, sub, action, children }) {
   return (
-    <section style={{ marginBottom: 40 }}>
-      <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 16 }}>
+    <section className="content-section" style={{ marginBottom: 40 }}>
+      <div className="row between section-head" style={{ alignItems: 'flex-end', marginBottom: 16 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ {ix}</span>

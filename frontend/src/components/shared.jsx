@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { fmtBRL, getEndsAtMs } from '../utils';
 
 // ============================================================
 // Score badge — circular AI score 0-100, color-coded
@@ -36,7 +37,7 @@ export function ScoreBadge({ value = 87, size = 56, showLabel = true }) {
 // Countdown timer
 // ============================================================
 export function Countdown({ until, compact, dark }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -170,7 +171,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
                    p.occupancy === 'ocupado' ? 'warn' : 'bad';
   return (
     <article
-      className="card hov fade-in"
+      className="card hov fade-in property-card"
       onClick={onClick}
     >
       {/* Photo with overlays */}
@@ -231,7 +232,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
         <div className="divider" style={{ margin: '14px 0' }}></div>
 
         {/* Numbers — 2 column layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14 }}>
+        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14 }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>lance mínimo</span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
@@ -277,6 +278,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
 export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
   return (
     <div
+      className="property-row"
       onClick={onClick}
       style={{
         display: 'grid',
@@ -334,13 +336,3 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
     </div>
   );
 }
-
-export const fmtBRL = (n) => (typeof n === 'number' ? n : 0).toLocaleString('pt-BR');
-
-/** Convert endsAt (ISO 8601 string or epoch ms number) to epoch ms for Countdown. */
-export const getEndsAtMs = (endsAt) => {
-  if (typeof endsAt === 'number') return endsAt;
-  if (typeof endsAt === 'string' && endsAt) return new Date(endsAt).getTime();
-  return 0;
-};
-

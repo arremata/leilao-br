@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { ScoreBadge, Countdown, Photo, Specs, fmtBRL } from './shared';
+import { ScoreBadge, Countdown, Photo, Specs } from './shared';
+import { fmtBRL } from '../utils';
 
 export default function PropertyDetail({ property, go, watched, toggleWatch }) {
+  const [tab, setTab] = useState('market');
+
   if (!property) {
     return (
       <div style={{ maxWidth: 1480, margin: '0 auto', padding: '60px 24px', textAlign: 'center' }}>
@@ -12,14 +15,13 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   }
   const p = property;
 
-  const [tab, setTab] = useState('market');
   const isWatched = watched?.includes(p.id);
 
   return (
-    <div style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 24px 80px' }}>
+    <div className="page detail-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 24px 80px' }}>
 
       {/* ===== Breadcrumb + actions ===== */}
-      <div className="row between" style={{ marginBottom: 18 }}>
+      <div className="row between detail-top" style={{ marginBottom: 18 }}>
         <button
           onClick={() => go('feed')}
           className="row gap-2"
@@ -30,7 +32,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <span className="mono" style={{ color: 'var(--fg-3)' }}>/</span>
           <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
         </button>
-        <div className="row gap-2">
+        <div className="row gap-2 detail-actions">
           <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
             <span style={{ color: isWatched ? 'var(--accent)' : 'var(--fg-2)' }}>
               {isWatched ? '★' : '☆'}
@@ -50,7 +52,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       </div>
 
       {/* ===== HERO: gallery + key facts ===== */}
-      <div style={{
+      <div className="detail-hero-grid" style={{
         display: 'grid',
         gridTemplateColumns: '1.4fr 1fr',
         gap: 24,
@@ -80,7 +82,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             </button>
           </div>
           {/* Thumbnail strip */}
-          <div className="row gap-2" style={{ marginTop: 10 }}>
+          <div className="row gap-2 thumb-strip" style={{ marginTop: 10 }}>
             {['Frente', 'Sala', 'Cozinha', 'Quarto', 'Banheiro', 'Vista'].map((l, i) => (
               <div key={l} style={{
                 width: 80, height: 56,
@@ -164,7 +166,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           </Collapsible>
 
           <Collapsible title="Características">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
               {p.viability?.features
                 ? Object.entries(p.viability.features).map(([lbl, val]) => (
                     <Meta key={lbl} lbl={lbl} val={val} />
@@ -175,7 +177,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           </Collapsible>
 
           <Collapsible title="Dados do leilão" last>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
               <Meta lbl="Leiloeiro" val={p.auctioneer} />
               <Meta lbl="Tribunal/Vara" val={p.court} />
               <Meta lbl="Processo" val={p.edital?.process || '—'} />
@@ -186,7 +188,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       </div>
 
       {/* ===== TABS ===== */}
-      <div style={{
+      <div className="detail-tabs" style={{
         display: 'flex', gap: 0,
         borderBottom: '1px solid var(--line-1)',
         marginBottom: 24,
@@ -334,14 +336,14 @@ function Viability({ p }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
         <Metric lbl="ROI líquido projetado" big={`+${grossROI}%`} sub="após custos, tributos e venda em 12 meses" color={grossROI >= 25 ? 'var(--good)' : grossROI >= 10 ? 'var(--warn)' : 'var(--bad)'} />
         <Metric lbl="Custo total estimado" big={`R$ ${fmtBRL(totalCost)}`} sub={`Lance + R$ ${fmtBRL(renoCost)} reforma + R$ ${fmtBRL(fees)} custos`} />
         <Metric lbl="Lance máximo recomendado" big={`R$ ${fmtBRL(maxBid)}`} sub={`Para atingir ${target}% de retorno líquido`} color="var(--accent)" />
         <Metric lbl="Payback" big="11 meses" sub="Considerando venda direta após reforma" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, marginBottom: 24 }}>
         <div className="card" style={{ padding: 22 }}>
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
             <div>
@@ -385,12 +387,12 @@ function Viability({ p }) {
           </div>
           <button className="btn sm">Resetar</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 22 }}>
+        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 22 }}>
           <SliderField label="Nível de reforma" value={reno} onChange={setReno} display={`R$ ${fmtBRL(renoCost)}`} description={reno < 25 ? 'Mínima — pintura e ajustes' : reno < 60 ? 'Padrão — cozinha, banheiros, piso' : 'Completa — desmontagem e reconstrução'} />
           <SliderField label="Meta de retorno líquido" value={target} onChange={setTarget} display={`${target}%`} description="Após custos, impostos e venda em 12 meses" min={5} max={80} />
         </div>
         <div className="divider" style={{ margin: '24px 0 20px' }}></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <Selector label="Cidade do comprador" value={city} options={['São Paulo / SP', 'Rio de Janeiro / RJ', 'Belo Horizonte / MG', 'Curitiba / PR']} onChange={setCity} hint="Define alíquota de ITBI aplicável" />
           <Selector label="Cenário tributário" value={exempt} options={['Primeiro imóvel', 'Reinvestimento em 180 dias', 'Pagamento integral de GC']} onChange={setExempt} hint="Isenção ou incidência do ganho de capital" />
         </div>
@@ -530,7 +532,7 @@ function Market({ p }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div className="card" style={{ padding: 22 }}>
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
             <div>
@@ -565,7 +567,7 @@ function Market({ p }) {
         <div className="card" style={{ padding: 22 }}>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.02 · indicadores</span>
           <h3 className="h2" style={{ marginTop: 4, marginBottom: 18 }}>{p.neighborhood} · base 2024–26</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
             {md.indicators.map(ind => (
               <Stat2 key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
             ))}
@@ -709,7 +711,7 @@ function CostBreakdown({ p }) {
       </div>
 
       <div className="card">
-        <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14, padding: '10px 20px', background: 'var(--bg-2)', fontFamily: 'var(--f-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--fg-3)' }}>
+        <div className="cost-row cost-head" style={{ display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14, padding: '10px 20px', background: 'var(--bg-2)', fontFamily: 'var(--f-mono)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--fg-3)' }}>
           <span></span>
           <span>Item</span>
           <span style={{ textAlign: 'right' }}>% sobre total</span>
@@ -718,7 +720,7 @@ function CostBreakdown({ p }) {
         {rows.map((r, i) => (
           <CostRow key={i} l={r.label} v={r.value} hint={r.hint} pct={total > 0 ? r.value / total * 100 : 0} />
         ))}
-        <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14, padding: '20px 20px', background: 'var(--bg-2)', alignItems: 'baseline', borderTop: '2px solid var(--line-2)' }}>
+        <div className="cost-row cost-total" style={{ display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14, padding: '20px 20px', background: 'var(--bg-2)', alignItems: 'baseline', borderTop: '2px solid var(--line-2)' }}>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
           <span style={{ fontSize: 15, fontWeight: 600 }}>Custo total — chave na mão</span>
           <span></span>
@@ -737,6 +739,7 @@ function CostRow({ l, v, hint, pct }) {
   const [open, setOpen] = useState(false);
   return (
     <div
+      className="cost-row"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       style={{
@@ -803,7 +806,7 @@ function LegalLocked() {
         filter: 'blur(10px)', opacity: 0.55, pointerEvents: 'none', userSelect: 'none',
       }}>
         <h3 className="h2" style={{ marginBottom: 18 }}>Matrícula 87.412 · 14º cartório de registro de imóveis</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="card" style={{ padding: 22 }}>
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>Item {i}</span>
@@ -917,7 +920,7 @@ function Edital({ p }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
+      <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
         <Meta lbl="Processo" val={e.process || '—'} />
         <Meta lbl="Exequente" val={e.creditor || '—'} />
         <Meta lbl="Executado" val={e.debtor || '—'} />

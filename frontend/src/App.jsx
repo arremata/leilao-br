@@ -5,9 +5,12 @@ import PropertyDetail from './components/PropertyDetail';
 import { analyzeUrl, fetchProperties, fetchDashboard } from './api';
 
 function App() {
-  const [screen, setScreen] = useState(() =>
-    localStorage.getItem('arremate_screen') || 'home'
-  );
+  const [screen, setScreen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedScreen = params.get('screen');
+    if (['home', 'feed', 'detail'].includes(requestedScreen)) return requestedScreen;
+    return localStorage.getItem('arremate_screen') || 'home';
+  });
   const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
@@ -73,7 +76,7 @@ function App() {
     '03 Detalhe do Imóvel';
 
   return (
-    <div data-screen-label={screenLabel}>
+    <div className="app-shell" data-screen-label={screenLabel}>
       <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} dashboard={dashboard} />
       {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} />}
       {screen === 'feed' && <Feed go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
@@ -106,7 +109,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, d
         </nav>
       </div>
 
-      <form className="search" onSubmit={handleSubmit}>
+      <form className="search topbar-search" onSubmit={handleSubmit}>
         <span className="mono" style={{ color: 'var(--fg-2)' }}>⌕</span>
         <input
           placeholder="Cole a URL do leilão para analisar..."
@@ -148,6 +151,19 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, d
           FG
         </div>
       </div>
+
+      <form className="search mobile-search" onSubmit={handleSubmit}>
+        <span className="mono" style={{ color: 'var(--fg-2)' }}>⌕</span>
+        <input
+          placeholder="Cole a URL do leilão para analisar..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          disabled={analyzing}
+        />
+        <button type="submit" className="btn sm primary" disabled={analyzing || !url.trim()}>
+          {analyzing ? '...' : 'Analisar'}
+        </button>
+      </form>
     </header>
   );
 }
