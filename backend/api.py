@@ -11,9 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
 
-from graph.state import AuctionState
-from graph.workflow import run_analysis
-
 DATA_DIR = Path(__file__).parent / "data"
 RESULTS_FILE = DATA_DIR / "results.json"
 SEED_FILE = Path(__file__).parent / "data" / "seed.json"
@@ -25,27 +22,30 @@ class AnalyzeRequest(BaseModel):
 
 
 def _load_results() -> list[dict]:
+    results = []
     if RESULTS_FILE.exists():
-        return json.loads(RESULTS_FILE.read_text(encoding="utf-8"))
-    return []
+        results = json.loads(RESULTS_FILE.read_text(encoding="utf-8"))
+
+    if SEED_FILE.exists():
+        existing_ids = {r.get("id") for r in results}
+        seed_data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
+        results.extend(s for s in seed_data if s.get("id") not in existing_ids)
+
+    return results
 
 
 def _save_results(results: list[dict]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    RESULTS_FILE.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        RESULTS_FILE.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.warning(f"Skipping JSON persistence: {e}")
 
 
 def _merge_seed() -> None:
     """Merge seed data into results.json, adding any missing entries by id."""
-    if not SEED_FILE.exists():
-        return
-    existing = _load_results()
-    existing_ids = {r.get("id") for r in existing}
-    seed_data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
-    added = [s for s in seed_data if s.get("id") not in existing_ids]
-    if added:
-        existing.extend(added)
-        _save_results(existing)
+    if RESULTS_FILE.exists():
+        _save_results(_load_results())
 
 
 app = FastAPI(title="Leilao AI API")
@@ -57,7 +57,7 @@ def _startup():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=["*"],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -108,6 +108,9 @@ def analyze(req: AnalyzeRequest) -> dict:
         raise HTTPException(status_code=400, detail="Provide either 'url' or 'pdf_texts'.")
 
     try:
+        from graph.state import AuctionState
+        from graph.workflow import run_analysis
+
         if req.url:
             initial_state = AuctionState(auction_url=req.url.strip())
         else:
