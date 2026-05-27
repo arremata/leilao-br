@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import Home from './components/Home';
 import Feed from './components/Feed';
 import PropertyDetail from './components/PropertyDetail';
+import Watchlist from './components/Watchlist';
+import History from './components/History';
 import { analyzeUrl, fetchProperties, fetchDashboard } from './api';
 
 function App() {
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedScreen = params.get('screen');
-    if (['home', 'feed', 'detail'].includes(requestedScreen)) return requestedScreen;
+    if (['home', 'feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
     return localStorage.getItem('arremate_screen') || 'home';
   });
   const [selected, setSelected] = useState(null);
@@ -21,6 +23,11 @@ function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
   const [dashboard, setDashboard] = useState(null);
+  const [history, setHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('arremate_history') || '[]');
+    } catch { return []; }
+  });
   const [feedSearch, setFeedSearch] = useState({ address: '', filters: null });
   const [feedKey, setFeedKey] = useState(0);
 
@@ -42,14 +49,33 @@ function App() {
     localStorage.setItem('arremate_watched', JSON.stringify(watched));
   }, [watched]);
 
+  useEffect(() => {
+    localStorage.setItem('arremate_history', JSON.stringify(history));
+  }, [history]);
+
   const go = (s, prop) => {
-    if (prop) setSelected(prop);
+    if (prop) {
+      setSelected(prop);
+      if (s === 'detail') {
+        const entry = {
+          id: prop.id, ts: Date.now(),
+          title: prop.title, address: prop.address,
+          city: prop.city, neighborhood: prop.neighborhood,
+          score: prop.score, minBid: prop.minBid,
+          discount: prop.discount, roi: prop.roi,
+          type: prop.type, auctionType: prop.auctionType,
+        };
+        setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
+      }
+    }
     setScreen(s);
   };
 
   const toggleWatch = (id) => {
     setWatched(w => w.includes(id) ? w.filter(x => x !== id) : [...w, id]);
   };
+
+  const clearHistory = useCallback(() => setHistory([]), []);
 
   const handleAnalyze = useCallback(async (url) => {
     if (!url || !url.trim()) return;
@@ -79,13 +105,17 @@ function App() {
   const screenLabel =
     screen === 'home' ? '01 Dashboard' :
     screen === 'feed' ? '02 Feed' :
-    '03 Detalhe do Imóvel';
+    screen === 'watchlist' ? '03 Watchlist' :
+    screen === 'history' ? '04 Histórico' :
+    '05 Detalhe do Imóvel';
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
       <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} />
       {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} />}
       {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+      {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+      {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
       {screen === 'detail' && <PropertyDetail property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
     </div>
   );
@@ -109,8 +139,10 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
         <nav className="nav">
           <a className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</a>
           <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
-          <a>Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}</a>
-          <a>Histórico</a>
+          <a className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
+            Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
+          </a>
+          <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</a>
         </nav>
       </div>
 
