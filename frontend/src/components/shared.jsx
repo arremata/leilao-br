@@ -77,16 +77,31 @@ export function Countdown({ until, compact, dark }) {
 // ============================================================
 // Photo placeholder
 // ============================================================
-export function Photo({ label = 'FOTO IMÓVEL', ratio = '16/10', children, style }) {
+export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', children, style }) {
   return (
     <div
       className="ph"
       style={{
         aspectRatio: ratio,
         width: '100%',
+        position: 'relative',
+        overflow: 'hidden',
         ...style,
       }}
     >
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt={label}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+      ) : null}
       {children}
       <div className="ph-label">{label}</div>
     </div>
@@ -208,7 +223,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
     >
       {/* Photo with overlays */}
       <div style={{ position: 'relative' }}>
-        <Photo label={p.photoLabel} ratio="16/10" />
+        <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
         {/* Score top-left */}
         <div style={{ position: 'absolute', top: 12, left: 12 }}>
           <ScoreBadge value={p.score} size={52} showLabel={false} />
@@ -328,8 +343,10 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       <div style={{
         width: 56, height: 42, borderRadius: 6, overflow: 'hidden',
         background: 'oklch(0.92 0.005 75)',
-        backgroundImage: 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
-      }}></div>
+        backgroundImage: p.photoUrl ? 'none' : 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
+      }}>
+        {p.photoUrl && <img src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+      </div>
       <ScoreBadge value={p.score} size={44} showLabel={false} />
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-0)', lineHeight: 1.25 }}>

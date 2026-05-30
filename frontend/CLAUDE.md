@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Arremate** — a Brazilian real estate auction intelligence app. Unified project with:
-- **Backend** (`../`): Python LangGraph AI agents + FastAPI API on port 8000
-- **Frontend** (`./`): React SPA (Vite + React 19) on port 5173
+**Arremate** — a Brazilian real estate auction intelligence platform. Unified project with:
+- **Backend** (`../backend/`): Python LangGraph AI agents + FastAPI API on port 8000
+- **Frontend** (`./`): React 19 SPA (Vite) on port 5173, responsive PWA
+- **Vercel** (`../vercel-backend/`): Serverless deployment with synced seed.json
 
 ## Commands
 
@@ -40,7 +41,7 @@ npm run preview      # preview production build
 
 ### Data model
 
-Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them; falls back to fixture data in `src/components/shared.jsx`. Each property: `id`, `score` (0-100), auction metadata (`auctionType`, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, and `risk` flags (`j`/`f`/`l`/`o`).
+Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them. Each property: `id`, `score` (0-100), auction metadata (`auctionType`, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, `risk` flags (`j`/`f`/`l`/`o`), `photoUrl`, `auctionUrl`. The `market` field reflects real comparable sales, not just the auction appraisal. `discount` can be negative (bid above market).
 
 ### API integration
 

@@ -88,7 +88,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         {/* Gallery */}
         <div>
           <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--line-1)' }}>
-            <Photo label={p.photoLabel} ratio="16/10" />
+            <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
             <div style={{
               position: 'absolute', top: 14, left: 14,
               background: 'oklch(1 0 0 / 0.92)', padding: '6px 10px',
@@ -96,7 +96,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               border: '1px solid var(--line-1)',
               fontFamily: 'var(--f-mono)',
             }}>
-              1 / 12 fotos
+              Fachada
             </div>
             <button style={{
               position: 'absolute', bottom: 14, right: 14,
@@ -109,26 +109,32 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             </button>
           </div>
           <div className="row gap-2 thumb-strip" style={{ marginTop: 10 }}>
-            {['Frente', 'Sala', 'Cozinha', 'Quarto', 'Banheiro', 'Vista'].map((l, i) => (
-              <div key={l} style={{
-                width: 80, height: 56,
-                borderRadius: 6,
-                background: 'oklch(0.92 0.005 75)',
-                backgroundImage: 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
-                border: i === 0 ? '2px solid var(--accent)' : '1px solid var(--line-1)',
-                position: 'relative',
-                cursor: 'pointer',
+            <div style={{
+              width: 80, height: 56,
+              borderRadius: 6,
+              overflow: 'hidden',
+              border: '2px solid var(--accent)',
+              position: 'relative',
+              cursor: 'pointer',
+            }}>
+              {p.photoUrl ? (
+                <img src={p.photoUrl} alt="Fachada" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{
+                  width: '100%', height: '100%',
+                  background: 'oklch(0.92 0.005 75)',
+                  backgroundImage: 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
+                }} />
+              )}
+              <span className="mono" style={{
+                position: 'absolute', bottom: 4, left: 4,
+                fontSize: 9, color: 'var(--fg-2)',
+                background: 'oklch(1 0 0 / 0.8)',
+                padding: '1px 4px', borderRadius: 3,
               }}>
-                <span className="mono" style={{
-                  position: 'absolute', bottom: 4, left: 4,
-                  fontSize: 9, color: 'var(--fg-2)',
-                  background: 'oklch(1 0 0 / 0.8)',
-                  padding: '1px 4px', borderRadius: 3,
-                }}>
-                  {l}
-                </span>
-              </div>
-            ))}
+                Fachada
+              </span>
+            </div>
           </div>
         </div>
 

@@ -162,3 +162,4 @@ class AuctionPropertyResult(BaseModel):
     costs: list[CostLineItem] | None = None
     edital: EditalDetail | None = None
     auction_url: str | None = None
+    photo_url: str | None = None

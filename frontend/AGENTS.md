@@ -2,7 +2,7 @@
 
 ## Overview
 
-React 19 SPA (Vite) for browsing and analyzing Brazilian real estate auctions. Currently displays mock data; integrating with the FastAPI backend.
+React 19 SPA (Vite) for browsing and analyzing Brazilian real estate auctions. Demo-ready with 3 real auction properties, real photos, and real market comparables. Responsive PWA with watchlist and history. Deployed to Vercel.
 
 ## Commands
 
@@ -32,7 +32,7 @@ Navigation via `go(screen, prop)` in `App.jsx`. Screen and watchlist persist to 
 | `src/App.jsx` | Root: screen state, API calls, `TopBar` with URL analyzer input |
 | `src/main.jsx` | Entry point (React 19 + StrictMode) |
 | `src/api.js` | `fetchProperties()` and `analyzeUrl()` — calls proxied via `/api` |
-| `src/components/shared.jsx` | Reusable components (`ScoreBadge`, `Countdown`, `Photo`, `Sparkline`, `RiskDots`, `Specs`, `PropertyCard`, `PropertyRow`) + fixtures + helpers (`fmtBRL`, `getEndsAtMs`) |
+| `src/components/shared.jsx` | Reusable components (`ScoreBadge`, `Countdown`, `Photo` (supports `photoUrl`), `Sparkline`, `RiskDots`, `Specs`, `PropertyCard`, `PropertyRow`) + fixtures + helpers (`fmtBRL`, `getEndsAtMs`) |
 | `src/components/Home.jsx` | Dashboard screen |
 | `src/components/Feed.jsx` | Feed screen with grid/list toggle, filters |
 | `src/components/PropertyDetail.jsx` | Property detail with tabs (Viabilidade, Mercado, Encargos, Juridico) |
@@ -54,15 +54,19 @@ Each property matches the `AuctionPropertyResult` shape from the backend (`backe
   id, score,           // 0-100
   photoLabel, title, address, type, neighborhood, city,
   auctionType, auctioneer, court,
-  discount,            // percentage
+  discount,            // percentage (negative = above market)
   minBid, market,      // raw BRL numbers — format with fmtBRL()
-  roi,                 // projected ROI %
+  roi,                 // projected ROI % (negative = loss)
   area, beds, baths, parking, floor,
   endsAt,              // ISO 8601 string — convert with getEndsAtMs()
   occupancy,           // "desocupado" | "ocupado" | "disputado"
-  risk: { j, f, l, o } // "good" | "warn" | "bad"
+  risk: { j, f, l, o }, // "good" | "warn" | "bad"
+  photoUrl,            // "/photos/auction1.jpg" — real property photo
+  auctionUrl           // original auction listing URL
 }
 ```
+
+**Important:** `market` is the estimated market value based on real comparable sales (not the official auction appraisal). `discount` = (market - minBid) / market × 100. Can be negative when bid exceeds market value.
 
 ## Key Conventions
 

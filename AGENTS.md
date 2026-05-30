@@ -4,24 +4,27 @@
 
 **Arremate** is a demo of a future Brazilian real estate auction intelligence platform. The goal is to map all real estate auctions in Brazil and provide AI-powered analysis that makes auction investing accessible and safer. Properties are sold at 30-70% below market value but carry complex legal risks — Arremate automates the research that today takes a full day and R$ 200-800 in legal fees into a 3-minute analysis.
 
-## Current Status: Demo Integration Phase
+## Current Status: Demo Ready
 
-The frontend UI is built with mock data and the AI pipeline is functional. We are now connecting the backend with the frontend — the FastAPI server exposes the LangGraph pipeline and the React SPA consumes it via the Vite proxy.
+The platform is demo-ready with 3 real Brazilian auction properties, real property photos, real market data (comparables, price/m² trends), and a responsive PWA frontend. Backend serves seed data via FastAPI; frontend consumes it. Deployed to Vercel (frontend + serverless backend).
 
 ```
 leilao/
 ├── backend/                 # Python — API + AI pipeline
-│   ├── api.py               # FastAPI server (port 8001)
+│   ├── api.py               # FastAPI server (port 8000)
 │   ├── app.py               # Gradio UI (legacy)
 │   ├── analyze.py           # CLI entry point
 │   ├── config.py            # Settings (LiteLLM, Tavily keys)
 │   ├── graph/               # LangGraph agent pipeline
-│   ├── tools/               # Web scraper, PDF parser, search
+│   │   └── contracts.py     # Pydantic data contract (AuctionPropertyResult)
+│   ├── tools/               # Web scraper, PDF parser, search, property scraper
 │   ├── tests/               # pytest suite
-│   ├── data/                # results.json persistence
+│   ├── data/                # seed.json + results.json persistence
 │   ├── requirements.txt
 │   └── .env
 ├── frontend/                # React 19 SPA (Vite, port 5173)
+│   └── public/photos/       # Real auction property photos
+├── vercel-backend/          # Vercel serverless backend (synced seed.json)
 ├── docs/                    # Design docs and plans
 ├── .venv/                   # Python virtual environment
 └── Makefile, dev.sh         # Dev scripts
@@ -33,7 +36,7 @@ leilao/
 │  Home · Feed · PropertyDetail                │
 │  Backend-driven data (seed + live analysis)   │
 └──────────────────────┬──────────────────────┘
-                       │  /api/* (Vite proxy → :8001)
+                       │  /api/* (Vite proxy → :8000)
 ┌──────────────────────┴──────────────────────┐
 │           API Server (FastAPI)                │
 │  GET /properties  ·  POST /analyze           │
@@ -81,9 +84,11 @@ URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scor
 
 The `AuctionPropertyResult` Pydantic model (`backend/graph/contracts.py`) is the single source of truth for the frontend shape. It serializes to camelCase JSON matching what the React components expect.
 
-Key fields: `id`, `score` (0-100), `minBid`, `market`, `discount`, `roi`, `risk` (J/F/L/O flags), `occupancy`, `endsAt`, `auctionType`, `auctioneer`, `court`, plus optional detail objects: `viability` (risk dimensions, alerts, description, features), `marketDetail` (indicators, trend, comparables), `costs` (line items), `edital` (process, creditor, liens, payment terms).
+Key fields: `id`, `score` (0-100), `minBid`, `market`, `discount`, `roi`, `risk` (J/F/L/O flags), `occupancy`, `endsAt`, `auctionType`, `auctioneer`, `court`, `photoUrl`, `auctionUrl`, plus optional detail objects: `viability` (risk dimensions, alerts, description, features), `marketDetail` (indicators, trend, comparables), `costs` (line items), `edital` (process, creditor, liens, payment terms).
 
-Frontend starts with an empty property list and populates exclusively from `GET /properties`. No fixture fallback. Seed data (`backend/data/seed.json`) loads into `results.json` on API startup when empty, providing 3 demo properties (p1, p3, p5).
+Frontend starts with an empty property list and populates exclusively from `GET /properties`. Seed data (`backend/data/seed.json`) loads into `results.json` on API startup via `_merge_seed()`, providing 3 real auction properties (a1, a2, a3).
+
+**Important:** `market` field should reflect real comparable sales data, not just the official auction appraisal. `discount` and `roi` derive from the gap between `minBid` and `market`. When updating seed data, always sync to `vercel-backend/seed.json` and clear `backend/data/results.json`.
 
 ## Competitors
 
@@ -145,4 +150,5 @@ The full platform will include:
 
 Every meaningful change to the project should be recorded here with a brief description.
 
-- **2026-05-14** — Extended `AuctionPropertyResult` with detail objects (`viability`, `marketDetail`, `costs`, `edital`). Created seed data (`backend/data/seed.json`) with 3 demo properties. Frontend now reads all detail tab data from the property object instead of hardcoded values. Removed non-seeded fixture properties (p2, p4, p6, p7, p8). App starts with empty state and populates exclusively from the API. Backend port changed from 8000 to 8001 (port conflict).
+- **2026-05-14** — Extended `AuctionPropertyResult` with detail objects (`viability`, `marketDetail`, `costs`, `edital`). Created seed data (`backend/data/seed.json`) with 3 demo properties. Frontend now reads all detail tab data from the property object instead of hardcoded values. Removed non-seeded fixture properties (p2, p4, p6, p7, p8). App starts with empty state and populates exclusively from the API.
+- **2026-05-29** — Demo prep: replaced old mock entries (p1, p3, p5) with 3 real auctions (a1, a2, a3) scraped from Caixa and leilaoimovel.com.br. Added real property photos (`frontend/public/photos/`). Updated `Photo` component to support `photoUrl`. Merged `deploy/vercel-setup` branch (responsive PWA, watchlist, history, card UI overhaul). Enriched market data with real comparables from ImovelWeb, Santamérica, Arbo, Cruciol, Perfeito Imóveis etc. Updated `market` field to reflect real comparable sales (not just appraisal). Backend port is 8000. Added Vercel deployment (`vercel-backend/`). Properties: a1 (Curitiba, score 48, bad deal), a2 (Londrina Jd. Santa Cruz, score 76, decent), a3 (Londrina Farid Libos, score 71, good discount but occupied).

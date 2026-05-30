@@ -1,272 +1,842 @@
 [
   {
-    "id": "p1",
-    "auctionUrl": null,
-    "score": 87,
-    "photoLabel": "APTO · VILA MADALENA · SP",
-    "title": "Apto. 78 m², Rua Harmonia",
-    "address": "R. Harmonia, 412 · ap. 71",
+    "id": "a1",
+    "auctionUrl": "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnOrigem=index&hdnimovel=01787702097611",
+    "photoUrl": "/photos/auction1.jpg",
+    "score": 48,
+    "photoLabel": "APTO · SANTA CÂNDIDA · PR",
+    "title": "Apto. 103, Residencial Chievo",
+    "address": "R. Pedro Kachel, 81 · ap. 103 · bl. 16",
     "type": "Apartamento",
-    "neighborhood": "Vila Madalena",
-    "city": "São Paulo, SP",
-    "auctionType": "1ª praça",
-    "auctioneer": "Zukerman Leilões",
-    "court": "7ª Vara Cível SP",
-    "discount": 42,
-    "minBid": 312000,
-    "market": 540000,
-    "roi": 38,
-    "area": 78,
+    "neighborhood": "Santa Cândida",
+    "city": "Curitiba, PR",
+    "auctionType": "2ª praça",
+    "auctioneer": "Caixa Econômica Federal",
+    "court": "—",
+    "discount": -21,
+    "minBid": 253345,
+    "market": 210000,
+    "roi": -14,
+    "area": 45.74,
     "beds": 2,
-    "baths": 2,
+    "baths": 1,
     "parking": 1,
-    "floor": "7º",
-    "endsAt": "2026-05-17T14:30:00",
-    "occupancy": "desocupado",
-    "risk": { "j": "good", "f": "good", "l": "warn", "o": "good" },
+    "floor": null,
+    "endsAt": "2026-06-05T10:00:00",
+    "occupancy": "ocupado",
+    "risk": {
+      "j": "good",
+      "f": "bad",
+      "l": "warn",
+      "o": "bad"
+    },
     "viability": {
       "riskDimensions": [
-        { "dim": "Jurídico", "pct": 92, "state": "good", "note": "Sem ônus, sem processos correlatos" },
-        { "dim": "Financeiro", "pct": 78, "state": "good", "note": "Dívida conhecida: R$ 4.200 IPTU + R$ 18.400 condomínio" },
-        { "dim": "Liquidez", "pct": 62, "state": "warn", "note": "Média de 84 dias para vender no bairro" },
-        { "dim": "Ocupação", "pct": 95, "state": "good", "note": "Imóvel desocupado há 11 meses · vistoria registrada" }
+        {
+          "dim": "Jurídico",
+          "pct": 85,
+          "state": "good",
+          "note": "Matrícula limpa, sem ônus adicionais além da alienação fiduciária"
+        },
+        {
+          "dim": "Financeiro",
+          "pct": 30,
+          "state": "bad",
+          "note": "Lance mínimo R$ 253k acima do valor de mercado R$ 210k — sem margem de lucro"
+        },
+        {
+          "dim": "Liquidez",
+          "pct": 48,
+          "state": "warn",
+          "note": "Lance mínimo acima da média do bairro (R$ 4.590/m²) — margem de revenda apertada"
+        },
+        {
+          "dim": "Ocupação",
+          "pct": 30,
+          "state": "bad",
+          "note": "Imóvel ocupado — necessária imissão na posse"
+        }
       ],
       "alerts": [
-        { "level": "warn", "title": "Divergência de área", "text": "Edital declara 78 m², matrícula consta 76,4 m²." },
-        { "level": "warn", "title": "Condomínio em atraso", "text": "R$ 18.400 de dívida condominial — assumir no arremate." },
-        { "level": "good", "title": "Imóvel desocupado", "text": "Sem inquilinos há 11 meses, vistoria registrada." },
-        { "level": "good", "title": "IPTU em dia até Q1", "text": "Apenas R$ 4.200 do trimestre atual pendentes." }
+        {
+          "level": "bad",
+          "title": "Imóvel ocupado",
+          "text": "Será necessária ação de imissão na posse. Custo estimado de R$ 5.000–12.000 e prazo de 6-12 meses."
+        },
+        {
+          "level": "warn",
+          "title": "Condomínio pendente",
+          "text": "Débitos condominiais são de responsabilidade do comprador. Solicitar certidão do síndico."
+        },
+        {
+          "level": "warn",
+          "title": "Área compacta",
+          "text": "38,40 m² de área privativa — abaixo da média para 2 quartos na região."
+        },
+        {
+          "level": "good",
+          "title": "Aceita FGTS",
+          "text": "Permite utilização de FGTS. Consultar condições de enquadramento."
+        }
       ],
-      "description": "Apartamento de 78 m² no 7º andar do Edifício Harmonia, frente leste, em rua arborizada da Vila Madalena. Dois dormitórios sendo uma suíte, sala ampla integrada à varanda, cozinha planejada e área de serviço separada. Prédio com elevador, portaria 24h e uma vaga de garagem coberta.",
+      "description": "Apartamento de 45,74 m² (38,40 m² privativos) no Residencial Chievo, bloco 16, bairro Santa Cândida. Dois quartos, sala, cozinha, banheiro e uma vaga de garagem. Condomínio com área de lazer.",
       "features": {
-        "Ano de construção": "2003 (22 anos)",
-        "Conservação": "Bom estado",
-        "Posição solar": "Leste · sol da manhã",
-        "Vista": "Rua arborizada",
-        "Andar": "7º de 12 andares",
-        "Mobiliado": "Não",
-        "IPTU mensal": "R$ 380",
-        "Condomínio": "R$ 1.240"
+        "Condomínio": "Residencial Chievo",
+        "Área total": "45,74 m²",
+        "Área privativa": "38,40 m²",
+        "Matrícula": "92.385 — CRI Curitiba",
+        "Inscrição imobiliária": "53500240544006",
+        "Edital": "0022/0226 — CPA/RE"
       }
     },
     "marketDetail": {
       "indicators": [
-        { "lbl": "Preço/m² · bairro", "val": "R$ 11.420", "delta": "+4,2% YoY", "pos": true },
-        { "lbl": "Preço/m² · imóvel", "val": "R$ 6.923", "delta": "abaixo da média", "pos": true },
-        { "lbl": "Dias médios p/ venda", "val": "84 dias", "delta": "vs. SP 102", "pos": true },
-        { "lbl": "Yield aluguel", "val": "0,58 %/mês", "delta": "vs. SP 0,52%", "pos": true },
-        { "lbl": "Cap rate projetado", "val": "6,9% a.a.", "delta": "vs. Selic 10,5%", "neg": true },
-        { "lbl": "Liquidez · score", "val": "62 / 100", "delta": "estável 12m" }
+        {
+          "lbl": "Preço/m² · bairro",
+          "val": "R$ 4.590",
+          "delta": "+12% YoY",
+          "pos": true
+        },
+        {
+          "lbl": "Preço/m² · imóvel",
+          "val": "R$ 5.540",
+          "delta": "20% acima do bairro",
+          "neg": true
+        },
+        {
+          "lbl": "Dias médios p/ venda",
+          "val": "107 dias",
+          "delta": "vs. Curitiba 60",
+          "neg": true
+        },
+        {
+          "lbl": "Yield aluguel",
+          "val": "0,65 %/mês",
+          "delta": "vs. Curitiba 0,48%",
+          "pos": true
+        },
+        {
+          "lbl": "Cap rate projetado",
+          "val": "7,8% a.a.",
+          "delta": "vs. Selic 15%",
+          "neg": true
+        },
+        {
+          "lbl": "Liquidez · score",
+          "val": "58 / 100",
+          "delta": "moderada"
+        }
       ],
-      "trend": [9200, 9180, 9320, 9410, 9380, 9500, 9620, 9580, 9700, 9850, 9920, 10010, 10180, 10240, 10120, 10350, 10480, 10560, 10620, 10680, 10780, 10820, 10960, 11020, 11100, 11050, 11150, 11240, 11200, 11280, 11320, 11380, 11410, 11420, 11380, 11420],
+      "trend": [
+        3500,
+        3550,
+        3580,
+        3620,
+        3660,
+        3700,
+        3750,
+        3800,
+        3830,
+        3870,
+        3900,
+        3950,
+        3980,
+        4020,
+        4060,
+        4100,
+        4130,
+        4170,
+        4200,
+        4240,
+        4280,
+        4320,
+        4360,
+        4400,
+        4430,
+        4450,
+        4470,
+        4490,
+        4510,
+        4530,
+        4540,
+        4550,
+        4560,
+        4570,
+        4580,
+        4590
+      ],
       "trendStartLabel": "mai/2023",
       "trendEndLabel": "mai/2026",
       "comparables": [
-        { "address": "R. Harmonia, 320", "areaM2": 82, "beds": 2, "pricePerM2": 11200, "salePrice": 918000, "source": "ZAP Imóveis", "url": "https://www.zapimoveis.com.br/imovel/venda-apartamento-2-quartos-vila-madalena-sao-paulo-sp-82m2-id-1234" },
-        { "address": "R. Aspicuelta, 511", "areaM2": 75, "beds": 2, "pricePerM2": 11680, "salePrice": 876000, "source": "Viva Real", "url": "https://www.vivareal.com.br/imovel/apartamento-2-quartos-vila-madalena-sao-paulo-75m2-venda-RS876000-id-5678" },
-        { "address": "R. Fradique Coutinho, 1240", "areaM2": 95, "beds": 3, "pricePerM2": 11050, "salePrice": 1050000, "source": "Imovelweb", "url": "https://www.imovelweb.com.br/propriedades/apartamento-3-quartos-vila-madalena-95m2-9012.html" },
-        { "address": "R. Mourato Coelho, 880", "areaM2": 68, "beds": 2, "pricePerM2": 11400, "salePrice": 775000, "source": "ZAP Imóveis", "url": "https://www.zapimoveis.com.br/imovel/venda-apartamento-2-quartos-vila-madalena-sao-paulo-sp-68m2-id-3456" },
-        { "address": "R. Wisard, 422", "areaM2": 88, "beds": 3, "pricePerM2": 11820, "salePrice": 1040000, "source": "Viva Real", "url": "https://www.vivareal.com.br/imovel/apartamento-3-quartos-vila-madalena-sao-paulo-88m2-venda-RS1040000-id-7890" }
+        {
+          "address": "Santa Cândida — apt. 45 m², 2q, 1 vg",
+          "areaM2": 45,
+          "beds": 2,
+          "pricePerM2": 4667,
+          "salePrice": 210000,
+          "source": "ImovelWeb",
+          "url": "https://www.imovelweb.com.br/apartamentos-venda-santa-candida-curitiba-2-quartos.html"
+        },
+        {
+          "address": "Santa Cândida — apt. 50 m², 2q, 1 vg",
+          "areaM2": 50,
+          "beds": 2,
+          "pricePerM2": 4700,
+          "salePrice": 235000,
+          "source": "Habitarium",
+          "url": "https://www.zapimoveis.com.br/venda/apartamentos/pr+curitiba++sta-candida/2-quartos/"
+        },
+        {
+          "address": "Est. Guilherme Weigert, 1725 — Parque Chalet, 44 m²",
+          "areaM2": 44,
+          "beds": 2,
+          "pricePerM2": 4545,
+          "salePrice": 200000,
+          "source": "WiMoveis",
+          "url": "https://www.wimoveis.com.br/venda/apartamentos/pr/curitiba/santa-candida/ordem-precio-menor"
+        },
+        {
+          "address": "Santa Cândida — apt. 47 m², 2q, 1 bn",
+          "areaM2": 47,
+          "beds": 2,
+          "pricePerM2": 3617,
+          "salePrice": 170000,
+          "source": "ImovelWeb",
+          "url": "https://www.imovelweb.com.br/apartamentos-venda-santa-candida-curitiba-2-quartos.html"
+        },
+        {
+          "address": "Santa Cândida — apt. 51 m², 2q, 1 bn",
+          "areaM2": 51,
+          "beds": 2,
+          "pricePerM2": 3510,
+          "salePrice": 179000,
+          "source": "ImovelWeb",
+          "url": "https://www.imovelweb.com.br/apartamentos-venda-santa-candida-curitiba-2-quartos.html"
+        }
       ]
     },
     "costs": [
-      { "label": "Lance de arremate", "value": 312000, "hint": "Valor declarado como mínimo no edital.", "kind": "price" },
-      { "label": "ITBI · São Paulo (3%)", "value": 9360, "hint": "Imposto de transmissão devido ao município.", "kind": "tax" },
-      { "label": "Comissão do leiloeiro (5%)", "value": 15600, "hint": "Sobre o valor do arremate, devida no ato.", "kind": "fee" },
-      { "label": "Custas judiciais", "value": 4800, "hint": "Taxa cartorária, edital, oficial de justiça.", "kind": "fee" },
-      { "label": "Registro em cartório", "value": 6240, "hint": "Inclui escritura e averbações na matrícula.", "kind": "fee" },
-      { "label": "IPTU em atraso assumido", "value": 4200, "hint": "IPTU vencido até a data do arremate.", "kind": "debt" },
-      { "label": "Condomínio em atraso", "value": 18400, "hint": "Débito condominial cobrado pelo síndico.", "kind": "debt" },
-      { "label": "Ação de imissão na posse", "value": 0, "hint": "Não aplicável — imóvel desocupado.", "kind": "fee" },
-      { "label": "Reforma estimada", "value": 36000, "hint": "Cozinha, banheiros, pintura, piso laminado.", "kind": "reno" },
-      { "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Isento · primeiro imóvel · até R$ 35k.", "kind": "tax" }
-    ],
-    "edital": {
-      "process": "1024778-32.2024.8.26.0100",
-      "creditor": "Banco Santander S.A.",
-      "debtor": "Construtora Vila Madalena Ltda.",
-      "modality": "Eletrônico · plataforma Zukerman",
-      "firstBidDate": "15/05/2026 às 14h30",
-      "firstBidPrice": 312000,
-      "secondBidDate": "29/05/2026 às 14h30",
-      "secondBidPrice": 270000,
-      "propertyDescription": "Apartamento nº 71 do 7º pavimento do Edifício Harmonia, situado na Rua Harmonia, nº 412, Vila Madalena, com área privativa de 78,00 m², compreendendo dois dormitórios sendo um suíte, sala de estar e jantar, cozinha, área de serviço, dois banheiros e uma vaga de garagem (vaga 24). Matriculado sob nº 87.412 no 14º Cartório de Registro de Imóveis da Capital.",
-      "liens": [
-        "Hipoteca de 1º grau em favor de Banco Santander S.A. — extinta com a arrematação (art. 1.501 CC).",
-        "IPTU em aberto: R$ 4.200,00 referente ao 1º trimestre de 2026.",
-        "Dívida condominial: R$ 18.400,00 conforme certidão do síndico anexa aos autos (fls. 412).",
-        "Não há registro de penhoras adicionais sobre o imóvel."
-      ],
-      "paymentTerms": "À vista no prazo de 24h via depósito judicial, ou parcelado em até 30 vezes mediante caução de 25% e atualização pela tabela do TJSP, com correção mensal pelo IPCA + 1% a.m. (art. 895 CPC).",
-      "summaryNote": "Texto resumido pela IA Arremate. O documento original contém 14 páginas e está disponível no link \"PDF original\" acima."
-    }
-  },
-  {
-    "id": "p3",
-    "auctionUrl": null,
-    "score": 91,
-    "photoLabel": "COMERCIAL · ITAIM BIBI · SP",
-    "title": "Sala 64 m², Faria Lima",
-    "address": "Av. Brig. Faria Lima, 1845 · cj. 412",
-    "type": "Comercial",
-    "neighborhood": "Itaim Bibi",
-    "city": "São Paulo, SP",
-    "auctionType": "Extrajudicial",
-    "auctioneer": "Mega Leilões",
-    "court": "—",
-    "discount": 38,
-    "minBid": 680000,
-    "market": 1100000,
-    "roi": 44,
-    "area": 64,
-    "beds": 0,
-    "baths": 1,
-    "parking": 1,
-    "floor": "14º",
-    "endsAt": "2026-05-16T00:00:00",
-    "occupancy": "desocupado",
-    "risk": { "j": "good", "f": "good", "l": "good", "o": "good" },
-    "viability": {
-      "riskDimensions": [
-        { "dim": "Jurídico", "pct": 95, "state": "good", "note": "Sem ônus, sem processos correlatos" },
-        { "dim": "Financeiro", "pct": 82, "state": "good", "note": "Sem débitos significativos identificados" },
-        { "dim": "Liquidez", "pct": 88, "state": "good", "note": "Alta liquidez no bairro" },
-        { "dim": "Ocupação", "pct": 93, "state": "good", "note": "Imóvel desocupado" }
-      ],
-      "alerts": [
-        { "level": "good", "title": "Imóvel desocupado", "text": "Sala comercial vazia, disponível para posse imediata." },
-        { "level": "good", "title": "Sem débitos", "text": "IPTU e condomínio em dia." }
-      ],
-      "description": "Sala comercial de 64 m² no 14º andar, na Av. Faria Lima, Itaim Bibi. Uma sala ampla com recepção, banheiro privativo e uma vaga de garagem. Edifício corporativo com portaria, elevador e infraestrutura de TI.",
-      "features": {
-        "Área": "64 m²",
-        "Cidade": "São Paulo",
-        "Tipo de leilão": "Extrajudicial",
-        "Andar": "14º",
-        "IPTU mensal": "R$ 720",
-        "Condomínio": "R$ 2.100"
+      {
+        "label": "Lance de arremate",
+        "value": 253345,
+        "hint": "Valor mínimo do 2º leilão.",
+        "kind": "price"
+      },
+      {
+        "label": "ITBI · Curitiba (2,7%)",
+        "value": 6840,
+        "hint": "Imposto de transmissão sobre o valor de avaliação.",
+        "kind": "tax"
+      },
+      {
+        "label": "Comissão do leiloeiro (5%)",
+        "value": 12667,
+        "hint": "Sobre o valor do arremate, devida no ato.",
+        "kind": "fee"
+      },
+      {
+        "label": "Registro em cartório",
+        "value": 4200,
+        "hint": "Inclui escritura e averbações na matrícula.",
+        "kind": "fee"
+      },
+      {
+        "label": "Condomínio em atraso (est.)",
+        "value": 8500,
+        "hint": "Estimativa — solicitar certidão do síndico para valor exato.",
+        "kind": "debt"
+      },
+      {
+        "label": "IPTU em atraso (est.)",
+        "value": 3200,
+        "hint": "Verificar com a Prefeitura de Curitiba.",
+        "kind": "debt"
+      },
+      {
+        "label": "Ação de imissão na posse",
+        "value": 8000,
+        "hint": "Estimativa incluindo honorários advocatícios.",
+        "kind": "fee"
+      },
+      {
+        "label": "Reforma estimada",
+        "value": 22000,
+        "hint": "Pintura, piso, banheiro, cozinha.",
+        "kind": "reno"
       }
-    },
-    "marketDetail": {
-      "indicators": [
-        { "lbl": "Preço/m² · bairro", "val": "R$ 17.180", "delta": "+3,8% YoY", "pos": true },
-        { "lbl": "Preço/m² · imóvel", "val": "R$ 10.625", "delta": "abaixo da média", "pos": true },
-        { "lbl": "Dias médios p/ venda", "val": "56 dias", "delta": "vs. SP 102", "pos": true },
-        { "lbl": "Liquidez · score", "val": "9 / 10", "delta": "alta liquidez" }
-      ],
-      "trend": [15200, 15350, 15480, 15600, 15700, 15850, 16000, 16120, 16250, 16400, 16500, 16620, 16750, 16880, 16950, 17050, 17150, 17200, 17300, 17380, 17450, 17500, 17600, 17680, 17750, 17800, 17850, 17920, 18000, 18050, 18100, 18150, 18200, 18250, 18300, 18350],
-      "trendStartLabel": "mai/2023",
-      "trendEndLabel": "mai/2026",
-      "comparables": []
-    },
-    "costs": [
-      { "label": "Lance de arremate", "value": 680000, "hint": "Valor declarado como mínimo no edital.", "kind": "price" },
-      { "label": "ITBI · São Paulo (3%)", "value": 20400, "hint": "Imposto de transmissão devido ao município.", "kind": "tax" },
-      { "label": "Comissão do leiloeiro (5%)", "value": 34000, "hint": "Sobre o valor do arremate, devida no ato.", "kind": "fee" },
-      { "label": "Custas judiciais", "value": 0, "hint": "Não aplicável — leilão extrajudicial.", "kind": "fee" },
-      { "label": "Registro em cartório", "value": 13600, "hint": "Inclui escritura e averbações na matrícula.", "kind": "fee" },
-      { "label": "IPTU em atraso assumido", "value": 0, "hint": "IPTU em dia.", "kind": "debt" },
-      { "label": "Condomínio em atraso", "value": 0, "hint": "Sem débito condominial.", "kind": "debt" },
-      { "label": "Reforma estimada", "value": 25000, "hint": "Pintura, piso, adequação elétrica.", "kind": "reno" },
-      { "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Isento · primeiro imóvel · até R$ 35k.", "kind": "tax" }
     ],
     "edital": {
       "process": "",
-      "creditor": "",
-      "debtor": "",
-      "modality": "Eletrônico · Mega Leilões",
-      "firstBidDate": "",
-      "firstBidPrice": 680000,
-      "secondBidDate": "",
-      "secondBidPrice": 0,
-      "propertyDescription": "Sala comercial de 64 m² no 14º andar, Av. Brig. Faria Lima, 1845, cj. 412, Itaim Bibi, São Paulo-SP.",
-      "liens": [],
-      "paymentTerms": "À vista no prazo de 24h via depósito judicial.",
-      "summaryNote": "Texto resumido pela IA Arremate."
+      "creditor": "Caixa Econômica Federal",
+      "debtor": "Ex-mutuário (identificação sob sigilo)",
+      "modality": "Leilão Único · Edital 0022/0226 CPA/RE",
+      "firstBidDate": "01/06/2026 às 10h00",
+      "firstBidPrice": 274000,
+      "secondBidDate": "05/06/2026 às 10h00",
+      "secondBidPrice": 253345,
+      "propertyDescription": "Apartamento 103, Bloco 16, do Residencial Chievo, situado na Rua Pedro Kachel, nº 81, bairro Santa Cândida, Curitiba-PR, com área total de 45,74 m² e área privativa de 38,40 m², composto de 2 quartos, sala, cozinha, WC e 1 vaga de garagem. Matrícula nº 92.385.",
+      "liens": [
+        "Alienação fiduciária em favor da Caixa Econômica Federal — consolidada.",
+        "Condomínio: débitos sob responsabilidade do comprador.",
+        "Tributos (IPTU): sob responsabilidade do comprador."
+      ],
+      "paymentTerms": "Recursos próprios ou FGTS. Pagamento à vista. Permite utilização de FGTS — consultar condições e enquadramento.",
+      "summaryNote": "Texto resumido pela IA Arremate. O edital original foi publicado em 29/05/2026."
     }
   },
   {
-    "id": "p5",
-    "auctionUrl": null,
-    "score": 82,
-    "photoLabel": "COBERTURA · BARRA SUL · SC",
-    "title": "Cobertura 180 m², Av. Atlântica",
-    "address": "Av. Atlântica, 5500 · cobertura",
-    "type": "Cobertura",
-    "neighborhood": "Barra Sul",
-    "city": "Balneário Camboriú, SC",
-    "auctionType": "1ª praça",
-    "auctioneer": "Lance Já",
-    "court": "2ª Vara Cível BC",
-    "discount": 35,
-    "minBid": 1240000,
-    "market": 1900000,
-    "roi": 41,
-    "area": 180,
-    "beds": 3,
-    "baths": 4,
-    "parking": 3,
-    "floor": "20º",
-    "endsAt": "2026-05-18T00:00:00",
+    "id": "a2",
+    "auctionUrl": "https://www.leilaoimovel.com.br/imovel/pr/londrina/residencial-apartamento-n-3-534-localizado-no-condominio-residencial-catuai-em-londrina-pr-imovel-2827357",
+    "photoUrl": "/photos/auction2.webp",
+    "score": 76,
+    "photoLabel": "APTO · JD. SANTA CRUZ · PR",
+    "title": "Apto. 3.534, Residencial Catuaí",
+    "address": "R. Ieda Pesarini Ferreira, 95 · ap. 3.534 · bl. 35",
+    "type": "Apartamento",
+    "neighborhood": "Jardim Santa Cruz",
+    "city": "Londrina, PR",
+    "auctionType": "2ª praça",
+    "auctioneer": "Leilão Judicial Eletrônico",
+    "court": "Foro Central Cível SP",
+    "discount": 21,
+    "minBid": 122687,
+    "market": 155000,
+    "roi": 10,
+    "area": 48,
+    "beds": 2,
+    "baths": 1,
+    "parking": 1,
+    "floor": null,
+    "endsAt": "2026-06-08T14:00:00",
     "occupancy": "desocupado",
-    "risk": { "j": "good", "f": "good", "l": "warn", "o": "good" },
+    "risk": {
+      "j": "good",
+      "f": "good",
+      "l": "good",
+      "o": "good"
+    },
     "viability": {
       "riskDimensions": [
-        { "dim": "Jurídico", "pct": 88, "state": "good", "note": "Sem ônus, sem processos correlatos" },
-        { "dim": "Financeiro", "pct": 80, "state": "good", "note": "Sem débitos significativos identificados" },
-        { "dim": "Liquidez", "pct": 65, "state": "warn", "note": "Média de 78 dias para vender no bairro" },
-        { "dim": "Ocupação", "pct": 92, "state": "good", "note": "Imóvel desocupado" }
+        {
+          "dim": "Jurídico",
+          "pct": 90,
+          "state": "good",
+          "note": "Processo regular, sem ônus adicionais na matrícula"
+        },
+        {
+          "dim": "Financeiro",
+          "pct": 85,
+          "state": "good",
+          "note": "Desconto de 30% sobre avaliação — margem confortável"
+        },
+        {
+          "dim": "Liquidez",
+          "pct": 75,
+          "state": "good",
+          "note": "Condomínio Catuaí tem boa procura na região"
+        },
+        {
+          "dim": "Ocupação",
+          "pct": 95,
+          "state": "good",
+          "note": "Informação não confirmada — verificar no edital"
+        }
       ],
       "alerts": [
-        { "level": "good", "title": "Imóvel desocupado", "text": "Cobertura vazia, disponível para posse imediata." },
-        { "level": "good", "title": "Sem débitos", "text": "IPTU e condomínio em dia." }
+        {
+          "level": "good",
+          "title": "Desconto expressivo",
+          "text": "30% abaixo do valor de avaliação. Margem de segurança para revenda."
+        },
+        {
+          "level": "good",
+          "title": "Parcelamento disponível",
+          "text": "Sinal de 25% + 30x. Possibilidade de alavancagem."
+        },
+        {
+          "level": "warn",
+          "title": "Verificar ocupação",
+          "text": "Status de ocupação não explicitado no edital. Recomendar vistoria."
+        },
+        {
+          "level": "good",
+          "title": "Condomínio consolidado",
+          "text": "Residencial Catuaí é empreendimento conhecido com infraestrutura completa."
+        }
       ],
-      "description": "Cobertura duplex de 180 m² no 20º andar, na Av. Atlântica, Barra Sul, Balneário Camboriú. Três suítes, sala ampla com terraço panorâmico, cozinha gourmet, área de serviço, quatro banheiros e três vagas de garagem cobertas.",
+      "description": "Apartamento nº 3.534 no Condomínio Residencial Catuaí, bloco 35, Jardim Santa Cruz, Londrina/PR. Dois quartos, sala, cozinha, banheiro e vaga de garagem. Condomínio com área de lazer, portaria e playground.",
       "features": {
-        "Área": "180 m²",
-        "Cidade": "Balneário Camboriú",
-        "Tipo de leilão": "1ª praça",
-        "Andar": "20º",
-        "IPTU mensal": "R$ 1.200",
-        "Condomínio": "R$ 3.800"
+        "Condomínio": "Residencial Catuaí",
+        "Matrícula": "104.093 — 2º CRI Londrina/PR",
+        "Cadastro Municipal": "07020527205550256",
+        "Processo": "4001883-07.2025.8.26.0011",
+        "Forma de pagamento": "À vista (24h) ou parcelado 25% + 30x",
+        "Plataforma": "www.leje.com.br"
       }
     },
     "marketDetail": {
       "indicators": [
-        { "lbl": "Preço/m² · bairro", "val": "R$ 15.200", "delta": "+5,8% YoY", "pos": true },
-        { "lbl": "Preço/m² · imóvel", "val": "R$ 6.889", "delta": "abaixo da média", "pos": true },
-        { "lbl": "Dias médios p/ venda", "val": "78 dias", "delta": "vs. SC 95", "pos": true },
-        { "lbl": "Liquidez · score", "val": "7 / 10", "delta": "alta liquidez" }
+        {
+          "lbl": "Preço/m² · bairro",
+          "val": "R$ 2.850",
+          "delta": "+8,2% YoY",
+          "pos": true
+        },
+        {
+          "lbl": "Preço/m² · imóvel",
+          "val": "R$ 2.556",
+          "delta": "10% abaixo",
+          "pos": true
+        },
+        {
+          "lbl": "Dias médios p/ venda",
+          "val": "85 dias",
+          "delta": "vs. Londrina 80",
+          "neg": true
+        },
+        {
+          "lbl": "Yield aluguel",
+          "val": "0,53 %/mês",
+          "delta": "vs. Londrina 0,50%",
+          "pos": true
+        },
+        {
+          "lbl": "Cap rate projetado",
+          "val": "6,4% a.a.",
+          "delta": "vs. Selic 15%",
+          "neg": true
+        },
+        {
+          "lbl": "Liquidez · score",
+          "val": "70 / 100",
+          "delta": "boa"
+        }
       ],
-      "trend": [11800, 11950, 12100, 12200, 12350, 12500, 12650, 12800, 12950, 13100, 13250, 13400, 13550, 13700, 13850, 14000, 14150, 14300, 14450, 14600, 14750, 14900, 15050, 15150, 15200, 15300, 15400, 15500, 15600, 15700, 15800, 15900, 16000, 16100, 16200, 16300],
+      "trend": [
+        2100,
+        2120,
+        2150,
+        2170,
+        2200,
+        2230,
+        2250,
+        2280,
+        2310,
+        2340,
+        2370,
+        2400,
+        2420,
+        2450,
+        2480,
+        2510,
+        2530,
+        2560,
+        2580,
+        2610,
+        2640,
+        2660,
+        2690,
+        2710,
+        2730,
+        2750,
+        2770,
+        2790,
+        2800,
+        2810,
+        2820,
+        2830,
+        2840,
+        2845,
+        2848,
+        2850
+      ],
       "trendStartLabel": "mai/2023",
       "trendEndLabel": "mai/2026",
-      "comparables": []
+      "comparables": [
+        {
+          "address": "Res. Catuaí, Av. Saul Elkind — 57 m², 3q",
+          "areaM2": 57,
+          "beds": 3,
+          "pricePerM2": 2719,
+          "salePrice": 155000,
+          "source": "Imob. Perez",
+          "url": "https://imobiliariaperez.com.br/comprar/apartamento-a-venda/pr/londrina/jardim-santa-cruz/residencial-catuai"
+        },
+        {
+          "address": "Res. Ouro Verde, R. Ieda Pesarini Ferreira, 130 — 57 m²",
+          "areaM2": 57,
+          "beds": 3,
+          "pricePerM2": 2544,
+          "salePrice": 145000,
+          "source": "Santamérica",
+          "url": "https://www.santamerica.com.br/comprar/Londrina/Apartamento/Padrao/Jardim-Santa-Cruz/50838"
+        },
+        {
+          "address": "Res. Ouro Verde, Av. Saul Elkind — 45 m², 2q",
+          "areaM2": 45,
+          "beds": 2,
+          "pricePerM2": 3000,
+          "salePrice": 135000,
+          "source": "Arbo Imóveis",
+          "url": "https://www.arboimoveis.com.br/imovel/apartamento/venda-e-locacao/londrina/pr/jardim-santa-cruz/AP1061_AUROI"
+        },
+        {
+          "address": "Jd. Santa Cruz — 60 m², 3q",
+          "areaM2": 60,
+          "beds": 3,
+          "pricePerM2": 2367,
+          "salePrice": 142000,
+          "source": "Perfeito Imóveis",
+          "url": "https://www.perfeitoimoveis.com.br/imovel/apartamento-de-60-m-jardim-santa-cruz-londrina-a-venda-por-r-142-000/AP2435-PEE"
+        }
+      ]
     },
     "costs": [
-      { "label": "Lance de arremate", "value": 1240000, "hint": "Valor declarado como mínimo no edital.", "kind": "price" },
-      { "label": "ITBI · Balneário Camboriú (3%)", "value": 37200, "hint": "Imposto de transmissão devido ao município.", "kind": "tax" },
-      { "label": "Comissão do leiloeiro (5%)", "value": 62000, "hint": "Sobre o valor do arremate, devida no ato.", "kind": "fee" },
-      { "label": "Custas judiciais", "value": 18600, "hint": "Taxa cartorária, edital, oficial de justiça.", "kind": "fee" },
-      { "label": "Registro em cartório", "value": 24800, "hint": "Inclui escritura e averbações na matrícula.", "kind": "fee" },
-      { "label": "IPTU em atraso assumido", "value": 0, "hint": "IPTU em dia.", "kind": "debt" },
-      { "label": "Condomínio em atraso", "value": 0, "hint": "Sem débito condominial.", "kind": "debt" },
-      { "label": "Reforma estimada", "value": 55000, "hint": "Pintura, cozinha, banheiros, pisos.", "kind": "reno" },
-      { "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Isento · primeiro imóvel · até R$ 35k.", "kind": "tax" }
+      {
+        "label": "Lance de arremate",
+        "value": 122687,
+        "hint": "Valor mínimo do 2º leilão (70% da avaliação).",
+        "kind": "price"
+      },
+      {
+        "label": "ITBI · Londrina (2%)",
+        "value": 2454,
+        "hint": "Imposto de transmissão sobre o valor do arremate.",
+        "kind": "tax"
+      },
+      {
+        "label": "Comissão do leiloeiro (5%)",
+        "value": 6134,
+        "hint": "Sobre o valor do arremate, devida no ato.",
+        "kind": "fee"
+      },
+      {
+        "label": "Registro em cartório",
+        "value": 3800,
+        "hint": "Inclui carta de arrematação e averbações.",
+        "kind": "fee"
+      },
+      {
+        "label": "IPTU em atraso (est.)",
+        "value": 1800,
+        "hint": "Débitos propter rem — verificar com a prefeitura.",
+        "kind": "debt"
+      },
+      {
+        "label": "Condomínio em atraso (est.)",
+        "value": 4500,
+        "hint": "Solicitar certidão negativa de débitos condominiais.",
+        "kind": "debt"
+      },
+      {
+        "label": "Reforma estimada",
+        "value": 18000,
+        "hint": "Pintura, pisos, banheiro.",
+        "kind": "reno"
+      }
     ],
     "edital": {
-      "process": "5003412-88.2023.8.24.0005",
+      "process": "4001883-07.2025.8.26.0011",
+      "creditor": "A definir (verificar edital)",
+      "debtor": "A definir (verificar edital)",
+      "modality": "Leilão Judicial Eletrônico · plataforma LEJE",
+      "firstBidDate": "Data a confirmar",
+      "firstBidPrice": 175268,
+      "secondBidDate": "Data a confirmar",
+      "secondBidPrice": 122687,
+      "propertyDescription": "Apartamento nº 3.534, localizado no Condomínio Residencial Catuaí, bloco 35, situado na Rua Ieda Pesarini Ferreira, nº 95, Jardim Santa Cruz, Londrina/PR. Matrícula nº 104.093 do 2º Cartório de Registro de Imóveis de Londrina/PR.",
+      "liens": [
+        "Penhora judicial vinculada ao processo nº 4001883-07.2025.8.26.0011.",
+        "Verificar existência de débitos condominiais e tributários."
+      ],
+      "paymentTerms": "À vista: pagamento em até 24h após encerramento. A prazo: sinal mínimo de 25% + saldo em até 30 parcelas corrigidas pelo IPCA + 1% a.m. (art. 895, CPC).",
+      "summaryNote": "Texto resumido pela IA Arremate. Consultar edital completo na plataforma LEJE (www.leje.com.br)."
+    }
+  },
+  {
+    "id": "a3",
+    "auctionUrl": "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel=8787708457057",
+    "photoUrl": "/photos/auction3.jpeg",
+    "score": 71,
+    "photoLabel": "APTO · CONJ. DR. FARID · PR",
+    "title": "Apto. 607, Spazio Lille",
+    "address": "Av. Pref. Milton R. Menezes, 635 · ap. 607 · torre 03",
+    "type": "Apartamento",
+    "neighborhood": "Conj. Hab. Dr. Farid Libos",
+    "city": "Londrina, PR",
+    "auctionType": "Venda direta",
+    "auctioneer": "Caixa Econômica Federal",
+    "court": "—",
+    "discount": 43,
+    "minBid": 119069,
+    "market": 210000,
+    "roi": 17,
+    "area": 57.04,
+    "beds": 2,
+    "baths": 1,
+    "parking": 1,
+    "floor": "6º",
+    "endsAt": "2026-06-12T18:00:00",
+    "occupancy": "ocupado",
+    "risk": {
+      "j": "good",
+      "f": "warn",
+      "l": "good",
+      "o": "bad"
+    },
+    "viability": {
+      "riskDimensions": [
+        {
+          "dim": "Jurídico",
+          "pct": 88,
+          "state": "good",
+          "note": "Alienação fiduciária consolidada em favor da CEF, sem ônus adicionais"
+        },
+        {
+          "dim": "Financeiro",
+          "pct": 65,
+          "state": "warn",
+          "note": "Débitos condominiais até 10% da avaliação — comprador paga"
+        },
+        {
+          "dim": "Liquidez",
+          "pct": 72,
+          "state": "good",
+          "note": "Spazio Lille tem boa rotatividade no mercado local"
+        },
+        {
+          "dim": "Ocupação",
+          "pct": 25,
+          "state": "bad",
+          "note": "Imóvel ocupado — processo de desocupação necessário"
+        }
+      ],
+      "alerts": [
+        {
+          "level": "good",
+          "title": "Desconto de quase 40%",
+          "text": "R$ 119.069 vs. avaliação de R$ 197.000. Margem ampla para custos e revenda."
+        },
+        {
+          "level": "bad",
+          "title": "Imóvel ocupado",
+          "text": "Será necessária ação judicial para imissão na posse. Prazo estimado: 6-18 meses."
+        },
+        {
+          "level": "warn",
+          "title": "Condomínio limitado a 10%",
+          "text": "Caixa paga apenas o que exceder 10% do valor de avaliação (R$ 19.700). Comprador assume até esse limite."
+        },
+        {
+          "level": "good",
+          "title": "Aceita FGTS",
+          "text": "Permite utilização de FGTS. Consultar condições e enquadramento."
+        }
+      ],
+      "description": "Apartamento 607, Torre 03, do Spazio Lille, situado na Av. Prefeito Milton Ribeiro Menezes, nº 635, Conj. Hab. Dr. Farid Libos, Londrina/PR. Área total de 57,04 m² com 46,65 m² privativos. Dois quartos, sala, cozinha, WC e uma vaga de garagem (vaga 175, lote 12A, quadra 08).",
+      "features": {
+        "Condomínio": "Spazio Lille",
+        "Área total": "57,04 m²",
+        "Área privativa": "46,65 m²",
+        "Matrícula": "105.856 — CRI Londrina",
+        "Inscrição imobiliária": "7020890508610175",
+        "Averbação leilões negativos": "Averbado"
+      }
+    },
+    "marketDetail": {
+      "indicators": [
+        {
+          "lbl": "Preço/m² · bairro",
+          "val": "R$ 4.450",
+          "delta": "+10,3% YoY",
+          "pos": true
+        },
+        {
+          "lbl": "Preço/m² · imóvel",
+          "val": "R$ 2.087",
+          "delta": "53% abaixo do bairro",
+          "pos": true
+        },
+        {
+          "lbl": "Dias médios p/ venda",
+          "val": "80 dias",
+          "delta": "vs. Londrina 80",
+          "pos": false
+        },
+        {
+          "lbl": "Yield aluguel",
+          "val": "0,45 %/mês",
+          "delta": "vs. Londrina 0,50%",
+          "neg": true
+        },
+        {
+          "lbl": "Cap rate projetado",
+          "val": "5,4% a.a.",
+          "delta": "vs. Selic 15%",
+          "neg": true
+        },
+        {
+          "lbl": "Liquidez · score",
+          "val": "72 / 100",
+          "delta": "boa"
+        }
+      ],
+      "trend": [
+        3200,
+        3240,
+        3270,
+        3310,
+        3350,
+        3380,
+        3420,
+        3460,
+        3500,
+        3540,
+        3570,
+        3610,
+        3650,
+        3680,
+        3720,
+        3760,
+        3800,
+        3830,
+        3870,
+        3900,
+        3940,
+        3970,
+        4010,
+        4050,
+        4090,
+        4120,
+        4160,
+        4200,
+        4240,
+        4280,
+        4320,
+        4360,
+        4390,
+        4420,
+        4440,
+        4450
+      ],
+      "trendStartLabel": "mai/2023",
+      "trendEndLabel": "mai/2026",
+      "comparables": [
+        {
+          "address": "Spazio Lille, Av. Pref. Milton R. Menezes, 635 — 43 m², 2q",
+          "areaM2": 43,
+          "beds": 2,
+          "pricePerM2": 4302,
+          "salePrice": 185000,
+          "source": "EPseg Imóveis",
+          "url": "https://www.arboimoveis.com.br/imovel/apartamento/venda/londrina/pr/conjunto-habitacional-doutor-farid-libos/AP0302_EPSEG"
+        },
+        {
+          "address": "Spazio Lille — 45 m², 2q, 1 vg",
+          "areaM2": 45,
+          "beds": 2,
+          "pricePerM2": 4667,
+          "salePrice": 210000,
+          "source": "Cruciol",
+          "url": "https://www.cruciol.com.br/imovel/apartamento-londrina-2-quartos-45-m/AP1570-CRUC"
+        },
+        {
+          "address": "Spazio Lyon, Av. Pref. Milton R. Menezes, 715 — 47 m², 2q",
+          "areaM2": 47,
+          "beds": 2,
+          "pricePerM2": 4893,
+          "salePrice": 230000,
+          "source": "Santamérica",
+          "url": "https://www.santamerica.com.br/comprar/Londrina/Apartamento/Padrao/Farid-Libos/50078"
+        },
+        {
+          "address": "Spazio Lyon — 48 m², 2q, 1 vg",
+          "areaM2": 48,
+          "beds": 2,
+          "pricePerM2": 3938,
+          "salePrice": 189000,
+          "source": "Arbo Imóveis",
+          "url": "https://www.arboimoveis.com.br/imovel/AP3612_GPRDO"
+        },
+        {
+          "address": "Farid Libos — 43 m², 2q",
+          "areaM2": 43,
+          "beds": 2,
+          "pricePerM2": 4651,
+          "salePrice": 200000,
+          "source": "Catuaí Imóveis",
+          "url": "https://www.catuaiimoveis.com.br/imovel/apartamento-a-venda-spazio-lille-conjunto-habitacional-doutor-farid-libos-londrina"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "label": "Lance de arremate",
+        "value": 119069,
+        "hint": "Valor mínimo de venda (desconto de 39,56%).",
+        "kind": "price"
+      },
+      {
+        "label": "ITBI · Londrina (2%)",
+        "value": 2381,
+        "hint": "Imposto de transmissão sobre o valor do arremate.",
+        "kind": "tax"
+      },
+      {
+        "label": "Comissão do corretor (5%)",
+        "value": 5953,
+        "hint": "Comissão via corretores credenciados Caixa.",
+        "kind": "fee"
+      },
+      {
+        "label": "Registro em cartório",
+        "value": 4100,
+        "hint": "Inclui escritura e averbações na matrícula.",
+        "kind": "fee"
+      },
+      {
+        "label": "Condomínio em atraso (até 10%)",
+        "value": 15000,
+        "hint": "Comprador assume até R$ 19.700 (10% da avaliação). Estimativa conservadora.",
+        "kind": "debt"
+      },
+      {
+        "label": "IPTU em atraso",
+        "value": 3500,
+        "hint": "Tributos sob responsabilidade do comprador.",
+        "kind": "debt"
+      },
+      {
+        "label": "Ação de imissão na posse",
+        "value": 10000,
+        "hint": "Estimativa incluindo honorários e custas judiciais.",
+        "kind": "fee"
+      },
+      {
+        "label": "Reforma estimada",
+        "value": 20000,
+        "hint": "Pintura, pisos, banheiro, cozinha.",
+        "kind": "reno"
+      }
+    ],
+    "edital": {
+      "process": "",
       "creditor": "Caixa Econômica Federal",
-      "debtor": "Ocean View Empreendimentos Ltda.",
-      "modality": "Eletrônico · Lance Já",
+      "debtor": "Ex-mutuário (identificação sob sigilo)",
+      "modality": "Venda Direta Online · Caixa",
       "firstBidDate": "",
-      "firstBidPrice": 1240000,
+      "firstBidPrice": 119069,
       "secondBidDate": "",
       "secondBidPrice": 0,
-      "propertyDescription": "Cobertura duplex de 180 m² no 20º andar, Av. Atlântica, 5500, Barra Sul, Balneário Camboriú-SC.",
-      "liens": [],
-      "paymentTerms": "À vista no prazo de 24h via depósito judicial.",
-      "summaryNote": "Texto resumido pela IA Arremate."
+      "propertyDescription": "Apartamento nº 607, Torre 03, vaga de garagem nº 175, lote 12A, quadra 08, do Spazio Lille, situado na Avenida Prefeito Milton Ribeiro Menezes, nº 635, Conjunto Habitacional Dr. Farid Libos, Londrina-PR. Área total de 57,04 m², área privativa de 46,65 m². Matrícula nº 105.856 do CRI de Londrina/PR.",
+      "liens": [
+        "Alienação fiduciária em favor da Caixa Econômica Federal — consolidada.",
+        "Condomínio: comprador assume até 10% do valor de avaliação (R$ 19.700).",
+        "Tributos (IPTU): sob responsabilidade integral do comprador.",
+        "Leilões negativos averbados na matrícula."
+      ],
+      "paymentTerms": "Recursos próprios ou FGTS. Pagamento à vista. Permite utilização de FGTS — consultar condições e enquadramento.",
+      "summaryNote": "Texto resumido pela IA Arremate. Consultar condições completas no portal Caixa Imóveis."
     }
   }
 ]
