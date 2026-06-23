@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
@@ -16,6 +16,8 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
   });
   const [sort, setSort] = useState('score');
   const [view, setView] = useState('grid');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   const filtered = useMemo(() => {
     let list = [...properties];
@@ -35,8 +37,8 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     if (filters.discountMin > 0) list = list.filter(p => p.discount >= filters.discountMin);
     if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
     if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
-    if (filters.praca !== 'Todos') list = list.filter(p => p.auctionType === filters.praca);
-    if (filters.modalidade !== 'Todos') list = list.filter(p => p.auctionType === filters.modalidade);
+    if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
+    if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
     if (sort === 'score') list.sort((a, b) => b.score - a.score);
     else if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
@@ -46,6 +48,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
   }, [addressQuery, filters, sort, properties]);
+
+  useEffect(() => { setPage(1); }, [addressQuery, filters, sort]);
+
+  const paginated = filtered.slice(0, page * PAGE_SIZE);
 
   const activeFilterCount =
     (addressQuery.trim() ? 1 : 0) +
@@ -83,11 +89,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           </p>
         </div>
         <div className="row gap-2 page-actions">
-          <button className="btn">
-            <span className="mono" style={{ color: 'var(--fg-2)' }}>⌥</span>
-            Salvar busca
-          </button>
-          <button className="btn">
+          <button className="btn" disabled title="Em breve">
             <span className="mono" style={{ color: 'var(--fg-2)' }}>↗</span>
             Exportar CSV
           </button>
@@ -184,7 +186,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           desconto médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-          1–{filtered.length} de {filtered.length}
+          1–{paginated.length} de {filtered.length}
         </span>
       </div>
 
@@ -197,7 +199,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
           gap: 18,
         }}>
-          {filtered.map(p => (
+          {paginated.map(p => (
             <PropertyCard
               key={p.id}
               p={p}
@@ -231,7 +233,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             <span>encerra em</span>
             <span></span>
           </div>
-          {filtered.map(p => (
+          {paginated.map(p => (
             <PropertyRow
               key={p.id}
               p={p}
@@ -243,12 +245,12 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         </div>
       )}
 
-      {properties.length > filtered.length && (
+      {paginated.length < filtered.length && (
         <div style={{ textAlign: 'center', marginTop: 48 }}>
-          <button className="btn lg">
+          <button className="btn lg" onClick={() => setPage(p => p + 1)}>
             Carregar mais
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginLeft: 6 }}>
-              {(properties.length - filtered.length).toLocaleString('pt-BR')} restantes
+              {(filtered.length - paginated.length).toLocaleString('pt-BR')} restantes
             </span>
           </button>
         </div>

@@ -6,9 +6,10 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
 
   // Simulator state lives here so both Costs and Viability share it
-  const [reno, setReno] = useState(45);
+  const [reno, setReno] = useState(6);
   const [target, setTarget] = useState(30);
-  const [exempt, setExempt] = useState('Reinvestimento em 180 dias');
+  const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
+  const [legalAI, setLegalAI] = useState(false);
 
   if (!property) {
     return (
@@ -22,16 +23,18 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const isWatched = watched?.includes(p.id);
 
   // Compute simulator values from seed costs + sliders
-  const renoCost = Math.round((reno / 100) * 80000);
-  const gainCapital = (exempt === 'Primeiro imóvel' || exempt === 'Reinvestimento em 180 dias')
-    ? 0
-    : Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15);
+  const renoBase = p.costs?.find(c => c.kind === 'reno')?.value || 20000;
+  const renoCost = Math.round((reno / 100) * renoBase * 5);
+  const gainCapital = exempt === 'Pagamento integral de GC'
+    ? Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15)
+    : 0;
 
+  const legalAICost = legalAI ? 397 : 0;
   const dynamicTotal = (p.costs || []).reduce((acc, r) => {
     if (r.kind === 'reno') return acc + renoCost;
     if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) return acc + gainCapital;
     return acc + r.value;
-  }, 0);
+  }, legalAICost);
 
   const netSale = Math.round((p.market || 0) * 0.94);
   const grossROI = dynamicTotal > 0 ? Math.round(((netSale - dynamicTotal) / dynamicTotal) * 100) : 0;
@@ -41,6 +44,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 
   const sim = {
     reno, setReno, target, setTarget, exempt, setExempt,
+    legalAI, setLegalAI, legalAICost,
     renoCost, gainCapital, dynamicTotal, netSale, grossROI, maxBid,
   };
 
@@ -66,14 +70,11 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             </span>
             {isWatched ? 'Salvo' : 'Salvar'}
           </button>
-          <button className="btn sm" onClick={() => p.auctionUrl && window.open(p.auctionUrl, '_blank')} disabled={!p.auctionUrl} title={p.auctionUrl || 'URL não disponível'}>
-            <span className="mono">↗</span> Edital PDF
-          </button>
-          <button className="btn sm">
+          <button className="btn sm" disabled title="Em breve">
             <span className="mono">⎙</span> Exportar análise
           </button>
-          <button className="btn sm primary">
-            Dar lance
+          <button className="btn sm primary" onClick={() => p.auctionUrl && window.open(p.auctionUrl, '_blank')} disabled={!p.auctionUrl} title={p.auctionUrl || 'URL não disponível'}>
+            <span className="mono">↗</span> Acessar leilão
           </button>
         </div>
       </div>
@@ -98,15 +99,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             }}>
               Fachada
             </div>
-            <button style={{
-              position: 'absolute', bottom: 14, right: 14,
-              padding: '8px 14px', borderRadius: 6,
-              background: 'oklch(1 0 0 / 0.95)',
-              border: '1px solid var(--line-1)',
-              fontSize: 12, fontWeight: 500,
-            }}>
-              Ver todas →
-            </button>
           </div>
           <div className="row gap-2 thumb-strip" style={{ marginTop: 10 }}>
             <div style={{
@@ -141,7 +133,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         {/* Key facts panel */}
         <div className="card" style={{ padding: 22 }}>
           <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <span className="tag accent">{p.auctionType}</span>
+            <span className="tag accent">{p.praca || p.modalidade || p.auctionType}</span>
             <span className="tag">{p.type}</span>
             <span className={`tag dot ${p.occupancy === 'desocupado' ? 'good' : p.occupancy === 'ocupado' ? 'warn' : 'bad'}`}>
               {p.occupancy}
@@ -210,7 +202,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               <Meta lbl="Leiloeiro" val={p.auctioneer} />
               <Meta lbl="Tribunal/Vara" val={p.court} />
               <Meta lbl="Processo" val={p.edital?.process || '—'} />
-              <Meta lbl="Matrícula" val="—" />
+              <Meta lbl="Matrícula" val={p.viability?.features?.["Matrícula"] || "—"} />
             </div>
           </Collapsible>
         </div>
@@ -366,7 +358,10 @@ function Market({ p }) {
   const regionAppreciation = appreciationIndicator?.delta;
 
   // Filtrar "Liquidez · score" dos indicadores
-  const filteredIndicators = md.indicators.filter(i => !i.lbl.toLowerCase().includes('liquidez'));
+  const filteredIndicators = md.indicators.filter(i => {
+    const l = i.lbl.toLowerCase();
+    return !l.includes('liquidez') && !l.includes('yield') && !l.includes('cap rate');
+  });
 
   return (
     <div>
@@ -406,7 +401,7 @@ function Market({ p }) {
         {/* § 01.02 — indicadores + valorização */}
         <div className="card" style={{ padding: 22 }}>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.02 · indicadores</span>
-          <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>{p.neighborhood} · base 2024–26</h3>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>{p.neighborhood} · base 2024–2026</h3>
 
           {regionAppreciation && (
             <div style={{
@@ -495,7 +490,7 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 // TAB 2 — COSTS (with simulator at top)
 // ============================================================
 function CostBreakdown({ p, sim }) {
-  const { reno, setReno, target, setTarget, exempt, setExempt, renoCost, gainCapital, netSale, grossROI, maxBid } = sim;
+  const { reno, setReno, target, setTarget, exempt, setExempt, legalAI, setLegalAI, legalAICost, renoCost, gainCapital, netSale, grossROI, maxBid } = sim;
 
   const rows = (p.costs || []).map(r => {
     if (r.kind === 'reno') {
@@ -516,6 +511,15 @@ function CostBreakdown({ p, sim }) {
     }
     return r;
   });
+
+  if (legalAI) {
+    rows.push({
+      label: 'Assistente jurídico',
+      value: legalAICost,
+      hint: 'Diligência jurídica automatizada — matrícula, certidões, processos, protestos e parecer de nulidade.',
+      kind: 'legal',
+    });
+  }
 
   const dynamicTotal = rows.reduce((a, r) => a + r.value, 0);
 
@@ -539,7 +543,7 @@ function CostBreakdown({ p, sim }) {
               Arraste os controles — os custos abaixo recalculam ao vivo.
             </p>
           </div>
-          <button className="btn sm" onClick={() => { setReno(45); setTarget(30); setExempt('Reinvestimento em 180 dias'); }}>
+          <button className="btn sm" onClick={() => { setReno(6); setTarget(30); setExempt('Primeiro imóvel ou reinvestimento em 180 dias'); setLegalAI(false); }}>
             Resetar
           </button>
         </div>
@@ -589,10 +593,37 @@ function CostBreakdown({ p, sim }) {
         <Selector
           label="Cenário tributário"
           value={exempt}
-          options={['Primeiro imóvel', 'Reinvestimento em 180 dias', 'Pagamento integral de GC']}
+          options={['Primeiro imóvel ou reinvestimento em 180 dias', 'Pagamento integral de GC']}
           onChange={setExempt}
           hint="Isenção ou incidência do ganho de capital na venda"
         />
+
+        <div className="divider" style={{ margin: '20px 0' }}></div>
+        <div className="row between" style={{ alignItems: 'center' }}>
+          <div>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Assistente jurídico</span>
+            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--fg-3)' }}>
+              Inclui R$ 397 de análise jurídica automatizada no custo total
+            </p>
+          </div>
+          <button
+            onClick={() => setLegalAI(!legalAI)}
+            style={{
+              width: 44, height: 24, borderRadius: 12,
+              background: legalAI ? 'var(--accent)' : 'var(--bg-3)',
+              position: 'relative', transition: 'background .2s',
+              border: '1px solid ' + (legalAI ? 'var(--accent)' : 'var(--line-2)'),
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: 2, left: legalAI ? 22 : 2,
+              width: 18, height: 18, borderRadius: '50%',
+              background: '#fff', transition: 'left .2s',
+              boxShadow: '0 1px 3px oklch(0 0 0 / 0.15)',
+            }} />
+          </button>
+        </div>
       </div>
 
       {/* ── Cost table ── */}
@@ -784,7 +815,6 @@ function Viability({ p, sim }) {
         <Metric lbl="ROI líquido projetado" big={`${grossROI >= 0 ? '+' : ''}${grossROI}%`} sub="Após custos, tributos e venda estimada" color={grossROI >= 25 ? 'var(--good)' : grossROI >= 10 ? 'var(--warn)' : 'var(--bad)'} />
         <Metric lbl="Custo total estimado" big={`R$ ${fmtBRL(dynamicTotal)}`} sub="Lance + reforma + tributos e débitos" />
         <Metric lbl="Lance máximo recomendado" big={`R$ ${fmtBRL(Math.max(0, maxBid))}`} sub={`Para atingir ${target}% de retorno líquido`} color="var(--accent)" />
-        <Metric lbl="Payback" big="11 meses" sub="Considerando venda direta após reforma" />
       </div>
 
       <div style={{ marginBottom: 24, padding: '10px 16px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
@@ -957,8 +987,9 @@ function Edital({ p }) {
           <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Originado em: {e.firstBidDate || 'não informado'}</p>
         </div>
         <div className="row gap-2">
-          <button className="btn sm"><span className="mono">↗</span> Abrir no tribunal</button>
-          <button className="btn sm"><span className="mono">↓</span> PDF original</button>
+          <button className="btn sm" onClick={() => p.auctionUrl && window.open(p.auctionUrl, '_blank')} disabled={!p.auctionUrl}>
+            <span className="mono">↓</span> PDF original
+          </button>
         </div>
       </div>
       <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
