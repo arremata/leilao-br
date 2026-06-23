@@ -98,7 +98,12 @@ a { color: inherit; text-decoration: none; }
   background: rgba(255,255,255,0.72);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border-bottom: 1px solid var(--line-1);
+  border-bottom: 1px solid rgba(229,231,235,0.7);
+  transition: background .25s ease, box-shadow .25s ease;
+}
+.app-shell.scrolled .topbar {
+  background: rgba(255,255,255,0.88);
+  box-shadow: 0 6px 24px rgba(17,24,39,0.06);
 }
 .brand {
   display: inline-flex; align-items: center; gap: 8px;
@@ -175,8 +180,14 @@ a { color: inherit; text-decoration: none; }
   background: var(--accent);
   color: var(--accent-ink);
   border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(124,58,237,0.22);
 }
-.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn.primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  box-shadow: 0 6px 20px rgba(124,58,237,0.30);
+  transform: translateY(-1px);
+}
 .btn.ghost {
   border-color: transparent;
   background: transparent;
@@ -190,7 +201,7 @@ a { color: inherit; text-decoration: none; }
 .card {
   background: var(--bg-1);
   border: 1px solid var(--line-1);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .card.hov {
@@ -199,7 +210,8 @@ a { color: inherit; text-decoration: none; }
 }
 .card.hov:hover {
   border-color: var(--line-2);
-  box-shadow: 0 4px 14px rgba(17,24,39,0.05);
+  box-shadow: 0 8px 28px rgba(17,24,39,0.06);
+  transform: translateY(-2px);
 }
 
 /* ---------- Score badge ---------- */
@@ -421,6 +433,19 @@ a { color: inherit; text-decoration: none; }
   padding-bottom: env(safe-area-inset-bottom);
   overflow-x: hidden;
 }
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(560px circle at 8% -5%, rgba(124,58,237,0.06), transparent 70%),
+    radial-gradient(520px circle at 100% 30%, rgba(99,102,241,0.045), transparent 70%);
+}
+
+.page { position: relative; z-index: 1; }
 
 .mobile-search {
   display: none;

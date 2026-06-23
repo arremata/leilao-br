@@ -5,7 +5,7 @@ import { fmtBRL, getEndsAtMs } from '../utils';
 // Score badge — circular AI score 0-100, color-coded
 // ============================================================
 export function ScoreBadge({ value = 87, size = 56, showLabel = true }) {
-  const r = (size - 5) / 2;
+  const r = (size - 6) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - value / 100);
   const color =
@@ -20,9 +20,9 @@ export function ScoreBadge({ value = 87, size = 56, showLabel = true }) {
     <div className="score-wrap" style={{ '--size': size + 'px', background: bg, borderRadius: '50%' }}>
       <svg width={size} height={size}>
         <circle cx={size/2} cy={size/2} r={r}
-          stroke="var(--bg-1)" strokeWidth="2.5" fill="none" />
+          stroke="var(--bg-1)" strokeWidth="3" fill="none" />
         <circle cx={size/2} cy={size/2} r={r}
-          stroke={color} strokeWidth="2.5" fill="none"
+          stroke={color} strokeWidth="3" fill="none"
           strokeDasharray={c} strokeDashoffset={offset}
           strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset .5s ease' }} />
@@ -233,8 +233,8 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
           position: 'absolute', top: 14, right: 12,
           background: 'rgba(255,255,255,0.78)',
           padding: '5px 10px', borderRadius: 6,
-          backdropFilter: 'blur(4px)',
-          border: '1px solid var(--line-1)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.6)',
         }}>
           <Countdown until={p.endsAt} compact dark />
         </div>
@@ -245,9 +245,9 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
             position: 'absolute', bottom: 12, right: 12,
             width: 32, height: 32, borderRadius: 6,
             background: 'rgba(255,255,255,0.78)',
-            border: '1px solid var(--line-1)',
+            border: '1px solid rgba(255,255,255,0.6)',
             color: watched ? 'var(--accent)' : 'var(--fg-2)',
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(8px)',
             fontSize: 14,
           }}
           title={watched ? 'Remover da watchlist' : 'Adicionar à watchlist'}

@@ -53,6 +53,23 @@ function App() {
     localStorage.setItem('arremate_history', JSON.stringify(history));
   }, [history]);
 
+  // Scroll: topbar solidify + progress bar (visual only)
+  useEffect(() => {
+    const el = document.querySelector('.app-shell');
+    const bar = document.getElementById('argos-progress');
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      if (el) el.classList.toggle('scrolled', y > 36);
+      if (bar) {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const go = (s, prop) => {
     if (prop) {
       setSelected(prop);
@@ -132,10 +149,14 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
 
   return (
     <header className="topbar">
+      <div id="argos-progress" style={{
+        position: 'absolute', left: 0, bottom: 0, height: 2,
+        width: 0, background: 'var(--accent)', transition: 'width .1s linear',
+      }} />
       <div className="row gap-6" style={{ alignItems: 'center' }}>
         <button className="brand" onClick={() => go('home')}>
           <span className="logo"></span>
-          Arremate
+          Argos
         </button>
         <nav className="nav">
           <a className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</a>

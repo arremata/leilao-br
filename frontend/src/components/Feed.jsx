@@ -99,8 +99,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       {/* Filter bar */}
       <div className="filter-bar" style={{
         position: 'sticky', top: 60, zIndex: 20,
-        background: 'color-mix(in oklab, var(--bg-0) 94%, transparent)',
-        backdropFilter: 'blur(12px)',
+        background: 'rgba(255,255,255,0.6)',
+        backdropFilter: 'blur(16px) saturate(1.3)',
+        WebkitBackdropFilter: 'blur(16px) saturate(1.3)',
         padding: '14px 0',
         borderBottom: '1px solid var(--line-1)',
         marginBottom: 20,
