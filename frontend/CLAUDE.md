@@ -36,12 +36,12 @@ npm run preview      # preview production build
 - Components in `src/components/` with named exports
 - Entry point: `src/main.jsx` → `src/App.jsx`
 - React 19 + StrictMode
-- Three-screen SPA: `home`/`feed`/`detail`, driven by `go(screen, prop)` in `App.jsx`
+- Five-screen SPA: `home`/`feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`
 - Screen and watchlist persist to `localStorage` (keys: `arremate_screen`, `arremate_watched`)
 
 ### Data model
 
-Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them. Each property: `id`, `score` (0-100), auction metadata (`auctionType`, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, `risk` flags (`j`/`f`/`l`/`o`), `photoUrl`, `auctionUrl`. The `market` field reflects real comparable sales, not just the auction appraisal. `discount` can be negative (bid above market).
+Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them. Each property: `id`, `score` (0-100), auction metadata (`auctionType` = Judicial/Extrajudicial, `praca` = 1ª praça/2ª praça or null, `modalidade` = Licitação aberta/Venda direta, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, `risk` flags (`j`/`f`/`l`/`o`), `photoUrl`, `auctionUrl`. The `market` field reflects real comparable sales, not just the auction appraisal. `discount` can be negative (bid above market).
 
 ### API integration
 

@@ -143,6 +143,8 @@ class AuctionPropertyResult(BaseModel):
     neighborhood: str
     city: str
     auction_type: str
+    praca: str | None = None
+    modalidade: str | None = None
     auctioneer: str
     court: str
     discount: float

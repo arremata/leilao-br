@@ -88,7 +88,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
           ix="03"
           title="Sua watchlist"
           sub="Itens salvos · monitoramos preço, riscos e prazo automaticamente."
-          action={<button className="btn ghost sm">Configurar alertas →</button>}
+          action={<button className="btn ghost sm" disabled title="Em breve">Configurar alertas →</button>}
         >
           <div className="card responsive-table" style={{ overflow: 'hidden' }}>
             <div className="property-row table-head" style={{
@@ -404,7 +404,7 @@ function CompactRow({ p, rank, onClick }) {
       <div>
         <div style={{ fontSize: 14, fontWeight: 500 }}>{p.title}</div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {p.neighborhood}, {p.city} · {p.auctionType} · {p.auctioneer}
+          {p.neighborhood}, {p.city} · {p.praca || p.modalidade || p.auctionType} · {p.auctioneer}
         </div>
         <div className="row gap-3" style={{ marginTop: 6 }}>
           <span className="mono" style={{ fontSize: 12 }}>
