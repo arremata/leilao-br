@@ -92,7 +92,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
             <div style={{
               position: 'absolute', top: 14, left: 14,
-              background: 'oklch(1 0 0 / 0.92)', padding: '6px 10px',
+              background: 'rgba(255,255,255,0.92)', padding: '6px 10px',
               borderRadius: 6, fontSize: 11,
               border: '1px solid var(--line-1)',
               fontFamily: 'var(--f-mono)',
@@ -114,14 +114,14 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               ) : (
                 <div style={{
                   width: '100%', height: '100%',
-                  background: 'oklch(0.92 0.005 75)',
-                  backgroundImage: 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
+                  background: '#ECEEF1',
+                  backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
                 }} />
               )}
               <span className="mono" style={{
                 position: 'absolute', bottom: 4, left: 4,
                 fontSize: 9, color: 'var(--fg-2)',
-                background: 'oklch(1 0 0 / 0.8)',
+                background: 'rgba(255,255,255,0.8)',
                 padding: '1px 4px', borderRadius: 3,
               }}>
                 Fachada
@@ -620,7 +620,7 @@ function CostBreakdown({ p, sim }) {
               position: 'absolute', top: 2, left: legalAI ? 22 : 2,
               width: 18, height: 18, borderRadius: '50%',
               background: '#fff', transition: 'left .2s',
-              boxShadow: '0 1px 3px oklch(0 0 0 / 0.15)',
+              boxShadow: '0 1px 3px rgba(17,24,39,0.15)',
             }} />
           </button>
         </div>
@@ -923,8 +923,8 @@ function LegalLocked() {
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24 }}>
         <div className="card" style={{
           width: 'min(560px, 100%)', padding: 32,
-          background: 'oklch(1 0 0 / 0.92)', backdropFilter: 'blur(12px)',
-          boxShadow: '0 20px 50px oklch(0 0 0 / 0.08)',
+          background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
+          boxShadow: '0 20px 50px rgba(17,24,39,0.08)',
         }}>
           <div className="row gap-2 baseline" style={{ marginBottom: 18 }}>
             <span style={{ width: 26, height: 26, display: 'grid', placeItems: 'center', border: '1.5px solid var(--accent)', borderRadius: '50%', color: 'var(--accent)', fontSize: 12, fontFamily: 'var(--f-mono)' }}>⚿</span>

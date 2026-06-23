@@ -175,7 +175,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
           onClick={() => setUserMenuOpen(!userMenuOpen)}
           style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: 'oklch(0.75 0.06 60)',
+            background: 'var(--bg-3)',
             display: 'grid', placeItems: 'center',
             fontSize: 12, color: 'var(--fg-0)',
             fontWeight: 600,
@@ -193,7 +193,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
               minWidth: 200, padding: 6,
               background: 'var(--bg-0)', border: '1px solid var(--line-1)',
               borderRadius: 10, zIndex: 91,
-              boxShadow: '0 10px 28px oklch(0 0 0 / 0.1)',
+              boxShadow: '0 10px 28px rgba(17,24,39,0.1)',
             }}>
               <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-1)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>Gustavo D.</div>

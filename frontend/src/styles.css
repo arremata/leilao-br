@@ -1,43 +1,44 @@
 /* =========================================================
-   Arremate v2 — light, data-tool aesthetic
-   Single font family: IBM Plex (Sans + Mono)
+   Argos — Arctic / Violet identity
+   Fonts: Bricolage Grotesque (display), Inter (body), JetBrains Mono (numbers)
    ========================================================= */
 
 :root {
-  /* Warm paper background scale */
-  --bg-0: oklch(0.985 0.004 80);   /* page */
-  --bg-1: oklch(1 0 0);            /* card */
-  --bg-2: oklch(0.96 0.004 80);    /* chip / hover */
-  --bg-3: oklch(0.93 0.005 75);    /* lifted */
+  /* Fundo Arctic */
+  --bg-0: #FAFAFA;
+  --bg-1: #FFFFFF;
+  --bg-2: #F3F4F6;
+  --bg-3: #ECEEF1;
 
-  /* Strokes */
-  --line-1: oklch(0.91 0.005 75);
-  --line-2: oklch(0.85 0.006 75);
-  --line-3: oklch(0.72 0.008 70);
+  /* Linhas */
+  --line-1: #E5E7EB;
+  --line-2: #D1D5DB;
+  --line-3: #9CA3AF;
 
-  /* Text */
-  --fg-0: oklch(0.22 0.01 60);   /* primary */
-  --fg-1: oklch(0.4 0.008 60);   /* secondary */
-  --fg-2: oklch(0.55 0.007 60);  /* muted */
-  --fg-3: oklch(0.7 0.005 60);   /* placeholder */
+  /* Texto */
+  --fg-0: #111827;
+  --fg-1: #374151;
+  --fg-2: #6B7280;
+  --fg-3: #9CA3AF;
 
-  /* Accent — warm auction-hammer orange, more saturated for light bg */
-  --accent: oklch(0.6 0.18 45);
-  --accent-strong: oklch(0.55 0.2 42);
-  --accent-soft: oklch(0.95 0.04 55);
-  --accent-ink: oklch(1 0 0);
+  /* Acento — Argos Violet (UNICA cor de marca) */
+  --accent: #7C3AED;
+  --accent-strong: #6D28D9;
+  --accent-soft: #EDE9FE;
+  --accent-ink: #FFFFFF;
 
-  /* Risk traffic light */
-  --good: oklch(0.55 0.16 150);
-  --good-soft: oklch(0.95 0.04 150);
-  --warn: oklch(0.65 0.17 75);
-  --warn-soft: oklch(0.96 0.05 80);
-  --bad: oklch(0.55 0.2 25);
-  --bad-soft: oklch(0.96 0.04 25);
+  /* Sinais (somente dados) — contraste alto */
+  --good: #16A34A;
+  --good-soft: #DCFCE7;
+  --warn: #B45309;
+  --warn-soft: #FEF3C7;
+  --bad: #DC2626;
+  --bad-soft: #FEE2E2;
 
-  /* Fonts */
-  --f-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Fontes */
+  --f-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --f-sans: 'Inter', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -94,15 +95,17 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 20px;
   padding: 12px 20px;
-  background: color-mix(in oklab, var(--bg-0) 92%, transparent);
-  backdrop-filter: blur(14px);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border-bottom: 1px solid var(--line-1);
 }
 .brand {
   display: inline-flex; align-items: center; gap: 8px;
-  font-weight: 600;
+  font-family: var(--f-display);
+  font-weight: 800;
   font-size: 17px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
 }
 .brand .logo {
   width: 22px; height: 22px;
@@ -196,7 +199,7 @@ a { color: inherit; text-decoration: none; }
 }
 .card.hov:hover {
   border-color: var(--line-2);
-  box-shadow: 0 4px 14px oklch(0 0 0 / 0.05);
+  box-shadow: 0 4px 14px rgba(17,24,39,0.05);
 }
 
 /* ---------- Score badge ---------- */
@@ -228,11 +231,11 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   background:
     repeating-linear-gradient(135deg,
-      oklch(0.92 0.005 75) 0 1px,
+      #ECEEF1 0 1px,
       transparent 1px 16px),
     linear-gradient(180deg,
-      oklch(0.95 0.005 75),
-      oklch(0.9 0.005 75));
+      #F3F4F6,
+      #E5E7EB);
   color: var(--fg-2);
   overflow: hidden;
 }
@@ -241,7 +244,7 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--f-mono); font-size: 10px;
   color: var(--fg-2); letter-spacing: 0.1em; text-transform: uppercase;
   padding: 4px 8px;
-  background: oklch(1 0 0 / 0.8);
+  background: rgba(255,255,255,0.8);
   border-radius: 4px;
 }
 
@@ -259,7 +262,7 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
 }
 .tag.good { background: var(--good-soft); color: var(--good); border-color: transparent; }
-.tag.warn { background: var(--warn-soft); color: oklch(0.45 0.16 75); border-color: transparent; }
+.tag.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .tag.bad { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .tag.accent { background: var(--accent-soft); color: var(--accent-strong); border-color: transparent; }
 .tag.dot::before {
@@ -317,7 +320,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--accent);
   border: 3px solid var(--bg-1);
   cursor: pointer;
-  box-shadow: 0 1px 4px oklch(0 0 0 / 0.15);
+  box-shadow: 0 1px 4px rgba(17,24,39,0.15);
 }
 .slider::-moz-range-thumb {
   width: 18px; height: 18px;
@@ -325,7 +328,7 @@ a { color: inherit; text-decoration: none; }
   background: var(--accent);
   border: 3px solid var(--bg-1);
   cursor: pointer;
-  box-shadow: 0 1px 4px oklch(0 0 0 / 0.15);
+  box-shadow: 0 1px 4px rgba(17,24,39,0.15);
 }
 
 /* ---------- Section eyebrow ---------- */
@@ -342,23 +345,26 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------- Headings ---------- */
 .h1 {
+  font-family: var(--f-display);
   font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
   line-height: 1.1;
   margin: 0;
 }
 .h2 {
+  font-family: var(--f-display);
   font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   margin: 0;
 }
 .h3 {
+  font-family: var(--f-display);
   font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 

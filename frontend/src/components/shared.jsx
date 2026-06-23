@@ -231,7 +231,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
         {/* Countdown top-right */}
         <div style={{
           position: 'absolute', top: 14, right: 12,
-          background: 'oklch(1 0 0 / 0.9)',
+          background: 'rgba(255,255,255,0.78)',
           padding: '5px 10px', borderRadius: 6,
           backdropFilter: 'blur(4px)',
           border: '1px solid var(--line-1)',
@@ -244,7 +244,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
           style={{
             position: 'absolute', bottom: 12, right: 12,
             width: 32, height: 32, borderRadius: 6,
-            background: 'oklch(1 0 0 / 0.9)',
+            background: 'rgba(255,255,255,0.78)',
             border: '1px solid var(--line-1)',
             color: watched ? 'var(--accent)' : 'var(--fg-2)',
             backdropFilter: 'blur(4px)',
@@ -342,8 +342,8 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
     >
       <div style={{
         width: 56, height: 42, borderRadius: 6, overflow: 'hidden',
-        background: 'oklch(0.92 0.005 75)',
-        backgroundImage: p.photoUrl ? 'none' : 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
+        background: '#ECEEF1',
+        backgroundImage: p.photoUrl ? 'none' : 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
       }}>
         {p.photoUrl && <img src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
       </div>

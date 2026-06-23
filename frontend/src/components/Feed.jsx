@@ -286,7 +286,7 @@ function Filter({ label, value, options, onChange }) {
           <div className="card" style={{
             position: 'absolute', top: 'calc(100% + 4px)', left: 0,
             minWidth: 180, padding: 4, zIndex: 31,
-            boxShadow: '0 10px 28px oklch(0 0 0 / 0.08)',
+            boxShadow: '0 10px 28px rgba(17,24,39,0.08)',
           }}>
             {options.map(o => (
               <button
