@@ -10,7 +10,9 @@
     "type": "Apartamento",
     "neighborhood": "Santa Cândida",
     "city": "Curitiba, PR",
-    "auctionType": "2ª praça",
+    "auctionType": "Extrajudicial",
+    "praca": "2ª praça",
+    "modalidade": "Licitação aberta",
     "auctioneer": "Caixa Econômica Federal",
     "court": "—",
     "discount": -21,
@@ -94,7 +96,7 @@
         {
           "lbl": "Preço/m² · bairro",
           "val": "R$ 4.590",
-          "delta": "+12% YoY",
+          "delta": "+12% ao ano",
           "pos": true
         },
         {
@@ -107,18 +109,6 @@
           "lbl": "Dias médios p/ venda",
           "val": "107 dias",
           "delta": "vs. Curitiba 60",
-          "neg": true
-        },
-        {
-          "lbl": "Yield aluguel",
-          "val": "0,65 %/mês",
-          "delta": "vs. Curitiba 0,48%",
-          "pos": true
-        },
-        {
-          "lbl": "Cap rate projetado",
-          "val": "7,8% a.a.",
-          "delta": "vs. Selic 15%",
           "neg": true
         },
         {
@@ -259,6 +249,12 @@
         "kind": "fee"
       },
       {
+        "label": "Imposto sobre ganho de capital",
+        "value": 0,
+        "hint": "Isento — cenário padrão: reinvestimento em 180 dias.",
+        "kind": "tax"
+      },
+      {
         "label": "Reforma estimada",
         "value": 22000,
         "hint": "Pintura, piso, banheiro, cozinha.",
@@ -295,7 +291,9 @@
     "type": "Apartamento",
     "neighborhood": "Jardim Santa Cruz",
     "city": "Londrina, PR",
-    "auctionType": "2ª praça",
+    "auctionType": "Judicial",
+    "praca": "2ª praça",
+    "modalidade": "Licitação aberta",
     "auctioneer": "Leilão Judicial Eletrônico",
     "court": "Foro Central Cível SP",
     "discount": 21,
@@ -379,7 +377,7 @@
         {
           "lbl": "Preço/m² · bairro",
           "val": "R$ 2.850",
-          "delta": "+8,2% YoY",
+          "delta": "+8,2% ao ano",
           "pos": true
         },
         {
@@ -392,18 +390,6 @@
           "lbl": "Dias médios p/ venda",
           "val": "85 dias",
           "delta": "vs. Londrina 80",
-          "neg": true
-        },
-        {
-          "lbl": "Yield aluguel",
-          "val": "0,53 %/mês",
-          "delta": "vs. Londrina 0,50%",
-          "pos": true
-        },
-        {
-          "lbl": "Cap rate projetado",
-          "val": "6,4% a.a.",
-          "delta": "vs. Selic 15%",
           "neg": true
         },
         {
@@ -529,6 +515,12 @@
         "kind": "debt"
       },
       {
+        "label": "Imposto sobre ganho de capital",
+        "value": 0,
+        "hint": "Isento — cenário padrão: reinvestimento em 180 dias.",
+        "kind": "tax"
+      },
+      {
         "label": "Reforma estimada",
         "value": 18000,
         "hint": "Pintura, pisos, banheiro.",
@@ -564,7 +556,9 @@
     "type": "Apartamento",
     "neighborhood": "Conj. Hab. Dr. Farid Libos",
     "city": "Londrina, PR",
-    "auctionType": "Venda direta",
+    "auctionType": "Extrajudicial",
+    "praca": null,
+    "modalidade": "Venda direta",
     "auctioneer": "Caixa Econômica Federal",
     "court": "—",
     "discount": 43,
@@ -648,7 +642,7 @@
         {
           "lbl": "Preço/m² · bairro",
           "val": "R$ 4.450",
-          "delta": "+10,3% YoY",
+          "delta": "+10,3% ao ano",
           "pos": true
         },
         {
@@ -662,18 +656,6 @@
           "val": "80 dias",
           "delta": "vs. Londrina 80",
           "pos": false
-        },
-        {
-          "lbl": "Yield aluguel",
-          "val": "0,45 %/mês",
-          "delta": "vs. Londrina 0,50%",
-          "neg": true
-        },
-        {
-          "lbl": "Cap rate projetado",
-          "val": "5,4% a.a.",
-          "delta": "vs. Selic 15%",
-          "neg": true
         },
         {
           "lbl": "Liquidez · score",
@@ -811,6 +793,12 @@
         "value": 10000,
         "hint": "Estimativa incluindo honorários e custas judiciais.",
         "kind": "fee"
+      },
+      {
+        "label": "Imposto sobre ganho de capital",
+        "value": 0,
+        "hint": "Isento — cenário padrão: reinvestimento em 180 dias.",
+        "kind": "tax"
       },
       {
         "label": "Reforma estimada",

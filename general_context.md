@@ -39,7 +39,7 @@ Abre ao clicar em qualquer imóvel. 4 abas:
 🧾 Encargos
 	•	Tabela completa: lance, ITBI (alíquota da cidade), comissão, emolumentos do cartório (tabela IRIB), desocupação, reforma, IR
 	•	Total final com IR
-🔒 Jurídico — Premium R$ 197
+🔒 Assistente jurídico — Premium R$ 397
 	•	Análise manual por advogado especialista
 	•	Matrícula via ONR, ônus e hipotecas, processos DataJud + PROJUDI, protestos, dívida ativa
 	•	Parecer com risco de nulidade

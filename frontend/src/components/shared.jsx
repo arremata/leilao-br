@@ -260,7 +260,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
       <div style={{ padding: 16 }}>
         {/* Tags */}
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="tag">{p.auctionType}</span>
+          <span className="tag">{p.praca || p.modalidade || p.auctionType}</span>
           <span className="tag">{p.type}</span>
           <span className={`tag dot ${occColor}`}>{p.occupancy}</span>
         </div>
@@ -353,7 +353,7 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
           {p.title}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {p.auctionType}
+          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {p.praca || p.modalidade || p.auctionType}
         </div>
       </div>
       <div>

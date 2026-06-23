@@ -69,6 +69,39 @@ def _map_occupancy(occupation_status: str) -> str:
     return "ocupado"
 
 
+def _classify_auction_type(auction_type: str) -> str:
+    if not auction_type:
+        return "Extrajudicial"
+    lower = auction_type.lower()
+    if "judicial" in lower and "extrajudicial" not in lower:
+        return "Judicial"
+    return "Extrajudicial"
+
+
+def _extract_praca(auction_type: str) -> str | None:
+    if not auction_type:
+        return None
+    lower = auction_type.lower()
+    if "1" in lower and "praça" in lower:
+        return "1ª praça"
+    if "2" in lower and "praça" in lower:
+        return "2ª praça"
+    if "praça" in lower:
+        return auction_type.strip()
+    return None
+
+
+def _extract_modalidade(auction_type: str) -> str | None:
+    if not auction_type:
+        return None
+    lower = auction_type.lower()
+    if "venda direta" in lower:
+        return "Venda direta"
+    if "licitação" in lower or "licitacao" in lower:
+        return "Licitação aberta"
+    return "Licitação aberta"
+
+
 def _determine_court(auction_type: str, court_name: str, court_or_leiloeiro: str) -> str:
     if not auction_type:
         return "—"
@@ -209,7 +242,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
         indicators.append(MarketIndicator(
             lbl="Preço/m² · bairro",
             val=f"R$ {market.price_per_m2_neighborhood:,.0f}".replace(",", "."),
-            delta=f"+{market.area_appreciation_1y:.1f}% YoY" if market.area_appreciation_1y else "",
+            delta=f"+{market.area_appreciation_1y:.1f}% ao ano" if market.area_appreciation_1y else "",
             pos=True,
         ))
     price_per_m2_property = (metadata.auction_price or 0) / metadata.area_m2 if metadata.area_m2 and metadata.area_m2 > 0 else 0
@@ -438,7 +471,9 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         type=prop_type,
         neighborhood=neighborhood,
         city=f"{metadata.city}, {state_abbrev}" if metadata.city else "",
-        auction_type=metadata.auction_type,
+        auction_type=_classify_auction_type(metadata.auction_type),
+        praca=_extract_praca(metadata.auction_type),
+        modalidade=_extract_modalidade(metadata.auction_type),
         auctioneer=_determine_auctioneer(metadata.auctioneer_name, metadata.court_or_leiloeiro),
         court=_determine_court(metadata.auction_type, metadata.court_name, metadata.court_or_leiloeiro),
         discount=discount,

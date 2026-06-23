@@ -123,6 +123,7 @@ function App() {
 
 function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError }) {
   const [url, setUrl] = useState('');
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -169,17 +170,63 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
         </div>
       )}
 
-      <div className="row gap-2">
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'oklch(0.75 0.06 60)',
-          display: 'grid', placeItems: 'center',
-          fontSize: 12, color: 'var(--fg-0)',
-          fontWeight: 600,
-          border: '1px solid var(--line-1)',
-        }}>
-          FG
-        </div>
+      <div style={{ position: 'relative' }}>
+        <button
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'oklch(0.75 0.06 60)',
+            display: 'grid', placeItems: 'center',
+            fontSize: 12, color: 'var(--fg-0)',
+            fontWeight: 600,
+            border: '1px solid var(--line-1)',
+            cursor: 'pointer',
+          }}
+        >
+          GD
+        </button>
+        {userMenuOpen && (
+          <>
+            <div onClick={() => setUserMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+              minWidth: 200, padding: 6,
+              background: 'var(--bg-0)', border: '1px solid var(--line-1)',
+              borderRadius: 10, zIndex: 91,
+              boxShadow: '0 10px 28px oklch(0 0 0 / 0.1)',
+            }}>
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-1)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>Gustavo D.</div>
+                <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>gustavo@arremate.com</div>
+              </div>
+              <button
+                onClick={() => { setUserMenuOpen(false); go('home'); }}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '8px 12px', borderRadius: 6,
+                  fontSize: 12.5, color: 'var(--fg-1)',
+                  marginTop: 4,
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                Minha conta
+              </button>
+              <button
+                onClick={() => setUserMenuOpen(false)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '8px 12px', borderRadius: 6,
+                  fontSize: 12.5, color: 'var(--bad)',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                Sair
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <form className="search mobile-search" onSubmit={handleSubmit}>
