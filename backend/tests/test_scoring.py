@@ -1,6 +1,6 @@
 # tests/test_scoring.py
 from graph.state import AuctionState, PropertyMetadata, MarketResult, LegalResult
-from graph.scoring import scoring_node, compute_score, compute_risk_flags, compute_roi
+from graph.scoring import scoring_node, compute_risk_flags, compute_roi
 
 
 def _make_state(**overrides):
@@ -39,47 +39,6 @@ def _make_state(**overrides):
     )
     defaults.update(overrides)
     return AuctionState(**defaults)
-
-
-class TestComputeScore:
-    def test_score_neutral_inputs(self):
-        """With market_score=0, discount=0, medium risk, ocupado, mid liquidity, adjustments net to -5."""
-        score = compute_score(
-            market_score=0, discount_percentage=0.0,
-            risk_level="medium", occupation="ocupado", liquidity_days=90,
-        )
-        # 50 + 0 + 0 + 0 + (-5) + 0 = 45
-        assert score == 45
-
-    def test_score_high_market_good_legal(self):
-        score = compute_score(
-            market_score=8, discount_percentage=42.0,
-            risk_level="low", occupation="desocupado", liquidity_days=45,
-        )
-        # 50 + 24 + 12.6 + 15 + 10 + 5 = 116.6 -> 100
-        assert score == 100
-
-    def test_score_critical_legal_disputado(self):
-        score = compute_score(
-            market_score=2, discount_percentage=10.0,
-            risk_level="critical", occupation="disputado", liquidity_days=150,
-        )
-        # 50 + 6 + 3 - 30 - 15 - 5 = 9
-        assert score == 9
-
-    def test_score_clamped_to_0(self):
-        score = compute_score(
-            market_score=1, discount_percentage=0.0,
-            risk_level="critical", occupation="disputado", liquidity_days=150,
-        )
-        assert score >= 0
-
-    def test_score_clamped_to_100(self):
-        score = compute_score(
-            market_score=10, discount_percentage=50.0,
-            risk_level="low", occupation="desocupado", liquidity_days=30,
-        )
-        assert score == 100
 
 
 class TestComputeRiskFlags:
@@ -194,7 +153,6 @@ class TestScoringNode:
         state = _make_state()
         result = scoring_node(state)
         assert "scoring_result" in result
-        assert result["scoring_result"].score > 0
         assert result["scoring_result"].risk is not None
         assert result["scoring_result"].roi > 0
 
@@ -202,10 +160,13 @@ class TestScoringNode:
         state = _make_state(property_metadata=None)
         result = scoring_node(state)
         assert "scoring_result" in result
-        assert result["scoring_result"].score == 0
+        # No metadata -> default risk flags all bad, roi 0
+        assert result["scoring_result"].risk.j == "bad"
+        assert result["scoring_result"].roi == 0.0
 
     def test_scoring_node_no_market_or_legal(self):
         state = _make_state(market_result=None, legal_result=None)
         result = scoring_node(state)
         assert "scoring_result" in result
-        assert result["scoring_result"].score < 50
+        # With no legal result, risk_level defaults to "critical" -> j=bad
+        assert result["scoring_result"].risk.j == "bad"

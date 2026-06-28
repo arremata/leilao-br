@@ -42,6 +42,41 @@ def _save_results(results: list[dict]) -> None:
         logger.warning(f"Skipping JSON persistence: {e}")
 
 
+def _parse_ends_at(value) -> Optional["datetime"]:
+    """Parse endsAt (ISO string or epoch ms) into a timezone-aware datetime."""
+    from datetime import datetime, timezone
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+    try:
+        s = str(value).strip()
+        # ISO 8601 — FastAPI/seed format. Accept trailing Z or offset.
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_active(ends_at, now) -> bool:
+    """A property is active when endsAt is missing or still in the future."""
+    dt = _parse_ends_at(ends_at)
+    return dt is None or dt > now
+
+
+def _closing_within_24h(ends_at, now) -> bool:
+    """Active and ending within the next 24 hours."""
+    from datetime import timedelta
+    dt = _parse_ends_at(ends_at)
+    if dt is None:
+        return False
+    return now < dt <= now + timedelta(hours=24)
+
+
 def _merge_seed() -> None:
     """Merge seed data into results.json, adding any missing entries by id."""
     if RESULTS_FILE.exists():
@@ -70,20 +105,30 @@ def get_properties() -> list[dict]:
 
 @app.get("/dashboard")
 def get_dashboard() -> dict:
+    from datetime import datetime, timezone
+
     properties = _load_results()
-    count = len(properties)
-    avg_score = round(sum(p.get("score", 0) for p in properties) / max(count, 1))
+    # Active = endsAt in the future (or missing). Closed auctions don't count.
+    now = datetime.now(timezone.utc)
+    active = [
+        p for p in properties
+        if _is_active(p.get("endsAt"), now)
+    ]
+    active_count = len(active)
+    closing_soon = sum(1 for p in active if _closing_within_24h(p.get("endsAt"), now))
+    # Score field removed — use ROI average as the portfolio health KPI
+    avg_roi = round(sum(p.get("roi", 0) for p in properties) / max(len(properties), 1))
 
     return {
         "greeting": {
             "name": "Felipe",
-            "subtitle": f"{count} imóveis analisados no seu portfólio.",
+            "subtitle": f"{len(properties)} imóveis analisados no seu portfólio.",
         },
         "kpis": [
-            {"lbl": "Leilões ativos", "val": str(count), "delta": "seu portfólio", "pos": True},
-            {"lbl": "Encerrando em 24h", "val": "—", "delta": "em breve"},
+            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "seu portfólio", "pos": True},
+            {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
             {"lbl": "Análises restantes", "val": "3", "delta": "plano grátis"},
-            {"lbl": "Score médio · feed", "val": str(avg_score), "delta": "do portfólio", "pos": avg_score >= 70},
+            {"lbl": "ROI médio · feed", "val": f"{avg_roi}%", "delta": "do portfólio", "pos": avg_roi >= 10},
         ],
         "citySignals": [
             {"city": "São Paulo / SP", "volume": "412", "delta": "+8.2%", "trend": [8.4, 8.5, 8.6, 8.7, 8.8, 9.0, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7], "pos": True},
@@ -96,7 +141,7 @@ def get_dashboard() -> dict:
             {"time": "há 2h", "type": "price", "title": "Apto. 78 m², Vila Madalena", "text": "Lance mínimo reduzido em R$ 18.000 — agora R$ 312.000 (2ª praça)", "tone": "good"},
             {"time": "há 5h", "type": "risk", "title": "Casa 220 m², Ipanema", "text": "Novo processo detectado: ação anulatória em curso (1ª instância)", "tone": "bad"},
             {"time": "ontem", "type": "closing", "title": "Apto. 110 m², Savassi", "text": "Leilão encerra em 6h22 — você ainda não decidiu", "tone": "warn"},
-            {"time": "ontem", "type": "new", "title": "3 novos imóveis match com seu perfil", "text": "Itaim Bibi, Pinheiros e Vila Olímpia — score médio 84", "tone": "neutral"},
+            {"time": "ontem", "type": "new", "title": "3 novos imóveis match com seu perfil", "text": "Itaim Bibi, Pinheiros e Vila Olímpia — ROI médio 18%", "tone": "neutral"},
             {"time": "2 dias", "type": "legal", "title": "Sala 64 m², Faria Lima", "text": "Pesquisa jurídica completa entregue — 0 ressalvas", "tone": "good"},
         ],
     }

@@ -6,7 +6,7 @@ def test_analyze_url_calls_workflow():
     """analyze_url should build AuctionState with auction_url and call run_analysis."""
     from app import analyze_url
 
-    result_json = '{"id":"abc","score":87,"risk":{"j":"good","f":"good","l":"warn","o":"good"}}'
+    result_json = '{"id":"abc","risk":{"j":"good","f":"good","l":"warn","o":"good"}}'
     with patch("app.run_analysis") as mock_run:
         mock_run.return_value = {"result_json": result_json}
         result = analyze_url("https://leiloes.caixa.gov.br/leilao/123")
@@ -14,7 +14,7 @@ def test_analyze_url_calls_workflow():
     mock_run.assert_called_once()
     call_args = mock_run.call_args[0][0]
     assert call_args.auction_url == "https://leiloes.caixa.gov.br/leilao/123"
-    assert result["score"] == 87
+    assert result["risk"]["j"] == "good"
 
 
 def test_analyze_url_no_url():
@@ -29,7 +29,7 @@ def test_analyze_pdfs_calls_workflow():
     """analyze_pdfs should build AuctionState with pdf_texts and call run_analysis."""
     from app import analyze_pdfs
 
-    result_json = '{"id":"abc","score":73,"risk":{"j":"warn","f":"good","l":"good","o":"warn"}}'
+    result_json = '{"id":"abc","risk":{"j":"warn","f":"good","l":"good","o":"warn"}}'
     with (
         patch("app.parse_pdf") as mock_parse,
         patch("app.run_analysis") as mock_run,
@@ -42,7 +42,7 @@ def test_analyze_pdfs_calls_workflow():
     mock_run.assert_called_once()
     call_args = mock_run.call_args[0][0]
     assert call_args.pdf_texts == "Edital de Leilao"
-    assert result["score"] == 73
+    assert result["risk"]["j"] == "warn"
 
 
 def test_analyze_pdfs_no_files():

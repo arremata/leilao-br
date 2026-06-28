@@ -260,7 +260,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
             </div>
             <div className="mono" style={{ fontSize: 11, color: 'var(--fg-1)', marginTop: 4 }}>
               {(p.auctionDiscount ?? 0) >= 0
-                ? `${p.auctionDiscount ?? 0}% deságio oficial`
+                ? `${p.auctionDiscount ?? 0}% desconto oficial`
                 : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
             </div>
           </div>

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { ScoreBadge } from './shared';
 import { fmtBRL } from '../utils';
 
 export default function History({ go, history, clearHistory, properties }) {
@@ -20,9 +19,9 @@ export default function History({ go, history, clearHistory, properties }) {
   }, [history]);
 
   return (
-    <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
+    <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
 
-      <div className="row between page-header" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
+      <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 32 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ histórico</span>
@@ -56,7 +55,7 @@ export default function History({ go, history, clearHistory, properties }) {
       ) : (
         <div className="col gap-8">
           {grouped.map(group => (
-            <section key={group.label}>
+            <section key={group.label} className="fade-in">
               <div className="uppy" style={{ color: 'var(--fg-3)', marginBottom: 12, paddingLeft: 4 }}>
                 {group.label}
               </div>
@@ -93,7 +92,7 @@ function HistoryRow({ entry, live, last, onClick }) {
       onClick={live ? onClick : undefined}
       style={{
         display: 'grid',
-        gridTemplateColumns: '44px 1.8fr 1fr 0.7fr 0.7fr 80px 72px',
+        gridTemplateColumns: '1.8fr 1fr 0.7fr 0.7fr 80px 72px',
         gap: 14, padding: '14px 18px',
         borderBottom: last ? 'none' : '1px solid var(--line-1)',
         alignItems: 'center',
@@ -104,8 +103,6 @@ function HistoryRow({ entry, live, last, onClick }) {
       onMouseEnter={e => { if (live) e.currentTarget.style.background = 'var(--bg-2)'; }}
       onMouseLeave={e => { if (live) e.currentTarget.style.background = ''; }}
     >
-      <ScoreBadge value={entry.score} size={40} showLabel={false} />
-
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.25 }}>{entry.title}</div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>

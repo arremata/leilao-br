@@ -177,7 +177,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           <span style={{ margin: '0 8px' }}>·</span>
           desconto IA médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
           <span style={{ margin: '0 8px' }}>·</span>
-          deságio oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
+          desconto oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
           1–{paginated.length} de {filtered.length}

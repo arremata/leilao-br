@@ -6,9 +6,9 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
   const [view, setView] = useState('grid');
 
   return (
-    <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
+    <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
 
-      <div className="row between page-header" style={{ alignItems: 'flex-end', marginBottom: 28 }}>
+      <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 28 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ watchlist</span>
@@ -41,15 +41,16 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
         <div className="property-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-          gap: 18,
+          gap: 24,
         }}>
-          {watchedItems.map(p => (
+          {watchedItems.map((p, i) => (
             <PropertyCard
               key={p.id}
               p={p}
               onClick={() => go('detail', p)}
               watched
               onToggleWatch={toggleWatch}
+              staggerIndex={i}
             />
           ))}
         </div>
@@ -57,13 +58,13 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+            gridTemplateColumns: '60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
             gap: 14, padding: '10px 18px',
             background: 'var(--bg-2)', fontSize: 10.5,
             textTransform: 'uppercase', letterSpacing: '0.08em',
             fontFamily: 'var(--f-mono)', color: 'var(--fg-3)',
           }}>
-            <span>foto</span><span>score</span><span>imóvel</span>
+            <span>foto</span><span>imóvel</span>
             <span>preço</span><span>desconto</span><span>roi</span>
             <span>risco</span><span>encerra em</span><span></span>
           </div>
