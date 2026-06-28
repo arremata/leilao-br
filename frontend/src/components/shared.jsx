@@ -308,7 +308,7 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+        gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
         gap: 14,
         padding: '16px 20px',
         alignItems: 'center',
@@ -336,17 +336,25 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.minBid)}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', textDecoration: 'line-through' }}>
-          R$ {fmtBRL(p.market)}
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>lance mínimo</div>
+      </div>
+      <div>
+        <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {(p.auctionDiscount ?? 0) >= 0 ? `−${p.auctionDiscount ?? 0}% oficial` : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
         </div>
       </div>
       <div>
-        <div className="num-sm" style={{ color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>{p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>desconto</div>
-      </div>
-      <div>
-        <div className="num-sm" style={{ color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>{p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>ROI</div>
+        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>
+          R$ {fmtBRL(p.market)}
+        </div>
+        <div className="mono" style={{
+          fontSize: 11,
+          color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
+          fontWeight: 500,
+        }}>
+          {(p.discount ?? 0) >= 0 ? `+${p.discount}% IA` : `${p.discount}% acima IA`}
+        </div>
       </div>
       <RiskDots flags={p.risk} />
       <Countdown until={p.endsAt} compact />
