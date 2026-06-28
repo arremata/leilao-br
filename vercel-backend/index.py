@@ -8,7 +8,9 @@ public demo API online while the heavy analyzer remains a separate worker/API.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +39,36 @@ def _load_properties() -> list[dict]:
     return json.loads(SEED_FILE.read_text(encoding="utf-8"))
 
 
+def _parse_ends_at(value) -> Optional[datetime]:
+    """Parse endsAt (ISO string or epoch ms) into a timezone-aware datetime."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+    try:
+        s = str(value).strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_active(ends_at, now) -> bool:
+    dt = _parse_ends_at(ends_at)
+    return dt is None or dt > now
+
+
+def _closing_within_24h(ends_at, now) -> bool:
+    dt = _parse_ends_at(ends_at)
+    if dt is None:
+        return False
+    return now < dt <= now + timedelta(hours=24)
+
+
 @app.get("/properties")
 def get_properties() -> list[dict]:
     return _load_properties()
@@ -45,19 +77,23 @@ def get_properties() -> list[dict]:
 @app.get("/dashboard")
 def get_dashboard() -> dict:
     properties = _load_properties()
-    count = len(properties)
-    avg_score = round(sum(p.get("score", 0) for p in properties) / max(count, 1))
+    now = datetime.now(timezone.utc)
+    active = [p for p in properties if _is_active(p.get("endsAt"), now)]
+    active_count = len(active)
+    closing_soon = sum(1 for p in active if _closing_within_24h(p.get("endsAt"), now))
+    avg_discount = round(sum(p.get("discount", 0) for p in properties) / max(len(properties), 1))
+    avg_auction_discount = round(sum(p.get("auctionDiscount", 0) for p in properties) / max(len(properties), 1))
 
     return {
         "greeting": {
             "name": "Felipe",
-            "subtitle": f"{count} imóveis analisados no seu portfólio.",
+            "subtitle": f"{len(properties)} imóveis analisados no seu portfólio.",
         },
         "kpis": [
-            {"lbl": "Leilões ativos", "val": str(count), "delta": "seu portfólio", "pos": True},
-            {"lbl": "Encerrando em 24h", "val": "—", "delta": "em breve"},
-            {"lbl": "Análises restantes", "val": "3", "delta": "plano grátis"},
-            {"lbl": "Score médio · feed", "val": str(avg_score), "delta": "do portfólio", "pos": avg_score >= 70},
+            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "seu portfólio", "pos": True},
+            {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
+            {"lbl": "Desconto IA médio", "val": f"{avg_discount}%", "delta": "vs. mercado IA", "pos": avg_discount >= 15},
+            {"lbl": "Deságio oficial médio", "val": f"{avg_auction_discount}%", "delta": "vs. avaliação do edital", "pos": False},
         ],
         "citySignals": [
             {"city": "São Paulo / SP", "volume": "412", "delta": "+8.2%", "trend": [8.4, 8.5, 8.6, 8.7, 8.8, 9.0, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7], "pos": True},
