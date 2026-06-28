@@ -14,20 +14,27 @@ def _to_camel(snake: str) -> str:
 
 
 class RiskFlags(BaseModel):
-    """Risk assessment flags for the four dimensions that matter most in auctions."""
+    """Risk assessment flags — Jurídico dropped per product decision (Sep 2026).
+
+    Kept for backward-compat in the API surface but the frontend no longer
+    reads `j`. Computed as a placeholder only.
+    """
 
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
-    j: Literal["good", "warn", "bad"]  # Jurídico
+    j: Literal["good", "warn", "bad"]  # Jurídico — deprecated, kept for API compat
     f: Literal["good", "warn", "bad"]  # Financeiro
     l: Literal["good", "warn", "bad"]  # Liquidez
     o: Literal["good", "warn", "bad"]  # Ocupação
 
 
 class ScoringResult(BaseModel):
-    """Computed scoring data produced by the scoring node."""
+    """Computed scoring data produced by the scoring node.
 
-    score: int  # 0-100
+    The 0-100 `score` field has been removed — verdict is now derived from
+    risk flags. Only ROI and risk are computed.
+    """
+
     risk: RiskFlags
     roi: float  # projected ROI %
 
@@ -52,7 +59,10 @@ class AlertItem(BaseModel):
 
 
 class ViabilityDetail(BaseModel):
-    """Detail data for the viability/financial feasibility tab."""
+    """Detail data for the viability/financial feasibility tab.
+
+    Jurídico dimension dropped — only Financeiro, Liquidez and Ocupação remain.
+    """
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     risk_dimensions: list[RiskDimension]
@@ -135,7 +145,6 @@ class AuctionPropertyResult(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     id: str
-    score: int
     photo_label: str
     title: str
     address: str
@@ -151,6 +160,12 @@ class AuctionPropertyResult(BaseModel):
     min_bid: float
     market: float
     roi: float
+    # Valor de avaliação do edital (separado do market que é IA via comparáveis).
+    # Quando o edital não expõe avaliação própria, cai para min_bid.
+    appraisal: float
+    # Deságio oficial do leilão: (appraisal - min_bid) / appraisal * 100.
+    # Em 1ª praça costuma ser 0% (lance = avaliação).
+    auction_discount: float
     area: float
     beds: int | None = None
     baths: int | None = None
@@ -165,3 +180,8 @@ class AuctionPropertyResult(BaseModel):
     edital: EditalDetail | None = None
     auction_url: str | None = None
     photo_url: str | None = None
+    # Monthly recurring expenses used by the cost simulator to project
+    # recurring debts over the months-until-sale horizon.
+    monthly_condo: float | None = None
+    monthly_iptu: float | None = None
+    occupant_removal_cost: float | None = None
