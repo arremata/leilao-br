@@ -4,8 +4,8 @@ import { LiveCardHero } from './LiveCard';
 import { fmtBRL } from '../utils';
 
 export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch, history }) {
-  const topScored = useMemo(() =>
-    [...properties].sort((a, b) => b.roi - a.roi).slice(0, 3),
+  const topDiscounted = useMemo(() =>
+    [...properties].sort((a, b) => b.discount - a.discount).slice(0, 3),
     [properties]);
   const watchedItems = useMemo(() =>
     properties.filter(p => watched.includes(p.id)),
@@ -62,16 +62,16 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       {/* ========== Search + Filters ========== */}
       <SearchCommand onSearch={onSearch} />
 
-      {/* ========== Section 01 — Top ROI + Market signals split ========== */}
+      {/* ========== Section 01 — Top descontos + Market signals split ========== */}
       <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 28, marginBottom: 40 }}>
         <Section
           ix="01"
           title="Top oportunidades"
-          sub="Maior ROI projetado no portfólio, atualizados às 06:00."
+          sub="Maior desconto IA no portfólio, atualizados às 06:00."
           flush
         >
           <div className="col gap-3">
-            {topScored.map((p, i) => (
+            {topDiscounted.map((p, i) => (
               <CompactRow key={p.id} p={p} rank={i + 1} onClick={() => go('detail', p)} />
             ))}
           </div>
@@ -183,7 +183,6 @@ function SearchCommand({ onSearch }) {
   const [address, setAddress] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sf, setSf] = useState({
-    roiMin: 0,
     occupancy: 'Todos',
     discountMin: 0,
     judicial: 'Todos',
@@ -192,7 +191,6 @@ function SearchCommand({ onSearch }) {
   });
 
   const activeCount =
-    (sf.roiMin > 0 ? 1 : 0) +
     (sf.occupancy !== 'Todos' ? 1 : 0) +
     (sf.discountMin > 0 ? 1 : 0) +
     (sf.judicial !== 'Todos' ? 1 : 0) +
@@ -200,7 +198,7 @@ function SearchCommand({ onSearch }) {
     (sf.modalidade !== 'Todos' ? 1 : 0);
 
   const clearFilters = () => setSf({
-    roiMin: 0, occupancy: 'Todos', discountMin: 0,
+    occupancy: 'Todos', discountMin: 0,
     judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
   });
 
@@ -261,12 +259,6 @@ function SearchCommand({ onSearch }) {
           gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
           gap: '20px 28px',
         }}>
-          <FilterGroup
-            label="ROI mínimo"
-            options={[['Todos', 0], ['≥ 10%', 10], ['≥ 15%', 15], ['≥ 20%', 20], ['≥ 30%', 30]]}
-            value={sf.roiMin}
-            onChange={(v) => setSf(s => ({ ...s, roiMin: v }))}
-          />
           <FilterGroup
             label="Ocupação"
             options={[['Todos', 'Todos'], ['Desocupado', 'desocupado'], ['Ocupado', 'ocupado']]}
@@ -422,10 +414,7 @@ function CompactRow({ p, rank, onClick }) {
             <span style={{ color: 'var(--fg-0)', fontWeight: 500 }}>R$ {fmtBRL(p.minBid)}</span>
           </span>
           <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}
-          </span>
-          <span className="mono" style={{ fontSize: 12, color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
-            {p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`} ROI
+            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`} desconto IA
           </span>
         </div>
       </div>
