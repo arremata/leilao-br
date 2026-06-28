@@ -1,6 +1,8 @@
 # tests/test_output.py
 import json
 
+import pytest
+
 from graph.state import AuctionState, PropertyMetadata, MarketResult, LegalResult
 from graph.contracts import ScoringResult, RiskFlags
 from graph.output import output_node, build_result
@@ -39,7 +41,6 @@ def _make_full_state():
             occupation_status="Desocupado",
         ),
         scoring_result=ScoringResult(
-            score=87,
             risk=RiskFlags(j="good", f="good", l="warn", o="good"),
             roi=38.0,
         ),
@@ -52,7 +53,8 @@ class TestBuildResult:
         result = build_result(state)
 
         assert result.id  # non-empty
-        assert result.score == 87
+        # score field has been removed from the contract
+        assert not hasattr(result, "score")
         assert result.photo_label == "APARTAMENTO · VILA MADALENA · SP"
         assert "Harmonia" in result.title
         assert result.address == "R. Harmonia, 412, Vila Madalena, São Paulo - SP"
@@ -63,7 +65,10 @@ class TestBuildResult:
         assert result.auctioneer == "Zukerman Leilões"
         assert result.discount == 42.0
         assert result.min_bid == 312000.0
-        assert result.market == 540000.0
+        # market comes from IA (price_per_m2 * area), not the edital appraisal
+        assert result.market == 6923.0 * 78.0
+        # appraisal carries the edital value
+        assert result.appraisal == 540000.0
         assert result.roi == 38.0
         assert result.area == 78.0
         assert result.occupancy == "desocupado"
@@ -108,7 +113,8 @@ class TestOutputNode:
         result = output_node(state)
         assert "result_json" in result
         parsed = json.loads(result["result_json"])
-        assert parsed["score"] == 87
+        # score field removed from contract
+        assert "score" not in parsed
         assert parsed["risk"]["j"] == "good"
 
     def test_output_node_no_metadata(self):
@@ -116,7 +122,9 @@ class TestOutputNode:
         result = output_node(state)
         assert "result_json" in result
         parsed = json.loads(result["result_json"])
-        assert parsed["score"] == 0
+        # No score field; default risk flags are all bad
+        assert "score" not in parsed
+        assert parsed["risk"]["j"] == "bad"
 
     def test_output_node_no_scoring_result(self):
         state = _make_full_state()
@@ -124,7 +132,9 @@ class TestOutputNode:
         result = output_node(state)
         assert "result_json" in result
         parsed = json.loads(result["result_json"])
-        assert parsed["score"] == 0
+        # No score field; default risk flags are all bad when scoring_result is None
+        assert "score" not in parsed
+        assert parsed["risk"]["j"] == "bad"
 
 
 class TestBuildResultDetails:
@@ -132,9 +142,9 @@ class TestBuildResultDetails:
         state = _make_full_state()
         result = build_result(state)
         assert result.viability is not None
-        assert len(result.viability.risk_dimensions) == 4
-        assert result.viability.risk_dimensions[0].dim == "Jurídico"
-        assert result.viability.risk_dimensions[0].state == "good"
+        # Jurídico dimension removed — only 3 remain
+        assert len(result.viability.risk_dimensions) == 3
+        assert result.viability.risk_dimensions[0].dim == "Financeiro"
         assert len(result.viability.alerts) > 0
         assert result.viability.description != ""
 
@@ -181,3 +191,37 @@ class TestBuildResultDetails:
         assert "costs" in parsed
         assert "edital" in parsed
         assert "riskDimensions" in parsed["viability"]
+
+
+def test_build_result_market_is_ia_not_appraisal():
+    """market field must be IA (comparables), not the edital appraisal."""
+    state = AuctionState(
+        auction_url="http://x",
+        pdf_texts="",
+        property_metadata=PropertyMetadata(
+            address="Rua X, 100",
+            property_type="Apartamento",
+            area_m2=50.0,
+            auction_price=100000.0,        # lance mínimo
+            market_value_estimate=180000.0,  # avaliação do edital
+            city="Curitiba", state="PR",
+            neighborhood="Centro",
+        ),
+        market_result=MarketResult(
+            price_per_m2_neighborhood=3000.0,  # IA: 3000 * 50 = 150000
+            liquidity_days=60,
+        ),
+        legal_result=LegalResult(occupation_status="desocupado"),
+        scoring_result=ScoringResult(
+            risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            roi=10.0,
+        ),
+    )
+
+    result = build_result(state)
+    # market must come from IA (price_per_m2 * area), not appraisal
+    assert result.market == 150000.0
+    # appraisal carries the edital value
+    assert result.appraisal == 180000.0
+    # auction_discount: (180000 - 100000) / 180000 * 100 = 44.44
+    assert result.auction_discount == pytest.approx(44.44, abs=0.1)
