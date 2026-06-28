@@ -2,38 +2,6 @@ import { useState, useEffect } from 'react';
 import { fmtBRL, getEndsAtMs } from '../utils';
 
 // ============================================================
-// Score badge — circular AI score 0-100, color-coded
-// ============================================================
-export function ScoreBadge({ value = 87, size = 56, showLabel = true }) {
-  const r = (size - 6) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c * (1 - value / 100);
-  const color =
-    value >= 75 ? 'var(--good)' :
-    value >= 50 ? 'var(--warn)' :
-    'var(--bad)';
-  const bg =
-    value >= 75 ? 'var(--good-soft)' :
-    value >= 50 ? 'var(--warn-soft)' :
-    'var(--bad-soft)';
-  return (
-    <div className="score-wrap" style={{ '--size': size + 'px', background: bg, borderRadius: '50%' }}>
-      <svg width={size} height={size}>
-        <circle cx={size/2} cy={size/2} r={r}
-          stroke="var(--bg-1)" strokeWidth="3" fill="none" />
-        <circle cx={size/2} cy={size/2} r={r}
-          stroke={color} strokeWidth="3" fill="none"
-          strokeDasharray={c} strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset .5s ease' }} />
-      </svg>
-      <span className="score-val" style={{ color }}>{value}</span>
-      {showLabel && size >= 60 && <span className="score-lbl">SCORE</span>}
-    </div>
-  );
-}
-
-// ============================================================
 // Countdown timer
 // ============================================================
 export function Countdown({ until, compact, dark }) {
@@ -213,26 +181,23 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 // ============================================================
 // Property card — DENSE, lots of information
 // ============================================================
-export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
+export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex = 0 }) {
   const occColor = p.occupancy === 'desocupado' ? 'good' :
                    p.occupancy === 'ocupado' ? 'warn' : 'bad';
   return (
     <article
       className="card hov fade-in property-card"
       onClick={onClick}
+      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}
     >
       {/* Photo with overlays */}
       <div style={{ position: 'relative' }}>
         <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
-        {/* Score top-left */}
-        <div style={{ position: 'absolute', top: 12, left: 12 }}>
-          <ScoreBadge value={p.score} size={52} showLabel={false} />
-        </div>
         {/* Countdown top-right */}
         <div style={{
           position: 'absolute', top: 14, right: 12,
           background: 'rgba(255,255,255,0.78)',
-          padding: '5px 10px', borderRadius: 6,
+          padding: '5px 10px', borderRadius: 8,
           backdropFilter: 'blur(8px)',
           border: '1px solid rgba(255,255,255,0.6)',
         }}>
@@ -243,7 +208,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
           onClick={(e) => { e.stopPropagation(); onToggleWatch?.(p.id); }}
           style={{
             position: 'absolute', bottom: 12, right: 12,
-            width: 32, height: 32, borderRadius: 6,
+            width: 32, height: 32, borderRadius: 8,
             background: 'rgba(255,255,255,0.78)',
             border: '1px solid rgba(255,255,255,0.6)',
             color: watched ? 'var(--accent)' : 'var(--fg-2)',
@@ -257,7 +222,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
       </div>
 
       {/* Body */}
-      <div style={{ padding: 16 }}>
+      <div style={{ padding: 18 }}>
         {/* Tags */}
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
           <span className="tag">{p.praca || p.modalidade || p.auctionType}</span>
@@ -276,36 +241,50 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch }) {
         {/* Specs */}
         <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} dense />
 
-        <div className="divider" style={{ margin: '14px 0' }}></div>
+        <div className="divider" style={{ margin: '16px 0' }}></div>
 
-        {/* Numbers — 2 column layout */}
-        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 14 }}>
+        {/* Lance mínimo — compact header */}
+        <div className="row between baseline" style={{ marginBottom: 16 }}>
+          <span className="uppy" style={{ color: 'var(--fg-2)' }}>lance mínimo</span>
+          <span className="num-md" style={{ color: 'var(--fg-0)' }}>
+            R$ {fmtBRL(p.minBid)}
+          </span>
+        </div>
+
+        {/* Avaliação leilão + Mercado IA — 2 colunas */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>lance mínimo</span>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Avaliação leilão</span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
-              R$ {fmtBRL(p.minBid)}
+              R$ {fmtBRL(p.appraisal)}
             </div>
-            <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', textDecoration: 'line-through' }}>
-                R$ {fmtBRL(p.market)}
-              </span>
-              <span className="mono" style={{ fontSize: 11, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)', fontWeight: 500 }}>
-                {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}
-              </span>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--fg-1)', marginTop: 4 }}>
+              {(p.auctionDiscount ?? 0) >= 0
+                ? `${p.auctionDiscount ?? 0}% deságio oficial`
+                : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>ROI projetado</span>
-            <div className="num-md" style={{ marginTop: 3, color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
-              {p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`}
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+              <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
+              Mercado IA
+            </span>
+            <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
+              R$ {fmtBRL(p.market)}
             </div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 4 }}>
-              em 12 meses
+            <div className="mono" style={{
+              fontSize: 11, marginTop: 4,
+              color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
+              fontWeight: 500,
+            }}>
+              {(p.discount ?? 0) >= 0
+                ? `+${p.discount}% desconto IA`
+                : `${p.discount}% acima IA`}
             </div>
           </div>
         </div>
 
-        <div className="divider" style={{ margin: '14px 0' }}></div>
+        <div className="divider" style={{ margin: '16px 0' }}></div>
 
         {/* Bottom row: risk summary + leiloeiro */}
         <div className="row between" style={{ alignItems: 'center' }}>
@@ -329,9 +308,9 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+        gridTemplateColumns: '60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
         gap: 14,
-        padding: '14px 18px',
+        padding: '16px 20px',
         alignItems: 'center',
         borderTop: '1px solid var(--line-1)',
         cursor: 'pointer',
@@ -341,13 +320,12 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       onMouseLeave={e => e.currentTarget.style.background = ''}
     >
       <div style={{
-        width: 56, height: 42, borderRadius: 6, overflow: 'hidden',
+        width: 56, height: 42, borderRadius: 8, overflow: 'hidden',
         background: '#ECEEF1',
         backgroundImage: p.photoUrl ? 'none' : 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
       }}>
         {p.photoUrl && <img src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
       </div>
-      <ScoreBadge value={p.score} size={44} showLabel={false} />
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-0)', lineHeight: 1.25 }}>
           {p.title}
