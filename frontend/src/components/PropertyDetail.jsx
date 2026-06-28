@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Countdown, Photo, Specs, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
+import legalDemo from '../data/legalDemo';
+
+// Feature flag — quando `false`, a aba Jurídica volta a ser bloqueada
+// (card premium borrado) para quem não tem o plano. Mantido `true`
+// nesta fase para construir/validar o conteúdo como se estivesse liberado.
+const LEGAL_PREMIUM_UNLOCKED = true;
 
 export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
@@ -27,6 +33,11 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   }
   const p = property;
   const isWatched = watched?.includes(p.id);
+
+  // Análise jurídica: prioriza o que vem do backend (p.legal); enquanto
+  // não existir, usa o dado de demonstração por id.
+  const legal = p.legal || legalDemo[p.id] || null;
+  const legalUnlocked = LEGAL_PREMIUM_UNLOCKED && !!legal;
 
   // --- Renovation cost: button-based, scaled by region's R$/m² ---
   // Region price/m² from the market indicators; fall back to market/area.
@@ -332,7 +343,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           { v: 'cost', l: 'Custos', ix: '02' },
           { v: 'viability', l: 'Viabilidade financeira', ix: '03' },
           { v: 'edital', l: 'Edital', ix: '04' },
-          { v: 'legal', l: 'Jurídico', ix: '05', locked: true },
+          { v: 'legal', l: 'Jurídico', ix: '05', locked: !legalUnlocked },
         ].map(t => (
           <button
             key={t.v}
@@ -360,7 +371,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         {tab === 'market' && <Market p={p} />}
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
         {tab === 'viability' && <Viability p={p} sim={sim} />}
-        {tab === 'legal' && <LegalLocked />}
+        {tab === 'legal' && (legalUnlocked ? <LegalDetail legal={legal} p={p} /> : <LegalLocked />)}
         {tab === 'edital' && <Edital p={p} />}
       </div>
     </div>
@@ -1092,6 +1103,331 @@ function Alert({ level, title, children }) {
         <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{title}</span>
       </div>
       <p style={{ margin: '0 0 0 16px', fontSize: 12, color: 'var(--fg-1)' }}>{children}</p>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB 4 — LEGAL (análise jurídica — modo liberado)
+// ============================================================
+const REC_MAP = {
+  participar: { label: 'Participar', color: 'var(--good)', bg: 'var(--good-soft)' },
+  cautela: { label: 'Participar com cautela', color: 'var(--warn)', bg: 'var(--warn-soft)' },
+  nao: { label: 'Não recomendado', color: 'var(--bad)', bg: 'var(--bad-soft)' },
+};
+
+function nivelState(n) {
+  return n === 'baixo' ? 'good' : n === 'medio' ? 'warn' : 'bad';
+}
+
+function NivelBadge({ nivel }) {
+  return <span className={`tag dot ${nivelState(nivel)}`} style={{ textTransform: 'capitalize' }}>{nivel}</span>;
+}
+
+const STATE_MAP = {
+  verificado: { label: '✓ verificado', color: 'var(--good)', bg: 'var(--good-soft)' },
+  'nao-localizado': { label: '— não localizado', color: 'var(--warn)', bg: 'var(--warn-soft)' },
+  'requer-humano': { label: '⚑ requer autos', color: 'var(--bad)', bg: 'var(--bad-soft)' },
+  'requer-autos': { label: '⚑ requer autos', color: 'var(--bad)', bg: 'var(--bad-soft)' },
+};
+
+function StateBadge({ estado }) {
+  const s = STATE_MAP[estado] || STATE_MAP['nao-localizado'];
+  return (
+    <span className="mono" style={{
+      fontSize: 10.5, padding: '2px 8px', borderRadius: 4,
+      color: s.color, background: s.bg, whiteSpace: 'nowrap',
+    }}>{s.label}</span>
+  );
+}
+
+const GRAV_COLOR = { info: 'var(--fg-3)', warn: 'var(--warn)', bad: 'var(--bad)' };
+
+const DOC_STATE_MAP = {
+  baixado: { label: '✓ baixado', color: 'var(--good)', bg: 'var(--good-soft)' },
+  parcial: { label: '◐ parcial', color: 'var(--warn)', bg: 'var(--warn-soft)' },
+  'nao-disponivel': { label: '✕ não obtido', color: 'var(--bad)', bg: 'var(--bad-soft)' },
+  'upload-pendente': { label: '⤓ enviar', color: 'var(--warn)', bg: 'var(--warn-soft)' },
+};
+
+function DocBadge({ status }) {
+  const s = DOC_STATE_MAP[status] || DOC_STATE_MAP['nao-disponivel'];
+  return (
+    <span className="mono" style={{
+      fontSize: 10.5, padding: '2px 8px', borderRadius: 4,
+      color: s.color, background: s.bg, whiteSpace: 'nowrap',
+    }}>{s.label}</span>
+  );
+}
+
+function LegalDetail({ legal, p }) {
+  if (!legal) {
+    return (
+      <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Análise jurídica não disponível para este imóvel.</p>
+      </div>
+    );
+  }
+
+  const rec = REC_MAP[legal.conclusao?.recomendacao] || REC_MAP.cautela;
+  const fmtVal = (v) => (v == null ? '—' : `R$ ${fmtBRL(v)}`);
+
+  return (
+    <div>
+      {/* ── Cabeçalho: modalidade + base legal ── */}
+      <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+        <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05 · análise jurídica</span>
+          <span className="ia-chip">IA</span>
+        </div>
+        <h3 className="h2" style={{ marginBottom: 6 }}>{legal.modalidadeLabel || 'Análise jurídica'}</h3>
+        {legal.baseLegal && (
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>{legal.baseLegal}</p>
+        )}
+      </div>
+
+      {/* ── Conclusão (3 linhas) ── */}
+      {legal.conclusao && (
+        <div style={{
+          padding: '18px 20px', borderRadius: 10, marginBottom: 16,
+          background: rec.bg, borderLeft: `3px solid ${rec.color}`,
+        }}>
+          <div className="row gap-2 baseline" style={{ marginBottom: 10 }}>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Recomendação</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: rec.color }}>{rec.label}</span>
+          </div>
+          <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--fg-1)' }}>
+            <b style={{ color: 'var(--fg-0)' }}>Principal risco:</b> {legal.conclusao.principalRisco}
+          </p>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-1)' }}>
+            <b style={{ color: 'var(--fg-0)' }}>Providência antes do lance:</b> {legal.conclusao.providencia}
+          </p>
+        </div>
+      )}
+
+      {/* ── Desocupação (consistente com a aba Viabilidade) ── */}
+      {p?.occupancy === 'ocupado' && (p?.occupantRemovalCost ?? 0) > 0 && (
+        <div style={{
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+          padding: '12px 16px', borderRadius: 8, marginBottom: 16,
+          background: 'var(--warn-soft)', borderLeft: '3px solid var(--warn)',
+        }}>
+          <span style={{ color: 'var(--warn)', fontSize: 13 }}>⌂</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>
+              Imóvel ocupado — custo de desocupação estimado: R$ {fmtBRL(p.occupantRemovalCost)}
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
+              Estimativa de ação de imissão na posse, já contabilizada como custo do arrematante na aba <b style={{ color: 'var(--fg-1)' }}>Viabilidade</b>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Riscos jurídicos ── */}
+      {legal.riscos?.length > 0 && (
+        <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.01 · riscos jurídicos</span>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 16 }}>Classificação por tipo de risco</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+            {legal.riscos.map((r, i) => (
+              <div key={i} style={{ padding: '14px 16px', border: '1px solid var(--line-1)', borderRadius: 8, background: 'var(--bg-1)' }}>
+                <div className="row between" style={{ alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>{r.tipo}</span>
+                  <NivelBadge nivel={r.nivel} />
+                </div>
+                <div style={{ marginBottom: 6 }}><StateBadge estado={r.verificacao} /></div>
+                <p style={{ margin: 0, fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.45 }}>{r.fonte}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Processo / Partes / Dívida ── */}
+      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {legal.processo && (
+          <div className="card" style={{ padding: 22 }}>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.02 · processo</span>
+            <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>Procedimento e partes</h3>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
+              <Meta lbl="Tipo" val={legal.processo.tipo || '—'} />
+              <Meta lbl="Número / edital" val={legal.processo.numero || '—'} />
+              <Meta lbl="Foro / origem" val={legal.processo.foro || '—'} />
+              <Meta lbl="Fase" val={legal.processo.fase || '—'} />
+              {legal.partes && <Meta lbl="Credor / exequente" val={legal.partes.credor || '—'} />}
+              {legal.partes && <Meta lbl="Devedor / executado" val={legal.partes.devedor || '—'} />}
+            </div>
+            {legal.partes?.observacao && (
+              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>↳ {legal.partes.observacao}</p>
+            )}
+          </div>
+        )}
+        {legal.divida && (
+          <div className="card" style={{ padding: 22 }}>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.02 · dívida</span>
+            <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>Valor da dívida</h3>
+            <div className="num-xl" style={{ marginBottom: 6 }}>{fmtVal(legal.divida.valor)}</div>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5, marginTop: 10 }}>
+              <Meta lbl="Atualização" val={legal.divida.dataAtualizacao || '—'} />
+              <div>
+                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Memória de cálculo</span>
+                <div style={{ marginTop: 4 }}><StateBadge estado={legal.divida.memoriaCalculo} /></div>
+              </div>
+            </div>
+            {legal.divida.impugnacao && (
+              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>↳ {legal.divida.impugnacao}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Matrícula ── */}
+      {legal.matricula && (
+        <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.03 · matrícula</span>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>
+            Matrícula {legal.matricula.numero || '—'} · {legal.matricula.cartorio || '—'}
+          </h3>
+          <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5, marginBottom: 16 }}>
+            <Meta lbl="Proprietário registral" val={legal.matricula.proprietario || '—'} />
+            <Meta lbl="Titularidade" val={legal.matricula.titularidade || '—'} />
+          </div>
+          {legal.matricula.onus?.length > 0 && (
+            <>
+              <div className="divider" style={{ margin: '4px 0 14px' }}></div>
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>Ônus e gravames</span>
+              <div className="col gap-2" style={{ marginTop: 10 }}>
+                {legal.matricula.onus.map((o, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr', gap: 12, alignItems: 'baseline' }}>
+                    <span style={{ color: GRAV_COLOR[o.gravidade] || 'var(--fg-3)', fontSize: 11 }}>●</span>
+                    <div>
+                      <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{o.tipo}</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--fg-2)' }}> — {o.descricao}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Edital + Avaliação ── */}
+      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {legal.editalAnalise && (
+          <div className="card" style={{ padding: 22 }}>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.04 · edital</span>
+            <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>Análise do edital</h3>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
+              <Meta lbl="Publicação" val={legal.editalAnalise.dataPublicacao || '—'} />
+              <Meta lbl="Avaliação" val={fmtVal(legal.editalAnalise.valorAvaliacao)} />
+              <Meta lbl="Lance mínimo" val={fmtVal(legal.editalAnalise.lanceMinimo)} />
+              <Meta lbl="Desocupação" val={legal.editalAnalise.desocupacao || '—'} />
+            </div>
+            {legal.editalAnalise.debitos && (
+              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>
+                <b style={{ color: 'var(--fg-1)' }}>Débitos:</b> {legal.editalAnalise.debitos}
+              </p>
+            )}
+            {legal.editalAnalise.divergencias?.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                {legal.editalAnalise.divergencias.map((d, i) => (
+                  <div key={i} style={{ padding: '8px 12px', background: 'var(--warn-soft)', borderRadius: 6, borderLeft: '2px solid var(--warn)', marginTop: 6, fontSize: 12, color: 'var(--fg-1)' }}>{d}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {legal.avaliacao && (
+          <div className="card" style={{ padding: 22 }}>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.04 · avaliação</span>
+            <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>Análise da avaliação</h3>
+            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
+              <Meta lbl="Valor" val={fmtVal(legal.avaliacao.valor)} />
+              <Meta lbl="Data" val={legal.avaliacao.data || '—'} />
+              <Meta lbl="Avaliador" val={legal.avaliacao.avaliador || '—'} />
+              <div>
+                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Vistoria</span>
+                <div style={{ marginTop: 4 }}><StateBadge estado={legal.avaliacao.vistoria} /></div>
+              </div>
+            </div>
+            {legal.avaliacao.atualidade && (
+              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>↳ {legal.avaliacao.atualidade}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Atos essenciais / verificações (proveniência) ── */}
+      {legal.verificacoes?.length > 0 && (
+        <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.05 · atos essenciais</span>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 6 }}>Checagens e proveniência</h3>
+          <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--fg-2)' }}>
+            Cada item indica se foi <b>verificado</b> no documento, <b>não localizado</b> ou se <b>requer leitura dos autos</b> por um especialista.
+          </p>
+          <div>
+            {legal.verificacoes.map((v, i) => (
+              <div key={i} className="row between" style={{
+                gap: 12, padding: '10px 0', alignItems: 'center',
+                borderTop: i === 0 ? 'none' : '1px solid var(--line-1)',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: 'var(--fg-0)' }}>{v.item}</div>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                    {v.fonte}{v.nota && v.nota !== '—' ? ` · ${v.nota}` : ''}
+                  </div>
+                </div>
+                <StateBadge estado={v.estado} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Documentos analisados (proveniência das fontes) ── */}
+      {legal.documentos?.length > 0 && (
+        <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05.06 · documentos analisados</span>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 6 }}>Fontes da análise</h3>
+          <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--fg-2)' }}>
+            Documentos em que a IA se baseou — e o que foi extraído de cada um. Itens “não obtidos” limitam a análise e exigem diligência manual.
+          </p>
+          <div>
+            {legal.documentos.map((d, i) => (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '1fr auto', gap: 12,
+                padding: '12px 0', alignItems: 'start',
+                borderTop: i === 0 ? 'none' : '1px solid var(--line-1)',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="row gap-2 baseline" style={{ flexWrap: 'wrap' }}>
+                    <span className="tag" style={{ fontSize: 10 }}>{d.tipo}</span>
+                    {d.url ? (
+                      <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 500 }}>{d.nome} ↗</a>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{d.nome}</span>
+                    )}
+                  </div>
+                  <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 3 }}>
+                    {d.origem}{d.data ? ` · ${d.data}` : ''}
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.45 }}>
+                    <b style={{ color: 'var(--fg-1)' }}>Base:</b> {d.baseou}
+                  </p>
+                </div>
+                <DocBadge status={d.status} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Disclaimer ── */}
+      <div style={{ padding: 14, background: 'var(--bg-2)', borderRadius: 6, fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+        <b style={{ color: 'var(--fg-1)' }}>↳ Aviso:</b> triagem jurídica automatizada por IA, baseada nos documentos disponíveis. Não substitui parecer de advogado. Itens marcados como “requer autos” dependem de diligência humana antes do lance.
+      </div>
     </div>
   );
 }
