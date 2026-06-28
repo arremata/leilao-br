@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Countdown, Photo, Specs, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
 import legalDemo from '../data/legalDemo';
+import legalGlossary from '../data/legalGlossary';
 
 // Feature flag — quando `false`, a aba Jurídica volta a ser bloqueada
 // (card premium borrado) para quem não tem o plano. Mantido `true`
@@ -1160,7 +1161,80 @@ function DocBadge({ status }) {
   );
 }
 
+function GlossaryDrawer({ open, onClose }) {
+  const [q, setQ] = useState('');
+  const ql = q.trim().toLowerCase();
+  const groups = {};
+  for (const t of legalGlossary) {
+    if (ql && !`${t.termo} ${t.definicao}`.toLowerCase().includes(ql)) continue;
+    (groups[t.categoria] = groups[t.categoria] || []).push(t);
+  }
+  const cats = Object.keys(groups);
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.35)',
+          opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
+          transition: 'opacity .2s', zIndex: 60,
+        }}
+      />
+      <aside style={{
+        position: 'fixed', top: 0, right: 0, height: '100vh', width: 'min(420px, 92vw)',
+        background: 'var(--bg-1)', borderLeft: '1px solid var(--line-1)',
+        boxShadow: '-20px 0 50px rgba(17,24,39,0.12)',
+        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform .25s ease', zIndex: 61,
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div className="row between" style={{ padding: '18px 20px', borderBottom: '1px solid var(--line-1)', alignItems: 'center' }}>
+          <div>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>referência</span>
+            <h3 className="h2" style={{ marginTop: 2 }}>Glossário jurídico</h3>
+          </div>
+          <button onClick={onClose} className="btn sm" aria-label="Fechar glossário"><span className="mono">✕</span></button>
+        </div>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-1)' }}>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar termo ou artigo…"
+            style={{
+              width: '100%', padding: '8px 12px', fontSize: 13,
+              border: '1px solid var(--line-1)', borderRadius: 6,
+              background: 'var(--bg-2)', color: 'var(--fg-0)',
+            }}
+          />
+        </div>
+        <div style={{ overflowY: 'auto', padding: '8px 20px 40px', flex: 1 }}>
+          {cats.length === 0 && (
+            <p style={{ fontSize: 13, color: 'var(--fg-2)', marginTop: 16 }}>Nenhum termo encontrado.</p>
+          )}
+          {cats.map(cat => (
+            <div key={cat} style={{ marginTop: 18 }}>
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>{cat}</span>
+              <div style={{ marginTop: 8 }}>
+                {groups[cat].map(t => (
+                  <div key={t.termo} style={{ padding: '10px 0', borderTop: '1px solid var(--line-1)' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg-0)' }}>{t.termo}</div>
+                    <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-1)', lineHeight: 1.5 }}>{t.definicao}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p style={{ marginTop: 24, fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.5 }}>
+            Conteúdo educativo — não substitui orientação de advogado.
+          </p>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function LegalDetail({ legal, p }) {
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
   if (!legal) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -1176,14 +1250,21 @@ function LegalDetail({ legal, p }) {
     <div>
       {/* ── Cabeçalho: modalidade + base legal ── */}
       <div className="card" style={{ padding: 22, marginBottom: 16 }}>
-        <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05 · análise jurídica</span>
-          <span className="ia-chip">IA</span>
+        <div className="row between" style={{ alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 05 · análise jurídica</span>
+              <span className="ia-chip">IA</span>
+            </div>
+            <h3 className="h2" style={{ marginBottom: 6 }}>{legal.modalidadeLabel || 'Análise jurídica'}</h3>
+            {legal.baseLegal && (
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>{legal.baseLegal}</p>
+            )}
+          </div>
+          <button className="btn sm" onClick={() => setGlossaryOpen(true)} style={{ flexShrink: 0 }} title="Abrir glossário jurídico">
+            <span className="mono">§</span> Glossário
+          </button>
         </div>
-        <h3 className="h2" style={{ marginBottom: 6 }}>{legal.modalidadeLabel || 'Análise jurídica'}</h3>
-        {legal.baseLegal && (
-          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>{legal.baseLegal}</p>
-        )}
       </div>
 
       {/* ── Conclusão (3 linhas) ── */}
@@ -1428,6 +1509,8 @@ function LegalDetail({ legal, p }) {
       <div style={{ padding: 14, background: 'var(--bg-2)', borderRadius: 6, fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
         <b style={{ color: 'var(--fg-1)' }}>↳ Aviso:</b> triagem jurídica automatizada por IA, baseada nos documentos disponíveis. Não substitui parecer de advogado. Itens marcados como “requer autos” dependem de diligência humana antes do lance.
       </div>
+
+      <GlossaryDrawer open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
     </div>
   );
 }
