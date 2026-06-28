@@ -3,7 +3,6 @@
     "id": "a1",
     "auctionUrl": "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnOrigem=index&hdnimovel=01787702097611",
     "photoUrl": "/photos/auction1.jpg",
-    "score": 48,
     "photoLabel": "APTO · SANTA CÂNDIDA · PR",
     "title": "Apto. 103, Residencial Chievo",
     "address": "R. Pedro Kachel, 81 · ap. 103 · bl. 16",
@@ -19,6 +18,8 @@
     "minBid": 253345,
     "market": 210000,
     "roi": -14,
+    "appraisal": 253345,
+    "auctionDiscount": 0,
     "area": 45.74,
     "beds": 2,
     "baths": 1,
@@ -32,14 +33,11 @@
       "l": "warn",
       "o": "bad"
     },
+    "monthlyCondo": 708,
+    "monthlyIptu": 267,
+    "occupantRemovalCost": 10000,
     "viability": {
       "riskDimensions": [
-        {
-          "dim": "Jurídico",
-          "pct": 85,
-          "state": "good",
-          "note": "Matrícula limpa, sem ônus adicionais além da alienação fiduciária"
-        },
         {
           "dim": "Financeiro",
           "pct": 30,
@@ -284,7 +282,6 @@
     "id": "a2",
     "auctionUrl": "https://www.leilaoimovel.com.br/imovel/pr/londrina/residencial-apartamento-n-3-534-localizado-no-condominio-residencial-catuai-em-londrina-pr-imovel-2827357",
     "photoUrl": "/photos/auction2.webp",
-    "score": 76,
     "photoLabel": "APTO · JD. SANTA CRUZ · PR",
     "title": "Apto. 3.534, Residencial Catuaí",
     "address": "R. Ieda Pesarini Ferreira, 95 · ap. 3.534 · bl. 35",
@@ -300,6 +297,8 @@
     "minBid": 122687,
     "market": 155000,
     "roi": 10,
+    "appraisal": 175267,
+    "auctionDiscount": 30,
     "area": 48,
     "beds": 2,
     "baths": 1,
@@ -313,14 +312,11 @@
       "l": "good",
       "o": "good"
     },
+    "monthlyCondo": 375,
+    "monthlyIptu": 150,
+    "occupantRemovalCost": null,
     "viability": {
       "riskDimensions": [
-        {
-          "dim": "Jurídico",
-          "pct": 90,
-          "state": "good",
-          "note": "Processo regular, sem ônus adicionais na matrícula"
-        },
         {
           "dim": "Financeiro",
           "pct": 85,
@@ -549,7 +545,6 @@
     "id": "a3",
     "auctionUrl": "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel=8787708457057",
     "photoUrl": "/photos/auction3.jpeg",
-    "score": 71,
     "photoLabel": "APTO · CONJ. DR. FARID · PR",
     "title": "Apto. 607, Spazio Lille",
     "address": "Av. Pref. Milton R. Menezes, 635 · ap. 607 · torre 03",
@@ -565,6 +560,8 @@
     "minBid": 119069,
     "market": 210000,
     "roi": 17,
+    "appraisal": 170099,
+    "auctionDiscount": 30,
     "area": 57.04,
     "beds": 2,
     "baths": 1,
@@ -578,14 +575,11 @@
       "l": "good",
       "o": "bad"
     },
+    "monthlyCondo": 1250,
+    "monthlyIptu": 292,
+    "occupantRemovalCost": 10000,
     "viability": {
       "riskDimensions": [
-        {
-          "dim": "Jurídico",
-          "pct": 88,
-          "state": "good",
-          "note": "Alienação fiduciária consolidada em favor da CEF, sem ônus adicionais"
-        },
         {
           "dim": "Financeiro",
           "pct": 65,
