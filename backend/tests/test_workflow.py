@@ -298,7 +298,8 @@ def test_run_analysis_returns_final_state_with_result_json():
         assert result["result_json"] != ""
         # result_json should be valid JSON
         parsed = json.loads(result["result_json"])
-        assert "score" in parsed
+        # score field removed from contract
+        assert "score" not in parsed
         assert "id" in parsed
 
 
@@ -330,9 +331,10 @@ def test_run_analysis_state_accumulation():
         assert result["legal_result"] is not None
         assert result["legal_result"].risk_level == "low"
 
-        # Scoring output
+        # Scoring output — score field removed, only risk + roi
         assert result["scoring_result"] is not None
-        assert result["scoring_result"].score > 0
+        assert result["scoring_result"].risk is not None
+        assert result["scoring_result"].roi is not None
 
         # Output node result
         assert result["result_json"] != ""

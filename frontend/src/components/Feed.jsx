@@ -10,11 +10,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     modalidade: initialFilters?.modalidade || 'Todos',
     occupancy: initialFilters?.occupancy || 'Todos',
     propertyType: 'Todos',
-    scoreMin: initialFilters?.scoreMin || 0,
     discountMin: initialFilters?.discountMin || 0,
     city: 'Todas',
   });
-  const [sort, setSort] = useState('score');
+  const [sort, setSort] = useState('discount');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
@@ -33,16 +32,13 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     }
     if (filters.occupancy !== 'Todos') list = list.filter(p => p.occupancy === filters.occupancy);
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
-    if (filters.scoreMin > 0) list = list.filter(p => p.score >= filters.scoreMin);
     if (filters.discountMin > 0) list = list.filter(p => p.discount >= filters.discountMin);
     if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
     if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
-    if (sort === 'score') list.sort((a, b) => b.score - a.score);
-    else if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
-    else if (sort === 'roi') list.sort((a, b) => b.roi - a.roi);
+    if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
     else if (sort === 'soonest') list.sort((a, b) => getEndsAtMs(a.endsAt) - getEndsAtMs(b.endsAt));
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
@@ -57,7 +53,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     (addressQuery.trim() ? 1 : 0) +
     (filters.occupancy !== 'Todos' ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
-    (filters.scoreMin > 0 ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
     (filters.judicial !== 'Todos' ? 1 : 0) +
@@ -69,15 +64,15 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     setFilters({
       judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
       occupancy: 'Todos', propertyType: 'Todos',
-      scoreMin: 0, discountMin: 0, city: 'Todas',
+      discountMin: 0, city: 'Todas',
     });
   };
 
   return (
-    <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '24px 24px 80px' }}>
+    <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
 
       {/* Header */}
-      <div className="row between page-header" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
+      <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ feed</span>
@@ -99,8 +94,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       {/* Filter bar */}
       <div className="filter-bar" style={{
         position: 'sticky', top: 60, zIndex: 20,
-        background: 'color-mix(in oklab, var(--bg-0) 94%, transparent)',
-        backdropFilter: 'blur(12px)',
+        background: 'rgba(255,255,255,0.6)',
+        backdropFilter: 'blur(16px) saturate(1.3)',
+        WebkitBackdropFilter: 'blur(16px) saturate(1.3)',
         padding: '14px 0',
         borderBottom: '1px solid var(--line-1)',
         marginBottom: 20,
@@ -154,9 +150,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           <Filter label="Cidade" value={filters.city}
             options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
             onChange={(v) => setFilters({ ...filters, city: v })} />
-          <RangeChip label="Score" suffix=" pts" value={filters.scoreMin}
-            onChange={(v) => setFilters({ ...filters, scoreMin: v })} />
-          <RangeChip label="Desconto" suffix="%" value={filters.discountMin}
+          <RangeChip label="Desconto IA" suffix="%" max={60} value={filters.discountMin}
             onChange={(v) => setFilters({ ...filters, discountMin: v })} />
 
           {activeFilterCount > 0 && (
@@ -181,9 +175,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         <span className="mono" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-0)' }}>{filtered.length.toString().padStart(3, '0')}</b> resultados
           <span style={{ margin: '0 8px' }}>·</span>
-          score médio {Math.round(filtered.reduce((a, b) => a + b.score, 0) / Math.max(filtered.length, 1))}
+          desconto IA médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
           <span style={{ margin: '0 8px' }}>·</span>
-          desconto médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
+          desconto oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
           1–{paginated.length} de {filtered.length}
@@ -197,15 +191,16 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         <div className="property-grid feed-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-          gap: 18,
+          gap: 24,
         }}>
-          {paginated.map(p => (
+          {paginated.map((p, i) => (
             <PropertyCard
               key={p.id}
               p={p}
               onClick={() => go('detail', p)}
               watched={watched.includes(p.id)}
               onToggleWatch={toggleWatch}
+              staggerIndex={i}
             />
           ))}
         </div>
@@ -213,7 +208,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
             gap: 14,
             padding: '10px 18px',
             background: 'var(--bg-2)',
@@ -224,11 +219,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             color: 'var(--fg-3)',
           }}>
             <span>foto</span>
-            <span>score</span>
             <span>imóvel</span>
-            <span>preço</span>
-            <span>desconto</span>
-            <span>roi</span>
+            <span>lance</span>
+            <span>avaliação</span>
+            <span>mercado IA</span>
             <span>risco</span>
             <span>encerra em</span>
             <span></span>
@@ -286,7 +280,7 @@ function Filter({ label, value, options, onChange }) {
           <div className="card" style={{
             position: 'absolute', top: 'calc(100% + 4px)', left: 0,
             minWidth: 180, padding: 4, zIndex: 31,
-            boxShadow: '0 10px 28px oklch(0 0 0 / 0.08)',
+            boxShadow: '0 10px 28px rgba(17,24,39,0.08)',
           }}>
             {options.map(o => (
               <button
@@ -313,7 +307,7 @@ function Filter({ label, value, options, onChange }) {
   );
 }
 
-function RangeChip({ label, suffix, value, onChange }) {
+function RangeChip({ label, suffix, value, onChange, max = 100 }) {
   const active = value > 0;
   return (
     <div style={{
@@ -334,7 +328,7 @@ function RangeChip({ label, suffix, value, onChange }) {
         {value}{suffix}
       </span>
       <input
-        type="range" min="0" max="100" step="5"
+        type="range" min="0" max={max} step="1"
         value={value}
         onChange={(e) => onChange(+e.target.value)}
         className="slider"
@@ -367,9 +361,7 @@ function Sort({ value, onChange }) {
           backgroundPosition: 'right 10px center',
         }}
       >
-        <option value="score">melhor score</option>
-        <option value="discount">maior desconto</option>
-        <option value="roi">maior ROI projetado</option>
+        <option value="discount">maior desconto IA</option>
         <option value="soonest">encerra antes</option>
         <option value="price-asc">menor preço</option>
         <option value="price-desc">maior preço</option>

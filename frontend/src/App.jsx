@@ -5,6 +5,7 @@ import PropertyDetail from './components/PropertyDetail';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
 import { analyzeUrl, fetchProperties, fetchDashboard } from './api';
+import { LiveCardProgress } from './components/LiveCard';
 
 function App() {
   const [screen, setScreen] = useState(() => {
@@ -16,8 +17,8 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('arremate_watched') || '["p1","p3"]');
-    } catch { return ['p1', 'p3']; }
+      return JSON.parse(localStorage.getItem('arremate_watched') || '[]');
+    } catch { return []; }
   });
   const [properties, setProperties] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -33,7 +34,15 @@ function App() {
 
   useEffect(() => {
     fetchProperties().then(data => {
-      if (Array.isArray(data)) setProperties(data);
+      if (Array.isArray(data)) {
+        setProperties(data);
+        // Prune watchlist IDs that no longer exist (e.g. legacy "p1"/"p3" fallback).
+        const validIds = new Set(data.map(p => p.id));
+        setWatched(prev => {
+          const next = prev.filter(id => validIds.has(id));
+          return next.length === prev.length ? prev : next;
+        });
+      }
     }).catch(() => {});
     fetchDashboard().then(data => {
       if (data) setDashboard(data);
@@ -53,6 +62,43 @@ function App() {
     localStorage.setItem('arremate_history', JSON.stringify(history));
   }, [history]);
 
+  // Fade-in: observe .fade-in elements and add .is-visible
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('is-visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -20px 0px' });
+    const observe = () => {
+      document.querySelectorAll('.fade-in:not(.is-visible)').forEach(el => observer.observe(el));
+    };
+    observe();
+    // Re-observe on screen changes
+    const mo = new MutationObserver(observe);
+    mo.observe(document.getElementById('root'), { childList: true, subtree: true });
+    return () => { observer.disconnect(); mo.disconnect(); };
+  }, []);
+
+  // Scroll: topbar solidify + progress bar (visual only)
+  useEffect(() => {
+    const el = document.querySelector('.app-shell');
+    const bar = document.getElementById('argos-progress');
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      if (el) el.classList.toggle('scrolled', y > 36);
+      if (bar) {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const go = (s, prop) => {
     if (prop) {
       setSelected(prop);
@@ -61,7 +107,7 @@ function App() {
           id: prop.id, ts: Date.now(),
           title: prop.title, address: prop.address,
           city: prop.city, neighborhood: prop.neighborhood,
-          score: prop.score, minBid: prop.minBid,
+          risk: prop.risk, minBid: prop.minBid,
           discount: prop.discount, roi: prop.roi,
           type: prop.type, auctionType: prop.auctionType,
         };
@@ -112,7 +158,12 @@ function App() {
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
       <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} />
-      {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} />}
+      {analyzing && (
+        <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 0' }}>
+          <LiveCardProgress analyzing={analyzing} />
+        </div>
+      )}
+      {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} history={history} />}
       {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
       {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
       {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
@@ -132,10 +183,14 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
 
   return (
     <header className="topbar">
+      <div id="argos-progress" style={{
+        position: 'absolute', left: 0, bottom: 0, height: 2,
+        width: 0, background: 'var(--accent)', transition: 'width .1s linear',
+      }} />
       <div className="row gap-6" style={{ alignItems: 'center' }}>
         <button className="brand" onClick={() => go('home')}>
           <span className="logo"></span>
-          Arremate
+          Argos
         </button>
         <nav className="nav">
           <a className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</a>
@@ -175,7 +230,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
           onClick={() => setUserMenuOpen(!userMenuOpen)}
           style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: 'oklch(0.75 0.06 60)',
+            background: 'var(--bg-3)',
             display: 'grid', placeItems: 'center',
             fontSize: 12, color: 'var(--fg-0)',
             fontWeight: 600,
@@ -193,7 +248,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
               minWidth: 200, padding: 6,
               background: 'var(--bg-0)', border: '1px solid var(--line-1)',
               borderRadius: 10, zIndex: 91,
-              boxShadow: '0 10px 28px oklch(0 0 0 / 0.1)',
+              boxShadow: '0 10px 28px rgba(17,24,39,0.1)',
             }}>
               <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-1)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>Gustavo D.</div>

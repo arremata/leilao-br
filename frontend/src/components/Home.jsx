@@ -1,21 +1,22 @@
 import { useState, useMemo } from 'react';
-import { PropertyRow, ScoreBadge, Countdown, Sparkline, RiskSummary } from './shared';
+import { PropertyRow, Countdown, Sparkline, RiskSummary } from './shared';
+import { LiveCardHero } from './LiveCard';
 import { fmtBRL } from '../utils';
 
-export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch }) {
-  const topScored = useMemo(() =>
-    [...properties].sort((a, b) => b.score - a.score).slice(0, 3),
+export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch, history }) {
+  const topDiscounted = useMemo(() =>
+    [...properties].sort((a, b) => b.discount - a.discount).slice(0, 3),
     [properties]);
   const watchedItems = useMemo(() =>
     properties.filter(p => watched.includes(p.id)),
     [watched, properties]);
 
   return (
-    <div className="page home-page" style={{ padding: '24px 24px 80px', maxWidth: 1480, margin: '0 auto' }}>
+    <div className="page home-page" style={{ padding: '28px 28px 80px', maxWidth: 1480, margin: '0 auto' }}>
 
       {/* ========== Greeting + KPI strip ========== */}
       <div style={{ marginBottom: 32 }}>
-        <div className="row between baseline page-header" style={{ marginBottom: 18 }}>
+        <div className="row between baseline page-header fade-in" style={{ marginBottom: 18 }}>
           <div>
             <h1 className="h1">Bom dia, {dashboard?.greeting?.name || 'Investidor'}.</h1>
             <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
@@ -30,7 +31,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
         </div>
 
         {/* KPI strip — only first 2 API KPIs + watchlist */}
-        <div className="card kpi-strip" style={{
+        <div className="card kpi-strip fade-in" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           overflow: 'hidden',
@@ -47,19 +48,30 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
         </div>
       </div>
 
+      {/* ========== Live Card Hero — last analysis ========== */}
+      {history && history.length > 0 && (
+        <LiveCardHero
+          entry={history[0]}
+          onClick={() => {
+            const live = properties.find(p => p.id === history[0].id);
+            if (live) go('detail', live);
+          }}
+        />
+      )}
+
       {/* ========== Search + Filters ========== */}
       <SearchCommand onSearch={onSearch} />
 
-      {/* ========== Section 01 — Top score + Market signals split ========== */}
-      <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 24, marginBottom: 40 }}>
+      {/* ========== Section 01 — Top descontos + Market signals split ========== */}
+      <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 28, marginBottom: 40 }}>
         <Section
           ix="01"
-          title="Top score disponível"
-          sub="Os melhores ratings da IA, atualizados às 06:00."
+          title="Top oportunidades"
+          sub="Maior desconto IA no portfólio, atualizados às 06:00."
           flush
         >
           <div className="col gap-3">
-            {topScored.map((p, i) => (
+            {topDiscounted.map((p, i) => (
               <CompactRow key={p.id} p={p} rank={i + 1} onClick={() => go('detail', p)} />
             ))}
           </div>
@@ -93,7 +105,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
           <div className="card responsive-table" style={{ overflow: 'hidden' }}>
             <div className="property-row table-head" style={{
               display: 'grid',
-              gridTemplateColumns: '60px 60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+              gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
               gap: 14,
               padding: '10px 18px',
               background: 'var(--bg-2)',
@@ -104,11 +116,10 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
               color: 'var(--fg-3)',
             }}>
               <span>foto</span>
-              <span>score</span>
               <span>imóvel</span>
-              <span>preço</span>
-              <span>desconto</span>
-              <span>roi</span>
+              <span>lance</span>
+              <span>avaliação</span>
+              <span>mercado IA</span>
               <span>risco</span>
               <span>encerra</span>
               <span></span>
@@ -172,7 +183,6 @@ function SearchCommand({ onSearch }) {
   const [address, setAddress] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sf, setSf] = useState({
-    scoreMin: 0,
     occupancy: 'Todos',
     discountMin: 0,
     judicial: 'Todos',
@@ -181,7 +191,6 @@ function SearchCommand({ onSearch }) {
   });
 
   const activeCount =
-    (sf.scoreMin > 0 ? 1 : 0) +
     (sf.occupancy !== 'Todos' ? 1 : 0) +
     (sf.discountMin > 0 ? 1 : 0) +
     (sf.judicial !== 'Todos' ? 1 : 0) +
@@ -189,7 +198,7 @@ function SearchCommand({ onSearch }) {
     (sf.modalidade !== 'Todos' ? 1 : 0);
 
   const clearFilters = () => setSf({
-    scoreMin: 0, occupancy: 'Todos', discountMin: 0,
+    occupancy: 'Todos', discountMin: 0,
     judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
   });
 
@@ -250,12 +259,6 @@ function SearchCommand({ onSearch }) {
           gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
           gap: '20px 28px',
         }}>
-          <FilterGroup
-            label="Score mínimo"
-            options={[['Todos', 0], ['≥ 60', 60], ['≥ 70', 70], ['≥ 80', 80], ['≥ 90', 90]]}
-            value={sf.scoreMin}
-            onChange={(v) => setSf(s => ({ ...s, scoreMin: v }))}
-          />
           <FilterGroup
             label="Ocupação"
             options={[['Todos', 'Todos'], ['Desocupado', 'desocupado'], ['Ocupado', 'ocupado']]}
@@ -365,7 +368,7 @@ function Kpi({ lbl, val, delta, pos, urgent, last }) {
 // ============================================================
 function Section({ ix, title, sub, action, children }) {
   return (
-    <section className="content-section" style={{ marginBottom: 40 }}>
+    <section className="content-section fade-in" style={{ marginBottom: 40 }}>
       <div className="row between section-head" style={{ alignItems: 'flex-end', marginBottom: 16 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
@@ -391,7 +394,7 @@ function CompactRow({ p, rank, onClick }) {
       className="card hov compact-row"
       style={{
         display: 'grid',
-        gridTemplateColumns: '24px 56px 1fr auto auto',
+        gridTemplateColumns: '24px 1fr auto auto',
         gap: 14,
         padding: '14px 18px',
         alignItems: 'center',
@@ -400,7 +403,6 @@ function CompactRow({ p, rank, onClick }) {
       <span className="mono" style={{ fontSize: 12, color: 'var(--fg-3)' }}>
         #{rank}
       </span>
-      <ScoreBadge value={p.score} size={48} showLabel={false} />
       <div>
         <div style={{ fontSize: 14, fontWeight: 500 }}>{p.title}</div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
@@ -412,10 +414,7 @@ function CompactRow({ p, rank, onClick }) {
             <span style={{ color: 'var(--fg-0)', fontWeight: 500 }}>R$ {fmtBRL(p.minBid)}</span>
           </span>
           <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`}
-          </span>
-          <span className="mono" style={{ fontSize: 12, color: p.roi > 0 ? 'var(--good)' : p.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
-            {p.roi >= 0 ? `+${p.roi}%` : `${p.roi}%`} ROI
+            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`} desconto IA
           </span>
         </div>
       </div>

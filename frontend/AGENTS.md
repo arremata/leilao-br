@@ -32,7 +32,7 @@ Navigation via `go(screen, prop)` in `App.jsx`. Screen and watchlist persist to 
 | `src/App.jsx` | Root: screen state, API calls, `TopBar` with URL analyzer input |
 | `src/main.jsx` | Entry point (React 19 + StrictMode) |
 | `src/api.js` | `fetchProperties()` and `analyzeUrl()` — calls proxied via `/api` |
-| `src/components/shared.jsx` | Reusable components (`ScoreBadge`, `Countdown`, `Photo` (supports `photoUrl`), `Sparkline`, `RiskDots`, `Specs`, `PropertyCard`, `PropertyRow`) + fixtures + helpers (`fmtBRL`, `getEndsAtMs`) |
+| `src/components/shared.jsx` | Reusable components (`Countdown`, `Photo` (supports `photoUrl`), `Sparkline`, `RiskSummary`, `RiskDots`, `Specs`, `PropertyCard`, `PropertyRow`) + fixtures + helpers (`fmtBRL`, `getEndsAtMs`) |
 | `src/components/Home.jsx` | Dashboard screen |
 | `src/components/Feed.jsx` | Feed screen with grid/list toggle, filters |
 | `src/components/PropertyDetail.jsx` | Property detail with tabs (Viabilidade, Mercado, Encargos, Juridico) |
