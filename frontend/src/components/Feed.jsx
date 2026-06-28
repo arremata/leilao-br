@@ -10,11 +10,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     modalidade: initialFilters?.modalidade || 'Todos',
     occupancy: initialFilters?.occupancy || 'Todos',
     propertyType: 'Todos',
-    roiMin: initialFilters?.roiMin || 0,
     discountMin: initialFilters?.discountMin || 0,
     city: 'Todas',
   });
-  const [sort, setSort] = useState('roi');
+  const [sort, setSort] = useState('discount');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
@@ -33,7 +32,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     }
     if (filters.occupancy !== 'Todos') list = list.filter(p => p.occupancy === filters.occupancy);
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
-    if (filters.roiMin > 0) list = list.filter(p => p.roi >= filters.roiMin);
     if (filters.discountMin > 0) list = list.filter(p => p.discount >= filters.discountMin);
     if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
     if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
@@ -41,7 +39,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
     if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
-    else if (sort === 'roi') list.sort((a, b) => b.roi - a.roi);
     else if (sort === 'soonest') list.sort((a, b) => getEndsAtMs(a.endsAt) - getEndsAtMs(b.endsAt));
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
@@ -56,7 +53,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     (addressQuery.trim() ? 1 : 0) +
     (filters.occupancy !== 'Todos' ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
-    (filters.roiMin > 0 ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
     (filters.judicial !== 'Todos' ? 1 : 0) +
@@ -68,7 +64,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     setFilters({
       judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
       occupancy: 'Todos', propertyType: 'Todos',
-      roiMin: 0, discountMin: 0, city: 'Todas',
+      discountMin: 0, city: 'Todas',
     });
   };
 
@@ -154,9 +150,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           <Filter label="Cidade" value={filters.city}
             options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
             onChange={(v) => setFilters({ ...filters, city: v })} />
-          <RangeChip label="ROI" suffix="%" max={50} value={filters.roiMin}
-            onChange={(v) => setFilters({ ...filters, roiMin: v })} />
-          <RangeChip label="Desconto" suffix="%" max={60} value={filters.discountMin}
+          <RangeChip label="Desconto IA" suffix="%" max={60} value={filters.discountMin}
             onChange={(v) => setFilters({ ...filters, discountMin: v })} />
 
           {activeFilterCount > 0 && (
@@ -181,9 +175,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         <span className="mono" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-0)' }}>{filtered.length.toString().padStart(3, '0')}</b> resultados
           <span style={{ margin: '0 8px' }}>·</span>
-          ROI médio {Math.round(filtered.reduce((a, b) => a + b.roi, 0) / Math.max(filtered.length, 1))}%
+          desconto IA médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
           <span style={{ margin: '0 8px' }}>·</span>
-          desconto médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
+          deságio oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
           1–{paginated.length} de {filtered.length}
@@ -367,9 +361,7 @@ function Sort({ value, onChange }) {
           backgroundPosition: 'right 10px center',
         }}
       >
-        <option value="roi">melhor ROI</option>
-        <option value="discount">maior desconto</option>
-        <option value="roi">maior ROI projetado</option>
+        <option value="discount">maior desconto IA</option>
         <option value="soonest">encerra antes</option>
         <option value="price-asc">menor preço</option>
         <option value="price-desc">maior preço</option>
