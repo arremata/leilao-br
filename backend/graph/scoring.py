@@ -1,5 +1,10 @@
 # graph/scoring.py
-"""Scoring node: compute overall score, risk flags, and ROI from market + legal results."""
+"""Scoring node: compute risk flags and ROI from market + legal results.
+
+The 0-100 `score` was removed in favour of a simple Bom/Ruim verdict derived
+from risk flags. Jurídico risk is still computed (kept for API compatibility
+in RiskFlags.j) but is no longer surfaced in the frontend viability tab.
+"""
 
 from __future__ import annotations
 
@@ -14,33 +19,6 @@ from graph.state import AuctionState, LegalResult, MarketResult, PropertyMetadat
 
 _DEBT_INDICATORS = re.compile(r"r\$\s*[\d.,]+", re.IGNORECASE)
 _NEGLECT_KEYWORDS = {"nenhum", "n/a", "inexistente", "não consta", "nao consta", "sem débito", "sem debito", ""}
-
-
-def compute_score(
-    market_score: int,
-    discount_percentage: float,
-    risk_level: str,
-    occupation: str,
-    liquidity_days: int,
-) -> int:
-    """Compute a 0-100 score from market and legal factors."""
-    score = 50.0
-    score += market_score * 3
-    score += discount_percentage * 0.3
-    legal_adj = {"low": 15, "medium": 0, "high": -15, "critical": -30}
-    score += legal_adj.get(risk_level, 0)
-    occ_lower = occupation.lower()
-    if "desocupado" in occ_lower:
-        score += 10
-    elif any(w in occ_lower for w in ("disputado", "posseiro", "invasor")):
-        score -= 15
-    else:
-        score -= 5
-    if liquidity_days < 60:
-        score += 5
-    elif liquidity_days > 120:
-        score -= 5
-    return max(0, min(100, int(round(score))))
 
 
 def _has_non_trivial_debt(debt_text: str) -> bool:
@@ -113,7 +91,7 @@ def _get_occupation(legal_result: Optional[LegalResult]) -> str:
 
 
 def scoring_node(state: AuctionState) -> dict:
-    """LangGraph node: compute score, risk flags, and ROI from market + legal results."""
+    """LangGraph node: compute risk flags and ROI from market + legal results."""
     metadata = state.property_metadata if hasattr(state, "property_metadata") else state.get("property_metadata")
     market_result = state.market_result if hasattr(state, "market_result") else state.get("market_result")
     legal_result = state.legal_result if hasattr(state, "legal_result") else state.get("legal_result")
@@ -122,15 +100,12 @@ def scoring_node(state: AuctionState) -> dict:
         logger.warning("Scoring node: no property metadata available")
         return {
             "scoring_result": ScoringResult(
-                score=0,
                 risk=RiskFlags(j="bad", f="bad", l="bad", o="bad"),
                 roi=0.0,
             ),
             "errors": ["No property metadata for scoring"],
         }
 
-    market_score = market_result.market_score if market_result and market_result.market_score is not None else 0
-    discount_pct = market_result.discount_percentage if market_result and market_result.discount_percentage is not None else 0.0
     liquidity_days = market_result.liquidity_days if market_result and market_result.liquidity_days is not None else 90
     risk_level = legal_result.risk_level if legal_result and legal_result.risk_level else "critical"
     occupation = _get_occupation(legal_result)
@@ -138,11 +113,6 @@ def scoring_node(state: AuctionState) -> dict:
     iptu = legal_result.tax_debts_iptu if legal_result else ""
     condo = legal_result.condominium_debts if legal_result else ""
     federal = legal_result.federal_state_debts if legal_result else ""
-
-    score = compute_score(
-        market_score=market_score, discount_percentage=discount_pct,
-        risk_level=risk_level, occupation=occupation, liquidity_days=liquidity_days,
-    )
 
     risk = compute_risk_flags(
         risk_level=risk_level, tax_debts_iptu=iptu,
@@ -159,6 +129,6 @@ def scoring_node(state: AuctionState) -> dict:
     auction_price = metadata.auction_price if metadata.auction_price is not None else 0.0
     roi = compute_roi(min_bid=auction_price, market_value=market_value, reform_estimate=reform_estimate)
 
-    scoring_result = ScoringResult(score=score, risk=risk, roi=roi)
-    logger.info(f"Scoring node: score={score}, risk={risk.model_dump()}, roi={roi}%")
+    scoring_result = ScoringResult(risk=risk, roi=roi)
+    logger.info(f"Scoring node: risk={risk.model_dump()}, roi={roi}%")
     return {"scoring_result": scoring_result}

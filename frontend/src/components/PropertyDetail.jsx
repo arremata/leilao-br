@@ -1,15 +1,21 @@
 import { useState } from 'react';
-import { ScoreBadge, Countdown, Photo, Specs } from './shared';
+import { Countdown, Photo, Specs, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
 
 export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
 
   // Simulator state lives here so both Costs and Viability share it
-  const [reno, setReno] = useState(6);
+  // renoPct: 0 = leve, 60 = inter, 100 = completa (presets). Slider interpolates.
+  const [renoPct, setRenoPct] = useState(60);
+  const [monthsToSale, setMonthsToSale] = useState(12); // 3..24
   const [target, setTarget] = useState(30);
   const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
   const [legalAI, setLegalAI] = useState(false);
+  // Occupant-removal toggle: default ON when the property exposes a removal cost.
+  // Initial state must be computed from a possibly-null property, so default to false
+  // and let the sim re-derive availability after the early-return guard below.
+  const [includeOccupantRemoval, setIncludeOccupantRemoval] = useState(false);
 
   if (!property) {
     return (
@@ -22,19 +28,131 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const p = property;
   const isWatched = watched?.includes(p.id);
 
-  // Compute simulator values from seed costs + sliders
-  const renoBase = p.costs?.find(c => c.kind === 'reno')?.value || 20000;
-  const renoCost = Math.round((reno / 100) * renoBase * 5);
+  // --- Renovation cost: button-based, scaled by region's R$/m² ---
+  // Region price/m² from the market indicators; fall back to market/area.
+  const _neighborhoodIndicator = p.marketDetail?.indicators?.find(
+    i => i.lbl.toLowerCase().includes('bairro') && i.val
+  );
+  const _parseBRLperM2 = (s) => {
+    if (!s) return 0;
+    const m = String(s).replace(/[^\d.,]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.');
+    const v = parseFloat(m);
+    return isNaN(v) ? 0 : v;
+  };
+  const regionPricePerM2 = _parseBRLperM2(_neighborhoodIndicator?.val) || (p.area > 0 ? (p.market || 0) / p.area : 0);
+
+  // Renovation rate: tier by region price/m², then interpolate by renoPct (0-100).
+  // Presets: 0 = leve, 60 = inter, 100 = completa. Slider interpolates linearly
+  // between leve→inter (0-60) and inter→completa (60-100).
+  // Taxa leve reduzida (era 450/350/250) — pintura/ajustes custam menos.
+  const _renoRate = (pct, pricePerM2) => {
+    const tier = pricePerM2 > 6000 ? 'high' : pricePerM2 > 3000 ? 'mid' : 'low';
+    const table = {
+      high: { leve: 200, inter: 1000, completa: 1500 },
+      mid:  { leve: 150, inter: 800,  completa: 1300 },
+      low:  { leve: 100, inter: 600,  completa: 1100 },
+    };
+    const t = table[tier];
+    const p = Math.max(0, Math.min(100, pct));
+    if (p <= 60) {
+      // leve → inter
+      return Math.round(t.leve + (t.inter - t.leve) * (p / 60));
+    }
+    // inter → completa
+    return Math.round(t.inter + (t.completa - t.inter) * ((p - 60) / 40));
+  };
+  const renoRate = _renoRate(renoPct, regionPricePerM2);
+  const renoCost = Math.round(renoRate * (p.area || 0));
+  const _renoLevelLabel = (pct) => {
+    if (pct <= 0) return 'leve — pintura e ajustes';
+    if (pct < 30) return 'leve+ — pintura e ajustes';
+    if (pct < 60) return 'inter- — cozinha, banheiros, piso';
+    if (pct === 60) return 'intermediária — cozinha, banheiros, piso';
+    if (pct < 100) return 'completa- — desmontagem parcial';
+    return 'completa — desmontagem e reconstrução';
+  };
+
+  // --- Projected recurring debts over months-to-sale ---
+  const monthlyCondo = p.monthlyCondo || 0;
+  const monthlyIptu = p.monthlyIptu || 0;
+  const projectedCondo = Math.round(monthlyCondo * monthsToSale);
+  const projectedIptu = Math.round(monthlyIptu * monthsToSale);
+
+  // --- Occupant removal cost (toggle, default on when property is not vacant) ---
+  const occupantRemovalAvailable = (p.occupantRemovalCost ?? 0) > 0;
+  const occupantRemovalCost = includeOccupantRemoval && occupantRemovalAvailable ? (p.occupantRemovalCost || 0) : 0;
+
   const gainCapital = exempt === 'Pagamento integral de GC'
     ? Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15)
     : 0;
 
   const legalAICost = legalAI ? 397 : 0;
-  const dynamicTotal = (p.costs || []).reduce((acc, r) => {
-    if (r.kind === 'reno') return acc + renoCost;
-    if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) return acc + gainCapital;
-    return acc + r.value;
-  }, legalAICost);
+
+  // Build the dynamic cost rows: take seed costs, replace reno + capital gains,
+  // replace the condo/IPTU debt lines with projected values, add occupant removal.
+  const dynamicRows = (p.costs || [])
+    .filter(r => {
+      // Drop the static condo/IPTU debt lines — replaced by projected versions below.
+      const label = r.label.toLowerCase();
+      if (r.kind === 'debt' && (label.includes('condomínio') || label.includes('condominio'))) return false;
+      if (r.kind === 'debt' && label.includes('iptu')) return false;
+      return true;
+    })
+    .map(r => {
+      if (r.kind === 'reno') {
+        return {
+          ...r,
+          value: renoCost,
+          hint: `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m². Região: R$ ${regionPricePerM2.toLocaleString('pt-BR')}/m².`,
+        };
+      }
+      if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) {
+        return {
+          ...r,
+          value: gainCapital,
+          hint: gainCapital === 0
+            ? `Isento — ${exempt.toLowerCase()}.`
+            : 'Alíquota de 15% sobre o ganho líquido estimado na venda.',
+        };
+      }
+      return r;
+    });
+
+  // Insert projected condo + IPTU as debt lines (only when they have a monthly value)
+  if (monthlyCondo > 0) {
+    dynamicRows.push({
+      label: `Condomínio projetado (${monthsToSale} meses)`,
+      value: projectedCondo,
+      hint: `R$ ${monthlyCondo.toLocaleString('pt-BR')}/mês × ${monthsToSale} meses até a venda.`,
+      kind: 'debt',
+    });
+  }
+  if (monthlyIptu > 0) {
+    dynamicRows.push({
+      label: `IPTU projetado (${monthsToSale} meses)`,
+      value: projectedIptu,
+      hint: `R$ ${monthlyIptu.toLocaleString('pt-BR')}/mês × ${monthsToSale} meses até a venda.`,
+      kind: 'debt',
+    });
+  }
+  if (occupantRemovalCost > 0) {
+    dynamicRows.push({
+      label: 'Remoção de ocupante',
+      value: occupantRemovalCost,
+      hint: 'Estimativa de ação de imissão na posse — honorários advocatícios e custas.',
+      kind: 'fee',
+    });
+  }
+  if (legalAICost > 0) {
+    dynamicRows.push({
+      label: 'Assistente jurídico',
+      value: legalAICost,
+      hint: 'Diligência jurídica automatizada — matrícula, certidões, processos, protestos e parecer de nulidade.',
+      kind: 'legal',
+    });
+  }
+
+  const dynamicTotal = dynamicRows.reduce((a, r) => a + r.value, 0);
 
   const netSale = Math.round((p.market || 0) * 0.94);
   const grossROI = dynamicTotal > 0 ? Math.round(((netSale - dynamicTotal) / dynamicTotal) * 100) : 0;
@@ -43,9 +161,13 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     : 0;
 
   const sim = {
-    reno, setReno, target, setTarget, exempt, setExempt,
+    renoPct, setRenoPct, monthsToSale, setMonthsToSale,
+    target, setTarget, exempt, setExempt,
     legalAI, setLegalAI, legalAICost,
-    renoCost, gainCapital, dynamicTotal, netSale, grossROI, maxBid,
+    renoCost, renoRate, regionPricePerM2,
+    monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
+    occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval, occupantRemovalCost,
+    gainCapital, dynamicTotal, dynamicRows, netSale, grossROI, maxBid,
   };
 
   return (
@@ -92,7 +214,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
             <div style={{
               position: 'absolute', top: 14, left: 14,
-              background: 'oklch(1 0 0 / 0.92)', padding: '6px 10px',
+              background: 'rgba(255,255,255,0.92)', padding: '6px 10px',
               borderRadius: 6, fontSize: 11,
               border: '1px solid var(--line-1)',
               fontFamily: 'var(--f-mono)',
@@ -114,14 +236,14 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               ) : (
                 <div style={{
                   width: '100%', height: '100%',
-                  background: 'oklch(0.92 0.005 75)',
-                  backgroundImage: 'repeating-linear-gradient(135deg, oklch(0.88 0.005 75) 0 1px, transparent 1px 8px)',
+                  background: '#ECEEF1',
+                  backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
                 }} />
               )}
               <span className="mono" style={{
                 position: 'absolute', bottom: 4, left: 4,
                 fontSize: 9, color: 'var(--fg-2)',
-                background: 'oklch(1 0 0 / 0.8)',
+                background: 'rgba(255,255,255,0.8)',
                 padding: '1px 4px', borderRadius: 3,
               }}>
                 Fachada
@@ -150,19 +272,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
 
-          {/* Score + countdown */}
+          {/* Countdown + risk summary */}
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
-            <div className="row gap-3" style={{ alignItems: 'center', flex: 1, minWidth: 0 }}>
-              <ScoreBadge value={p.score} size={64} showLabel={false} />
-              <div style={{ minWidth: 0 }}>
-                <div className="uppy" style={{ color: 'var(--fg-3)' }}>Score Arremate</div>
-                <div className="num-md" style={{ marginTop: 2 }}>{p.score}<span style={{ color: 'var(--fg-3)' }}>/100</span></div>
-                <div className="mono" style={{ fontSize: 11, color: p.score >= 50 ? 'var(--good)' : 'var(--bad)', marginTop: 2 }}>
-                  {p.score >= 50 ? '↑ acima da média' : '↓ abaixo da média'}
-                </div>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ minWidth: 0 }}>
               <div className="uppy" style={{ color: 'var(--fg-3)' }}>Encerra em</div>
               <div style={{ marginTop: 4 }}>
                 <Countdown until={p.endsAt} dark />
@@ -171,6 +283,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
                 {p.endsAt ? new Date(p.endsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) + ' · ' + new Date(p.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
               </div>
             </div>
+            <RiskSummary flags={p.risk} />
           </div>
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
@@ -385,7 +498,10 @@ function Market({ p }) {
                 <div className="num-md" style={{ marginTop: 4, color: 'var(--accent)' }}>R$ {fmtBRL(bid)}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Mercado estimado</span>
+                <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+                  <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
+                  Mercado estimado
+                </span>
                 <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(p.market)}</div>
               </div>
             </div>
@@ -393,7 +509,7 @@ function Market({ p }) {
               <b style={{ color: gapValue >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>R$ {fmtBRL(Math.abs(gapValue))}</b>
               <span style={{ color: 'var(--fg-1)' }}> de gap bruto · </span>
               <b>{discountPct >= 0 ? `−${discountPct.toFixed(0)}%` : `+${Math.abs(discountPct).toFixed(1)}%`}</b>
-              <span style={{ color: 'var(--fg-1)' }}> {discountPct >= 0 ? 'abaixo' : 'acima'} da avaliação</span>
+              <span style={{ color: 'var(--fg-1)' }}> {discountPct >= 0 ? 'abaixo' : 'acima'} do mercado IA</span>
             </div>
           </div>
         </div>
@@ -490,46 +606,29 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 // TAB 2 — COSTS (with simulator at top)
 // ============================================================
 function CostBreakdown({ p, sim }) {
-  const { reno, setReno, target, setTarget, exempt, setExempt, legalAI, setLegalAI, legalAICost, renoCost, gainCapital, netSale, grossROI, maxBid } = sim;
+  const {
+    renoPct, setRenoPct, monthsToSale, setMonthsToSale,
+    target, setTarget, exempt, setExempt, legalAI, setLegalAI,
+    renoCost, renoRate, regionPricePerM2,
+    projectedCondo, projectedIptu,
+    occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval,
+    netSale, grossROI, maxBid, dynamicRows, dynamicTotal,
+  } = sim;
 
-  const rows = (p.costs || []).map(r => {
-    if (r.kind === 'reno') {
-      return {
-        ...r,
-        value: renoCost,
-        hint: `Nível: ${reno < 25 ? 'mínima — pintura e ajustes' : reno < 60 ? 'padrão — cozinha, banheiros, piso' : 'completa — desmontagem e reconstrução'}. Ajuste o slider acima.`,
-      };
-    }
-    if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) {
-      return {
-        ...r,
-        value: gainCapital,
-        hint: gainCapital === 0
-          ? `Isento — ${exempt.toLowerCase()}.`
-          : 'Alíquota de 15% sobre o ganho líquido estimado na venda.',
-      };
-    }
-    return r;
-  });
-
-  if (legalAI) {
-    rows.push({
-      label: 'Assistente jurídico',
-      value: legalAICost,
-      hint: 'Diligência jurídica automatizada — matrícula, certidões, processos, protestos e parecer de nulidade.',
-      kind: 'legal',
-    });
-  }
-
-  const dynamicTotal = rows.reduce((a, r) => a + r.value, 0);
-
-  if (rows.length === 0) {
+  if ((dynamicRows || []).length === 0) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Dados de custos não disponíveis para este imóvel.</p>
       </div>
     );
   }
+
+  // Presets snap the slider to canonical levels. Slider position 0/60/100 = leve/inter/completa.
+  const renoPresets = [
+    { id: 'leve',     label: 'Leve',          pct: 0 },
+    { id: 'inter',    label: 'Intermediária', pct: 60 },
+    { id: 'completa', label: 'Completa',      pct: 100 },
+  ];
 
   return (
     <div>
@@ -540,10 +639,17 @@ function CostBreakdown({ p, sim }) {
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 02.01 · simulador</span>
             <h3 className="h2" style={{ marginTop: 4 }}>Cenário do investidor</h3>
             <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>
-              Arraste os controles — os custos abaixo recalculam ao vivo.
+              Ajuste os controles — os custos abaixo recalculam ao vivo.
             </p>
           </div>
-          <button className="btn sm" onClick={() => { setReno(6); setTarget(30); setExempt('Primeiro imóvel ou reinvestimento em 180 dias'); setLegalAI(false); }}>
+          <button className="btn sm" onClick={() => {
+            setRenoPct(60);
+            setMonthsToSale(12);
+            setTarget(30);
+            setExempt('Primeiro imóvel ou reinvestimento em 180 dias');
+            setLegalAI(false);
+            if (occupantRemovalAvailable) setIncludeOccupantRemoval(true);
+          }}>
             Resetar
           </button>
         </div>
@@ -568,24 +674,83 @@ function CostBreakdown({ p, sim }) {
           />
         </div>
 
-        {/* Sliders */}
-        <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 24 }}>
+        {/* Renovation slider + presets + months-to-sale + target */}
+        <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginBottom: 24 }}>
+          {/* Renovation — slider + presets */}
+          <div>
+            <div className="row between baseline">
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>Nível de reforma</span>
+              <span className="mono" style={{ fontSize: 16, fontWeight: 500, color: 'var(--accent)' }}>
+                R$ {fmtBRL(renoCost)}
+              </span>
+            </div>
+            <input
+              type="range" min={0} max={100} value={renoPct}
+              onChange={(e) => setRenoPct(+e.target.value)}
+              className="slider"
+              style={{ width: '100%', marginTop: 14 }}
+            />
+            <div className="row between" style={{ marginTop: 8 }}>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>leve</span>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>completa</span>
+            </div>
+            <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
+              {renoPresets.map(b => {
+                const active = renoPct === b.pct;
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setRenoPct(b.pct)}
+                    style={{
+                      padding: '6px 10px', fontSize: 11.5, borderRadius: 6,
+                      border: '1px solid ' + (active ? 'var(--accent)' : 'var(--line-1)'),
+                      background: active ? 'var(--accent-soft)' : 'var(--bg-1)',
+                      color: active ? 'var(--accent-strong)' : 'var(--fg-1)',
+                      fontWeight: active ? 500 : 400,
+                      transition: 'all .15s',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {b.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
+              R$ {renoRate}/m² × {Math.round(p.area || 0)} m² · {renoPct}%
+            </p>
+          </div>
+
+          {/* Months to sale */}
           <SliderField
-            label="Nível de reforma"
-            value={reno}
-            onChange={setReno}
-            display={`R$ ${fmtBRL(renoCost)}`}
-            description={reno < 25 ? 'Mínima — pintura e ajustes' : reno < 60 ? 'Padrão — cozinha, banheiros, piso' : 'Completa — desmontagem e reconstrução'}
+            label="Meses até venda"
+            value={monthsToSale}
+            onChange={setMonthsToSale}
+            display={`${monthsToSale}m`}
+            description={`Condomínio + IPTU projetados: R$ ${fmtBRL(projectedCondo + projectedIptu)}`}
+            min={3}
+            max={24}
           />
+
+          {/* Target ROI */}
           <SliderField
             label="Meta de retorno líquido"
             value={target}
             onChange={setTarget}
             display={`${target}%`}
-            description="Após custos, impostos e venda em 12 meses"
+            description="Após custos, impostos e venda projetada"
             min={5}
             max={80}
           />
+        </div>
+
+        {/* Region price/m² context */}
+        <div style={{
+          padding: '10px 14px', background: 'var(--bg-2)', borderRadius: 6,
+          fontSize: 11.5, color: 'var(--fg-2)', marginBottom: 20,
+        }}>
+          <span className="mono" style={{ color: 'var(--fg-3)' }}>região:</span>{' '}
+          R$ {regionPricePerM2.toLocaleString('pt-BR')}/m² · taxa de reforma aplicada: R$ {renoRate}/m²
         </div>
 
         {/* Tax scenario */}
@@ -597,6 +762,38 @@ function CostBreakdown({ p, sim }) {
           onChange={setExempt}
           hint="Isenção ou incidência do ganho de capital na venda"
         />
+
+        {/* Occupant removal toggle (only when applicable) */}
+        {occupantRemovalAvailable && (
+          <>
+            <div className="divider" style={{ margin: '20px 0' }}></div>
+            <div className="row between" style={{ alignItems: 'center' }}>
+              <div>
+                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Remoção de ocupante</span>
+                <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--fg-3)' }}>
+                  Inclui R$ {fmtBRL(p.occupantRemovalCost || 0)} para ação de imissão na posse
+                </p>
+              </div>
+              <button
+                onClick={() => setIncludeOccupantRemoval(!includeOccupantRemoval)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12,
+                  background: includeOccupantRemoval ? 'var(--accent)' : 'var(--bg-3)',
+                  position: 'relative', transition: 'background .2s',
+                  border: '1px solid ' + (includeOccupantRemoval ? 'var(--accent)' : 'var(--line-2)'),
+                  cursor: 'pointer', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: includeOccupantRemoval ? 22 : 2,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: '#fff', transition: 'left .2s',
+                  boxShadow: '0 1px 3px rgba(17,24,39,0.15)',
+                }} />
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="divider" style={{ margin: '20px 0' }}></div>
         <div className="row between" style={{ alignItems: 'center' }}>
@@ -620,7 +817,7 @@ function CostBreakdown({ p, sim }) {
               position: 'absolute', top: 2, left: legalAI ? 22 : 2,
               width: 18, height: 18, borderRadius: '50%',
               background: '#fff', transition: 'left .2s',
-              boxShadow: '0 1px 3px oklch(0 0 0 / 0.15)',
+              boxShadow: '0 1px 3px rgba(17,24,39,0.15)',
             }} />
           </button>
         </div>
@@ -652,7 +849,7 @@ function CostBreakdown({ p, sim }) {
             <span style={{ textAlign: 'right' }}>% do total</span>
             <span style={{ textAlign: 'right' }}>Valor</span>
           </div>
-          {rows.map((r, i) => (
+          {dynamicRows.map((r, i) => (
             <CostRow key={i} l={r.label} v={r.value} hint={r.hint} pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0} />
           ))}
           <div className="cost-row" style={{
@@ -667,7 +864,7 @@ function CostBreakdown({ p, sim }) {
           </div>
         </div>
         <p style={{ marginTop: 14, fontSize: 11.5, color: 'var(--fg-3)' }}>
-          Cálculo conservador. Ganho de capital varia conforme reinvestimento. Honorários advocatícios não inclusos.
+          Condomínio e IPTU projetados pela quantidade de meses até venda. Ganho de capital varia conforme reinvestimento.
         </p>
       </div>
     </div>
@@ -804,7 +1001,6 @@ function Viability({ p, sim }) {
     );
   }
 
-  const goodCount = v.riskDimensions.filter(d => d.state === 'good').length;
   const warnCount = v.riskDimensions.filter(d => d.state === 'warn').length;
   const badCount = v.riskDimensions.filter(d => d.state === 'bad').length;
 
@@ -827,15 +1023,15 @@ function Viability({ p, sim }) {
             <div>
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 03.01</span>
               <h3 className="h2" style={{ marginTop: 4 }}>Riscos por dimensão</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Score quebrado nas quatro dimensões que mais explicam atrito em leilões.</p>
+              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Avaliação qualitativa nas três dimensões que mais impactam o arremate.</p>
             </div>
             <span className={`tag dot ${badCount > 0 ? 'bad' : warnCount > 0 ? 'warn' : 'good'}`}>
-              {goodCount} boas{warnCount > 0 ? ` · ${warnCount} atenção` : ''}{badCount > 0 ? ` · ${badCount} crítico${badCount > 1 ? 's' : ''}` : ''}
+              {badCount > 0 ? `${badCount} crítica${badCount > 1 ? 's' : ''}` : warnCount > 0 ? `${warnCount} atenção` : 'sem riscos'}
             </span>
           </div>
           <div className="col gap-4" style={{ marginTop: 20 }}>
             {v.riskDimensions.map(rd => (
-              <RiskBar key={rd.dim} dim={rd.dim} pct={rd.pct} state={rd.state} note={rd.note} />
+              <RiskBar key={rd.dim} dim={rd.dim} state={rd.state} note={rd.note} />
             ))}
           </div>
         </div>
@@ -869,14 +1065,14 @@ function Metric({ lbl, big, sub, color = 'var(--fg-0)' }) {
   );
 }
 
-function RiskBar({ dim, pct, state, note }) {
+function RiskBar({ dim, state, note }) {
+  const color = state === 'good' ? 'var(--good)' : state === 'warn' ? 'var(--warn)' : 'var(--bad)';
+  const pct = state === 'good' ? 100 : state === 'warn' ? 60 : 25;
   return (
     <div>
       <div className="row between baseline" style={{ marginBottom: 8 }}>
         <span style={{ fontSize: 13.5, color: 'var(--fg-0)', fontWeight: 500 }}>{dim}</span>
-        <span className="mono" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-          <b style={{ color: state === 'good' ? 'var(--good)' : state === 'warn' ? 'var(--warn)' : 'var(--bad)', fontWeight: 500 }}>{pct}</b>/100
-        </span>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
       </div>
       <div className={`bar ${state}`}>
         <i style={{ width: `${pct}%` }}></i>
@@ -923,8 +1119,8 @@ function LegalLocked() {
       <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24 }}>
         <div className="card" style={{
           width: 'min(560px, 100%)', padding: 32,
-          background: 'oklch(1 0 0 / 0.92)', backdropFilter: 'blur(12px)',
-          boxShadow: '0 20px 50px oklch(0 0 0 / 0.08)',
+          background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
+          boxShadow: '0 20px 50px rgba(17,24,39,0.08)',
         }}>
           <div className="row gap-2 baseline" style={{ marginBottom: 18 }}>
             <span style={{ width: 26, height: 26, display: 'grid', placeItems: 'center', border: '1.5px solid var(--accent)', borderRadius: '50%', color: 'var(--accent)', fontSize: 12, fontFamily: 'var(--f-mono)' }}>⚿</span>

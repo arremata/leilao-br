@@ -148,15 +148,8 @@ def _build_viability(state: AuctionState) -> ViabilityDetail | None:
 
     risk = scoring.risk if scoring else RiskFlags(j="bad", f="bad", l="bad", o="bad")
 
+    # Jurídico dimension dropped per product decision — only 3 dimensions remain.
     risk_dimensions = [
-        RiskDimension(
-            dim="Jurídico",
-            pct=_derive_risk_pct(risk.j, 7),
-            state=risk.j,
-            note="Sem ônus, sem processos correlatos" if risk.j == "good"
-            else "Riscos jurídicos identificados" if risk.j == "warn"
-            else "Riscos jurídicos significativos",
-        ),
         RiskDimension(
             dim="Financeiro",
             pct=_derive_risk_pct(risk.f, -7),
@@ -427,10 +420,11 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
 
     if not metadata:
         return AuctionPropertyResult(
-            id="unknown", score=0, photo_label="", title="Propriedade desconhecida",
+            id="unknown", photo_label="", title="Propriedade desconhecida",
             address="", type="", neighborhood="", city="", auction_type="",
             auctioneer="—", court="—", discount=0.0, min_bid=0.0, market=0.0,
-            roi=0.0, area=0.0, ends_at="", occupancy="ocupado",
+            roi=0.0, appraisal=0.0, auction_discount=0.0, area=0.0, ends_at="",
+            occupancy="ocupado",
             risk=RiskFlags(j="bad", f="bad", l="bad", o="bad"),
             viability=None,
             market_detail=None,
@@ -443,17 +437,18 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
     neighborhood = metadata.neighborhood or ""
     state_abbrev = metadata.state or ""
 
-    market_value = metadata.market_value_estimate
-    # If the LLM set market_value_estimate to the auction price, it likely
-    # confused the two — treat as missing and use market research instead
-    if market_value and metadata.auction_price and abs(market_value - metadata.auction_price) < 1:
-        market_value = None
-    if not market_value and market_result:
-        market_value = (market_result.price_per_m2_neighborhood or 0.0) * (metadata.area_m2 or 0.0)
-    if not market_value:
-        market_value = 0.0
+    # appraisal = valor de avaliação do edital (se houver), senão cai para lance mínimo
+    appraisal_value = metadata.market_value_estimate or (metadata.auction_price or 0.0)
 
-    score = scoring_result.score if scoring_result else 0
+    # market = valor de mercado pela IA (comparáveis da região).
+    # Sempre derivado do price_per_m2_neighborhood; NUNCA do appraisal do edital.
+    market_value = 0.0
+    if market_result and market_result.price_per_m2_neighborhood and metadata.area_m2:
+        market_value = (market_result.price_per_m2_neighborhood or 0.0) * (metadata.area_m2 or 0.0)
+    # Fallback: se a IA não trouxer comparáveis, usar o appraisal do edital como referência
+    if not market_value:
+        market_value = appraisal_value
+
     risk = scoring_result.risk if scoring_result else RiskFlags(j="bad", f="bad", l="bad", o="bad")
     roi = scoring_result.roi if scoring_result else 0.0
 
@@ -462,9 +457,22 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
 
     discount = market_result.discount_percentage if market_result else 0.0
 
+    # Monthly recurring expenses — derived from legal findings so the frontend
+    # simulator can project condo/IPTU over the months-until-sale horizon.
+    condo_debt_total = _parse_brl(legal_result.condominium_debts) if legal_result and legal_result.condominium_debts else 0.0
+    iptu_debt_total = _parse_brl(legal_result.tax_debts_iptu) if legal_result and legal_result.tax_debts_iptu else 0.0
+    # Assume the outstanding debt covers ~12 months of back fees — so monthly = total / 12.
+    monthly_condo = round(condo_debt_total / 12) if condo_debt_total else None
+    monthly_iptu = round(iptu_debt_total / 12) if iptu_debt_total else None
+
+    # Occupant-removal cost estimate — only when the property is not vacant.
+    occupant_removal_cost = None
+    occ_lower = (occupation_status or "").lower()
+    if "desocupado" not in occ_lower:
+        occupant_removal_cost = 10000.0  # average of R$ 5k–15k range
+
     return AuctionPropertyResult(
         id=_generate_id(metadata.address, metadata.auction_price or 0),
-        score=score,
         photo_label=f"{prop_type.upper()} · {neighborhood.upper()} · {state_abbrev}" if prop_type else "",
         title=f"{prop_type} {metadata.area_m2 or 0:.0f} m², {_extract_street(metadata.address)}" if prop_type else metadata.address,
         address=metadata.address,
@@ -480,6 +488,11 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         min_bid=metadata.auction_price or 0,
         market=market_value,
         roi=roi,
+        appraisal=appraisal_value,
+        auction_discount=round(
+            ((appraisal_value - (metadata.auction_price or 0)) / appraisal_value * 100) if appraisal_value > 0 else 0.0,
+            2,
+        ),
         area=metadata.area_m2 or 0,
         beds=metadata.beds,
         baths=metadata.baths,
@@ -493,6 +506,9 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         costs=_build_costs(state),
         edital=_build_edital(state),
         auction_url=state.auction_url or None,
+        monthly_condo=monthly_condo,
+        monthly_iptu=monthly_iptu,
+        occupant_removal_cost=occupant_removal_cost,
     )
 
 

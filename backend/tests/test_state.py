@@ -85,13 +85,15 @@ def test_auction_state_has_scoring_result_field():
     state = AuctionState()
     assert state.scoring_result is None
 
+    # score field removed from ScoringResult — only risk + roi now
     scoring = ScoringResult(
-        score=87,
         risk=RiskFlags(j="good", f="good", l="warn", o="good"),
         roi=38.0,
     )
     state = AuctionState(scoring_result=scoring)
-    assert state.scoring_result.score == 87
+    assert state.scoring_result.risk.j == "good"
+    assert state.scoring_result.roi == 38.0
+    assert not hasattr(state.scoring_result, "score")
 
 
 def test_auction_state_has_result_json_field():
@@ -99,8 +101,8 @@ def test_auction_state_has_result_json_field():
     state = AuctionState()
     assert state.result_json == ""
 
-    state = AuctionState(result_json='{"score": 87}')
-    assert state.result_json == '{"score": 87}'
+    state = AuctionState(result_json='{"risk": {"j": "good"}}')
+    assert state.result_json == '{"risk": {"j": "good"}}'
 
 
 def test_auction_state_no_report_html():
