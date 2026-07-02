@@ -506,6 +506,7 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         costs=_build_costs(state),
         edital=_build_edital(state),
         auction_url=state.auction_url or None,
+        photo_url=metadata.photo_url or None,
         monthly_condo=monthly_condo,
         monthly_iptu=monthly_iptu,
         occupant_removal_cost=occupant_removal_cost,

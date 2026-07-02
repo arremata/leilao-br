@@ -31,6 +31,7 @@ class PropertyMetadata:
     floor: str | None = None
     creditor: str = ""
     debtor: str = ""
+    photo_url: str = ""
 
 
 @dataclass

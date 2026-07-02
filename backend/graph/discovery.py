@@ -13,7 +13,7 @@ from tools.pdf_downloader import download_pdfs
 from tools.pdf_parser import parse_pdf
 from tools.web_scraper import extract_dynamic_pdf_urls, scrape_page
 
-DISCOVERY_SYSTEM_PROMPT = """You are a real estate auction page parser for Brazilian auction sites. Given the text content of an auction listing page, extract property details matching these fields:
+DISCOVERY_SYSTEM_PROMPT = """You are a real estate auction page parser for Brazilian auction sites (Caixa, LEJE, leilaoimovel, Kron, Superbid, court sites, etc.). Given the text content of an auction listing page, extract property details matching these fields:
 - address: full property address
 - property_type: type (Apartamento, Casa, Terreno, Comercial, etc.)
 - area_m2: area in square meters (float)
@@ -21,11 +21,11 @@ DISCOVERY_SYSTEM_PROMPT = """You are a real estate auction page parser for Brazi
 - baths: number of bathrooms/banheiros (int or null if not found)
 - parking: number of parking spots/vagas de garagem (int or null if not found)
 - floor: floor/andar (string or null if not found, e.g. "12º andar")
-- auction_price: 1ª praça minimum bid price as float. Look for "1ª praça", "1ª data", "1º leilão", "Lance inicial" followed by a price. This is the starting bid, NOT the market value.
-- auction_price_2nd: 2ª praça minimum bid price as float, or 0 if not found. Look for "2ª praça", "2ª data", "2º leilão", "2ª Etapa" followed by a price. This is typically LOWER than 1ª praça. IMPORTANT: Many pages show both praças — always extract both.
-- market_value_estimate: appraised/avaliação value ONLY if explicitly labeled as "valor de avaliação", "avaliação", or "valor de mercado" separately from the auction price. If no separate appraised value is shown, set to null. Do NOT use the auction price (1ª praça) as the market value — they are different things.
-- auction_date: 1ª praça auction date string (e.g. "21/05/2026"). Look near "1ª praça", "1ª data", "1º leilão".
-- auction_date_2nd: 2ª praça auction date string, or empty if not found. Look near "2ª praça", "2ª data", "2º leilão".
+- auction_price: minimum bid price as float. Brazilian auction sites use MANY different labels for this — "1ª praça", "1ª data", "1º leilão", "Lance inicial", "Lance atual", "Valor mínimo de venda", "Valor mínimo", "Venda mínima". Extract whichever applies. This is the BID price, NOT the appraised/market value.
+- auction_price_2nd: 2ª praça / 2º leilão minimum bid price as float, or 0 if not found. Look for "2ª praça", "2ª data", "2º leilão", "2ª Etapa" followed by a price. This is typically LOWER than 1ª praça. Many pages show both praças — always extract both.
+- market_value_estimate: appraised/avaliação value ONLY if explicitly labeled as "valor de avaliação", "avaliação", "valor de mercado", "Valor de avaliação" separately from the auction price. If no separate appraised value is shown, set to null. Do NOT use the auction price (1ª praça) as the market value — they are different things.
+- auction_date: auction date string (e.g. "21/05/2026"). Look near any praça/leilão date label.
+- auction_date_2nd: 2ª praça/2º leilão date string, or empty if not found.
 - auction_type: Judicial, Extrajudicial, Caixa, etc.
 - matricula: matrícula number if shown (e.g. "67.309", "87.412")
 - process_number: lawsuit process number. Look for "Processo:", "Número do Processo:", "processo nº". Format is CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO (e.g. 0000422-82.2022.8.16.0001). Must be 20 digits. Set to empty string if not found.
@@ -40,9 +40,10 @@ DISCOVERY_SYSTEM_PROMPT = """You are a real estate auction page parser for Brazi
 Set any field you cannot find to an empty string, 0 for numbers, or null for optional fields.
 
 CRITICAL RULES:
-1. Always extract BOTH 1ª and 2ª praça prices when shown. Many auction pages display them side by side.
-2. auction_price (1ª praça) and market_value_estimate (avaliação) are DIFFERENT. The auction price is the minimum bid; the market value is the appraised value. If only one price is shown, it's the auction price — set market_value_estimate to null.
-3. auctioneer_name and court_name are DIFFERENT. The auctioneer runs the auction (e.g. "Helcio Kronberg"). The court is the judicial vara (e.g. "13ª Vara Cível de Curitiba/PR"). Never combine them.
+1. Always extract BOTH 1ª and 2ª praça prices when both are shown.
+2. auction_price (minimum bid) and market_value_estimate (avaliação) are DIFFERENT. The auction price is the minimum bid; the market value is the appraised value. On Caixa pages, "Valor de avaliação" = market_value_estimate, and "Valor mínimo de venda" = auction_price. If only one price is shown, it's the auction price — set market_value_estimate to null.
+3. auctioneer_name and court_name are DIFFERENT. Never combine them.
+4. Extract prices from any labeled price field — do not rely solely on "1ª praça" patterns. Caixa uses "Valor mínimo de venda"; other sites use "Lance inicial", "Venda mínima", etc.
 
 Also identify the site type as one of: "caixa", "leiloeiro", "court", "aggregator", or "other"
 
@@ -85,6 +86,21 @@ def _preprocess_auction_text(text: str) -> str:
     match = re.search(r"Lance atual:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
     if match:
         summary_parts.append(f"1ª praça lance atual: R$ {match.group(1)}")
+
+    # Caixa pattern: "Valor de avaliação: R$ X" + "Valor mínimo de venda: R$ Y"
+    match = re.search(r"Valor de avalia[çc][ãa]o:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"Appraisal (avaliação): R$ {match.group(1)}")
+        summary_parts.append(f"market_value_estimate: R$ {match.group(1)}")
+
+    match = re.search(r"Valor m[íi]nimo de venda:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+    if match:
+        summary_parts.append(f"auction_price (Valor mínimo de venda): R$ {match.group(1)}")
+    else:
+        # Broader: "Valor mínimo" or "Venda mínima"
+        match = re.search(r"(?:Valor m[íi]nimo|Venda m[íi]nima):\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
+        if match:
+            summary_parts.append(f"auction_price: R$ {match.group(1)}")
 
     # Extract 2ª praça: "2ª praça DATE ... Lance inicial: R$ PRICE"
     match = re.search(r"2ª praça\s+(\d{2}/\d{2}(?:/\d{4})?).*?Lance inicial:\s*R\$\s*([\d.,]+)", clean, re.IGNORECASE)
@@ -170,6 +186,60 @@ def _extract_pdf_urls(html: str) -> list[str]:
             pdf_urls.append(url)
 
     return pdf_urls
+
+
+def _extract_photo_url(html: str, page_url: str) -> str:
+    """Find the property's main photo URL in the HTML.
+
+    Brazilian auction sites embed photos in different ways:
+    - Caixa: <img src="/fotos/F<imovel-id>.jpg" alt="Foto do imóvel">
+    - LEJE/leilaoimovel: <img src="..."> inside galeria/foto containers
+    - Generic: any <img> with alt/title containing "foto" or "imóvel"
+
+    Skips icons (small width), loading GIFs, and template placeholders.
+    Returns absolute URL (resolved against page_url) or empty string.
+    """
+    from urllib.parse import urljoin
+
+    # Pattern 1: alt or title attribute mentions "foto do imóvel" / "foto do imovel" (Caixa-style)
+    for m in re.finditer(
+        r'<img[^>]+(?:alt|title)=["\']([^"\']*(?:foto do im[óo]vel|foto do imovel)[^"\']*)["\'][^>]*>',
+        html, re.IGNORECASE,
+    ):
+        tag = m.group(0)
+        src_match = re.search(r'src=["\']([^"\']+)["\']', tag)
+        if src_match:
+            src = src_match.group(1)
+            if src and not src.endswith(".gif") and "loading" not in src.lower():
+                return urljoin(page_url, src)
+
+    # Pattern 2: any <img> whose src contains /fotos/ (Caixa) or "imovel/foto"
+    for m in re.finditer(r'<img[^>]+src=["\']([^"\']*(?:/fotos/|imovel.foto|galeria)[^"\']*)["\'][^>]*>', html, re.IGNORECASE):
+        src = m.group(1)
+        if src and not src.endswith(".gif") and "loading" not in src.lower():
+            return urljoin(page_url, src)
+
+    # Pattern 3: <img> with alt or title = "Foto" or containing property address
+    for m in re.finditer(
+        r'<img[^>]+(?:alt|title)=["\']([^"\']*)["\'][^>]*>',
+        html, re.IGNORECASE,
+    ):
+        alt_text = m.group(1).lower()
+        if alt_text in ("foto", "imagem") or ("imóvel" in alt_text and "icon" not in alt_text):
+            tag = m.group(0)
+            src_match = re.search(r'src=["\']([^"\']+)["\']', tag)
+            if src_match:
+                src = src_match.group(1)
+                if (
+                    src
+                    and not src.endswith(".gif")
+                    and "loading" not in src.lower()
+                    and "icon" not in src.lower()
+                    and "logo" not in src.lower()
+                ):
+                    return urljoin(page_url, src)
+
+    return ""
 
 
 def _clean_html(html: str) -> str:
@@ -304,6 +374,12 @@ def discovery_node(state: AuctionState) -> dict:
             "page_source_type": page_source_type,
             "errors": [f"Failed to parse discovery response: {e}"],
         }
+
+    # Extract property photo URL from raw HTML (LLM doesn't do this reliably)
+    photo_url = _extract_photo_url(html, url)
+    if photo_url:
+        metadata.photo_url = photo_url
+        logger.info(f"Discovery: extracted photo URL: {photo_url}")
 
     logger.info(f"Discovery: source type={page_source_type}")
 
