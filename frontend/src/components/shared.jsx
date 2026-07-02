@@ -11,8 +11,18 @@ export function Countdown({ until, compact, dark }) {
     return () => clearInterval(id);
   }, []);
   const untilMs = getEndsAtMs(until);
+  // No auction date — Caixa "compra direta" listings or unparseable date.
+  // Avoid rendering a meaningless counting-down 00:00:00 forever.
+  if (untilMs === 0) {
+    return (
+      <span className="countdown" style={{ color: 'var(--fg-2)' }}>
+        <span className="dot" style={{ background: 'var(--fg-3)' }}></span>
+        <span>Sem data</span>
+      </span>
+    );
+  }
   const ms = Math.max(0, untilMs - now);
-  const ended = untilMs > 0 && ms === 0;
+  const ended = ms === 0;
   const d = Math.floor(ms / 86400000);
   const h = Math.floor((ms % 86400000) / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);

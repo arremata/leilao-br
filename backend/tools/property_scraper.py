@@ -29,6 +29,34 @@ def _slug(text: str) -> str:
     return text
 
 
+def _clean_city(city: str) -> str:
+    """Strip state/region suffixes from a city string.
+
+    Discovery metadata often stores city as "Campo Largo, PR" or "Campo Largo - PR".
+    ZAP/VivaReal URL builders expect just the city name ("Campo Largo"), with state
+    in a separate parameter. Without this, _slug produces "campo-largo-pr" and the
+    onde=... URL parameter contains an extra comma that breaks field separation.
+    """
+    if not city:
+        return ""
+    # Drop anything after a comma or hyphen followed by a 2-letter state suffix
+    cleaned = re.split(r"\s*[,]\s*[A-Z]{2}\s*$", city.strip())[0]
+    cleaned = re.split(r"\s*[-]\s*[A-Z]{2}\s*$", cleaned)[0]
+    return cleaned.strip()
+
+
+def _extract_state_from_city_field(city: str, fallback_state: str = "") -> str:
+    """Recover state abbreviation from a city string like 'Campo Largo, PR'.
+
+    Discovery often merges city+state into a single field. Use this to
+    recover the state when PropertyMetadata.state is empty.
+    """
+    if not city:
+        return fallback_state
+    m = re.search(r"[,\-]\s*([A-Z]{2})\s*$", city.strip())
+    return m.group(1) if m else fallback_state
+
+
 def _extract_street(address: str) -> str:
     """Extract street name from a Brazilian address.
 
@@ -100,17 +128,25 @@ _STATE_FULL_NAMES = {
 
 def build_zap_url(metadata: PropertyMetadata, location_override: str = "") -> str:
     from urllib.parse import quote
-    city_slug = _slug(metadata.city)
-    state = metadata.state.lower()
-    state_full = _STATE_FULL_NAMES.get(metadata.state.upper(), _slug(metadata.state))
+    city_clean = _clean_city(metadata.city)
+    state_abbr = metadata.state.upper() or _extract_state_from_city_field(metadata.city)
+    if not state_abbr:
+        # Without a state we can't build a meaningful URL — bail to a city search.
+        return f"https://www.zapimoveis.com.br/venda/imoveis/{_slug(city_clean)}/" if city_clean else ""
+    city_slug = _slug(city_clean)
+    state = state_abbr.lower()
+    state_full = _STATE_FULL_NAMES.get(state_abbr, _slug(state_abbr))
     loc = location_override or metadata.neighborhood
     loc_slug = _abbreviate_neighborhood(loc) if loc else ""
 
     if loc_slug:
         location = f"{state}+{city_slug}++{loc_slug}"
+        # NOTE: omitted trailing coords — ZAP tolerates a missing lat/lng and uses
+        # the city/neighborhood fields to scope results. Hardcoded coords previously
+        # pinned every search to Curitiba regardless of the actual property city.
         onde = (
-            f",{state_full.replace('-', ' ').title()},{metadata.city},,{loc},,,neighborhood,"
-            f"BR>{state_full}>NULL>{metadata.city}>Barrios>{loc},-25.488999,-49.294193,"
+            f",{state_full.replace('-', ' ').title()},{city_clean},,{loc},,,neighborhood,"
+            f"BR>{state_full}>NULL>{city_clean}>Barrios>{loc},"
         )
         return f"https://www.zapimoveis.com.br/venda/imoveis/{location}/?onde={quote(onde)}"
     return f"https://www.zapimoveis.com.br/venda/imoveis/{state}+{city_slug}/"
@@ -118,16 +154,19 @@ def build_zap_url(metadata: PropertyMetadata, location_override: str = "") -> st
 
 def build_vivareal_url(metadata: PropertyMetadata, location_override: str = "") -> str:
     from urllib.parse import quote
-    city_slug = _slug(metadata.city)
-    state = metadata.state.upper()
-    state_full = _STATE_FULL_NAMES.get(state, _slug(metadata.state))
+    city_clean = _clean_city(metadata.city)
+    state_abbr = metadata.state.upper() or _extract_state_from_city_field(metadata.city)
+    if not state_abbr:
+        return f"https://www.vivareal.com.br/venda/{_slug(city_clean)}/" if city_clean else ""
+    city_slug = _slug(city_clean)
+    state_full = _STATE_FULL_NAMES.get(state_abbr, _slug(state_abbr))
     loc = location_override or metadata.neighborhood
     loc_slug = _neighborhood_slug_clean(loc) if loc else ""
 
     if loc_slug:
         onde = (
-            f",{state_full.replace('-', ' ').title()},{metadata.city},,{loc},,,neighborhood,"
-            f"BR>{state_full}>NULL>{metadata.city}>Barrios>{loc},-25.488999,-49.294193,"
+            f",{state_full.replace('-', ' ').title()},{city_clean},,{loc},,,neighborhood,"
+            f"BR>{state_full}>NULL>{city_clean}>Barrios>{loc},"
         )
         return (
             f"https://www.vivareal.com.br/venda/{state_full}/{city_slug}/bairros/{loc_slug}/"
@@ -137,25 +176,33 @@ def build_vivareal_url(metadata: PropertyMetadata, location_override: str = "") 
 
 
 def build_quintoandar_url(metadata: PropertyMetadata, location_override: str = "") -> str:
-    city_slug = _slug(metadata.city)
-    state_slug = _slug(metadata.state)
+    city_clean = _clean_city(metadata.city)
+    state_abbr = metadata.state.upper() or _extract_state_from_city_field(metadata.city)
+    state_slug = _slug(state_abbr) if state_abbr else ""
+    city_slug = _slug(city_clean)
     loc = location_override or metadata.neighborhood
     loc_slug = _neighborhood_slug_clean(loc) if loc else ""
 
-    if loc_slug:
+    if loc_slug and city_slug and state_slug:
         return f"https://www.quintoandar.com.br/comprar/imovel/{loc_slug}-{city_slug}-{state_slug}-brasil/"
-    return f"https://www.quintoandar.com.br/comprar/imovel/{city_slug}-{state_slug}-brasil/"
+    if city_slug and state_slug:
+        return f"https://www.quintoandar.com.br/comprar/imovel/{city_slug}-{state_slug}-brasil/"
+    return ""
 
 
 def build_chavesnamao_url(metadata: PropertyMetadata, location_override: str = "") -> str:
-    city_slug = _slug(metadata.city)
-    state_slug = _slug(metadata.state)
+    city_clean = _clean_city(metadata.city)
+    state_abbr = metadata.state.upper() or _extract_state_from_city_field(metadata.city)
+    state_slug = _slug(state_abbr) if state_abbr else ""
+    city_slug = _slug(city_clean)
     loc = location_override or metadata.neighborhood
     loc_slug = _neighborhood_slug_clean(loc) if loc else ""
 
-    if loc_slug:
+    if state_slug and city_slug and loc_slug:
         return f"https://www.chavesnamao.com.br/imoveis-a-venda/{state_slug}-{city_slug}/{loc_slug}/"
-    return f"https://www.chavesnamao.com.br/imoveis-a-venda/{state_slug}-{city_slug}/"
+    if state_slug and city_slug:
+        return f"https://www.chavesnamao.com.br/imoveis-a-venda/{state_slug}-{city_slug}/"
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -567,6 +614,31 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
 MIN_COMPS = 3
 
 
+def _matches_city(comp: ComparableProperty, expected_city: str) -> bool:
+    """Loose check that a comparable is in the same city as the auction property.
+
+    Discovery metadata sometimes stores city as "Campo Largo, PR" and comp
+    addresses come from varied formats. We compare slugs of the bare city
+    name (without state) to handle both. When in doubt (empty expected city
+    or address with no city token), err on the side of keeping the comp —
+    the URL filtering should already have scoped results correctly.
+    """
+    if not expected_city:
+        return True
+    expected = _slug(_clean_city(expected_city))
+    if not expected:
+        return True
+    # Addresses typically end with "City" or "City, State" or "City - State".
+    # Build a lowercased haystack and check if the expected city slug appears
+    # as a whole word (prevents "curitiba" matching "curitiba-abc" falsely,
+    # though slugifying both sides makes a simple substring check safe enough).
+    haystack = _slug(comp.address) if comp.address else ""
+    if not haystack:
+        # No address to verify — trust the URL scoping
+        return True
+    return expected in haystack
+
+
 async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparableProperty]:
     """Try each site scraper sequentially. Stop early when >= MIN_COMPS found.
 
@@ -592,14 +664,26 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
             ("Chaves na Mão", scrape_chavesnamao),
         ]
 
+        async def _run_scraper(name, scraper, loc) -> list[ComparableProperty]:
+            try:
+                comps = await scraper(page, metadata, location_override=loc)
+            except Exception as e:
+                logger.debug(f"Property scraper: {name} failed: {e}")
+                return []
+            # Filter out comps from a different city than the auction property
+            kept = [c for c in comps if _matches_city(c, metadata.city)]
+            dropped = len(comps) - len(kept)
+            if dropped:
+                logger.info(f"Property scraper: {name} dropped {dropped} comp(s) outside {metadata.city}")
+            logger.info(f"Property scraper: {name} returned {len(kept)} comps (location='{loc}')")
+            return kept
+
         for name, scraper in scrapers:
             if len(all_comps) >= MIN_COMPS:
                 logger.info(f"Property scraper: {len(all_comps)} comps found, skipping {name}")
                 break
 
-            comps = await scraper(page, metadata, location_override=location)
-            logger.info(f"Property scraper: {name} returned {len(comps)} comps (location='{location}')")
-            all_comps.extend(comps)
+            all_comps.extend(await _run_scraper(name, scraper, location))
 
             # Random delay between scrapers to avoid rate limits
             if len(all_comps) < MIN_COMPS:
@@ -611,14 +695,9 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
             for name, scraper in scrapers:
                 if len(all_comps) >= MIN_COMPS:
                     break
-                try:
-                    comps = await scraper(page, metadata, location_override=metadata.neighborhood)
-                    logger.info(f"Property scraper: {name} returned {len(comps)} comps (neighborhood fallback)")
-                    all_comps.extend(comps)
-                    if len(all_comps) < MIN_COMPS:
-                        await asyncio.sleep(random.uniform(1.0, 3.0))
-                except Exception as e:
-                    logger.debug(f"Property scraper: {name} neighborhood retry failed: {e}")
+                all_comps.extend(await _run_scraper(name, scraper, metadata.neighborhood))
+                if len(all_comps) < MIN_COMPS:
+                    await asyncio.sleep(random.uniform(1.0, 3.0))
 
         return all_comps
     finally:

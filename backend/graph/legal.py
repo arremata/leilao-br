@@ -1,4 +1,3 @@
-import asyncio
 import json
 
 import litellm
@@ -6,9 +5,8 @@ from loguru import logger
 
 from config import get_settings
 from graph.state import AuctionState, LegalResult
-from tools.web_search import web_search_multiple
 
-LEGAL_SYSTEM_PROMPT = """You are a real estate legal analyst in Brazil specializing in auction property risks. Given property details, PDF document text, and web search results, produce a comprehensive legal viability assessment.
+LEGAL_SYSTEM_PROMPT = """You are a real estate legal analyst in Brazil specializing in auction property risks. Given property details and PDF document text, produce a comprehensive legal viability assessment.
 
 You MUST return a JSON object with these exact fields:
 - registration_status: string (status of property registration)
@@ -37,30 +35,9 @@ Pay special attention to the PDF text - editais often contain critical legal inf
 Respond ONLY with the JSON object."""
 
 
-async def _run_legal_searches(metadata) -> list[dict]:
-    """Run targeted web searches for legal data."""
-    def _get(attr):
-        return getattr(metadata, attr, "") if hasattr(metadata, attr) else metadata.get(attr, "")
-
-    queries = [
-        f"certidao onus matricula {_get('matricula')} {_get('city')}",
-        f"acoes judiciais {_get('address')} {_get('city')}",
-        f"divida ativa {_get('address')} {_get('city')} {_get('state')}",
-        f"IPTU debito {_get('address')} {_get('city')}",
-        f"zoneamento {_get('neighborhood')} {_get('city')} {_get('state')}",
-    ]
-
-    return await web_search_multiple(queries)
-
-
-def _call_legal_llm(metadata, pdf_texts: str, search_results: list[dict]) -> object:
-    """Call Claude Sonnet via LiteLLM/OpenRouter for legal analysis."""
+def _call_legal_llm(metadata, pdf_texts: str) -> object:
+    """Call Claude Sonnet via LiteLLM/Tractian proxy for legal analysis."""
     settings = get_settings()
-
-    search_text = "\n".join(
-        f"[{r.get('title', '')}] {r.get('content', '')} (Source: {r.get('url', '')})"
-        for r in search_results
-    )
 
     def _get(attr):
         return getattr(metadata, attr, "") if hasattr(metadata, attr) else metadata.get(attr, "")
@@ -83,8 +60,7 @@ def _call_legal_llm(metadata, pdf_texts: str, search_results: list[dict]) -> obj
             {
                 "role": "user",
                 "content": f"Property Info:\n{property_info}\n\n"
-                f"Document Text:\n{pdf_texts[:8000]}\n\n"
-                f"Web Search Results:\n{search_text}",
+                f"Document Text:\n{pdf_texts[:8000]}",
             },
         ],
     )
@@ -104,10 +80,7 @@ def legal_node(state: AuctionState) -> dict:
 
     logger.info(f"Legal agent: researching {getattr(metadata, 'address', 'unknown property')}")
 
-    search_results = asyncio.run(_run_legal_searches(metadata))
-    logger.info(f"Legal agent: collected {len(search_results)} search results")
-
-    response = _call_legal_llm(metadata, pdf_texts, search_results)
+    response = _call_legal_llm(metadata, pdf_texts)
     response_text = response.choices[0].message.content
 
     try:
