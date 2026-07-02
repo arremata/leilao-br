@@ -47,15 +47,20 @@ def _call_planner_llm(pdf_texts: str) -> object:
 
 
 def planner_node(state: AuctionState) -> dict:
-    """LangGraph node: Extract property metadata and create research plan from PDF text."""
+    """LangGraph node: Extract property metadata and create research plan from PDF text.
+
+    When discovery already extracted metadata (e.g. Caixa pages with no PDFs),
+    preserve it — don't overwrite with an empty PropertyMetadata.
+    """
     pdf_texts = state.pdf_texts if hasattr(state, 'pdf_texts') else state.get("pdf_texts", "")
+    existing_metadata = state.property_metadata if hasattr(state, 'property_metadata') else state.get("property_metadata")
 
     if not pdf_texts.strip():
-        logger.warning("No PDF text to analyze")
+        logger.warning("No PDF text to analyze — preserving discovery metadata")
         return {
-            "property_metadata": PropertyMetadata(),
             "research_plan": "No documents provided. Limited research possible.",
             "errors": ["No PDF text available for analysis"],
+            # Don't return property_metadata — let LangGraph keep discovery's value
         }
 
     logger.info("Planner: extracting property metadata and creating research plan")
@@ -73,11 +78,17 @@ def planner_node(state: AuctionState) -> dict:
         # Filter to only known PropertyMetadata fields to avoid TypeError from unexpected LLM keys
         from dataclasses import fields as _fields
         _known = {f.name for f in _fields(PropertyMetadata)}
-        metadata = PropertyMetadata(**{k: v for k, v in parsed.get("property_metadata", {}).items() if k in _known})
+        new_meta = {k: v for k, v in parsed.get("property_metadata", {}).items() if k in _known}
+
+        # Preserve photo_url from discovery if planner didn't extract one
+        if existing_metadata and existing_metadata.photo_url and "photo_url" not in new_meta:
+            new_meta["photo_url"] = existing_metadata.photo_url
+
+        metadata = PropertyMetadata(**new_meta)
         research_plan = parsed.get("research_plan", "")
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"Failed to parse planner response: {e}")
-        metadata = PropertyMetadata()
+        metadata = existing_metadata or PropertyMetadata()
         research_plan = "Could not parse property data. Proceeding with limited research."
 
     logger.info(f"Planner: identified property at {metadata.address or 'unknown address'}")
