@@ -154,8 +154,8 @@ class TestMarketNode:
 
 
 class TestMarketNodeScraperIntegration:
-    def test_market_node_uses_scraper_comps_first(self):
-        """When scrapers return >=3 comps, Tavily should still be called for supplementary data."""
+    def test_market_node_uses_scraper_comps(self):
+        """Scraped comparables are passed to the LLM call."""
         state = _make_state()
         comp = ComparableProperty(
             address="Rua A, 45",
@@ -180,25 +180,21 @@ class TestMarketNodeScraperIntegration:
             "tendencies": "Mercado em alta",
             "discount_percentage": 30.0,
             "market_score": 8,
-            "raw_findings": "Scraper comps + Tavily data",
+            "raw_findings": "Scraper comps",
         }
 
         with patch("graph.market.scrape_comparables", new_callable=AsyncMock, return_value=[comp, comp, comp]) as mock_scrape, \
-             patch("graph.market.web_search_multiple", new_callable=AsyncMock, return_value=[]) as mock_tavily, \
-             patch("graph.market._call_market_llm", return_value=_mock_llm_response(llm_data)):
+             patch("graph.market._call_market_llm", return_value=_mock_llm_response(llm_data)) as mock_llm:
             result = market_node(state)
 
         assert result["market_result"].market_score == 8
         mock_scrape.assert_called_once()
-        # Tavily should still be called for non-comp data (appreciation, reform, etc.)
-        assert mock_tavily.called
-        # When scrapers return >=3 comps, comparable search query should be omitted
-        tavily_queries = mock_tavily.call_args[0][0]
-        assert len(tavily_queries) == 5  # 5 supplementary queries, no "imóveis à venda"
-        assert not any("imóveis à venda" in q for q in tavily_queries)
+        # Scraped comps are forwarded to the LLM as context
+        passed_comps = mock_llm.call_args[0][1]
+        assert len(passed_comps) == 3
 
-    def test_market_node_falls_back_to_tavily_when_scrapers_fail(self):
-        """When scrapers return <3 comps, Tavily should run all queries including comparable search."""
+    def test_market_node_handles_no_scraper_results(self):
+        """Pipeline still runs when scrapers return no comparables."""
         state = _make_state()
         llm_data = {
             "price_per_m2_neighborhood": 10000.0,
@@ -213,54 +209,12 @@ class TestMarketNodeScraperIntegration:
             "tendencies": "Estavel",
             "discount_percentage": 15.0,
             "market_score": 6,
-            "raw_findings": "Tavily only",
+            "raw_findings": "No comps",
         }
 
         with patch("graph.market.scrape_comparables", new_callable=AsyncMock, return_value=[]) as mock_scrape, \
-             patch("graph.market.web_search_multiple", new_callable=AsyncMock, return_value=[{"title": "Preco", "url": "http://x", "content": "R$ 10.000"}]) as mock_tavily, \
              patch("graph.market._call_market_llm", return_value=_mock_llm_response(llm_data)):
             result = market_node(state)
 
         assert result["market_result"].market_score == 6
         mock_scrape.assert_called_once()
-        assert mock_tavily.called
-        # When scrapers fail, comparable search query should be added
-        tavily_queries = mock_tavily.call_args[0][0]
-        assert len(tavily_queries) == 6  # 5 supplementary + 1 comparable search
-        assert any("imóveis à venda" in q for q in tavily_queries)
-
-    def test_market_node_merges_partial_scraper_results(self):
-        """When scrapers return 1-2 comps, they should be merged with Tavily results."""
-        state = _make_state()
-        comp = ComparableProperty(
-            address="Rua B, 99",
-            price=880000.0,
-            area_m2=80.0,
-            price_per_m2=11000.0,
-            source="QuintoAndar",
-            url="https://quintoandar.com.br/imovel/2",
-        )
-        llm_data = {
-            "price_per_m2_neighborhood": 11000.0,
-            "price_per_m2_city": 9000.0,
-            "comparable_properties": [],
-            "reform_estimate": 22000.0,
-            "area_appreciation_1y": 4.0,
-            "area_appreciation_3y": 12.0,
-            "area_appreciation_5y": 28.0,
-            "city_appreciation_1y": 3.0,
-            "liquidity_days": 50,
-            "tendencies": "Mercado estavel",
-            "discount_percentage": 20.0,
-            "market_score": 7,
-            "raw_findings": "Partial scraper + Tavily",
-        }
-
-        with patch("graph.market.scrape_comparables", new_callable=AsyncMock, return_value=[comp]) as mock_scrape, \
-             patch("graph.market.web_search_multiple", new_callable=AsyncMock, return_value=[{"title": "Preco", "url": "http://x", "content": "R$ 11.000"}]) as mock_tavily, \
-             patch("graph.market._call_market_llm", return_value=_mock_llm_response(llm_data)):
-            result = market_node(state)
-
-        assert result["market_result"].market_score == 7
-        mock_scrape.assert_called_once()
-        assert mock_tavily.called

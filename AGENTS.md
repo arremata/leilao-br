@@ -14,7 +14,7 @@ leilao/
 │   ├── api.py               # FastAPI server (port 8000)
 │   ├── app.py               # Gradio UI (legacy)
 │   ├── analyze.py           # CLI entry point
-│   ├── config.py            # Settings (LiteLLM, Tavily keys)
+│   ├── config.py            # Settings (LiteLLM/OpenRouter keys)
 │   ├── graph/               # LangGraph agent pipeline
 │   │   └── contracts.py     # Pydantic data contract (AuctionPropertyResult)
 │   ├── tools/               # Web scraper, PDF parser, search, property scraper
@@ -77,8 +77,7 @@ URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scor
 - **Web Scraper** (Playwright with stealth) — scrapes auction listing pages
 - **PDF Downloader** — downloads PDFs from extracted URLs
 - **PDF Parser** (PyMuPDF + pytesseract OCR fallback) — extracts text from edital PDFs
-- **Web Search** (Tavily API with retry logic) — market and legal research
-- **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables
+- **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables (web search via Tavily foi removido; análise usa apenas scrapers + PDFs do edital)
 
 ## Data Contract
 
@@ -141,7 +140,7 @@ The full platform will include:
 | API | FastAPI | FastAPI |
 | Frontend | React 19 + Vite | React + Mapbox |
 | PDF Parsing | PyMuPDF | PyMuPDF |
-| Web Search | Tavily | Tavily |
+| Web Search | — (removido; só scrapers) | A definir |
 | Web Scraping | Playwright | Playwright + Scrapy |
 | Persistence | JSON file | PostgreSQL |
 | Deployment | Local | Docker + AWS/GCP |

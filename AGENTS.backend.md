@@ -61,7 +61,6 @@ CORS allows `http://localhost:5173` (Vite dev server).
 | `web_scraper.py` | Playwright + stealth: scrape auction pages, extract dynamic PDF URLs |
 | `pdf_downloader.py` | Download PDFs from URLs |
 | `pdf_parser.py` | PyMuPDF text extraction, pytesseract OCR fallback |
-| `web_search.py` | Tavily API wrapper with retry logic |
 | `property_scraper.py` | Playwright scraper for Zap Imoveis comparables |
 
 ## Data Contract
@@ -74,7 +73,7 @@ CORS allows `http://localhost:5173` (Vite dev server).
 - **State**: `AuctionState` dataclass in `state.py` — all nodes read/write to this
 - **Results**: Nodes return `dict` patches (LangGraph merges into state)
 - **LLM calls**: All via `litellm.completion()` with `api_base` from `config.py`
-- **Config**: `config.py` reads `OPENROUTER_API_KEY` and `TAVILY_API_KEY` from `.env` (relative to CWD)
+- **Config**: `config.py` reads `OPENROUTER_API_KEY` from `.env` (relative to CWD)
 - **Scoring**: Rule-based algorithm (no LLM) — starts at 50, adjusts by market score, discount, legal risk, occupancy, liquidity
 - **ROI**: `(market_value - total_cost) / total_cost * 100`, where total_cost = min_bid + reform + 7.8% fees
 - **Persistence**: JSON file (`data/results.json`), no database yet
