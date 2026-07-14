@@ -116,17 +116,19 @@ function HistoryRow({ entry, live, last, onClick }) {
       </div>
 
       <div>
-        <div className="num-sm" style={{ color: entry.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-          {entry.discount >= 0 ? `−${entry.discount}%` : `+${Math.abs(entry.discount).toFixed(1)}%`}
+        <div className="num-sm" style={{ color: entry.discount > 0 ? 'var(--good)' : entry.discount < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
+          {entry.discount >= 0 ? `${entry.discount}%` : `+${Math.abs(entry.discount).toFixed(1)}%`}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>desconto</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {entry.discount >= 0 ? 'desconto IA' : 'acima IA'}
+        </div>
       </div>
 
       <div>
-        <div className="num-sm" style={{ color: entry.roi > 0 ? 'var(--good)' : entry.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
-          {entry.roi >= 0 ? `+${entry.roi}%` : `${entry.roi}%`}
+        <div className="num-sm" style={{ color: 'var(--fg-1)' }}>
+          {entry.appraisal ? `R$ ${fmtBRL(entry.appraisal)}` : '—'}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>ROI</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>avaliação</div>
       </div>
 
       <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', textAlign: 'right' }}>

@@ -189,6 +189,37 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 }
 
 // ============================================================
+// DiscountLabel — convenção única de sinal para descontos.
+// Positivo (imóvel mais barato que a referência): sem sinal, verde.
+//   "35% desconto IA" / compacto "35% IA" / oficial "35% desconto oficial".
+// Negativo (imóvel mais caro): prefixo "+", vermelho (ágio / acima IA).
+// ============================================================
+export function DiscountLabel({ value, official = false, compact = false, colored = true, style }) {
+  const v = value ?? 0;
+  const abs = Math.abs(v);
+  const fmtPct = Number.isInteger(abs) ? String(abs) : abs.toFixed(1);
+  let text;
+  if (official) {
+    text = v >= 0
+      ? (compact ? `${fmtPct}% oficial` : `${fmtPct}% desconto oficial`)
+      : `+${fmtPct}% ágio`;
+  } else {
+    text = v >= 0
+      ? (compact ? `${fmtPct}% IA` : `${fmtPct}% desconto IA`)
+      : (compact ? `+${fmtPct}% acima` : `+${fmtPct}% acima IA`);
+  }
+  const color = !colored ? 'var(--fg-2)'
+    : v > 0 ? 'var(--good)'
+    : v < 0 ? 'var(--bad)'
+    : 'var(--fg-2)';
+  return (
+    <span className="mono" style={{ fontSize: 11, fontWeight: 500, color, ...style }}>
+      {text}
+    </span>
+  );
+}
+
+// ============================================================
 // Property card — DENSE, lots of information
 // ============================================================
 export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex = 0 }) {
@@ -198,6 +229,9 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
     <article
       className="card hov fade-in property-card"
       onClick={onClick}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
       style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}
     >
       {/* Photo with overlays */}
@@ -268,10 +302,8 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--fg-1)', marginTop: 4 }}>
-              {(p.auctionDiscount ?? 0) >= 0
-                ? `${p.auctionDiscount ?? 0}% desconto oficial`
-                : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
+            <div style={{ marginTop: 4 }}>
+              <DiscountLabel value={p.auctionDiscount} official colored={false} style={{ color: 'var(--fg-1)' }} />
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -282,14 +314,8 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.market)}
             </div>
-            <div className="mono" style={{
-              fontSize: 11, marginTop: 4,
-              color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
-              fontWeight: 500,
-            }}>
-              {(p.discount ?? 0) >= 0
-                ? `+${p.discount}% desconto IA`
-                : `${p.discount}% acima IA`}
+            <div style={{ marginTop: 4 }}>
+              <DiscountLabel value={p.discount} />
             </div>
           </div>
         </div>
@@ -316,6 +342,9 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
     <div
       className="property-row"
       onClick={onClick}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
       style={{
         display: 'grid',
         gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
@@ -350,21 +379,13 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
-          {(p.auctionDiscount ?? 0) >= 0 ? `−${p.auctionDiscount ?? 0}% oficial` : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
-        </div>
+        <DiscountLabel value={p.auctionDiscount} official compact colored={false} />
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-0)' }}>
           R$ {fmtBRL(p.market)}
         </div>
-        <div className="mono" style={{
-          fontSize: 11,
-          color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
-          fontWeight: 500,
-        }}>
-          {(p.discount ?? 0) >= 0 ? `+${p.discount}% IA` : `${p.discount}% acima IA`}
-        </div>
+        <DiscountLabel value={p.discount} compact />
       </div>
       <RiskDots flags={p.risk} />
       <Countdown until={p.endsAt} compact />

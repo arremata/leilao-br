@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
@@ -45,7 +45,14 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     return list;
   }, [addressQuery, filters, sort, properties]);
 
-  useEffect(() => { setPage(1); }, [addressQuery, filters, sort]);
+  // Reset da paginação quando busca/filtros/ordenação mudam — feito durante o
+  // render (padrão recomendado pelo React) em vez de num effect.
+  const filterSig = JSON.stringify([addressQuery, filters, sort]);
+  const [prevFilterSig, setPrevFilterSig] = useState(filterSig);
+  if (filterSig !== prevFilterSig) {
+    setPrevFilterSig(filterSig);
+    setPage(1);
+  }
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 

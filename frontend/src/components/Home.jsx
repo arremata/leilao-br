@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { PropertyRow, Countdown, Sparkline, RiskSummary } from './shared';
+import { PropertyRow, Countdown, Sparkline, RiskSummary, DiscountLabel } from './shared';
 import { LiveCardHero } from './LiveCard';
 import { fmtBRL } from '../utils';
 
@@ -49,9 +49,11 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       </div>
 
       {/* ========== Live Card Hero — last analysis ========== */}
+      {/* Resolve o imóvel "vivo" por id: entradas antigas do histórico podem
+          não ter appraisal/market/auctionDiscount gravados (mostravam R$ 0). */}
       {history && history.length > 0 && (
         <LiveCardHero
-          entry={history[0]}
+          entry={properties.find(p => p.id === history[0].id) || history[0]}
           onClick={() => {
             const live = properties.find(p => p.id === history[0].id);
             if (live) go('detail', live);
@@ -413,9 +415,7 @@ function CompactRow({ p, rank, onClick }) {
             <span style={{ color: 'var(--fg-2)' }}>lance </span>
             <span style={{ color: 'var(--fg-0)', fontWeight: 500 }}>R$ {fmtBRL(p.minBid)}</span>
           </span>
-          <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`} desconto IA
-          </span>
+          <DiscountLabel value={p.discount} style={{ fontSize: 12 }} />
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>

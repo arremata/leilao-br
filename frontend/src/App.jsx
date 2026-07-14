@@ -31,8 +31,13 @@ function App() {
   });
   const [feedSearch, setFeedSearch] = useState({ address: '', filters: null });
   const [feedKey, setFeedKey] = useState(0);
+  // Carga inicial: 'loading' | 'error' | 'ready' — sem isso, backend fora do
+  // ar era indistinguível de "0 imóveis no portfólio".
+  const [loadState, setLoadState] = useState('loading');
 
-  useEffect(() => {
+  // Não seta estado sincronamente (chamado de dentro de useEffect);
+  // o estado inicial já é 'loading' e o retry usa retryLoad abaixo.
+  const loadData = useCallback(() => {
     fetchProperties().then(data => {
       if (Array.isArray(data)) {
         setProperties(data);
@@ -43,11 +48,21 @@ function App() {
           return next.length === prev.length ? prev : next;
         });
       }
-    }).catch(() => {});
+      setLoadState('ready');
+    }).catch(() => {
+      setLoadState('error');
+    });
     fetchDashboard().then(data => {
       if (data) setDashboard(data);
     }).catch(() => {});
   }, []);
+
+  const retryLoad = useCallback(() => {
+    setLoadState('loading');
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
     localStorage.setItem('arremate_screen', screen);
@@ -108,7 +123,9 @@ function App() {
           title: prop.title, address: prop.address,
           city: prop.city, neighborhood: prop.neighborhood,
           risk: prop.risk, minBid: prop.minBid,
-          discount: prop.discount, roi: prop.roi,
+          discount: prop.discount,
+          appraisal: prop.appraisal, market: prop.market,
+          auctionDiscount: prop.auctionDiscount, endsAt: prop.endsAt,
           type: prop.type, auctionType: prop.auctionType,
         };
         setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
@@ -157,10 +174,38 @@ function App() {
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
-      <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} />
+      <TopBar screen={screen} go={go} watchCount={watched.length} onAnalyze={handleAnalyze} analyzing={analyzing} analysisError={analysisError} onDismissError={() => setAnalysisError(null)} />
       {analyzing && (
         <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 0' }}>
           <LiveCardProgress analyzing={analyzing} />
+        </div>
+      )}
+      {loadState === 'loading' && properties.length === 0 && (
+        <div style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 28px 0' }}>
+          <div className="card" style={{
+            padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10,
+            fontSize: 13, color: 'var(--fg-2)',
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)',
+              animation: 'live-blink 1.2s ease-in-out infinite',
+            }} />
+            Carregando imóveis do portfólio…
+          </div>
+        </div>
+      )}
+      {loadState === 'error' && (
+        <div style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 28px 0' }}>
+          <div className="card" style={{
+            padding: '14px 20px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+            background: 'var(--bad-soft)', border: '1px solid var(--bad)',
+          }}>
+            <span style={{ fontSize: 13, color: 'var(--bad)', fontWeight: 500 }}>
+              Não foi possível carregar os imóveis. Verifique se o backend está no ar.
+            </span>
+            <button className="btn sm" onClick={retryLoad}>Tentar novamente</button>
+          </div>
         </div>
       )}
       {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} history={history} />}
@@ -172,7 +217,7 @@ function App() {
   );
 }
 
-function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError }) {
+function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError, onDismissError }) {
   const [url, setUrl] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -192,13 +237,14 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
           <span className="logo"></span>
           Argos
         </button>
+        {/* Botões (não <a> sem href): focáveis e ativáveis por teclado */}
         <nav className="nav">
-          <a className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</a>
-          <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
-          <a className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
+          <button className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</button>
+          <button className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</button>
+          <button className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
             Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
-          </a>
-          <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</a>
+          </button>
+          <button className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</button>
         </nav>
       </div>
 
@@ -218,10 +264,18 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
       {analysisError && (
         <div style={{
           position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-          background: 'var(--bad-soft)', color: 'var(--bad)', padding: '6px 14px',
+          background: 'var(--bad-soft)', color: 'var(--bad)', padding: '6px 10px 6px 14px',
           borderRadius: 6, fontSize: 12, zIndex: 50, marginTop: 4,
+          display: 'flex', alignItems: 'center', gap: 8, maxWidth: '90vw',
         }}>
-          {analysisError}
+          <span>Não conseguimos analisar essa URL. Verifique o link e tente de novo.</span>
+          <button
+            onClick={onDismissError}
+            aria-label="Fechar aviso de erro"
+            style={{ color: 'var(--bad)', fontWeight: 600, fontSize: 13, lineHeight: 1 }}
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -252,7 +306,7 @@ function TopBar({ screen, go, watchCount, onAnalyze, analyzing, analysisError })
             }}>
               <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-1)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>Gustavo D.</div>
-                <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>gustavo@arremate.com</div>
+                <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>gustavo@argos.imb.br</div>
               </div>
               <button
                 onClick={() => { setUserMenuOpen(false); go('home'); }}

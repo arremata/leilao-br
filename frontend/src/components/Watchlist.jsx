@@ -56,16 +56,17 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
         </div>
       ) : (
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
+          {/* Colunas alinhadas com PropertyRow (lance / avaliação / mercado IA) */}
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
             gap: 14, padding: '10px 18px',
             background: 'var(--bg-2)', fontSize: 10.5,
             textTransform: 'uppercase', letterSpacing: '0.08em',
             fontFamily: 'var(--f-mono)', color: 'var(--fg-3)',
           }}>
             <span>foto</span><span>imóvel</span>
-            <span>preço</span><span>desconto</span><span>roi</span>
+            <span>lance</span><span>avaliação</span><span>mercado IA</span>
             <span>risco</span><span>encerra em</span><span></span>
           </div>
           {watchedItems.map(p => (

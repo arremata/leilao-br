@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Countdown, Photo, Specs, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
 import legalDemo from '../data/legalDemo';
@@ -422,7 +422,7 @@ function PricingGrid({ p }) {
         {has2nd ? (
           <>
             <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
-              <div className="num-md">{fmtBRL(p.edital.secondBidPrice)}</div>
+              <div className="num-md">R$ {fmtBRL(p.edital.secondBidPrice)}</div>
               <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>−{secondDiscount}%</span>
             </div>
             {p.edital?.secondBidDate && (
@@ -615,7 +615,7 @@ function Market({ p }) {
               </div>
               <div className="mono" style={{ fontSize: 11, marginTop: 2, color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                 {discountVsMarketPct >= 0
-                  ? `−${discountVsMarketPct.toFixed(0)}% desconto IA`
+                  ? `${discountVsMarketPct.toFixed(0)}% desconto IA`
                   : `+${Math.abs(discountVsMarketPct).toFixed(1)}% acima IA`}
               </div>
             </div>
@@ -632,7 +632,7 @@ function Market({ p }) {
               </div>
               <div className="mono" style={{ fontSize: 11, marginTop: 2, color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                 {desagioOficialPct >= 0
-                  ? `−${desagioOficialPct.toFixed(0)}% deságio oficial`
+                  ? `${desagioOficialPct.toFixed(0)}% desconto oficial`
                   : `+${Math.abs(desagioOficialPct).toFixed(1)}% ágio`}
               </div>
             </div>
@@ -961,7 +961,10 @@ function CostBreakdown({ p, sim }) {
             </p>
           </div>
           <div className="row gap-2">
-            <button className="btn sm"><span className="mono">↓</span> PDF</button>
+            {/* Export ainda não implementado — sem handler ficava parecendo quebrado */}
+            <button className="btn sm" disabled style={{ opacity: 0.55, cursor: 'not-allowed' }}>
+              <span className="mono">↓</span> PDF <span className="tag" style={{ marginLeft: 6 }}>em breve</span>
+            </button>
           </div>
         </div>
 
@@ -1369,9 +1372,19 @@ function GlossaryTerm({ text, termKey, openGlossary }) {
   );
 }
 
-function GlossaryDrawer({ open, onClose }) {
-  const [q, setQ] = useState('');
+function GlossaryDrawer({ open, onClose, query, setQuery }) {
+  // Busca controlada pelo LegalDetail: clicar num termo linkificado abre o
+  // drawer já filtrado por aquele termo.
+  const q = query || '';
+  const setQ = setQuery;
   const ql = q.trim().toLowerCase();
+  // Esc fecha o drawer enquanto aberto
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
   const groups = {};
   for (const t of legalGlossary) {
     if (ql && !`${t.termo} ${t.definicao}`.toLowerCase().includes(ql)) continue;
@@ -1388,7 +1401,7 @@ function GlossaryDrawer({ open, onClose }) {
           transition: 'opacity .2s', zIndex: 60,
         }}
       />
-      <aside style={{
+      <aside role="dialog" aria-modal={open} aria-label="Glossário jurídico" style={{
         position: 'fixed', top: 0, right: 0, height: '100vh', width: 'min(420px, 92vw)',
         background: 'var(--bg-1)', borderLeft: '1px solid var(--line-1)',
         boxShadow: '-20px 0 50px rgba(17,24,39,0.12)',
@@ -1443,6 +1456,13 @@ function GlossaryDrawer({ open, onClose }) {
 
 function LegalDetail({ legal, p }) {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [glossaryQuery, setGlossaryQuery] = useState('');
+  // Clicar num termo linkificado abre o glossário filtrado pelo termo.
+  const openGlossary = (termKey) => {
+    setGlossaryQuery(termKey || '');
+    setGlossaryOpen(true);
+  };
+  const lk = (text) => linkify(text, openGlossary);
   if (!legal) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
@@ -1466,10 +1486,10 @@ function LegalDetail({ legal, p }) {
             </div>
             <h3 className="h2" style={{ marginBottom: 6 }}>{legal.modalidadeLabel || 'Análise jurídica'}</h3>
             {legal.baseLegal && (
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>{legal.baseLegal}</p>
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>{lk(legal.baseLegal)}</p>
             )}
           </div>
-          <button className="btn sm" onClick={() => setGlossaryOpen(true)} style={{ flexShrink: 0 }} title="Abrir glossário jurídico">
+          <button className="btn sm" onClick={() => openGlossary('')} style={{ flexShrink: 0 }} title="Abrir glossário jurídico">
             <span className="mono">§</span> Glossário
           </button>
         </div>
@@ -1486,10 +1506,10 @@ function LegalDetail({ legal, p }) {
             <span style={{ fontSize: 15, fontWeight: 600, color: rec.color }}>{rec.label}</span>
           </div>
           <p style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--fg-1)' }}>
-            <b style={{ color: 'var(--fg-0)' }}>Principal risco:</b> {legal.conclusao.principalRisco}
+            <b style={{ color: 'var(--fg-0)' }}>Principal risco:</b> {lk(legal.conclusao.principalRisco)}
           </p>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-1)' }}>
-            <b style={{ color: 'var(--fg-0)' }}>Providência antes do lance:</b> {legal.conclusao.providencia}
+            <b style={{ color: 'var(--fg-0)' }}>Providência antes do lance:</b> {lk(legal.conclusao.providencia)}
           </p>
         </div>
       )}
@@ -1522,11 +1542,11 @@ function LegalDetail({ legal, p }) {
             {legal.riscos.map((r, i) => (
               <div key={i} style={{ padding: '14px 16px', border: '1px solid var(--line-1)', borderRadius: 8, background: 'var(--bg-1)' }}>
                 <div className="row between" style={{ alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>{r.tipo}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-0)' }}>{lk(r.tipo)}</span>
                   <NivelBadge nivel={r.nivel} />
                 </div>
                 <div style={{ marginBottom: 6 }}><StateBadge estado={r.verificacao} /></div>
-                <p style={{ margin: 0, fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.45 }}>{r.fonte}</p>
+                <p style={{ margin: 0, fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.45 }}>{lk(r.fonte)}</p>
               </div>
             ))}
           </div>
@@ -1591,8 +1611,8 @@ function LegalDetail({ legal, p }) {
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr', gap: 12, alignItems: 'baseline' }}>
                     <span style={{ color: GRAV_COLOR[o.gravidade] || 'var(--fg-3)', fontSize: 11 }}>●</span>
                     <div>
-                      <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{o.tipo}</span>
-                      <span style={{ fontSize: 12.5, color: 'var(--fg-2)' }}> — {o.descricao}</span>
+                      <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{lk(o.tipo)}</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--fg-2)' }}> — {lk(o.descricao)}</span>
                     </div>
                   </div>
                 ))}
@@ -1622,7 +1642,7 @@ function LegalDetail({ legal, p }) {
             {legal.editalAnalise.divergencias?.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 {legal.editalAnalise.divergencias.map((d, i) => (
-                  <div key={i} style={{ padding: '8px 12px', background: 'var(--warn-soft)', borderRadius: 6, borderLeft: '2px solid var(--warn)', marginTop: 6, fontSize: 12, color: 'var(--fg-1)' }}>{d}</div>
+                  <div key={i} style={{ padding: '8px 12px', background: 'var(--warn-soft)', borderRadius: 6, borderLeft: '2px solid var(--warn)', marginTop: 6, fontSize: 12, color: 'var(--fg-1)' }}>{lk(d)}</div>
                 ))}
               </div>
             )}
@@ -1642,7 +1662,7 @@ function LegalDetail({ legal, p }) {
               </div>
             </div>
             {legal.avaliacao.atualidade && (
-              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>↳ {legal.avaliacao.atualidade}</p>
+              <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>↳ {lk(legal.avaliacao.atualidade)}</p>
             )}
           </div>
         )}
@@ -1663,7 +1683,7 @@ function LegalDetail({ legal, p }) {
                 borderTop: i === 0 ? 'none' : '1px solid var(--line-1)',
               }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: 'var(--fg-0)' }}>{v.item}</div>
+                  <div style={{ fontSize: 13, color: 'var(--fg-0)' }}>{lk(v.item)}</div>
                   <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
                     {v.fonte}{v.nota && v.nota !== '—' ? ` · ${v.nota}` : ''}
                   </div>
@@ -1718,7 +1738,12 @@ function LegalDetail({ legal, p }) {
         <b style={{ color: 'var(--fg-1)' }}>↳ Aviso:</b> triagem jurídica automatizada por IA, baseada nos documentos disponíveis. Não substitui parecer de advogado. Itens marcados como “requer autos” dependem de diligência humana antes do lance.
       </div>
 
-      <GlossaryDrawer open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
+      <GlossaryDrawer
+        open={glossaryOpen}
+        onClose={() => setGlossaryOpen(false)}
+        query={glossaryQuery}
+        setQuery={setGlossaryQuery}
+      />
     </div>
   );
 }

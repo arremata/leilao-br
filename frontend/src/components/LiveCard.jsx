@@ -75,7 +75,7 @@ export function LiveCardHero({ entry, onClick }) {
             </span>
             <div className="mono" style={{ fontSize: 10, color: 'var(--fg-2)', marginTop: 2 }}>
               {(entry.auctionDiscount ?? 0) >= 0
-                ? `${entry.auctionDiscount ?? 0}% deságio`
+                ? `${entry.auctionDiscount ?? 0}% desconto oficial`
                 : `+${Math.abs(entry.auctionDiscount ?? 0).toFixed(1)}% ágio`}
             </div>
           </div>
@@ -91,7 +91,7 @@ export function LiveCardHero({ entry, onClick }) {
               fontSize: 10, marginTop: 2, fontWeight: 500,
               color: (entry.discount ?? 0) > 0 ? 'var(--good)' : (entry.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
             }}>
-              {(entry.discount ?? 0) >= 0 ? `+${entry.discount}% desconto IA` : `${entry.discount}% acima IA`}
+              {(entry.discount ?? 0) >= 0 ? `${entry.discount}% desconto IA` : `+${Math.abs(entry.discount ?? 0)}% acima IA`}
             </div>
           </div>
         </div>
@@ -103,28 +103,28 @@ export function LiveCardHero({ entry, onClick }) {
 // ============================================================
 // LiveCardProgress — Animated analysis progress
 // ============================================================
-export function LiveCardProgress({ analyzing, onComplete }) {
+export function LiveCardProgress({ analyzing }) {
   const [completedSteps, setCompletedSteps] = useState([]);
-  const [done, setDone] = useState(false);
+  const done = false; // o card some quando a análise real termina (App só o renderiza com analyzing=true)
 
   useEffect(() => {
-    if (!analyzing) {
-      setCompletedSteps([]);
-      setDone(false);
-      return;
-    }
+    if (!analyzing) return undefined;
 
-    const delays = [600, 1400, 2400, 3200, 3800];
+    // Os timers só completam os 4 primeiros passos; o último fica "em
+    // andamento" enquanto a análise real não terminar — evita mostrar
+    // "Análise concluída" com o backend ainda trabalhando.
+    const delays = [600, 1400, 2400, 3200];
     const timers = delays.map((delay, i) =>
       setTimeout(() => {
         setCompletedSteps(prev => [...prev, i]);
-        if (i === delays.length - 1) {
-          setTimeout(() => setDone(true), 600);
-        }
       }, delay)
     );
 
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      // Reset assíncrono (cleanup), não no corpo do effect
+      setCompletedSteps([]);
+    };
   }, [analyzing]);
 
   if (!analyzing && completedSteps.length === 0) return null;
