@@ -6,7 +6,6 @@ from loguru import logger
 
 from config import get_settings
 from graph.state import AuctionState, MarketResult, ComparableProperty
-from tools.web_search import web_search_multiple
 from tools.property_scraper import scrape_comparables
 
 MARKET_SYSTEM_PROMPT = """You are a real estate market analyst in Brazil. Given property details and web search results, produce a comprehensive market analysis.
@@ -32,54 +31,26 @@ Where market_value = price_per_m2_neighborhood * area_m2
 Respond ONLY with the JSON object."""
 
 
-async def _run_market_searches(metadata) -> tuple[list[dict], list[ComparableProperty]]:
-    """Run scrapers first, then Tavily for supplementary data. Returns (search_results, scraped_comps)."""
-    def _get(attr):
-        return getattr(metadata, attr, "") if hasattr(metadata, attr) else metadata.get(attr, "")
-
-    neighborhood = _get("neighborhood")
-    city = _get("city")
-    state = _get("state")
-    property_type = _get("property_type")
-
-    # Step 1: Try property scrapers
+async def _run_market_searches(metadata) -> list[ComparableProperty]:
+    """Run property scrapers only — Tavily removed. Returns scraped comparables."""
     scraped_comps = await scrape_comparables(metadata)
     logger.info(f"Market agent: scrapers returned {len(scraped_comps)} comparable properties")
-
-    # Step 2: Run Tavily for supplementary data (always needed for appreciation, reform, trends)
-    queries = [
-        f"preço m² {neighborhood} {city} {state}",
-        f"valorização imobiliária {city} 2024 2025",
-        f"liquidez imóveis {neighborhood} {city}",
-        f"tendências mercado imobiliário {city} {state}",
-        f"custo reforma {property_type.lower()} {city} pintura piso",
-    ]
-
-    # Only add comparable search query if scrapers didn't return enough
-    if len(scraped_comps) < 3:
-        queries.insert(1, f"imóveis à venda {neighborhood} {city}")
-
-    search_results = await web_search_multiple(queries)
-    return search_results, scraped_comps
+    return scraped_comps
 
 
-def _call_market_llm(metadata, search_results: list[dict], scraped_comps: list[ComparableProperty] | None = None) -> object:
-    """Call GPT-4o via LiteLLM/OpenRouter for market analysis."""
+def _call_market_llm(metadata, scraped_comps: list[ComparableProperty] | None = None) -> object:
+    """Call Claude Sonnet via LiteLLM/Tractian proxy for market analysis."""
     settings = get_settings()
 
-    search_text = "\n".join(
-        f"[{r.get('title', '')}] {r.get('content', '')} (Source: {r.get('url', '')})"
-        for r in search_results
-    )
-
-    # Prepend scraped comparable properties as structured data
+    # Build context from scraped comparables only (Tavily removed)
+    search_text = ""
     if scraped_comps:
         comp_lines = "\n".join(
             f"[Comparable Property] {c.address} | Price: R$ {c.price:,.0f} | Area: {c.area_m2} m² | "
             f"Price/m²: R$ {c.price_per_m2:,.0f} | Source: {c.source} | URL: {c.url}"
             for c in scraped_comps
         )
-        search_text = f"SCRAPED COMPARABLE PROPERTIES (high confidence):\n{comp_lines}\n\n{search_text}"
+        search_text = f"SCRAPED COMPARABLE PROPERTIES (high confidence):\n{comp_lines}"
 
     def _get(attr):
         return getattr(metadata, attr, "") if hasattr(metadata, attr) else metadata.get(attr, "")
@@ -137,10 +108,10 @@ def market_node(state: AuctionState) -> dict:
 
     logger.info(f"Market agent: researching {getattr(metadata, 'address', 'unknown property')}")
 
-    search_results, scraped_comps = asyncio.run(_run_market_searches(metadata))
-    logger.info(f"Market agent: collected {len(search_results)} search results, {len(scraped_comps)} scraped comps")
+    scraped_comps = asyncio.run(_run_market_searches(metadata))
+    logger.info(f"Market agent: collected {len(scraped_comps)} scraped comps")
 
-    response = _call_market_llm(metadata, search_results, scraped_comps)
+    response = _call_market_llm(metadata, scraped_comps)
     response_text = response.choices[0].message.content
 
     try:

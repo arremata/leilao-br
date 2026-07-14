@@ -56,13 +56,14 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   // Renovation rate: tier by region price/m², then interpolate by renoPct (0-100).
   // Presets: 0 = leve, 60 = inter, 100 = completa. Slider interpolates linearly
   // between leve→inter (0-60) and inter→completa (60-100).
-  // Taxa leve reduzida (era 450/350/250) — pintura/ajustes custam menos.
+  // Taxas calibradas realisticamente — leve ~R$60/m² para pintura/ajustes leve
+  // em imóveis de leilão (R$5K para 80m² é o mercado).
   const _renoRate = (pct, pricePerM2) => {
     const tier = pricePerM2 > 6000 ? 'high' : pricePerM2 > 3000 ? 'mid' : 'low';
     const table = {
-      high: { leve: 200, inter: 1000, completa: 1500 },
-      mid:  { leve: 150, inter: 800,  completa: 1300 },
-      low:  { leve: 100, inter: 600,  completa: 1100 },
+      high: { leve: 80,  inter: 600,  completa: 1200 },
+      mid:  { leve: 70,  inter: 500,  completa: 1100 },
+      low:  { leve: 60,  inter: 400,  completa: 1000 },
     };
     const t = table[tier];
     const p = Math.max(0, Math.min(100, pct));
@@ -168,13 +169,23 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 
   const netSale = Math.round((p.market || 0) * 0.94);
   const grossROI = dynamicTotal > 0 ? Math.round(((netSale - dynamicTotal) / dynamicTotal) * 100) : 0;
-  const maxBid = dynamicTotal > 0
-    ? Math.round((netSale / (1 + target / 100)) - (dynamicTotal - (p.minBid || 0)))
+  // Lance máximo recomendado nunca pode ser inferior ao lance mínimo do leilão.
+  // O slider de meta de retorno é travado no ponto onde maxBid atinge o minBid:
+  // maxBid = netSale/(1+target/100) - (dynamicTotal - minBid) = minBid  ⇒  target = (netSale/dynamicTotal - 1)*100
+  const minBidFloor = p.minBid || 0;
+  const targetCap = dynamicTotal > 0
+    ? Math.max(5, Math.min(80, Math.round((netSale / dynamicTotal - 1) * 100)))
+    : 80;
+  const effectiveTarget = Math.min(target, targetCap);
+  const maxBidRaw = dynamicTotal > 0
+    ? Math.round((netSale / (1 + effectiveTarget / 100)) - (dynamicTotal - minBidFloor))
     : 0;
+  const maxBid = Math.max(maxBidRaw, minBidFloor);
 
   const sim = {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
-    target, setTarget, exempt, setExempt,
+    target: effectiveTarget, setTarget, targetCap,
+    exempt, setExempt,
     legalAI, setLegalAI, legalAICost,
     renoCost, renoRate, regionPricePerM2,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
@@ -474,9 +485,22 @@ function Market({ p }) {
 
   const has2nd = p.edital?.secondBidPrice && p.edital.secondBidPrice > 0;
   const bid = has2nd ? p.edital.secondBidPrice : p.minBid;
-  const bidPct = p.market > 0 ? (bid / p.market * 100) : 0;
-  const gapValue = p.market - bid;
-  const discountPct = p.market > 0 ? ((p.market - bid) / p.market * 100) : 0;
+  const appraisal = p.appraisal || 0;
+  const market = p.market || 0;
+
+  // Anchor for bar percentages: the larger of appraisal / market, so the bar
+  // can visualize all three values on the same scale even when the IA market
+  // estimate is smaller than the edital appraisal (or vice versa).
+  const barMax = Math.max(market, appraisal, bid, 1);
+  const bidPct = (bid / barMax) * 100;
+  const appraisalPct = (appraisal / barMax) * 100;
+  const marketPct = (market / barMax) * 100;
+
+  // Gaps relative to each reference
+  const gapVsMarket = market - bid;
+  const gapVsAppraisal = appraisal - bid;
+  const discountVsMarketPct = market > 0 ? ((market - bid) / market * 100) : 0;
+  const desagioOficialPct = appraisal > 0 ? ((appraisal - bid) / appraisal * 100) : 0;
 
   // Valorização da região — extraída do indicador de preço/m² do bairro
   const appreciationIndicator = md.indicators.find(i => i.lbl.toLowerCase().includes('bairro'));
@@ -496,32 +520,121 @@ function Market({ p }) {
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
             <div>
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.01 · spread</span>
-              <h3 className="h2" style={{ marginTop: 4 }}>Valor de mercado vs. lance mínimo</h3>
+              <h3 className="h2" style={{ marginTop: 4 }}>Lance vs. avaliação vs. mercado IA</h3>
             </div>
           </div>
-          <div style={{ position: 'relative', marginTop: 28 }}>
-            <div style={{ height: 12, background: 'var(--bg-3)', borderRadius: 6, position: 'relative' }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(bidPct, 100)}%`, background: 'var(--accent)', borderRadius: 6 }}></div>
-              <div style={{ position: 'absolute', left: `${Math.min(bidPct, 100)}%`, top: -10, width: 2, height: 32, background: 'var(--fg-0)' }}></div>
+
+          {/* 3-way stacked bar — bar fills with bid, markers for appraisal & market */}
+          <div style={{ position: 'relative', marginTop: 30, marginBottom: 8 }}>
+            <div style={{ height: 14, background: 'var(--bg-3)', borderRadius: 7, position: 'relative', overflow: 'visible' }}>
+              {/* Bid fill */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: `${Math.min(bidPct, 100)}%`,
+                background: 'var(--accent)', borderRadius: 7,
+              }}></div>
+              {/* Appraisal marker — vertical line + dot above */}
+              {appraisal > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${Math.min(appraisalPct, 100)}%`,
+                  top: -8, bottom: -8, width: 2,
+                  background: 'var(--fg-1)', transform: 'translateX(-1px)',
+                }}></div>
+              )}
+              {/* Mercado IA marker — vertical line + dot above (uses --good) */}
+              {market > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${Math.min(marketPct, 100)}%`,
+                  top: -8, bottom: -8, width: 2,
+                  background: 'var(--good)', transform: 'translateX(-1px)',
+                }}></div>
+              )}
             </div>
-            <div className="row between" style={{ marginTop: 14 }}>
-              <div>
-                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Lance mínimo</span>
-                <div className="num-md" style={{ marginTop: 4, color: 'var(--accent)' }}>R$ {fmtBRL(bid)}</div>
+            {/* Tick labels under bar — only show if they fit; otherwise rely on legend below */}
+          </div>
+
+          {/* Legend — three rows: bid / appraisal / mercado IA */}
+          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+            <div className="row between" style={{ alignItems: 'center' }}>
+              <div className="row gap-2" style={{ alignItems: 'center' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', display: 'inline-block' }}></span>
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>Lance mínimo {has2nd && '(2ª praça)'}</span>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
+                <span className="num-md" style={{ color: 'var(--accent)' }}>R$ {fmtBRL(bid)}</span>
+                {market > 0 && (
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                    {((bid / market) * 100).toFixed(0)}% do mercado
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="row between" style={{ alignItems: 'center' }}>
+              <div className="row gap-2" style={{ alignItems: 'center' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--fg-1)', display: 'inline-block' }}></span>
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>Avaliação edital</span>
+              </div>
+              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
+                <span className="num-md" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(appraisal)}</span>
+                {market > 0 && (
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                    {((appraisal / market) * 100).toFixed(0)}% do mercado
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="row between" style={{ alignItems: 'center' }}>
+              <div className="row gap-2" style={{ alignItems: 'center' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--good)', display: 'inline-block' }}></span>
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
                   <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
                   Mercado estimado
                 </span>
-                <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(p.market)}</div>
+              </div>
+              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
+                <span className="num-md" style={{ color: 'var(--good)' }}>R$ {fmtBRL(market)}</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>100% (referência)</span>
               </div>
             </div>
-            <div style={{ marginTop: 18, padding: '12px 14px', background: gapValue >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)', borderRadius: 6, fontSize: 13, color: 'var(--fg-0)' }}>
-              <b style={{ color: gapValue >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>R$ {fmtBRL(Math.abs(gapValue))}</b>
-              <span style={{ color: 'var(--fg-1)' }}> de gap bruto · </span>
-              <b>{discountPct >= 0 ? `−${discountPct.toFixed(0)}%` : `+${Math.abs(discountPct).toFixed(1)}%`}</b>
-              <span style={{ color: 'var(--fg-1)' }}> {discountPct >= 0 ? 'abaixo' : 'acima'} do mercado IA</span>
+          </div>
+
+          {/* Gap summary — two lines: vs mercado IA and vs avaliação (deságio oficial) */}
+          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{
+              padding: '11px 13px', borderRadius: 6, fontSize: 12.5,
+              background: gapVsMarket >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)',
+              borderLeft: `3px solid ${gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)'}`,
+            }}>
+              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>vs. mercado IA</div>
+              <div style={{ color: 'var(--fg-0)' }}>
+                <b style={{ color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
+                  R$ {fmtBRL(Math.abs(gapVsMarket))}
+                </b>
+              </div>
+              <div className="mono" style={{ fontSize: 11, marginTop: 2, color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)' }}>
+                {discountVsMarketPct >= 0
+                  ? `−${discountVsMarketPct.toFixed(0)}% desconto IA`
+                  : `+${Math.abs(discountVsMarketPct).toFixed(1)}% acima IA`}
+              </div>
+            </div>
+            <div style={{
+              padding: '11px 13px', borderRadius: 6, fontSize: 12.5,
+              background: gapVsAppraisal >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)',
+              borderLeft: `3px solid ${gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)'}`,
+            }}>
+              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>vs. avaliação oficial</div>
+              <div style={{ color: 'var(--fg-0)' }}>
+                <b style={{ color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
+                  R$ {fmtBRL(Math.abs(gapVsAppraisal))}
+                </b>
+              </div>
+              <div className="mono" style={{ fontSize: 11, marginTop: 2, color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)' }}>
+                {desagioOficialPct >= 0
+                  ? `−${desagioOficialPct.toFixed(0)}% deságio oficial`
+                  : `+${Math.abs(desagioOficialPct).toFixed(1)}% ágio`}
+              </div>
             </div>
           </div>
         </div>
@@ -620,7 +733,7 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 function CostBreakdown({ p, sim }) {
   const {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
-    target, setTarget, exempt, setExempt, legalAI, setLegalAI,
+    target, setTarget, targetCap, exempt, setExempt, legalAI, setLegalAI,
     renoCost, renoRate, regionPricePerM2,
     projectedCondo, projectedIptu,
     occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval,
@@ -686,8 +799,8 @@ function CostBreakdown({ p, sim }) {
           />
         </div>
 
-        {/* Renovation slider + presets + months-to-sale + target */}
-        <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginBottom: 24 }}>
+          {/* Renovation slider + presets + months-to-sale + target */}
+          <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginBottom: 24 }}>
           {/* Renovation — slider + presets */}
           <div>
             <div className="row between baseline">
@@ -744,15 +857,17 @@ function CostBreakdown({ p, sim }) {
             max={24}
           />
 
-          {/* Target ROI */}
+          {/* Target ROI — travado no ponto onde o lance máximo atinge o lance mínimo */}
           <SliderField
             label="Meta de retorno líquido"
             value={target}
             onChange={setTarget}
             display={`${target}%`}
-            description="Após custos, impostos e venda projetada"
+            description={target >= targetCap
+              ? `Limite — lance máximo = lance mínimo do leilão`
+              : `Após custos, impostos e venda projetada`}
             min={5}
-            max={80}
+            max={targetCap}
           />
         </div>
 

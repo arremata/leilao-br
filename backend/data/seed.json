@@ -820,5 +820,271 @@
       "paymentTerms": "Recursos próprios ou FGTS. Pagamento à vista. Permite utilização de FGTS — consultar condições e enquadramento.",
       "summaryNote": "Texto resumido pela IA Arremate. Consultar condições completas no portal Caixa Imóveis."
     }
+  },
+  {
+    "id": "a4",
+    "photoLabel": "APARTAMENTO · ITAQUI · PR",
+    "title": "Apartamento 58 m², RUA PROFESSOR OVIDIO JORGE NOGUEIRA",
+    "address": "RUA PROFESSOR OVIDIO JORGE NOGUEIRA, N. 77 APTO. 206 BL 01, ITAQUI - CEP: 83602-335, CAMPO LARGO - PARANA",
+    "type": "Apartamento",
+    "neighborhood": "Itaqui",
+    "city": "Campo Largo, PR",
+    "auctionType": "Extrajudicial",
+    "praca": null,
+    "modalidade": "Licitação aberta",
+    "auctioneer": "Caixa Econômica Federal",
+    "court": "—",
+    "discount": 39.56,
+    "minBid": 123300.35,
+    "market": 230642.16,
+    "roi": 25.83,
+    "appraisal": 204000.0,
+    "auctionDiscount": 39.56,
+    "area": 58.42,
+    "beds": 2,
+    "baths": null,
+    "parking": 1,
+    "floor": null,
+    "endsAt": "",
+    "occupancy": "ocupado",
+    "risk": {
+      "j": "bad",
+      "f": "good",
+      "l": "warn",
+      "o": "warn"
+    },
+    "viability": {
+      "riskDimensions": [
+        {
+          "dim": "Financeiro",
+          "pct": 78,
+          "state": "good",
+          "note": "Sem débitos significativos identificados"
+        },
+        {
+          "dim": "Liquidez",
+          "pct": 52,
+          "state": "warn",
+          "note": "Média de 84 dias para vender no bairro"
+        },
+        {
+          "dim": "Ocupação",
+          "pct": 70,
+          "state": "warn",
+          "note": "Imóvel ocupado — verificar necessidade de imissão na posse"
+        }
+      ],
+      "alerts": [
+        {
+          "level": "warn",
+          "title": "IPTU em atraso",
+          "text": "Não identificado no documento fornecido. Imóvel localizado em Campo Largo - PR. Recomenda-se solicitação de certidão negativa de débitos de IPTU junto à Prefeitura Municipal de Campo Largo, pois débitos de IPTU têm natureza propter rem e acompanham o imóvel mesmo após arrematação."
+        },
+        {
+          "level": "warn",
+          "title": "Condomínio em atraso",
+          "text": "Imóvel em condomínio (Apartamento 206, Bloco 01). Débitos condominiais têm natureza propter rem e são transferidos ao arrematante. Ausência de informação no documento fornecido. Recomenda-se contato direto com a administradora do condomínio para levantamento de débitos em aberto, incluindo taxas ordinárias e extraordinárias."
+        }
+      ],
+      "description": "Apartamento de 58 m², localizado na RUA PROFESSOR OVIDIO JORGE NOGUEIRA, N. 77 APTO. 206 BL 01, ITAQUI - CEP: 83602-335, CAMPO LARGO - PARANA, no bairro Itaqui.",
+      "features": {
+        "Área": "58 m²",
+        "Dormitórios": "2",
+        "Vagas": "1",
+        "Cidade": "Campo Largo",
+        "Bairro": "Itaqui",
+        "Tipo de leilão": "Caixa",
+        "Tipo de imóvel": "Apartamento"
+      }
+    },
+    "marketDetail": {
+      "indicators": [
+        {
+          "lbl": "Preço/m² · bairro",
+          "val": "R$ 3.948",
+          "delta": "+7.5% ao ano",
+          "pos": true,
+          "neg": null
+        },
+        {
+          "lbl": "Preço/m² · imóvel",
+          "val": "R$ 2.111",
+          "delta": "abaixo da média",
+          "pos": true,
+          "neg": null
+        },
+        {
+          "lbl": "Dias médios p/ venda",
+          "val": "75 dias",
+          "delta": "bairro Itaqui",
+          "pos": true,
+          "neg": null
+        },
+        {
+          "lbl": "Liquidez · score",
+          "val": "8 / 10",
+          "delta": "",
+          "pos": null,
+          "neg": null
+        }
+      ],
+      "trend": [
+        3673.0,
+        3680.0,
+        3688.0,
+        3696.0,
+        3703.0,
+        3711.0,
+        3718.0,
+        3726.0,
+        3734.0,
+        3741.0,
+        3749.0,
+        3757.0,
+        3764.0,
+        3772.0,
+        3780.0,
+        3787.0,
+        3795.0,
+        3803.0,
+        3810.0,
+        3818.0,
+        3826.0,
+        3833.0,
+        3841.0,
+        3849.0,
+        3856.0,
+        3864.0,
+        3871.0,
+        3879.0,
+        3887.0,
+        3894.0,
+        3902.0,
+        3910.0,
+        3917.0,
+        3925.0,
+        3933.0,
+        3940.0
+      ],
+      "trendStartLabel": "",
+      "trendEndLabel": "",
+      "comparables": [
+        {
+          "address": "Itaqui, Campo Largo - PR (sem endereço específico)",
+          "areaM2": 40.0,
+          "beds": null,
+          "pricePerM2": 3105.0,
+          "salePrice": 124206.0,
+          "source": "Chaves na Mão",
+          "url": "https://www.chavesnamao.com.br/imovel/apartamento-a-venda-2-quartos-com-garagem-pr-campo-largo-itaqui-45m2-RS124206/id-42718913/"
+        },
+        {
+          "address": "Rua São Paulo, 66, Itaqui, Campo Largo - PR",
+          "areaM2": 158.0,
+          "beds": null,
+          "pricePerM2": 3987.0,
+          "salePrice": 630000.0,
+          "source": "Chaves na Mão",
+          "url": "https://www.chavesnamao.com.br/imovel/casa-a-venda-3-quartos-com-garagem-pr-campo-largo-itaqui-158m2-RS630000/id-40979966/"
+        },
+        {
+          "address": "Itaqui, Campo Largo - PR (sem endereço específico)",
+          "areaM2": 44.0,
+          "beds": null,
+          "pricePerM2": 5227.0,
+          "salePrice": 230000.0,
+          "source": "Chaves na Mão",
+          "url": "https://www.chavesnamao.com.br/imovel/apartamento-a-venda-com-garagem-pr-campo-largo-itaqui-RS230000/id-40323547/"
+        },
+        {
+          "address": "Rua Professor Ovídio Jorge Nogueira, Itaqui, Campo Largo - PR",
+          "areaM2": 49.0,
+          "beds": null,
+          "pricePerM2": 3531.0,
+          "salePrice": 173000.0,
+          "source": "Chaves na Mão",
+          "url": "https://www.chavesnamao.com.br/imovel/apartamento-a-venda-2-quartos-com-garagem-pr-campo-largo-itaqui-58m2-RS173000/id-43676560/"
+        }
+      ]
+    },
+    "costs": [
+      {
+        "label": "Lance de arremate",
+        "value": 123300.35,
+        "hint": "Valor declarado como mínimo no edital.",
+        "kind": "price"
+      },
+      {
+        "label": "ITBI · Campo Largo (3%)",
+        "value": 3699.0,
+        "hint": "Imposto de transmissão devido ao município.",
+        "kind": "tax"
+      },
+      {
+        "label": "Comissão do leiloeiro (5%)",
+        "value": 6165.0,
+        "hint": "Sobre o valor do arremate, devida no ato.",
+        "kind": "fee"
+      },
+      {
+        "label": "Custas judiciais",
+        "value": 1850.0,
+        "hint": "Taxa cartorária, edital, oficial de justiça.",
+        "kind": "fee"
+      },
+      {
+        "label": "Registro em cartório",
+        "value": 2466.0,
+        "hint": "Inclui escritura e averbações na matrícula.",
+        "kind": "fee"
+      },
+      {
+        "label": "IPTU em atraso assumido",
+        "value": 0.0,
+        "hint": "IPTU em dia.",
+        "kind": "debt"
+      },
+      {
+        "label": "Condomínio em atraso",
+        "value": 0.0,
+        "hint": "Sem débito condominial.",
+        "kind": "debt"
+      },
+      {
+        "label": "Reforma estimada",
+        "value": 29210.0,
+        "hint": "Estimativa de reforma necessária.",
+        "kind": "reno"
+      },
+      {
+        "label": "Imposto sobre ganho de capital",
+        "value": 0.0,
+        "hint": "Isento · primeiro imóvel · até R$ 35k.",
+        "kind": "tax"
+      }
+    ],
+    "edital": {
+      "process": "",
+      "creditor": "",
+      "debtor": "",
+      "modality": "Presencial",
+      "firstBidDate": "",
+      "firstBidPrice": 123300.35,
+      "secondBidDate": "",
+      "secondBidPrice": 0.0,
+      "propertyDescription": "Apartamento com 58 m², situado na RUA PROFESSOR OVIDIO JORGE NOGUEIRA, N. 77 APTO. 206 BL 01, ITAQUI - CEP: 83602-335, CAMPO LARGO - PARANA",
+      "liens": [
+        "Não foi possível identificar penhoras, ônus reais ou gravames a partir do documento fornecido (texto do edital vazio). Verificação obrigatória na matrícula atualizada do imóvel junto ao CRI competente.",
+        "IPTU em aberto: Não identificado no documento fornecido. Imóvel localizado em Campo Largo - PR. Recomenda-se solicitação de certidão negativa de débitos de IPTU junto à Prefeitura Municipal de Campo Largo, pois débitos de IPTU têm natureza propter rem e acompanham o imóvel mesmo após arrematação.",
+        "Dívida condominial: Imóvel em condomínio (Apartamento 206, Bloco 01). Débitos condominiais têm natureza propter rem e são transferidos ao arrematante. Ausência de informação no documento fornecido. Recomenda-se contato direto com a administradora do condomínio para levantamento de débitos em aberto, incluindo taxas ordinárias e extraordinárias."
+      ],
+      "paymentTerms": "À vista no prazo de 24h via depósito judicial.",
+      "summaryNote": "Texto resumido pela IA Arremate."
+    },
+    "auctionUrl": "https://venda-imoveis.caixa.gov.br/sistema/detalhe-imovel.asp?hdnimovel=8787710407215",
+    "photoUrl": "https://venda-imoveis.caixa.gov.br/fotos/F878771040721521.jpg",
+    "monthlyCondo": null,
+    "monthlyIptu": null,
+    "occupantRemovalCost": 10000.0
   }
 ]
