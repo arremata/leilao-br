@@ -31,3 +31,7 @@ build/
 # Data (generated at runtime)
 backend/data/results.json
 .vercel
+
+# Local-only helpers / reference material
+rodar-local.bat
+docs/references/

@@ -1161,6 +1161,99 @@ function DocBadge({ status }) {
   );
 }
 
+// Índice e detector de termos do glossário no texto da análise.
+const GLOSSARY_BY_TERM = Object.fromEntries(legalGlossary.map(t => [t.termo, t]));
+
+const GLOSSARY_MATCHERS = [
+  { src: 'art\\.?\\s*886', key: 'Art. 886 (CPC)' },
+  { src: 'art\\.?\\s*887', key: 'Art. 887 (CPC)' },
+  { src: 'art\\.?\\s*873', key: 'Art. 873 (CPC)' },
+  { src: 'art\\.?\\s*889', key: 'Art. 889 (CPC)' },
+  { src: 'art\\.?\\s*891', key: 'Art. 891 (CPC)' },
+  { src: 'art\\.?\\s*895', key: 'Art. 895 (CPC)' },
+  { src: 'art\\.?\\s*903', key: 'Art. 903 (CPC)' },
+  { src: 'art\\.?\\s*843', key: 'Art. 843 (CPC)' },
+  { src: 'art\\.?\\s*844', key: 'Art. 844 (CPC)' },
+  { src: 'art\\.?\\s*(?:26|27|30)', key: 'Lei 9.514/97' },
+  { src: 'lei\\s*9\\.?514(?:/97)?', key: 'Lei 9.514/97' },
+  { src: 'lei\\s*8\\.?009(?:/90)?', key: 'Lei 8.009/90' },
+  { src: 'bem de fam[íi]lia', key: 'Lei 8.009/90' },
+  { src: 'CTN', key: 'CTN, art. 130, § único' },
+  { src: 'pre[çc]o vil', key: 'Preço vil' },
+  { src: 'propter rem', key: 'Propter rem' },
+  { src: 'aliena[çc][ãa]o fiduci[áa]ria', key: 'Alienação fiduciária' },
+  { src: 'consolida[çc][ãa]o(?: da propriedade)?', key: 'Consolidação da propriedade' },
+  { src: 'purga[çc][ãa]o da mora', key: 'Purgação da mora' },
+  { src: 'imiss[ãa]o na posse', key: 'Imissão na posse' },
+  { src: 'pra[çc]a', key: 'Praça (1ª e 2ª)' },
+  { src: 'matr[íi]cula', key: 'Matrícula' },
+  { src: 'penhora', key: 'Penhora' },
+  { src: 'usufruto', key: 'Usufruto / direito real de habitação' },
+  { src: 'carta de arremata[çc][ãa]o', key: 'Carta de arrematação' },
+  { src: 'venda direta', key: 'Venda direta' },
+  { src: 'DataJud', key: 'DataJud' },
+  { src: 'ONR', key: 'ONR' },
+];
+
+const GLOSSARY_RE = new RegExp(GLOSSARY_MATCHERS.map(m => `(${m.src})`).join('|'), 'gi');
+
+// Quebra um texto em nós React, transformando termos técnicos em elementos interativos.
+function linkify(text, openGlossary) {
+  if (!text || typeof text !== 'string') return text;
+  const out = [];
+  let last = 0;
+  let key = 0;
+  GLOSSARY_RE.lastIndex = 0;
+  let m;
+  while ((m = GLOSSARY_RE.exec(text)) !== null) {
+    let termKey = null;
+    for (let i = 0; i < GLOSSARY_MATCHERS.length; i++) {
+      if (m[i + 1] !== undefined) { termKey = GLOSSARY_MATCHERS[i].key; break; }
+    }
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      <GlossaryTerm key={key++} text={m[0]} termKey={termKey} openGlossary={openGlossary} />
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out.length ? out : text;
+}
+
+function GlossaryTerm({ text, termKey, openGlossary }) {
+  const [hover, setHover] = useState(false);
+  const entry = GLOSSARY_BY_TERM[termKey];
+  if (!entry) return text;
+  return (
+    <span
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={() => openGlossary(termKey)}
+      style={{
+        position: 'relative', cursor: 'help',
+        borderBottom: '1px dashed var(--accent)',
+        color: 'inherit',
+      }}
+    >
+      {text}
+      {hover && (
+        <span style={{
+          position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
+          width: 260, maxWidth: '70vw', padding: '10px 12px', borderRadius: 8,
+          background: 'var(--fg-0)', color: 'var(--bg-1)',
+          fontSize: 11.5, lineHeight: 1.45, fontWeight: 400,
+          boxShadow: '0 8px 24px rgba(17,24,39,0.22)', zIndex: 70,
+          whiteSpace: 'normal', textAlign: 'left',
+        }}>
+          <b>{entry.termo}</b>
+          <span style={{ display: 'block', marginTop: 4 }}>{entry.definicao}</span>
+          <span style={{ display: 'block', marginTop: 6, fontSize: 10, opacity: 0.7 }}>Clique para abrir o glossário ›</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function GlossaryDrawer({ open, onClose }) {
   const [q, setQ] = useState('');
   const ql = q.trim().toLowerCase();
