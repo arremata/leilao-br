@@ -134,6 +134,136 @@ class EditalDetail(BaseModel):
     summary_note: str
 
 
+class LegalOnusItem(BaseModel):
+    """Um ônus/gravame listado na matrícula ou no edital."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    tipo: str
+    descricao: str
+    gravidade: Literal["info", "warn", "bad"] = "info"
+
+
+class LegalConclusao(BaseModel):
+    """Recomendação acionável: participar, cautela ou não participar."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    recomendacao: Literal["sim", "cautela", "nao"]
+    principal_risco: str
+    providencia: str
+
+
+class LegalProcesso(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    tipo: str = ""
+    numero: str = ""
+    foro: str = ""
+    fase: str = ""
+    link: str | None = None
+
+
+class LegalPartes(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    credor: str = ""
+    devedor: str = ""
+    observacao: str = ""
+
+
+class LegalDivida(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    valor: float | None = None
+    data_atualizacao: str = ""
+    memoria_calculo: str = ""
+    impugnacao: str = ""
+
+
+class LegalMatricula(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    numero: str = ""
+    cartorio: str = ""
+    proprietario: str = ""
+    titularidade: str = ""
+    onus: list[LegalOnusItem] = []
+
+
+class LegalEditalAnalise(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    data_publicacao: str = ""
+    antecedencia: str = ""
+    valor_avaliacao: float | None = None
+    lance_minimo: float | None = None
+    debitos: str = ""
+    desocupacao: str = ""
+    divergencias: list[str] = []
+
+
+class LegalAvaliacao(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    data: str = ""
+    valor: float | None = None
+    avaliador: str = ""
+    vistoria: str = ""
+    atualidade: str = ""
+    impugnacao: str = ""
+
+
+class LegalRisco(BaseModel):
+    """Risco identificado, com estado de verificação anti-alucinação e fonte citada."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    tipo: str
+    nivel: Literal["baixo", "medio", "alto"]
+    verificacao: Literal["verificado", "nao-localizado", "requer-humano"]
+    fonte: str  # trecho literal do documento ou justificativa da não-localização
+
+
+class LegalVerificacao(BaseModel):
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    item: str
+    estado: Literal["verificado", "nao-localizado", "requer-humano"]
+    fonte: str = ""
+    nota: str = ""
+
+
+class LegalDocumento(BaseModel):
+    """Proveniência: documento usado (ou não disponível) na análise."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    tipo: str
+    nome: str
+    origem: str = ""
+    url: str | None = None
+    data: str | None = None
+    status: Literal["baixado", "parcial", "nao-disponivel"] = "nao-disponivel"
+    baseou: str = ""
+
+
+class LegalDetail(BaseModel):
+    """Análise jurídica ramificada por modalidade — shape consumido pela aba
+    Jurídica do frontend (espelha frontend/src/data/legalDemo.js)."""
+    model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
+
+    modalidade: Literal["judicial", "extrajudicial", "venda-direta"]
+    modalidade_label: str
+    base_legal: str = ""
+    conclusao: LegalConclusao
+    processo: LegalProcesso = LegalProcesso()
+    partes: LegalPartes = LegalPartes()
+    divida: LegalDivida = LegalDivida()
+    matricula: LegalMatricula = LegalMatricula()
+    edital_analise: LegalEditalAnalise = LegalEditalAnalise()
+    avaliacao: LegalAvaliacao = LegalAvaliacao()
+    riscos: list[LegalRisco] = []
+    verificacoes: list[LegalVerificacao] = []
+    documentos: list[LegalDocumento] = []
+
+
 class AuctionPropertyResult(BaseModel):
     """The single source of truth for what the frontend consumes.
 
@@ -178,6 +308,9 @@ class AuctionPropertyResult(BaseModel):
     market_detail: MarketDetail | None = None
     costs: list[CostLineItem] | None = None
     edital: EditalDetail | None = None
+    # Análise jurídica completa (aba Jurídica). O frontend usa
+    # property.legal ?? legalDemo[id] — quando presente, o demo é ignorado.
+    legal: LegalDetail | None = None
     auction_url: str | None = None
     photo_url: str | None = None
     # Monthly recurring expenses used by the cost simulator to project

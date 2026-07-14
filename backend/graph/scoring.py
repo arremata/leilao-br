@@ -40,7 +40,9 @@ def compute_risk_flags(
 ) -> RiskFlags:
     if risk_level == "low":
         j = "good"
-    elif risk_level == "medium":
+    elif risk_level in ("medium", "unknown"):
+        # "unknown" = análise não concluída (parse/validação falhou) — incerteza
+        # não é risco jurídico confirmado, então não derruba o flag para "bad".
         j = "warn"
     else:
         j = "bad"

@@ -108,8 +108,7 @@ def test_workflow_entry_point_is_discovery():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
         call_order = []
@@ -137,8 +136,7 @@ def test_workflow_discovery_runs_before_planner():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
         call_order = []
@@ -174,8 +172,7 @@ def test_workflow_planner_runs_before_market_and_legal():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
         call_order = []
@@ -207,8 +204,7 @@ def test_workflow_scoring_runs_after_market_and_legal():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
         call_order = []
@@ -242,8 +238,7 @@ def test_workflow_all_nodes_execute():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
         call_order = []
@@ -286,8 +281,7 @@ def test_run_analysis_returns_final_state_with_result_json():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
 
@@ -312,8 +306,7 @@ def test_run_analysis_state_accumulation():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
 
@@ -349,8 +342,7 @@ def test_run_analysis_preserves_initial_pdf_data():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
 
@@ -376,8 +368,7 @@ def test_run_analysis_market_and_legal_run_in_parallel():
         patch("graph.planner._call_planner_llm") as mock_planner_llm,
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(mock_planner_llm, mock_market_llm, mock_legal_llm)
 
@@ -403,8 +394,7 @@ def test_run_analysis_with_empty_pdf_text():
         patch("graph.discovery.download_pdfs", new_callable=AsyncMock, return_value=[]),
         patch("graph.market._call_market_llm") as mock_market_llm,
         patch("graph.legal._call_legal_llm") as mock_legal_llm,
-        patch("graph.market._run_market_searches", return_value=([], [])),
-        patch("graph.legal._run_legal_searches", return_value=[]),
+        patch("graph.market._run_market_searches", new_callable=AsyncMock, return_value=[]),
     ):
         _setup_llm_mocks(None, mock_market_llm, mock_legal_llm)
 

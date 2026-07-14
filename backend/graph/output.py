@@ -13,7 +13,7 @@ from graph.contracts import (
     AuctionPropertyResult, RiskFlags, ScoringResult,
     RiskDimension, AlertItem, ViabilityDetail,
     MarketIndicator, ComparableSale, MarketDetail,
-    CostLineItem, EditalDetail,
+    CostLineItem, EditalDetail, LegalDetail,
 )
 from graph.state import AuctionState, LegalResult, MarketResult, PropertyMetadata
 
@@ -373,6 +373,22 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
     return costs
 
 
+def _build_legal(state: AuctionState) -> LegalDetail | None:
+    """Converte o `detail` validado do nó jurídico para o contrato da aba Jurídica.
+
+    Retorna None quando o nó não produziu análise ramificada — o frontend
+    cai no fallback (legalDemo) nesse caso.
+    """
+    legal = state.legal_result
+    if not legal or not legal.detail:
+        return None
+    try:
+        return LegalDetail.model_validate(legal.detail)
+    except Exception as e:  # noqa: BLE001 — detail corrompido não pode derrubar o resultado inteiro
+        logger.warning(f"Output node: legal detail inválido, omitindo aba Jurídica: {e}")
+        return None
+
+
 def _build_edital(state: AuctionState) -> EditalDetail | None:
     metadata = state.property_metadata
     if not metadata:
@@ -466,10 +482,15 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
     monthly_iptu = round(iptu_debt_total / 12) if iptu_debt_total else None
 
     # Occupant-removal cost estimate — only when the property is not vacant.
+    # Prefere o valor extraído do edital pelo nó jurídico; o fallback fixo só
+    # entra quando o documento não traz custo estimável.
     occupant_removal_cost = None
     occ_lower = (occupation_status or "").lower()
     if "desocupado" not in occ_lower:
-        occupant_removal_cost = 10000.0  # average of R$ 5k–15k range
+        if legal_result and legal_result.eviction_cost_estimate:
+            occupant_removal_cost = float(legal_result.eviction_cost_estimate)
+        else:
+            occupant_removal_cost = 10000.0  # average of R$ 5k–15k range
 
     return AuctionPropertyResult(
         id=_generate_id(metadata.address, metadata.auction_price or 0),
@@ -505,6 +526,7 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         market_detail=_build_market_detail(state),
         costs=_build_costs(state),
         edital=_build_edital(state),
+        legal=_build_legal(state),
         auction_url=state.auction_url or None,
         photo_url=metadata.photo_url or None,
         monthly_condo=monthly_condo,

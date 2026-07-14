@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Annotated, Optional
 
 from graph.contracts import ScoringResult
 
@@ -74,9 +75,18 @@ class LegalResult:
     construction_permits: str = ""
     occupation_status: str = ""
     usufruct_rights: str = ""
-    risk_level: str = ""  # low, medium, high, critical
+    risk_level: str = ""  # low, medium, high, critical, unknown
     risk_details: str = ""
     raw_findings: str = ""
+    # Modalidade detectada: judicial | extrajudicial | venda-direta
+    modalidade: str = ""
+    # Prazo/custo de desocupação extraídos do edital (None = não localizado;
+    # output.py cai no fallback fixo apenas nesse caso).
+    eviction_deadline: str = ""
+    eviction_cost_estimate: Optional[float] = None
+    # Análise ramificada completa (shape de contracts.LegalDetail, snake_case),
+    # validada no legal_node antes de ser armazenada.
+    detail: Optional[dict] = None
 
 
 @dataclass
@@ -89,7 +99,10 @@ class AuctionState:
     legal_result: Optional[LegalResult] = None
     scoring_result: Optional[ScoringResult] = None
     result_json: str = ""
-    errors: list[str] = field(default_factory=list)
+    # Reducer operator.add: market e legal rodam em paralelo e ambos podem
+    # devolver `errors` no mesmo passo — sem o reducer o LangGraph levanta
+    # InvalidUpdateError (só um valor por canal por passo).
+    errors: Annotated[list[str], operator.add] = field(default_factory=list)
     auction_url: str = ""
     downloaded_pdfs: list[str] = field(default_factory=list)
     page_source_type: str = ""

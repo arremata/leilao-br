@@ -61,7 +61,9 @@ class TestBuildResult:
         assert result.type == "Apartamento"
         assert result.neighborhood == "Vila Madalena"
         assert result.city == "São Paulo, SP"
-        assert result.auction_type == "1ª praça"
+        # auction_type foi dividido: classificação Judicial/Extrajudicial + praca separada
+        assert result.auction_type == "Extrajudicial"
+        assert result.praca == "1ª praça"
         assert result.auctioneer == "Zukerman Leilões"
         assert result.discount == 42.0
         assert result.min_bid == 312000.0

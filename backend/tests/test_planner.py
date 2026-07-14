@@ -55,10 +55,14 @@ def test_planner_extracts_metadata():
 
 
 def test_planner_handles_empty_text():
-    """Test that planner handles empty PDF text gracefully."""
+    """Test that planner handles empty PDF text gracefully.
+
+    Sem PDF, o planner NÃO devolve property_metadata — preserva o que o
+    discovery já extraiu (comportamento de páginas Caixa sem PDFs).
+    """
     state = AuctionState(pdf_texts="", pdf_sources=[])
 
     result = planner_node(state)
 
-    assert result["property_metadata"].address == ""
+    assert "property_metadata" not in result
     assert "errors" in result
