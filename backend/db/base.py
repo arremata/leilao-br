@@ -10,7 +10,7 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 DEFAULT_DATABASE_URL = "sqlite:///./leilao.db"
@@ -37,13 +37,10 @@ def get_engine(url: str | None = None) -> Engine:
 def init_db(engine: Engine) -> None:
     """Create all tables registered on Base.metadata."""
     # Import models so they register on Base.metadata before create_all.
-    try:
-        from db import models  # noqa: F401
-    except ImportError:
-        pass  # models added in Task 2; engine/session helpers work without it
+    from db import models  # noqa: F401
 
     Base.metadata.create_all(engine)
 
 
-def make_session_factory(engine: Engine) -> sessionmaker:
+def make_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
