@@ -84,7 +84,19 @@ def test_ingest_geocodes_new_properties_when_geocoder_given():
         assert prop.geocode_status == "ok"
 
 
-from ingestion.run import build_parser, run_cli
+from ingestion.run import _preco_changed, build_parser, run_cli
+
+
+def test_preco_changed_ignores_subcent_noise():
+    # Differences below half a cent are float noise, not real price changes.
+    assert _preco_changed(100000.0, 100000.004) is False
+    assert _preco_changed(100000.0, 100000.0) is False
+    # A one-cent difference is a real change.
+    assert _preco_changed(100000.0, 100000.01) is True
+    # None handling: appearing/disappearing prices count as a change.
+    assert _preco_changed(None, 100.0) is True
+    assert _preco_changed(100.0, None) is True
+    assert _preco_changed(None, None) is False
 
 
 def test_build_parser_defaults():

@@ -23,6 +23,18 @@ class IngestSummary:
     events_created: int = 0
 
 
+def _preco_changed(old: float | None, new: float | None) -> bool:
+    """True when the price changed by at least half a cent.
+
+    A plain float `!=` treats representation noise as a real change, which
+    would emit spurious price_change events on re-ingest. Comparing with a
+    half-cent tolerance keeps the change-event history trustworthy.
+    """
+    if old is None or new is None:
+        return old != new
+    return abs(old - new) >= 0.005
+
+
 def _apply_fields(prop: Property, n: NormalizedProperty) -> None:
     prop.uf = n.uf
     prop.city = n.city
@@ -79,7 +91,7 @@ def ingest(session_factory, adapter: SourceAdapter, geocoder=None) -> IngestSumm
                 summary.events_created += 1
             else:
                 events: list[PropertyEvent] = []
-                if existing.preco != n.preco:
+                if _preco_changed(existing.preco, n.preco):
                     events.append(PropertyEvent(
                         property_id=existing.id, event_type="price_change",
                         old_value=str(existing.preco), new_value=str(n.preco),
