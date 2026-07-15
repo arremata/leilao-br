@@ -49,8 +49,8 @@ class Property(Base):
     photo_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
 
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
-    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     raw_payload: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
 
@@ -63,7 +63,7 @@ class PropertyEvent(Base):
     event_type: Mapped[str] = mapped_column(String(32))
     old_value: Mapped[Optional[str]] = mapped_column(Text, default=None)
     new_value: Mapped[Optional[str]] = mapped_column(Text, default=None)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Enrichment(Base):
@@ -73,4 +73,4 @@ class Enrichment(Base):
     property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"), unique=True, index=True)
     result_json: Mapped[str] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(String(16), default="v1")
-    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
