@@ -12,7 +12,10 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const requestedScreen = params.get('screen');
     if (['home', 'feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
-    return localStorage.getItem('arremate_screen') || 'home';
+    const stored = localStorage.getItem('arremate_screen') || 'home';
+    // 'detail' não sobrevive a reload: o imóvel selecionado não é persistido,
+    // então restaurar essa tela cairia em "Nenhum imóvel selecionado".
+    return stored === 'detail' ? 'home' : stored;
   });
   const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
