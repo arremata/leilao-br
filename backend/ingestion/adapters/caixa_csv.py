@@ -10,8 +10,13 @@ also inject csv_bytes (e.g. a manually downloaded file) to bypass fetching.
 
 from __future__ import annotations
 
+import asyncio
 import unicodedata
 from typing import Optional
+
+from loguru import logger
+from playwright.async_api import async_playwright
+from playwright_stealth import Stealth
 
 from ingestion.adapters.base import NormalizedProperty, RawListing
 from ingestion.normalize import (
@@ -49,6 +54,45 @@ class CaixaCsvAdapter:
     def __init__(self, uf: str, csv_bytes: Optional[bytes] = None):
         self.uf = uf.upper()
         self._csv_bytes = csv_bytes
+
+    def csv_url(self) -> str:
+        return CSV_URL_TEMPLATE.format(uf=self.uf)
+
+    def fetch_raw(self) -> list[RawListing]:
+        raw = self._csv_bytes if self._csv_bytes is not None else asyncio.run(self._download())
+        return parse_caixa_csv(raw)
+
+    async def _download(self) -> bytes:
+        """Fetch the CSV through a stealth browser context so the Radware bot
+        manager sees a real browser session. Visits the download page first to
+        pick up cookies, then requests the CSV via the browser's request API."""
+        pw = await async_playwright().start()
+        try:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1920, "height": 1080},
+            )
+            page = await context.new_page()
+            await Stealth().apply_stealth_async(page)
+            await page.goto(
+                "https://venda-imoveis.caixa.gov.br/sistema/download-lista.asp",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
+            await page.wait_for_timeout(4000)
+            resp = await context.request.get(self.csv_url(), timeout=30000)
+            body = await resp.body()
+            await browser.close()
+            return body
+        except Exception as e:  # pragma: no cover - network dependent
+            logger.error(f"Caixa CSV download failed for {self.uf}: {e}")
+            return b""
+        finally:
+            await pw.stop()
 
     def normalize(self, raw: RawListing) -> NormalizedProperty:
         r = raw.raw
