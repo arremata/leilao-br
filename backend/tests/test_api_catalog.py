@@ -73,6 +73,46 @@ def test_catalog_analyze_runs_enrichment_and_persists(monkeypatch):
     api.app.dependency_overrides.clear()
 
 
+def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
+    client, factory = _client_with_db()
+    with factory() as s:
+        s.add(Property(source="caixa", source_id="1", uf="PR", city="Curitiba",
+                       neighborhood="Centro", address="Rua A", property_type="Casa",
+                       area_m2=50.0, preco=100000.0, avaliacao=200000.0,
+                       modalidade="Venda Direta Online", status="active",
+                       detail_url="https://venda-imoveis.caixa.gov.br/imovel/1",
+                       detail_fetched=False))
+        s.commit()
+        prop_id = s.query(Property).filter_by(source_id="1").one().id
+
+    from graph.contracts import AuctionPropertyResult, RiskFlags
+
+    def _fake_enrich(metadata, pdf_texts="", auction_url=""):
+        return AuctionPropertyResult(
+            id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
+            neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
+            auctioneer="—", court="—", discount=40.0, min_bid=100000.0, market=180000.0,
+            roi=20.0, appraisal=200000.0, auction_discount=50.0, area=50.0, ends_at="",
+            occupancy="desocupado", risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            viability=None, market_detail=None, costs=None, edital=None, auction_url=None,
+        )
+
+    async def _fake_fetch_detail(detail_url, base_url="https://venda-imoveis.caixa.gov.br"):
+        return {"photo_url": "https://venda-imoveis.caixa.gov.br/fotos/F1.jpg",
+                "full_description": "Casa ampla", "document_urls": []}
+
+    monkeypatch.setattr(api, "run_structured_enrichment", _fake_enrich)
+    monkeypatch.setattr(api, "fetch_detail", _fake_fetch_detail)
+
+    resp = client.post(f"/catalog/{prop_id}/analyze")
+    assert resp.status_code == 200
+    with factory() as s:
+        prop = s.get(Property, prop_id)
+        assert prop.photo_url == "https://venda-imoveis.caixa.gov.br/fotos/F1.jpg"
+        assert prop.detail_fetched is True
+    api.app.dependency_overrides.clear()
+
+
 def test_ingest_endpoint_uses_injected_file(monkeypatch, tmp_path):
     client, factory = _client_with_db()
 

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from db.base import get_engine, init_db, make_session_factory
 from db.models import Property, Enrichment
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
+from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -265,11 +266,35 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
     return card
 
 
+def _maybe_fetch_detail(prop: Property) -> None:
+    """Lazily scrape the Caixa detail page once to fill photo_url.
+
+    The CSV feed has no photo; the picture only exists on the per-property
+    detail page. We scrape it on first analyze (best-effort): a failure leaves
+    detail_fetched False so a later analyze retries.
+    """
+    import asyncio
+
+    if prop.detail_fetched or not prop.detail_url:
+        return
+    try:
+        detail = asyncio.run(fetch_detail(prop.detail_url))
+    except Exception as e:
+        logger.warning(f"Detail fetch failed for property {prop.id}: {e}")
+        return
+    if detail.get("photo_url"):
+        prop.photo_url = detail["photo_url"]
+    prop.detail_fetched = True
+
+
 @app.post("/catalog/{prop_id}/analyze")
 def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> dict:
     prop = session.get(Property, prop_id)
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
+
+    _maybe_fetch_detail(prop)
+    session.flush()
 
     metadata = metadata_from_property(prop)
     result = run_structured_enrichment(metadata, auction_url=prop.detail_url)
