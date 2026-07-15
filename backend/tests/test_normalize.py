@@ -59,3 +59,18 @@ def test_parse_description_terreno_no_beds():
 def test_parse_description_empty():
     d = parse_description("")
     assert d == {"property_type": None, "area_m2": None, "beds": None}
+
+
+from ingestion.normalize import map_modalidade
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("Venda Online", "Venda Direta Online"),
+    ("Leilão SFI - Edital Único", "Leilão SFI"),
+    ("Licitação Aberta", "Licitação Aberta"),
+    ("Venda Direta", "Venda Direta Online"),
+    ("", "Outros"),
+    ("qualquer coisa", "Outros"),
+])
+def test_map_modalidade(raw, expected):
+    assert map_modalidade(raw) == expected

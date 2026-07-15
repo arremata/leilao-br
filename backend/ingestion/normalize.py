@@ -81,3 +81,17 @@ def parse_description(desc: str) -> dict:
         result["beds"] = int(beds_match.group(1))
 
     return result
+
+
+def map_modalidade(raw: str) -> str:
+    """Map the Caixa 'Modalidade de venda' free text to a stable enum-ish label."""
+    if not raw:
+        return "Outros"
+    low = _strip_accents(raw).lower()
+    if "leilao" in low or "sfi" in low:
+        return "Leilão SFI"
+    if "licita" in low:
+        return "Licitação Aberta"
+    if "venda direta" in low or "online" in low:
+        return "Venda Direta Online"
+    return "Outros"
