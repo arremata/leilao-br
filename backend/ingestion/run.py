@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 from loguru import logger
 from sqlalchemy import select
@@ -124,3 +126,49 @@ def ingest(session_factory, adapter: SourceAdapter, geocoder=None) -> IngestSumm
         f"={summary.unchanged} events={summary.events_created}"
     )
     return summary
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Ingest auction listings into the catalog.")
+    parser.add_argument("--source", default="caixa", help="Source adapter (default: caixa)")
+    parser.add_argument("--uf", default="PR", help="State code, e.g. PR (default: PR)")
+    parser.add_argument("--file", default=None, help="Local CSV path to ingest instead of fetching")
+    parser.add_argument("--geocode", action="store_true", help="Geocode new rows via Nominatim")
+    return parser
+
+
+def _build_adapter(args):
+    from ingestion.adapters.caixa_csv import CaixaCsvAdapter
+
+    if args.source != "caixa":
+        raise SystemExit(f"Unknown source: {args.source}")
+    csv_bytes = Path(args.file).read_bytes() if args.file else None
+    return CaixaCsvAdapter(uf=args.uf, csv_bytes=csv_bytes)
+
+
+def run_cli(argv=None, session_factory=None) -> IngestSummary:
+    args = build_parser().parse_args(argv)
+    if session_factory is None:
+        from db.base import get_engine, init_db, make_session_factory
+
+        engine = get_engine()
+        init_db(engine)
+        session_factory = make_session_factory(engine)
+
+    geocoder = None
+    if args.geocode:
+        from ingestion.geocode import NominatimClient
+
+        geocoder = NominatimClient()
+
+    adapter = _build_adapter(args)
+    return ingest(session_factory, adapter, geocoder=geocoder)
+
+
+def main() -> None:  # pragma: no cover - thin CLI wrapper
+    summary = run_cli()
+    logger.info(f"Done: {summary}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

@@ -82,3 +82,30 @@ def test_ingest_geocodes_new_properties_when_geocoder_given():
         assert prop.lat == -25.4
         assert prop.lng == -49.2
         assert prop.geocode_status == "ok"
+
+
+from ingestion.run import build_parser, run_cli
+
+
+def test_build_parser_defaults():
+    args = build_parser().parse_args([])
+    assert args.source == "caixa"
+    assert args.uf == "PR"
+    assert args.file is None
+
+
+def test_run_cli_with_file(tmp_path):
+    csv_text = (
+        "N° do imóvel;UF;Cidade;Bairro;Endereço;Preço;Valor de avaliação;Desconto;"
+        "Descrição;Modalidade de venda;Link de acesso\n"
+        "555;PR;CURITIBA;CENTRO;RUA Z, 9;10.000,00;20.000,00;50,0;"
+        "Casa, área total 40,00 m2, 1 quarto.;Venda Online;http://x\n"
+    )
+    csv_file = tmp_path / "lista.csv"
+    csv_file.write_bytes(csv_text.encode("latin-1"))
+
+    factory = _factory()
+    summary = run_cli(["--uf", "PR", "--file", str(csv_file)], session_factory=factory)
+    assert summary.inserted == 1
+    with factory() as s:
+        assert s.query(Property).filter_by(source_id="555").count() == 1
