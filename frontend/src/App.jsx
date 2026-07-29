@@ -4,7 +4,7 @@ import Feed from './components/Feed';
 import PropertyDetail from './components/PropertyDetail';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
-import { analyzeUrl, fetchProperties, fetchDashboard } from './api';
+import { analyzeUrl, fetchCatalog, fetchDashboard } from './api';
 import { LiveCardProgress } from './components/LiveCard';
 
 function App() {
@@ -33,7 +33,7 @@ function App() {
   const [feedKey, setFeedKey] = useState(0);
 
   useEffect(() => {
-    fetchProperties().then(data => {
+    fetchCatalog().then(data => {
       if (Array.isArray(data)) {
         setProperties(data);
         // Prune watchlist IDs that no longer exist (e.g. legacy "p1"/"p3" fallback).
@@ -167,7 +167,7 @@ function App() {
       {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
       {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
       {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
-      {screen === 'detail' && <PropertyDetail property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
+      {screen === 'detail' && <PropertyDetail key={selected?.id} property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
     </div>
   );
 }

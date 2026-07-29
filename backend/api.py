@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -117,7 +119,44 @@ def get_session():
         yield session
 
 
+def _card_title(p: Property) -> str:
+    """Human-readable card title from ingested fields.
+
+    Mirrors build_result's title shape ("{type} {area} m²") but keyed on the
+    neighborhood we have at ingestion time; falls back to the raw address when
+    the source gave us no property type.
+    """
+    if p.property_type:
+        title = f"{p.property_type} {p.area_m2 or 0:.0f} m²"
+        if p.neighborhood:
+            title += f", {p.neighborhood}"
+        return title
+    return p.address or ""
+
+
 def _property_card(p: Property) -> dict:
+    def _iso(value):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        return value.isoformat()
+
+    auction_dates = [
+        value for value in (p.first_auction_at, p.second_auction_at)
+        if value is not None
+    ]
+    now = datetime.now(timezone.utc)
+    comparable_dates = [
+        value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        if value.tzinfo is None else value
+        for value in auction_dates
+    ]
+    next_auction_at = next(
+        (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
+        comparable_dates[-1] if comparable_dates else None,
+    )
+
     return {
         "id": p.id,
         "sourceId": p.source_id,
@@ -126,13 +165,20 @@ def _property_card(p: Property) -> dict:
         "city": p.city,
         "neighborhood": p.neighborhood,
         "address": p.address,
+        "title": _card_title(p),
         "type": p.property_type,
         "area": p.area_m2,
         "beds": p.beds,
         "minBid": p.preco,
         "appraisal": p.avaliacao,
         "desconto": p.desconto_oficial,
+        "auctionDiscount": p.desconto_oficial,
         "modalidade": p.modalidade,
+        "firstAuctionAt": _iso(p.first_auction_at),
+        "secondAuctionAt": _iso(p.second_auction_at),
+        "firstAuctionPrice": p.first_auction_price,
+        "secondAuctionPrice": p.second_auction_price,
+        "endsAt": _iso(next_auction_at),
         "lat": p.lat,
         "lng": p.lng,
         "photoUrl": p.photo_url,
@@ -297,7 +343,11 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     session.flush()
 
     metadata = metadata_from_property(prop)
-    result = run_structured_enrichment(metadata, auction_url=prop.detail_url)
+    # Reuse the ingested description as the legal node's document text so it
+    # analyzes real source data instead of running blind on empty input.
+    result = run_structured_enrichment(
+        metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
+    )
     result_json = result.model_dump_json(by_alias=True)
 
     from datetime import datetime, timezone

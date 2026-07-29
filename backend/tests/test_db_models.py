@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from db.base import Base, get_engine, init_db, make_session_factory
 from db.models import Property, PropertyEvent, Enrichment
@@ -19,6 +19,22 @@ def test_make_session_factory_yields_working_session():
     factory = make_session_factory(engine)
     with factory() as session:
         assert session.execute.__call__ is not None
+
+
+def test_init_db_adds_auction_dates_to_existing_properties_table():
+    engine = get_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE properties (id INTEGER PRIMARY KEY, source VARCHAR(32))"
+        ))
+
+    init_db(engine)
+
+    columns = {column["name"] for column in inspect(engine).get_columns("properties")}
+    assert {
+        "first_auction_at", "second_auction_at", "dates_fetched_at",
+        "first_auction_price", "second_auction_price",
+    }.issubset(columns)
 
 
 def _session():

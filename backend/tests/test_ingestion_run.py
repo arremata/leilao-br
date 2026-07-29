@@ -1,3 +1,5 @@
+import asyncio
+
 from db.base import get_engine, init_db, make_session_factory
 from db.models import Property, PropertyEvent
 from ingestion.adapters.base import RawListing
@@ -14,6 +16,16 @@ class _StubAdapter(CaixaCsvAdapter):
 
     def fetch_raw(self):
         return self._rows
+
+    async def fetch_raw_async(self):
+        return self._rows
+
+
+def _stub_validate_photo_url(url):
+    """Hermetic validator: assume every derived photo URL is valid so the tests
+    don't hit the live Caixa /fotos/ endpoint. ingest() resolves the photo but
+    the photo content itself is irrelevant to these upsert/event tests."""
+    return True
 
 
 def _row(source_id, preco, modalidade="Venda Online"):
@@ -38,7 +50,9 @@ def _factory():
 def test_ingest_inserts_new_properties_and_new_events():
     factory = _factory()
     adapter = _StubAdapter("PR", [_row("1", "100.000,00"), _row("2", "90.000,00")])
-    summary = ingest(factory, adapter)
+    summary = asyncio.run(ingest(
+        factory, adapter, validate_photo_url=_stub_validate_photo_url,
+    ))
     assert summary.inserted == 2
     with factory() as s:
         assert s.query(Property).count() == 2
@@ -47,8 +61,14 @@ def test_ingest_inserts_new_properties_and_new_events():
 
 def test_ingest_second_run_detects_price_change():
     factory = _factory()
-    ingest(factory, _StubAdapter("PR", [_row("1", "100.000,00")]))
-    summary = ingest(factory, _StubAdapter("PR", [_row("1", "80.000,00")]))
+    asyncio.run(ingest(
+        factory, _StubAdapter("PR", [_row("1", "100.000,00")]),
+        validate_photo_url=_stub_validate_photo_url,
+    ))
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", [_row("1", "80.000,00")]),
+        validate_photo_url=_stub_validate_photo_url,
+    ))
     assert summary.updated == 1
     with factory() as s:
         prop = s.query(Property).filter_by(source_id="1").one()
@@ -60,8 +80,14 @@ def test_ingest_second_run_detects_price_change():
 
 def test_ingest_marks_missing_properties_removed():
     factory = _factory()
-    ingest(factory, _StubAdapter("PR", [_row("1", "100.000,00"), _row("2", "90.000,00")]))
-    summary = ingest(factory, _StubAdapter("PR", [_row("1", "100.000,00")]))
+    asyncio.run(ingest(
+        factory, _StubAdapter("PR", [_row("1", "100.000,00"), _row("2", "90.000,00")]),
+        validate_photo_url=_stub_validate_photo_url,
+    ))
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", [_row("1", "100.000,00")]),
+        validate_photo_url=_stub_validate_photo_url,
+    ))
     assert summary.removed == 1
     with factory() as s:
         gone = s.query(Property).filter_by(source_id="2").one()
@@ -76,7 +102,10 @@ def test_ingest_geocodes_new_properties_when_geocoder_given():
         def geocode(self, address):
             return (-25.4, -49.2)
 
-    ingest(factory, _StubAdapter("PR", [_row("1", "100.000,00")]), geocoder=_Geo())
+    asyncio.run(ingest(
+        factory, _StubAdapter("PR", [_row("1", "100.000,00")]),
+        geocoder=_Geo(), validate_photo_url=_stub_validate_photo_url,
+    ))
     with factory() as s:
         prop = s.query(Property).filter_by(source_id="1").one()
         assert prop.lat == -25.4
@@ -117,7 +146,11 @@ def test_run_cli_with_file(tmp_path):
     csv_file.write_bytes(csv_text.encode("latin-1"))
 
     factory = _factory()
-    summary = run_cli(["--uf", "PR", "--file", str(csv_file)], session_factory=factory)
+    summary = run_cli(
+        ["--uf", "PR", "--file", str(csv_file)],
+        session_factory=factory,
+        validate_photo_url=_stub_validate_photo_url,
+    )
     assert summary.inserted == 1
     with factory() as s:
         assert s.query(Property).filter_by(source_id="555").count() == 1

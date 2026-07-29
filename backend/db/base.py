@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -40,6 +40,35 @@ def init_db(engine: Engine) -> None:
     from db import models  # noqa: F401
 
     Base.metadata.create_all(engine)
+
+    # v1 predates migrations and create_all() does not add columns to an
+    # existing table. Keep this small compatibility migration here so deployed
+    # SQLite/Postgres catalogs gain the auction-date fields on next startup.
+    existing = {column["name"] for column in inspect(engine).get_columns("properties")}
+    date_columns = {
+        "first_auction_at": "TIMESTAMP WITH TIME ZONE",
+        "second_auction_at": "TIMESTAMP WITH TIME ZONE",
+        "dates_fetched_at": "TIMESTAMP WITH TIME ZONE",
+    }
+    price_columns = {
+        "first_auction_price": "DOUBLE PRECISION",
+        "second_auction_price": "DOUBLE PRECISION",
+    }
+    with engine.begin() as connection:
+        for name, postgres_type in date_columns.items():
+            if name in existing:
+                continue
+            column_type = "DATETIME" if engine.dialect.name == "sqlite" else postgres_type
+            connection.execute(text(
+                f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
+            ))
+        for name, postgres_type in price_columns.items():
+            if name in existing:
+                continue
+            column_type = "FLOAT" if engine.dialect.name == "sqlite" else postgres_type
+            connection.execute(text(
+                f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
+            ))
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

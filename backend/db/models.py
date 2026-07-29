@@ -42,6 +42,17 @@ class Property(Base):
     avaliacao: Mapped[Optional[float]] = mapped_column(Float, default=None)
     desconto_oficial: Mapped[Optional[float]] = mapped_column(Float, default=None)
     modalidade: Mapped[Optional[str]] = mapped_column(String(64), default=None)
+    first_auction_price: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    second_auction_price: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    first_auction_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    second_auction_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    dates_fetched_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     descricao_raw: Mapped[str] = mapped_column(Text, default="")
     detail_url: Mapped[str] = mapped_column(Text, default="")

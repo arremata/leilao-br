@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, Protocol, runtime_checkable
 
 
@@ -30,6 +31,10 @@ class NormalizedProperty:
     avaliacao: Optional[float] = None
     desconto_oficial: Optional[float] = None
     modalidade: Optional[str] = None
+    first_auction_price: Optional[float] = None
+    second_auction_price: Optional[float] = None
+    first_auction_at: Optional[datetime] = None
+    second_auction_at: Optional[datetime] = None
     descricao_raw: str = ""
     detail_url: str = ""
     photo_url: Optional[str] = None

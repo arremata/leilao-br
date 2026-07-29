@@ -20,3 +20,33 @@ def test_csv_url_for_uf():
     assert adapter.csv_url() == (
         "https://venda-imoveis.caixa.gov.br/listaweb/Lista_imoveis_PR.csv"
     )
+
+
+import pytest
+from ingestion.adapters.caixa_csv import looks_like_captcha, CaixaFetchError
+
+# Shape of the Radware Bot Manager response served to automated clients.
+CAPTCHA_HTML = (
+    b"<head>\n  <title>Radware Bot Manager CAPTCHA</title>"
+    b'<script type="text/javascript">window.SSJSInternal = 48397;</script></head>'
+)
+
+
+def test_looks_like_captcha_detects_radware_page():
+    assert looks_like_captcha(CAPTCHA_HTML) is True
+
+
+def test_looks_like_captcha_false_for_valid_csv():
+    assert looks_like_captcha(SAMPLE.encode("latin-1")) is False
+
+
+def test_fetch_raw_raises_on_captcha_response():
+    adapter = CaixaCsvAdapter(uf="PR", csv_bytes=CAPTCHA_HTML)
+    with pytest.raises(CaixaFetchError):
+        adapter.fetch_raw()
+
+
+def test_fetch_raw_raises_on_empty_response():
+    adapter = CaixaCsvAdapter(uf="PR", csv_bytes=b"")
+    with pytest.raises(CaixaFetchError):
+        adapter.fetch_raw()

@@ -4,7 +4,9 @@ only to extract structure from raw HTML/PDF)."""
 
 from __future__ import annotations
 
-from graph.state import AuctionState, PropertyMetadata
+from loguru import logger
+
+from graph.state import AuctionState, PropertyMetadata, LegalResult
 from graph.market import market_node
 from graph.legal import legal_node
 from graph.scoring import scoring_node
@@ -12,6 +14,12 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 
 PIPELINE_VERSION = "v1"
+
+# Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
+# legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
+# True once the proxy/legal issue is fixed — the node is wired up and best-effort
+# (a transient failure falls back to an empty LegalResult, see below).
+LEGAL_NODE_ENABLED = False
 
 
 def metadata_from_property(prop) -> PropertyMetadata:
@@ -38,6 +46,16 @@ def run_structured_enrichment(
         property_metadata=metadata, pdf_texts=pdf_texts, auction_url=auction_url,
     )
     state.market_result = market_node(state)["market_result"]
-    state.legal_result = legal_node(state)["legal_result"]
+    if LEGAL_NODE_ENABLED:
+        # Best-effort: a transient LLM/proxy failure must not sink the whole
+        # analysis when market + scoring succeeded. Fall back to an empty
+        # LegalResult so downstream nodes still run.
+        try:
+            state.legal_result = legal_node(state)["legal_result"]
+        except Exception as exc:  # noqa: BLE001 — degrade gracefully on any legal failure
+            logger.warning(f"Legal node failed, continuing without legal analysis: {exc}")
+            state.legal_result = LegalResult()
+    else:
+        state.legal_result = LegalResult()
     state.scoring_result = scoring_node(state)["scoring_result"]
     return build_result(state)

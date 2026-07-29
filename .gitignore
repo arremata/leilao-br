@@ -30,4 +30,5 @@ build/
 
 # Data (generated at runtime)
 backend/data/results.json
+backend/*.db
 .vercel

@@ -61,6 +61,38 @@ def test_parse_description_empty():
     assert d == {"property_type": None, "area_m2": None, "beds": None}
 
 
+# Real Caixa CSV description format: number BEFORE the keyword, dot decimals,
+# no 'm2' suffix, beds as 'qto(s)'. Prefer privativa, then total, then terreno.
+def test_parse_description_real_apartment_privativa_before_and_qto():
+    d = parse_description(
+        "Apartamento, 43.37 de área total, 41.54 de área privativa, "
+        "0.00 de área do terreno,  2 qto(s), 1 vaga(s) de garagem."
+    )
+    assert d["property_type"] == "Apartamento"
+    assert d["area_m2"] == pytest.approx(41.54)
+    assert d["beds"] == 2
+
+
+def test_parse_description_real_house_privativa_before_and_qto():
+    d = parse_description(
+        "Casa, 0.00 de área total, 130.00 de área privativa, "
+        "354.00 de área do terreno,  3 qto(s), WC, 1 sala(s), cozinha."
+    )
+    assert d["property_type"] == "Casa"
+    assert d["area_m2"] == pytest.approx(130.0)
+    assert d["beds"] == 3
+
+
+def test_parse_description_real_terreno_falls_back_to_area_do_terreno():
+    d = parse_description(
+        "Terreno, 0.00 de área total, 0.00 de área privativa, "
+        "197270.00 de área do terreno."
+    )
+    assert d["property_type"] == "Terreno"
+    assert d["area_m2"] == pytest.approx(197270.0)
+    assert d["beds"] is None
+
+
 from ingestion.normalize import map_modalidade
 
 

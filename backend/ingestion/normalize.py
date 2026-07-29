@@ -62,21 +62,29 @@ def parse_description(desc: str) -> dict:
             result["property_type"] = t
             break
 
-    # Area: prefer 'privativa', fall back to 'total', then any 'm2' number.
+    # Area: prefer 'privativa', then 'total', then land area, taking the first
+    # positive value. Handles both the real Caixa format (number *before* the
+    # keyword, dot decimals, no 'm2' suffix, e.g. "41.54 de área privativa") and
+    # the older format (number *after*, comma decimals, 'm2' suffix).
     area = None
     for pattern in (
-        r"area privativa[^0-9]*([\d.,]+)\s*m",
-        r"area total[^0-9]*([\d.,]+)\s*m",
+        r"([\d.,]+)\s+de\s+area privativa",   # real: "41.54 de área privativa"
+        r"area privativa\s+de\s+([\d.,]+)",   # old:  "área privativa de 65,00"
+        r"([\d.,]+)\s+de\s+area total",       # real: "43.37 de área total"
+        r"area total\s+([\d.,]+)\s*m",        # old:  "área total 120,00 m2"
+        r"([\d.,]+)\s+de\s+area do terreno",  # real fallback (terrenos)
         r"([\d.,]+)\s*m2",
         r"([\d.,]+)\s*m²",
     ):
         m = re.search(pattern, flat)
         if m:
-            area = parse_brl_number(m.group(1))
-            break
-    result["area_m2"] = area if area else None
+            value = parse_brl_number(m.group(1))
+            if value > 0:
+                area = value
+                break
+    result["area_m2"] = area
 
-    beds_match = re.search(r"(\d+)\s*(?:quarto|dormit)", flat)
+    beds_match = re.search(r"(\d+)\s*(?:quarto|dormit|qto)", flat)
     if beds_match:
         result["beds"] = int(beds_match.group(1))
 

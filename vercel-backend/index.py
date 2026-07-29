@@ -8,15 +8,22 @@ public demo API online while the heavy analyzer remains a separate worker/API.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.pool import NullPool
 
 SEED_FILE = Path(__file__).with_name("seed.json")
+SAO_PAULO = ZoneInfo("America/Sao_Paulo")
+_engine = None
 
 app = FastAPI(title="Arremate Demo API")
 
@@ -37,6 +44,90 @@ def _load_properties() -> list[dict]:
     if not SEED_FILE.exists():
         return []
     return json.loads(SEED_FILE.read_text(encoding="utf-8"))
+
+
+def _get_engine():
+    """Return the cached Supabase engine without opening a connection eagerly."""
+    global _engine
+    if _engine is None:
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            raise HTTPException(status_code=503, detail="Catalog database is not configured")
+        # Supabase supplies the pool; avoid retaining serverless client-side
+        # connections between invocations.
+        _engine = create_engine(database_url, poolclass=NullPool, pool_pre_ping=True)
+    return _engine
+
+
+def _iso(value) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=SAO_PAULO)
+    return value.isoformat()
+
+
+def _catalog_card(row) -> dict:
+    p = dict(row)
+    auction_dates = [
+        value for value in (p.get("first_auction_at"), p.get("second_auction_at"))
+        if value is not None
+    ]
+    comparable_dates = [
+        value.replace(tzinfo=SAO_PAULO) if value.tzinfo is None else value
+        for value in auction_dates
+    ]
+    now = datetime.now(timezone.utc)
+    next_auction = next(
+        (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
+        comparable_dates[-1] if comparable_dates else None,
+    )
+    property_type = p.get("property_type")
+    if property_type:
+        title = f"{property_type} {p.get('area_m2') or 0:.0f} m²"
+        if p.get("neighborhood"):
+            title += f", {p['neighborhood']}"
+    else:
+        title = p.get("address") or ""
+
+    return {
+        "id": p["id"],
+        "sourceId": p.get("source_id"),
+        "source": p.get("source"),
+        "uf": p.get("uf"),
+        "city": p.get("city"),
+        "neighborhood": p.get("neighborhood"),
+        "address": p.get("address"),
+        "title": title,
+        "type": property_type,
+        "area": p.get("area_m2"),
+        "beds": p.get("beds"),
+        "minBid": p.get("preco"),
+        "appraisal": p.get("avaliacao"),
+        "desconto": p.get("desconto_oficial"),
+        "auctionDiscount": p.get("desconto_oficial"),
+        "modalidade": p.get("modalidade"),
+        "firstAuctionAt": _iso(p.get("first_auction_at")),
+        "secondAuctionAt": _iso(p.get("second_auction_at")),
+        "firstAuctionPrice": p.get("first_auction_price"),
+        "secondAuctionPrice": p.get("second_auction_price"),
+        "endsAt": _iso(next_auction),
+        "lat": p.get("lat"),
+        "lng": p.get("lng"),
+        "photoUrl": p.get("photo_url"),
+        "auctionUrl": p.get("detail_url"),
+        "status": p.get("status"),
+    }
+
+
+_CATALOG_COLUMNS = """
+    id, source_id, source, uf, city, neighborhood, address, property_type,
+    area_m2, beds, preco, avaliacao, desconto_oficial, modalidade,
+    first_auction_at, second_auction_at, first_auction_price,
+    second_auction_price, lat, lng, photo_url, detail_url, status
+"""
 
 
 def _parse_ends_at(value) -> Optional[datetime]:
@@ -72,6 +163,44 @@ def _closing_within_24h(ends_at, now) -> bool:
 @app.get("/properties")
 def get_properties() -> list[dict]:
     return _load_properties()
+
+
+@app.get("/catalog")
+def get_catalog(uf: Optional[str] = None) -> list[dict]:
+    query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE status = 'active'"
+    params = {}
+    if uf:
+        query += " AND uf = :uf"
+        params["uf"] = uf.upper()
+    query += " ORDER BY last_seen_at DESC, id DESC"
+    try:
+        with _get_engine().connect() as connection:
+            rows = connection.execute(text(query), params).mappings().all()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
+    return [_catalog_card(row) for row in rows]
+
+
+@app.get("/catalog/{property_id}")
+def get_catalog_item(property_id: int) -> dict:
+    query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
+    try:
+        with _get_engine().connect() as connection:
+            row = connection.execute(text(query), {"id": property_id}).mappings().one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Property not found")
+            enrichment = connection.execute(
+                text("SELECT result_json FROM enrichments WHERE property_id = :id"),
+                {"id": property_id},
+            ).scalar_one_or_none()
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
+
+    card = _catalog_card(row)
+    card["enrichment"] = json.loads(enrichment) if enrichment else None
+    return card
 
 
 @app.get("/dashboard")

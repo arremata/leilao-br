@@ -32,7 +32,7 @@ Respond ONLY with the JSON object."""
 
 
 async def _run_market_searches(metadata) -> list[ComparableProperty]:
-    """Run property scrapers only — Tavily removed. Returns scraped comparables."""
+    """Run property scrapers and return the comparable listings found."""
     scraped_comps = await scrape_comparables(metadata)
     logger.info(f"Market agent: scrapers returned {len(scraped_comps)} comparable properties")
     return scraped_comps
@@ -42,7 +42,7 @@ def _call_market_llm(metadata, scraped_comps: list[ComparableProperty] | None = 
     """Call Claude Sonnet via LiteLLM/Tractian proxy for market analysis."""
     settings = get_settings()
 
-    # Build context from scraped comparables only (Tavily removed)
+    # Build context from direct listing-source comparables.
     search_text = ""
     if scraped_comps:
         comp_lines = "\n".join(

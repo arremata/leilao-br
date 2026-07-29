@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Countdown, Photo, Specs, RiskSummary } from './shared';
 import { fmtBRL } from '../utils';
+import { fetchCatalogItem, analyzeCatalogItem } from '../api';
 
 export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
@@ -17,6 +18,30 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   // and let the sim re-derive availability after the early-return guard below.
   const [includeOccupantRemoval, setIncludeOccupantRemoval] = useState(false);
 
+  // On-demand enrichment for ingested catalog items. Seed / URL-analyzed
+  // properties already carry marketDetail and skip the fetch entirely.
+  const [enrichment, setEnrichment] = useState(null);
+  // Thin catalog items start in the loading state (fetch fires on mount);
+  // already-enriched or absent properties never fetch.
+  const [enrichLoading, setEnrichLoading] = useState(() => !!property && !property.marketDetail);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState(null);
+
+  const alreadyEnriched = !!property?.marketDetail;
+
+  // Fetch enrichment for a thin catalog item once. App remounts this component
+  // per property (key={id}), so state resets naturally on navigation — no need
+  // to clear it synchronously here.
+  useEffect(() => {
+    if (!property || alreadyEnriched) return undefined;
+    let cancelled = false;
+    fetchCatalogItem(property.id)
+      .then(item => { if (!cancelled && item?.enrichment) setEnrichment(item.enrichment); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setEnrichLoading(false); });
+    return () => { cancelled = true; };
+  }, [property, alreadyEnriched]);
+
   if (!property) {
     return (
       <div style={{ maxWidth: 1480, margin: '0 auto', padding: '60px 24px', textAlign: 'center' }}>
@@ -25,8 +50,25 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       </div>
     );
   }
-  const p = property;
+  // Effective property: an already-enriched result as-is, a thin catalog card
+  // merged with its fetched enrichment, or the thin card alone (hero-only view).
+  const enriched = alreadyEnriched ? property : (enrichment ? { ...property, ...enrichment } : null);
+  const isEnriched = !!enriched;
+  const p = enriched || property;
   const isWatched = watched?.includes(p.id);
+
+  const handleAnalyze = async () => {
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      const result = await analyzeCatalogItem(property.id);
+      setEnrichment(result);
+    } catch (err) {
+      setAnalyzeError(err.message || 'Falha ao analisar o imóvel.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   // --- Renovation cost: button-based, scaled by region's R$/m² ---
   // Region price/m² from the market indicators; fall back to market/area.
@@ -153,22 +195,55 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     });
   }
 
-  const dynamicTotal = dynamicRows.reduce((a, r) => a + r.value, 0);
+  // ── Base cost model at minBid (seed values) ──
+  // Used to derive fee rates and the target slider cap. The rows are then
+  // rebased onto maxBid so the displayed total reflects the recommended bid.
+  const baseTotal = dynamicRows.reduce((a, r) => a + r.value, 0);
 
   const netSale = Math.round((p.market || 0) * 0.94);
-  const grossROI = dynamicTotal > 0 ? Math.round(((netSale - dynamicTotal) / dynamicTotal) * 100) : 0;
-  // Lance máximo recomendado nunca pode ser inferior ao lance mínimo do leilão.
-  // O slider de meta de retorno é travado no ponto onde maxBid atinge o minBid:
-  // maxBid = netSale/(1+target/100) - (dynamicTotal - minBid) = minBid  ⇒  target = (netSale/dynamicTotal - 1)*100
   const minBidFloor = p.minBid || 0;
-  const targetCap = dynamicTotal > 0
-    ? Math.max(5, Math.min(80, Math.round((netSale / dynamicTotal - 1) * 100)))
+
+  // %-of-bid fees scale with the actual arremate price: ITBI, comissão (leiloeiro/corretor),
+  // custas judiciais, registro em cartório. Everything else (reform, debts, flat fees,
+  // projected condo/IPTU, legal, capital gains) is independent of the bid.
+  const _isScalingFee = (r) => {
+    if (r.kind === 'price') return false;
+    const lbl = r.label.toLowerCase();
+    if (r.kind === 'tax' && lbl.includes('itbi')) return true;
+    if (r.kind === 'fee' && (lbl.includes('comiss') || lbl.includes('custas') || lbl.includes('registro'))) return true;
+    return false;
+  };
+  const scalingFeesAtMinBid = dynamicRows.filter(_isScalingFee).reduce((a, r) => a + r.value, 0);
+  const flatCosts = baseTotal - minBidFloor - scalingFeesAtMinBid;
+  const feeRate = minBidFloor > 0 ? scalingFeesAtMinBid / minBidFloor : 0;
+
+  // Lance máximo recomendado nunca pode ser inferior ao lance mínimo do leilão.
+  // Slider de meta de retorno é travado no ponto onde maxBid atinge o minBid:
+  // at maxBid = minBid, total = minBid(1+feeRate) + flatCosts = baseTotal ⇒ target = (netSale/baseTotal - 1)*100
+  const targetCap = baseTotal > 0
+    ? Math.max(5, Math.min(80, Math.round((netSale / baseTotal - 1) * 100)))
     : 80;
   const effectiveTarget = Math.min(target, targetCap);
-  const maxBidRaw = dynamicTotal > 0
-    ? Math.round((netSale / (1 + effectiveTarget / 100)) - (dynamicTotal - minBidFloor))
+  // Solve for maxBid with fee scaling: total = maxBid(1+feeRate) + flatCosts = netSale/(1+T)
+  // ⇒ maxBid = (netSale/(1+T) - flatCosts) / (1+feeRate)
+  const maxBidRaw = baseTotal > 0
+    ? Math.round((netSale / (1 + effectiveTarget / 100) - flatCosts) / (1 + feeRate))
     : 0;
   const maxBid = Math.max(maxBidRaw, minBidFloor);
+
+  // Rebase the cost rows onto maxBid: price row → maxBid, scaling fees → maxBid × (orig/minBid).
+  const rebasedRows = dynamicRows.map(r => {
+    if (r.kind === 'price') {
+      const suffix = '(lance máximo recomendado)';
+      return { ...r, value: maxBid, hint: r.hint ? `${r.hint} ${suffix}` : suffix };
+    }
+    if (_isScalingFee(r) && minBidFloor > 0) {
+      return { ...r, value: Math.round(r.value * maxBid / minBidFloor) };
+    }
+    return r;
+  });
+  const dynamicTotal = rebasedRows.reduce((a, r) => a + r.value, 0);
+  const externalCosts = Math.max(0, dynamicTotal - maxBid);
 
   const sim = {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
@@ -178,7 +253,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     renoCost, renoRate, regionPricePerM2,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
     occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval, occupantRemovalCost,
-    gainCapital, dynamicTotal, dynamicRows, netSale, grossROI, maxBid,
+    gainCapital, dynamicTotal, dynamicRows: rebasedRows, netSale, maxBid, externalCosts,
   };
 
   return (
@@ -206,7 +281,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <button className="btn sm" disabled title="Em breve">
             <span className="mono">⎙</span> Exportar análise
           </button>
-          <button className="btn sm primary" onClick={() => p.auctionUrl && window.open(p.auctionUrl, '_blank')} disabled={!p.auctionUrl} title={p.auctionUrl || 'URL não disponível'}>
+          <button className="btn sm primary" onClick={() => (p.auctionUrl || p.detailUrl) && window.open(p.auctionUrl || p.detailUrl, '_blank')} disabled={!(p.auctionUrl || p.detailUrl)} title={p.auctionUrl || p.detailUrl || 'URL não disponível'}>
             <span className="mono">↗</span> Acessar leilão
           </button>
         </div>
@@ -332,6 +407,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         </div>
       </div>
 
+      {isEnriched ? (<>
       {/* ===== TABS ===== */}
       <div className="detail-tabs" style={{
         display: 'flex', gap: 0,
@@ -374,6 +450,31 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         {tab === 'legal' && <LegalLocked />}
         {tab === 'edital' && <Edital p={p} />}
       </div>
+      </>) : (
+        <AnalyzeCTA
+          onAnalyze={handleAnalyze}
+          analyzing={analyzing}
+          loading={enrichLoading}
+          error={analyzeError}
+        />
+      )}
+    </div>
+  );
+}
+
+function AnalyzeCTA({ onAnalyze, analyzing, loading, error }) {
+  return (
+    <div className="card fade-in" style={{ padding: 40, textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
+      <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>ANÁLISE NÃO EXECUTADA</div>
+      <h2 style={{ fontSize: 18, margin: '0 0 8px', color: 'var(--fg-0)' }}>Este imóvel ainda não foi analisado</h2>
+      <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: '0 0 22px' }}>
+        Rode a análise da IA para estimar o valor de mercado por comparáveis, a viabilidade
+        financeira, os custos totais e a leitura do edital.
+      </p>
+      <button className="btn primary" onClick={onAnalyze} disabled={analyzing || loading} style={{ minWidth: 180 }}>
+        {analyzing ? 'Analisando…' : loading ? 'Carregando…' : 'Analisar imóvel'}
+      </button>
+      {error && <p style={{ marginTop: 16, fontSize: 12.5, color: 'var(--bad)' }}>{error}</p>}
     </div>
   );
 }
@@ -391,18 +492,26 @@ function Meta({ lbl, val }) {
 }
 
 function PricingGrid({ p }) {
-  const has2nd = p.edital?.secondBidPrice && p.edital.secondBidPrice > 0;
+  const firstBidPrice = p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid;
+  const secondBidPrice = p.secondAuctionPrice || p.edital?.secondBidPrice || 0;
+  const has2nd = secondBidPrice > 0;
+  const firstBidDate = p.edital?.firstBidDate || (p.firstAuctionAt
+    ? new Date(p.firstAuctionAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null);
+  const secondBidDate = p.edital?.secondBidDate || (p.secondAuctionAt
+    ? new Date(p.secondAuctionAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null);
   const secondDiscount = has2nd
-    ? Math.round((p.minBid - p.edital.secondBidPrice) / p.minBid * 100)
+    ? Math.round((firstBidPrice - secondBidPrice) / firstBidPrice * 100)
     : 0;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
       <div>
         <span className="uppy" style={{ color: 'var(--fg-3)' }}>1ª praça</span>
-        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(p.minBid)}</div>
-        {p.edital?.firstBidDate && (
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{p.edital.firstBidDate}</div>
+        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(firstBidPrice)}</div>
+        {firstBidDate && (
+          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{firstBidDate}</div>
         )}
       </div>
       <div>
@@ -410,17 +519,22 @@ function PricingGrid({ p }) {
         {has2nd ? (
           <>
             <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
-              <div className="num-md">{fmtBRL(p.edital.secondBidPrice)}</div>
+              <div className="num-md">R$ {fmtBRL(secondBidPrice)}</div>
               <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>−{secondDiscount}%</span>
             </div>
-            {p.edital?.secondBidDate && (
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{p.edital.secondBidDate}</div>
+            {secondBidDate && (
+              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
             )}
           </>
         ) : (
-          <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)', fontStyle: 'italic' }}>
-            Ainda não divulgada
-          </div>
+          <>
+            <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)', fontStyle: 'italic' }}>
+              Valor ainda não divulgado
+            </div>
+            {secondBidDate && (
+              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -725,7 +839,7 @@ function CostBreakdown({ p, sim }) {
     renoCost, renoRate, regionPricePerM2,
     projectedCondo, projectedIptu,
     occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval,
-    netSale, grossROI, maxBid, dynamicRows, dynamicTotal,
+    netSale, maxBid, dynamicRows, dynamicTotal, externalCosts,
   } = sim;
 
   if ((dynamicRows || []).length === 0) {
@@ -767,23 +881,32 @@ function CostBreakdown({ p, sim }) {
           </button>
         </div>
 
-        {/* Metric tiles */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+        {/* Metric tiles — tonal hierarchy: hero (maxBid) / good (venda) / cost (total) / muted (external) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 24 }}>
           <SimMetric
-            lbl="ROI líquido projetado"
-            big={`${grossROI >= 0 ? '+' : ''}${grossROI}%`}
-            color={grossROI >= 25 ? 'var(--good)' : grossROI >= 10 ? 'var(--warn)' : 'var(--bad)'}
+            lbl="Custos externos"
+            big={`R$ ${fmtBRL(externalCosts)}`}
+            sub="Tudo além do arremate: taxas, reforma, débitos"
+            tone="muted"
           />
-          <SimMetric lbl="Custo total estimado" big={`R$ ${fmtBRL(dynamicTotal)}`} />
+          <SimMetric
+            lbl="Custo total estimado"
+            big={`R$ ${fmtBRL(dynamicTotal)}`}
+            sub="Arremate + custos externos (baseado no lance máximo)"
+            tone="cost"
+          />
           <SimMetric
             lbl="Lance máximo recomendado"
             big={`R$ ${fmtBRL(Math.max(0, maxBid))}`}
-            color="var(--accent)"
+            sub={`Para atingir ${target}% de retorno líquido`}
+            tone="hero"
           />
           <SimMetric
             lbl="Venda estimada (líq. 6%)"
             big={`R$ ${fmtBRL(netSale)}`}
-            color="var(--fg-1)"
+            sub="Valor de mercado líquido de comissão de venda"
+            tone="good"
+            delta={netSale - dynamicTotal}
           />
         </div>
 
@@ -986,15 +1109,40 @@ function CostBreakdown({ p, sim }) {
   );
 }
 
-function SimMetric({ lbl, big, color = 'var(--fg-0)' }) {
+// Tonal palette — hero (maxBid) leads, good (venda) follows, cost is neutral-bold, muted recedes.
+const _tones = {
+  hero:   { cardBg: 'var(--accent)',           border: 'var(--accent-strong)', num: 'var(--accent-ink)',  lbl: 'rgba(255,255,255,0.75)', sub: 'rgba(255,255,255,0.85)', chipBg: 'rgba(255,255,255,0.18)', chipFg: '#fff' },
+  good:   { cardBg: 'var(--good-soft)',         border: 'var(--good)',           num: 'var(--good)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-2)',            chipBg: 'var(--good)',           chipFg: '#fff' },
+  cost:   { cardBg: 'var(--bg-1)',              border: 'var(--line-2)',         num: 'var(--fg-0)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-2)',            chipBg: 'var(--bg-3)',           chipFg: 'var(--fg-1)' },
+  muted:  { cardBg: 'var(--bg-2)',              border: 'var(--line-1)',         num: 'var(--fg-1)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-3)',            chipBg: 'transparent',          chipFg: 'var(--fg-2)' },
+};
+function SimMetric({ lbl, big, sub, tone = 'muted', delta }) {
+  const t = _tones[tone] || _tones.muted;
+  const showDelta = typeof delta === 'number';
+  const deltaPos = delta >= 0;
   return (
     <div style={{
-      padding: '14px 16px',
-      background: 'var(--bg-2)', borderRadius: 8,
-      border: '1px solid var(--line-1)',
+      padding: '16px 18px',
+      background: t.cardBg, borderRadius: 10,
+      border: `1px solid ${t.border}`,
+      boxShadow: tone === 'hero' ? '0 6px 18px rgba(124,58,237,0.22)' : 'none',
     }}>
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>{lbl}</span>
-      <div className="num-xl" style={{ marginTop: 8, color }}>{big}</div>
+      <span className="uppy" style={{ color: t.lbl, fontSize: 10.5, letterSpacing: '0.06em' }}>{lbl}</span>
+      <div className="num-xl" style={{ marginTop: 8, color: t.num, fontSize: tone === 'hero' ? 30 : 26, fontWeight: 600 }}>{big}</div>
+      {showDelta && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          marginTop: 6, padding: '3px 8px', borderRadius: 6,
+          background: deltaPos ? 'var(--good)' : 'var(--bad)',
+          color: '#fff', fontSize: 11.5, fontWeight: 600,
+          fontFamily: 'var(--f-mono)',
+        }}>
+          <span>{deltaPos ? '▲' : '▼'}</span>
+          <span>R$ {fmtBRL(Math.abs(delta))}</span>
+          <span style={{ fontWeight: 400, opacity: 0.85 }}>lucro líq.</span>
+        </div>
+      )}
+      {sub && <p style={{ margin: showDelta ? '8px 0 0' : '6px 0 0', fontSize: 11.5, color: t.sub, lineHeight: 1.4 }}>{sub}</p>}
     </div>
   );
 }
@@ -1106,7 +1254,7 @@ function Selector({ label, value, options, onChange, hint }) {
 // ============================================================
 function Viability({ p, sim }) {
   const v = p.viability;
-  const { dynamicTotal, grossROI, maxBid, target } = sim;
+  const { dynamicTotal, maxBid, target, externalCosts } = sim;
 
   if (!v) {
     return (
@@ -1123,9 +1271,9 @@ function Viability({ p, sim }) {
     <div>
       {/* Metrics from simulator */}
       <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <Metric lbl="ROI líquido projetado" big={`${grossROI >= 0 ? '+' : ''}${grossROI}%`} sub="Após custos, tributos e venda estimada" color={grossROI >= 25 ? 'var(--good)' : grossROI >= 10 ? 'var(--warn)' : 'var(--bad)'} />
-        <Metric lbl="Custo total estimado" big={`R$ ${fmtBRL(dynamicTotal)}`} sub="Lance + reforma + tributos e débitos" />
-        <Metric lbl="Lance máximo recomendado" big={`R$ ${fmtBRL(Math.max(0, maxBid))}`} sub={`Para atingir ${target}% de retorno líquido`} color="var(--accent)" />
+        <Metric lbl="Custos externos" big={`R$ ${fmtBRL(externalCosts)}`} sub="Taxas, reforma, débitos — tudo além do arremate" tone="muted" />
+        <Metric lbl="Custo total estimado" big={`R$ ${fmtBRL(dynamicTotal)}`} sub="Arremate + custos externos (baseado no lance máximo)" tone="cost" />
+        <Metric lbl="Lance máximo recomendado" big={`R$ ${fmtBRL(Math.max(0, maxBid))}`} sub={`Para atingir ${target}% de retorno líquido`} tone="hero" />
       </div>
 
       <div style={{ marginBottom: 24, padding: '10px 16px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
@@ -1170,12 +1318,18 @@ function Viability({ p, sim }) {
   );
 }
 
-function Metric({ lbl, big, sub, color = 'var(--fg-0)' }) {
+function Metric({ lbl, big, sub, tone = 'muted' }) {
+  const t = _tones[tone] || _tones.muted;
   return (
-    <div className="card" style={{ padding: 20 }}>
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>{lbl}</span>
-      <div className="num-xl" style={{ marginTop: 10, color }}>{big}</div>
-      <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.45 }}>{sub}</p>
+    <div style={{
+      padding: 22,
+      background: t.cardBg, borderRadius: 10,
+      border: `1px solid ${t.border}`,
+      boxShadow: tone === 'hero' ? '0 6px 18px rgba(124,58,237,0.22)' : 'none',
+    }}>
+      <span className="uppy" style={{ color: t.lbl, fontSize: 10.5, letterSpacing: '0.06em' }}>{lbl}</span>
+      <div className="num-xl" style={{ marginTop: 10, color: t.num, fontSize: tone === 'hero' ? 30 : 26, fontWeight: 600 }}>{big}</div>
+      <p style={{ margin: '10px 0 0', fontSize: 12, color: t.sub, lineHeight: 1.45 }}>{sub}</p>
     </div>
   );
 }
