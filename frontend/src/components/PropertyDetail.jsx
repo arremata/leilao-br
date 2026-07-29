@@ -1374,11 +1374,11 @@ function GlossaryTerm({ text, termKey, openGlossary }) {
 
 function GlossaryDrawer({ open, onClose, query, setQuery }) {
   // Busca controlada pelo LegalDetail: clicar num termo linkificado abre o
-  // drawer já filtrado por aquele termo.
+  // modal já filtrado por aquele termo.
   const q = query || '';
   const setQ = setQuery;
   const ql = q.trim().toLowerCase();
-  // Esc fecha o drawer enquanto aberto
+  // Esc fecha o modal enquanto aberto
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -1391,33 +1391,39 @@ function GlossaryDrawer({ open, onClose, query, setQuery }) {
     (groups[t.categoria] = groups[t.categoria] || []).push(t);
   }
   const cats = Object.keys(groups);
+  if (!open) return null;
   return (
-    <>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.22)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24, zIndex: 60,
+      }}
+    >
       <div
-        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Glossário jurídico"
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.35)',
-          opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
-          transition: 'opacity .2s', zIndex: 60,
+          width: 'min(560px, 100%)', maxHeight: 'min(640px, 86vh)',
+          background: 'var(--bg-1)', borderRadius: 14,
+          border: '1px solid var(--line-1)',
+          boxShadow: '0 24px 64px rgba(17,24,39,0.28)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
-      />
-      <aside role="dialog" aria-modal={open} aria-label="Glossário jurídico" style={{
-        position: 'fixed', top: 0, right: 0, height: '100vh', width: 'min(420px, 92vw)',
-        background: 'var(--bg-1)', borderLeft: '1px solid var(--line-1)',
-        boxShadow: '-20px 0 50px rgba(17,24,39,0.12)',
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform .25s ease', zIndex: 61,
-        display: 'flex', flexDirection: 'column',
-      }}>
-        <div className="row between" style={{ padding: '18px 20px', borderBottom: '1px solid var(--line-1)', alignItems: 'center' }}>
+      >
+        <div className="row between" style={{ padding: '16px 20px', borderBottom: '1px solid var(--line-1)', alignItems: 'center', flexShrink: 0 }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>referência</span>
             <h3 className="h2" style={{ marginTop: 2 }}>Glossário jurídico</h3>
           </div>
           <button onClick={onClose} className="btn sm" aria-label="Fechar glossário"><span className="mono">✕</span></button>
         </div>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-1)' }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-1)', flexShrink: 0 }}>
           <input
+            autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar termo ou artigo…"
@@ -1428,7 +1434,7 @@ function GlossaryDrawer({ open, onClose, query, setQuery }) {
             }}
           />
         </div>
-        <div style={{ overflowY: 'auto', padding: '8px 20px 40px', flex: 1 }}>
+        <div style={{ overflowY: 'auto', padding: '8px 20px 24px', flex: 1 }}>
           {cats.length === 0 && (
             <p style={{ fontSize: 13, color: 'var(--fg-2)', marginTop: 16 }}>Nenhum termo encontrado.</p>
           )}
@@ -1449,8 +1455,8 @@ function GlossaryDrawer({ open, onClose, query, setQuery }) {
             Conteúdo educativo — não substitui orientação de advogado.
           </p>
         </div>
-      </aside>
-    </>
+      </div>
+    </div>
   );
 }
 
