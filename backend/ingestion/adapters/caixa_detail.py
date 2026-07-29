@@ -89,7 +89,8 @@ def parse_detail_html(html: str, base_url: str) -> dict:
 
 
 async def fetch_auction_dates_batch(
-    urls: list[str], concurrency: int = 10, retries: int = 2,
+    urls: list[str], concurrency: int = 2, retries: int = 1,
+    request_interval: float = 1.0,
 ) -> list[dict | None]:
     """Fetch Caixa detail dates concurrently, preserving input order.
 
@@ -101,15 +102,27 @@ async def fetch_auction_dates_batch(
         return []
 
     semaphore = asyncio.Semaphore(concurrency)
+    request_lock = asyncio.Lock()
+    last_request_started = 0.0
     headers = {"User-Agent": _DETAIL_UA}
 
     # curl_cffi impersonates Chrome's TLS/HTTP fingerprint. Plain httpx and
     # urllib are redirected to Radware CAPTCHA pages even with a browser UA.
     async with AsyncSession(impersonate="chrome", headers=headers) as client:
         async def _one(url: str):
+            nonlocal last_request_started
             async with semaphore:
                 for attempt in range(retries + 1):
                     try:
+                        # Caixa rate-limits bursty detail-page traffic. Space
+                        # request starts globally even though a small amount of
+                        # response overlap is allowed by the semaphore.
+                        async with request_lock:
+                            loop = asyncio.get_running_loop()
+                            wait = request_interval - (loop.time() - last_request_started)
+                            if wait > 0:
+                                await asyncio.sleep(wait)
+                            last_request_started = loop.time()
                         response = await client.get(
                             url, timeout=10, allow_redirects=True
                         )
@@ -136,7 +149,7 @@ async def fetch_auction_dates_batch(
                             f"for {url}: {exc}"
                         )
                     if attempt < retries:
-                        await asyncio.sleep(0.25 * (attempt + 1))
+                        await asyncio.sleep(5.0 * (attempt + 1))
                 logger.warning(f"Auction dates unavailable for {url}; will retry")
                 return None
 
