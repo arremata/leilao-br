@@ -51,6 +51,7 @@ def run_worker(
     adapter_factory: Optional[Callable[[str], SourceAdapter]] = None,
     geocoder=None,
     limit: Optional[int] = None,
+    date_limit: Optional[int] = 50,
 ) -> dict[str, UFResult]:
     """Ingest each UF in turn, isolating per-UF failures.
 
@@ -73,7 +74,10 @@ def run_worker(
             # Playwright objects would hang. Photo URLs are now derived from
             # source_id and HEAD-validated, so no detail-page browser fetch.
             summary = asyncio.run(
-                ingest(session_factory, adapter, geocoder=geocoder, limit=limit)
+                ingest(
+                    session_factory, adapter, geocoder=geocoder, limit=limit,
+                    date_limit=date_limit,
+                )
             )
             report[uf] = UFResult(uf=uf, summary=summary)
         except Exception as e:  # isolate: one bad UF must not abort the rest
@@ -97,6 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit", type=int, default=None,
         help="Only ingest the first N listings per UF (testing/partial runs).",
     )
+    parser.add_argument(
+        "--date-limit", type=int, default=50,
+        help="Maximum auction detail pages per UF (default: 50; 0 disables).",
+    )
     return parser
 
 
@@ -116,7 +124,10 @@ def main(argv=None) -> dict[str, UFResult]:  # pragma: no cover - thin CLI wrapp
         geocoder = NominatimClient()
 
     ufs = parse_ufs(args.ufs)
-    report = run_worker(ufs, session_factory, geocoder=geocoder, limit=args.limit)
+    report = run_worker(
+        ufs, session_factory, geocoder=geocoder, limit=args.limit,
+        date_limit=args.date_limit,
+    )
 
     ok = sum(1 for r in report.values() if r.error is None)
     failed = [uf for uf, r in report.items() if r.error is not None]

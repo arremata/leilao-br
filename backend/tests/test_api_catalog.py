@@ -65,16 +65,16 @@ def test_catalog_card_exposes_both_auction_dates_as_iso_strings():
         s.add(Property(
             source="caixa", source_id="date-1", uf="PR", address="Rua X",
             preco=100000.0, status="active",
-            first_auction_at=datetime(2026, 8, 4, 10, 0, tzinfo=tz),
-            second_auction_at=datetime(2026, 8, 10, 10, 0, tzinfo=tz),
+            first_auction_at=datetime(2099, 8, 4, 10, 0, tzinfo=tz),
+            second_auction_at=datetime(2099, 8, 10, 10, 0, tzinfo=tz),
             first_auction_price=140000.0, second_auction_price=94464.41,
         ))
         s.commit()
 
     card = client.get("/catalog?uf=PR").json()[0]
-    assert card["firstAuctionAt"] == "2026-08-04T10:00:00-03:00"
-    assert card["secondAuctionAt"] == "2026-08-10T10:00:00-03:00"
-    assert card["endsAt"] == "2026-08-04T10:00:00-03:00"
+    assert card["firstAuctionAt"] == "2099-08-04T10:00:00-03:00"
+    assert card["secondAuctionAt"] == "2099-08-10T10:00:00-03:00"
+    assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["firstAuctionPrice"] == 140000.0
     assert card["secondAuctionPrice"] == 94464.41
     api.app.dependency_overrides.clear()

@@ -366,6 +366,28 @@ def test_ingest_date_failure_is_non_fatal_and_retried():
     assert prop.dates_fetched_at is None
 
 
+def test_ingest_caps_date_enrichment_and_defers_the_rest():
+    factory = _factory()
+    rows = [_row(str(i)) for i in range(5)]
+    for row in rows:
+        row.raw["modalidade"] = "Leilão SFI"
+    calls = []
+
+    async def _fetch(urls):
+        calls.append(urls)
+        return [None] * len(urls)
+
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", rows), date_limit=2,
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_fetch,
+    ))
+
+    assert len(calls[0]) == 2
+    assert summary.dates_failed == 2
+    assert summary.dates_deferred == 3
+
+
 # --- _validate_photos_concurrently ------------------------------------------
 
 

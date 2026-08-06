@@ -77,6 +77,7 @@ class IngestSummary:
     events_created: int = 0
     dates_updated: int = 0
     dates_failed: int = 0
+    dates_deferred: int = 0
 
 
 def _preco_changed(old: float | None, new: float | None) -> bool:
@@ -143,6 +144,7 @@ async def ingest(
     adapter: SourceAdapter,
     geocoder=None,
     limit: Optional[int] = None,
+    date_limit: Optional[int] = 50,
     validate_photo_url: Callable[[str], bool] = _default_validate_photo_url,
     fetch_auction_dates=None,
 ) -> IngestSummary:
@@ -277,14 +279,18 @@ async def ingest(
         # Date enrichment is deliberately outside the upsert transaction: a
         # slow Caixa response must not hold database locks. Only Leilão SFI
         # rows missing/stale by 24h are selected, and requests are concurrent.
-        if pending_dates:
+        if pending_dates and date_limit != 0:
+            selected_dates = (
+                pending_dates if date_limit is None else pending_dates[:date_limit]
+            )
+            summary.dates_deferred = len(pending_dates) - len(selected_dates)
             if fetch_auction_dates is None:
                 from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
                 fetch_auction_dates = fetch_auction_dates_batch
-            urls = [url for _, url in pending_dates]
+            urls = [url for _, url in selected_dates]
             date_results = await fetch_auction_dates(urls)
             with session_factory() as session:
-                for (property_id, _), result in zip(pending_dates, date_results):
+                for (property_id, _), result in zip(selected_dates, date_results):
                     if result is None:
                         summary.dates_failed += 1
                         continue
@@ -317,7 +323,8 @@ async def ingest(
         f"Ingest[{adapter.source}/{adapter.uf}]: "
         f"+{summary.inserted} ~{summary.updated} -{summary.removed} "
         f"={summary.unchanged} events={summary.events_created} "
-        f"dates={summary.dates_updated}/{summary.dates_failed}failed"
+        f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
+        f"{summary.dates_deferred}deferred"
     )
     return summary
 

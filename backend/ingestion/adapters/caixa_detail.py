@@ -90,7 +90,7 @@ def parse_detail_html(html: str, base_url: str) -> dict:
 
 async def fetch_auction_dates_batch(
     urls: list[str], concurrency: int = 2, retries: int = 1,
-    request_interval: float = 1.0,
+    request_interval: float = 1.0, max_consecutive_429: int = 3,
 ) -> list[dict | None]:
     """Fetch Caixa detail dates concurrently, preserving input order.
 
@@ -103,15 +103,20 @@ async def fetch_auction_dates_batch(
 
     semaphore = asyncio.Semaphore(concurrency)
     request_lock = asyncio.Lock()
+    rate_limit_lock = asyncio.Lock()
+    circuit_open = asyncio.Event()
     last_request_started = 0.0
+    consecutive_429 = 0
     headers = {"User-Agent": _DETAIL_UA}
 
     # curl_cffi impersonates Chrome's TLS/HTTP fingerprint. Plain httpx and
     # urllib are redirected to Radware CAPTCHA pages even with a browser UA.
     async with AsyncSession(impersonate="chrome", headers=headers) as client:
         async def _one(url: str):
-            nonlocal last_request_started
+            nonlocal last_request_started, consecutive_429
             async with semaphore:
+                if circuit_open.is_set():
+                    return None
                 for attempt in range(retries + 1):
                     try:
                         # Caixa rate-limits bursty detail-page traffic. Space
@@ -127,6 +132,8 @@ async def fetch_auction_dates_batch(
                             url, timeout=10, allow_redirects=True
                         )
                         response.raise_for_status()
+                        async with rate_limit_lock:
+                            consecutive_429 = 0
                         parsed = parse_detail_html(
                             response.text,
                             base_url="https://venda-imoveis.caixa.gov.br",
@@ -144,10 +151,22 @@ async def fetch_auction_dates_batch(
                                 "second_auction_price": parsed["second_auction_price"],
                             }
                     except (RequestsError, ValueError) as exc:
+                        response = getattr(exc, "response", None)
+                        if getattr(response, "status_code", None) == 429:
+                            async with rate_limit_lock:
+                                consecutive_429 += 1
+                                if consecutive_429 >= max_consecutive_429:
+                                    circuit_open.set()
+                                    logger.warning(
+                                        "Caixa detail rate-limit circuit opened; "
+                                        "deferring remaining URLs"
+                                    )
                         logger.debug(
                             f"auction-date fetch attempt {attempt + 1} failed "
                             f"for {url}: {exc}"
                         )
+                        if circuit_open.is_set():
+                            return None
                     if attempt < retries:
                         await asyncio.sleep(5.0 * (attempt + 1))
                 logger.warning(f"Auction dates unavailable for {url}; will retry")
