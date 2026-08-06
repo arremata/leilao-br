@@ -24,6 +24,9 @@ on:
         type: boolean
         required: true
         default: false
+  schedule:
+    # GitHub cron is UTC. 08:17 UTC is 05:17 in Brasilia standard time.
+    - cron: "17 8 * * *"
 permissions:
   contents: read
 
@@ -35,8 +38,8 @@ jobs:
   ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Manual runs default to staging. Production is selected explicitly during
-    # the controlled rollout; cron is added only after production validation.
+    # Manual runs default to staging. Scheduled runs have no dispatch inputs,
+    # so they resolve to the Production environment.
     environment: ${{ github.event.inputs.target_environment || 'Production' }}
     env:
       # Deliberately differs from the legacy repository-level DATABASE_URL:

@@ -1,9 +1,8 @@
 # Caixa Ingestion on GitHub Actions
 
-> Status: **implemented, manual rollout mode.** The workflow lives at
+> Status: **production enabled.** The workflow lives at
 > `.github/workflows/ingest.yml`; manual runs support configurable environment,
-> UFs, limit, and geocoding. Cron is temporarily disabled until production is
-> validated.
+> UFs, limit, and geocoding, and the production PR catalog runs daily.
 
 ## Why GitHub Actions
 
@@ -26,7 +25,8 @@ That requirement rules out Vercel for ingestion:
 The frontend-facing API stays on Vercel; only ingestion moves to Actions.
 
 GitHub Environments isolate credentials: manual runs default to `staging` and
-can explicitly select `Production`. Each environment must define its own
+can explicitly select `Production`; scheduled runs use `Production`. Each
+environment must define its own
 `INGEST_DATABASE_URL` secret; the workflow maps it to `DATABASE_URL` for the
 worker. Using the same secret value in both defeats this safety boundary.
 
