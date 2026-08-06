@@ -51,7 +51,7 @@ def run_worker(
     adapter_factory: Optional[Callable[[str], SourceAdapter]] = None,
     geocoder=None,
     limit: Optional[int] = None,
-    date_limit: Optional[int] = 50,
+    date_limit: Optional[int] = None,
 ) -> dict[str, UFResult]:
     """Ingest each UF in turn, isolating per-UF failures.
 
@@ -102,8 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only ingest the first N listings per UF (testing/partial runs).",
     )
     parser.add_argument(
-        "--date-limit", type=int, default=50,
-        help="Maximum auction detail pages per UF (default: 50; 0 disables).",
+        "--date-limit", type=int, default=None,
+        help=(
+            "Optional maximum auction detail pages per UF; by default all "
+            "eligible pages are fetched (0 disables)."
+        ),
     )
     return parser
 
