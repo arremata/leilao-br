@@ -63,6 +63,16 @@ def test_parse_detail_html_accepts_missing_second_date_and_time():
     assert data["second_auction_at"] is None
 
 
+def test_parse_detail_html_extracts_licitacao_aberta_date():
+    data = parse_detail_html(
+        "<span>Data da Licitação Aberta - 05/08/2026 - 10h00</span>",
+        base_url="https://x",
+    )
+
+    assert data["first_auction_at"].isoformat() == "2026-08-05T10:00:00-03:00"
+    assert data["second_auction_at"] is None
+
+
 def test_date_batch_retries_http_200_without_dates_in_fresh_session(monkeypatch):
     sessions_created = 0
 

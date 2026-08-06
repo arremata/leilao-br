@@ -307,6 +307,18 @@ def test_needs_auction_dates_only_for_missing_or_stale_caixa_sfi_rows():
     assert _needs_auction_dates(prop, now) is False
 
 
+def test_needs_auction_dates_for_licitacao_aberta_without_requiring_praca_price():
+    now = datetime(2026, 8, 6, tzinfo=ZoneInfo("UTC"))
+    prop = Property(
+        source="caixa", source_id="1", modalidade="Licitação Aberta",
+        detail_url="https://x/detail",
+    )
+    assert _needs_auction_dates(prop, now) is True
+
+    prop.dates_fetched_at = now
+    assert _needs_auction_dates(prop, now) is False
+
+
 def test_ingest_fetches_and_persists_auction_dates_without_blocking_csv_upsert():
     factory = _factory()
     row = _row("1555522441313")
