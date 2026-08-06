@@ -170,7 +170,10 @@ async def ingest(
         # took ~11 min; bounded concurrency cuts that to ~1 min. /fotos/ is not
         # Radware-guarded, so parallel plain HTTP is safe.
         pending_photos: list[tuple] = []  # (prop, photo_url)
-        pending_dates: list[tuple[int, str]] = []  # (property_id, detail_url)
+        # (property_id, detail_url, never_fetched). Never-fetched rows are
+        # prioritized over TTL refreshes so the per-run cap eventually covers
+        # the whole catalog instead of repeatedly refreshing the same prefix.
+        pending_dates: list[tuple[int, str, bool]] = []
 
         with session_factory() as session:
             for raw in raws:
@@ -238,7 +241,9 @@ async def ingest(
                 if _needs_detail_fetch(existing, n) and n.photo_url:
                     pending_photos.append((prop, n.photo_url))
                 if _needs_auction_dates(prop, now):
-                    pending_dates.append((prop.id, prop.detail_url))
+                    pending_dates.append((
+                        prop.id, prop.detail_url, prop.dates_fetched_at is None,
+                    ))
 
             # Removed detection is valid only for a complete source snapshot.
             # A --limit smoke test intentionally sees only a prefix and must
@@ -280,6 +285,7 @@ async def ingest(
         # slow Caixa response must not hold database locks. Only Leilão SFI
         # rows missing/stale by 24h are selected, and requests are concurrent.
         if pending_dates and date_limit != 0:
+            pending_dates.sort(key=lambda candidate: not candidate[2])
             selected_dates = (
                 pending_dates if date_limit is None else pending_dates[:date_limit]
             )
@@ -287,10 +293,10 @@ async def ingest(
             if fetch_auction_dates is None:
                 from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
                 fetch_auction_dates = fetch_auction_dates_batch
-            urls = [url for _, url in selected_dates]
+            urls = [url for _, url, _ in selected_dates]
             date_results = await fetch_auction_dates(urls)
             with session_factory() as session:
-                for (property_id, _), result in zip(selected_dates, date_results):
+                for (property_id, _, _), result in zip(selected_dates, date_results):
                     if result is None:
                         summary.dates_failed += 1
                         continue
