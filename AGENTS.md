@@ -149,6 +149,7 @@ The full platform will include:
 
 Every meaningful change to the project should be recorded here with a brief description.
 
+- **2026-08-06** — Added Caixa's official `Valor de avaliação` to the property-detail pricing panel, keeping it distinct from both the 1ª praça/minimum sale price and the AI comparable-market estimate.
 - **2026-08-06** — Removed the default 50-page auction-date enrichment cap. Production ingestion now processes every eligible Leilão SFI detail page in the run while retaining one-request-per-second pacing, bounded concurrency, retries, and the consecutive-429 circuit breaker. `--date-limit` remains available for controlled smoke runs.
 - **2026-08-06** — Added fresh-session recovery passes for Caixa detail pages that transiently return HTTP 200 without auction content. Only failed URLs are retried after a cooldown, and warnings are emitted only after all recovery passes are exhausted.
 - **2026-08-06** — Added Caixa `Licitação Aberta` date ingestion. Its single scheduled date is parsed from the detail page into `first_auction_at`/`endsAt`; unlike Leilão SFI, it does not require separate praça prices to count as successfully refreshed.
