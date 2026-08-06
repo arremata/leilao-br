@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
+from dataclasses import asdict
+
+from fastapi import Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from db.base import get_engine, init_db, make_session_factory
+from db.models import Property, Enrichment
+from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
+from ingestion.adapters.caixa_detail import fetch_detail
+from ingestion.run import run_cli
 
 DATA_DIR = Path(__file__).parent / "data"
 RESULTS_FILE = DATA_DIR / "results.json"
@@ -19,6 +32,12 @@ SEED_FILE = Path(__file__).parent / "data" / "seed.json"
 class AnalyzeRequest(BaseModel):
     url: Optional[str] = None
     pdf_texts: Optional[str] = None
+
+
+class IngestRequest(BaseModel):
+    source: str = "caixa"
+    uf: str = "PR"
+    file: Optional[str] = None
 
 
 def _load_results() -> list[dict]:
@@ -89,6 +108,84 @@ app = FastAPI(title="Leilao AI API")
 @app.on_event("startup")
 def _startup():
     _merge_seed()
+    engine = get_engine()
+    init_db(engine)
+    app.state.session_factory = make_session_factory(engine)
+
+
+def get_session():
+    factory = app.state.session_factory
+    with factory() as session:
+        yield session
+
+
+def _card_title(p: Property) -> str:
+    """Human-readable card title from ingested fields.
+
+    Mirrors build_result's title shape ("{type} {area} m²") but keyed on the
+    neighborhood we have at ingestion time; falls back to the raw address when
+    the source gave us no property type.
+    """
+    if p.property_type:
+        title = f"{p.property_type} {p.area_m2 or 0:.0f} m²"
+        if p.neighborhood:
+            title += f", {p.neighborhood}"
+        return title
+    return p.address or ""
+
+
+def _property_card(p: Property) -> dict:
+    def _iso(value):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        return value.isoformat()
+
+    auction_dates = [
+        value for value in (p.first_auction_at, p.second_auction_at)
+        if value is not None
+    ]
+    now = datetime.now(timezone.utc)
+    comparable_dates = [
+        value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        if value.tzinfo is None else value
+        for value in auction_dates
+    ]
+    next_auction_at = next(
+        (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
+        comparable_dates[-1] if comparable_dates else None,
+    )
+
+    return {
+        "id": p.id,
+        "sourceId": p.source_id,
+        "source": p.source,
+        "uf": p.uf,
+        "city": p.city,
+        "neighborhood": p.neighborhood,
+        "address": p.address,
+        "title": _card_title(p),
+        "type": p.property_type,
+        "area": p.area_m2,
+        "beds": p.beds,
+        "minBid": p.preco,
+        "appraisal": p.avaliacao,
+        "desconto": p.desconto_oficial,
+        "auctionDiscount": p.desconto_oficial,
+        "modalidade": p.modalidade,
+        "firstAuctionAt": _iso(p.first_auction_at),
+        "secondAuctionAt": _iso(p.second_auction_at),
+        "firstAuctionPrice": p.first_auction_price,
+        "secondAuctionPrice": p.second_auction_price,
+        "endsAt": _iso(next_auction_at),
+        "lat": p.lat,
+        "lng": p.lng,
+        "photoUrl": p.photo_url,
+        "detailUrl": p.detail_url,
+        "status": p.status,
+    }
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -191,6 +288,93 @@ def analyze(req: AnalyzeRequest) -> dict:
         import traceback
         logger.error(f"Analysis failed: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
+
+
+@app.get("/catalog")
+def list_catalog(uf: Optional[str] = None, session: Session = Depends(get_session)) -> list[dict]:
+    stmt = select(Property).where(Property.status == "active")
+    if uf:
+        stmt = stmt.where(Property.uf == uf.upper())
+    props = session.execute(stmt).scalars().all()
+    return [_property_card(p) for p in props]
+
+
+@app.get("/catalog/{prop_id}")
+def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> dict:
+    prop = session.get(Property, prop_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    card = _property_card(prop)
+    enr = session.execute(
+        select(Enrichment).where(Enrichment.property_id == prop_id)
+    ).scalar_one_or_none()
+    card["enrichment"] = json.loads(enr.result_json) if enr else None
+    return card
+
+
+def _maybe_fetch_detail(prop: Property) -> None:
+    """Lazily scrape the Caixa detail page once to fill photo_url.
+
+    The CSV feed has no photo; the picture only exists on the per-property
+    detail page. We scrape it on first analyze (best-effort): a failure leaves
+    detail_fetched False so a later analyze retries.
+    """
+    import asyncio
+
+    if prop.detail_fetched or not prop.detail_url:
+        return
+    try:
+        detail = asyncio.run(fetch_detail(prop.detail_url))
+    except Exception as e:
+        logger.warning(f"Detail fetch failed for property {prop.id}: {e}")
+        return
+    if detail.get("photo_url"):
+        prop.photo_url = detail["photo_url"]
+    prop.detail_fetched = True
+
+
+@app.post("/catalog/{prop_id}/analyze")
+def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> dict:
+    prop = session.get(Property, prop_id)
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    _maybe_fetch_detail(prop)
+    session.flush()
+
+    metadata = metadata_from_property(prop)
+    # Reuse the ingested description as the legal node's document text so it
+    # analyzes real source data instead of running blind on empty input.
+    result = run_structured_enrichment(
+        metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
+    )
+    result_json = result.model_dump_json(by_alias=True)
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    enr = session.execute(
+        select(Enrichment).where(Enrichment.property_id == prop_id)
+    ).scalar_one_or_none()
+    if enr:
+        enr.result_json = result_json
+        enr.pipeline_version = PIPELINE_VERSION
+        enr.computed_at = now
+    else:
+        session.add(Enrichment(
+            property_id=prop_id, result_json=result_json,
+            pipeline_version=PIPELINE_VERSION, computed_at=now,
+        ))
+    session.commit()
+    return json.loads(result_json)
+
+
+@app.post("/ingest")
+def trigger_ingest(req: IngestRequest) -> dict:
+    argv = ["--source", req.source, "--uf", req.uf]
+    if req.file:
+        argv += ["--file", req.file]
+    summary = run_cli(argv, session_factory=app.state.session_factory)
+    return asdict(summary)
 
 
 if __name__ == "__main__":
