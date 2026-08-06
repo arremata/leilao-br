@@ -14,7 +14,7 @@ leilao/
 │   ├── api.py               # FastAPI server (port 8000)
 │   ├── app.py               # Gradio UI (legacy)
 │   ├── analyze.py           # CLI entry point
-│   ├── config.py            # Settings (LiteLLM, Tavily keys)
+│   ├── config.py            # Settings (LiteLLM proxy key)
 │   ├── graph/               # LangGraph agent pipeline
 │   │   └── contracts.py     # Pydantic data contract (AuctionPropertyResult)
 │   ├── tools/               # Web scraper, PDF parser, search, property scraper
@@ -77,7 +77,6 @@ URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scor
 - **Web Scraper** (Playwright with stealth) — scrapes auction listing pages
 - **PDF Downloader** — downloads PDFs from extracted URLs
 - **PDF Parser** (PyMuPDF + pytesseract OCR fallback) — extracts text from edital PDFs
-- **Web Search** (Tavily API with retry logic) — market and legal research
 - **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables
 
 ## Data Contract
@@ -141,7 +140,7 @@ The full platform will include:
 | API | FastAPI | FastAPI |
 | Frontend | React 19 + Vite | React + Mapbox |
 | PDF Parsing | PyMuPDF | PyMuPDF |
-| Web Search | Tavily | Tavily |
+| Market research | Direct listing scrapers | Direct listing scrapers |
 | Web Scraping | Playwright | Playwright + Scrapy |
 | Persistence | JSON file | PostgreSQL |
 | Deployment | Local | Docker + AWS/GCP |
@@ -149,6 +148,14 @@ The full platform will include:
 ## Changelog
 
 Every meaningful change to the project should be recorded here with a brief description.
+
+- **2026-07-29** — Added a daily/manual GitHub Actions workflow for the Caixa ingestion worker, with isolated staging/production environments, configurable UFs, optional limits/geocoding, Xvfb-backed Chrome, concurrency protection, and failure summaries. Manual runs default to staging, scheduled runs target production, and the worker exits nonzero when any UF fails so scheduled runs cannot report false success.
+- **2026-07-29** — Added Caixa auction-date and praça-price ingestion. Leilão SFI detail pages are fetched concurrently with Chrome TLS impersonation; both 1º/2º leilão dates and minimum prices are parsed and cached for 24 hours, independently from appraisal/current CSV price. Failures retry without aborting CSV ingestion, existing databases receive compatibility columns on startup, and catalog cards expose/render both praças plus the next auction as `endsAt`.
+- **2026-07-29** — Connected the lightweight Vercel backend to Supabase for read-only `GET /catalog` and `GET /catalog/{id}` endpoints, keeping the heavy ingestion and AI pipeline outside serverless functions.
+- **2026-07-29** — Rate-limited Caixa detail-date enrichment after the full PR staging run exposed HTTP 429 responses under burst concurrency. Detail requests now start at most once per second with two in flight and conservative retry backoff; catalog/photo persistence remains independent of date enrichment.
+- **2026-08-06** — Capped auction-date enrichment at 50 detail pages per UF/run and added a circuit breaker after three consecutive HTTP 429 responses. Excess work remains retryable on later runs. Temporarily disabled the ingestion cron for controlled production smoke/full imports.
+- **2026-08-06** — Completed the controlled production rollout: 10-property smoke run succeeded, followed by a full PR import (711 new, 10 existing, 50 dates enriched, 0 date failures, 248 dates deferred). Enabled daily production ingestion at 08:17 UTC / 05:17 Brasília time.
+- **2026-08-06** — Prioritized never-enriched auction dates ahead of TTL refreshes so the 50-page daily cap progresses through the complete catalog fairly.
 
 - **2026-05-14** — Extended `AuctionPropertyResult` with detail objects (`viability`, `marketDetail`, `costs`, `edital`). Created seed data (`backend/data/seed.json`) with 3 demo properties. Frontend now reads all detail tab data from the property object instead of hardcoded values. Removed non-seeded fixture properties (p2, p4, p6, p7, p8). App starts with empty state and populates exclusively from the API.
 - **2026-06-22** — Frontend fixes: split `auctionType` into three fields (`auctionType` = Judicial/Extrajudicial, `praca` = 1ª/2ª praça, `modalidade` = Licitação aberta/Venda direta) fixing broken Feed filters. Unified "Dar lance" + "Edital PDF" into single "Acessar leilão" CTA. Removed non-functional buttons (Ver todas, Salvar busca, Abrir no tribunal, Payback). Renamed "IA jurídica" → "Assistente jurídico". Fixed renovation cost slider to use property-specific base from seed costs. Fixed Matrícula field to read from viability features. Implemented real pagination in Feed. Added user avatar dropdown menu. Disabled future-feature buttons (Exportar análise, Exportar CSV, Configurar alertas) with "Em breve" tooltip. Created `FUTURE_FEATURES.md` with specs.

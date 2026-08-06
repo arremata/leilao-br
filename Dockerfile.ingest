@@ -1,0 +1,31 @@
+# Scheduled Caixa ingestion worker.
+#
+# The frontend-facing API is deployed serverless (Vercel) and cannot run a
+# headed browser. This image is the separate worker: it drives a real Chrome
+# under Xvfb to fetch the per-state CSVs past the bot manager, normalizes them,
+# and upserts into the shared catalog DB (DATABASE_URL).
+#
+# Build:  docker build -f Dockerfile.ingest -t leilao-ingest .
+# Run:    docker run --rm -e DATABASE_URL=... leilao-ingest --ufs PR,SP
+# Schedule this container (cron / k8s CronJob / ECS scheduled task).
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+# xvfb provides the virtual display the headed Chrome needs on a headless host.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt \
+    && python -m playwright install --with-deps chrome
+
+COPY backend ./backend
+
+WORKDIR /app/backend
+# xvfb-run supplies the virtual display; args after the image name pass through
+# to the worker (e.g. --ufs PR,SP --geocode).
+ENTRYPOINT ["xvfb-run", "-a", "python", "-m", "ingestion.worker"]
+CMD ["--ufs", "PR"]
