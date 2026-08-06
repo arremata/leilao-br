@@ -144,7 +144,7 @@ async def ingest(
     adapter: SourceAdapter,
     geocoder=None,
     limit: Optional[int] = None,
-    date_limit: Optional[int] = 50,
+    date_limit: Optional[int] = None,
     validate_photo_url: Callable[[str], bool] = _default_validate_photo_url,
     fetch_auction_dates=None,
 ) -> IngestSummary:
@@ -171,8 +171,8 @@ async def ingest(
         # Radware-guarded, so parallel plain HTTP is safe.
         pending_photos: list[tuple] = []  # (prop, photo_url)
         # (property_id, detail_url, never_fetched). Never-fetched rows are
-        # prioritized over TTL refreshes so the per-run cap eventually covers
-        # the whole catalog instead of repeatedly refreshing the same prefix.
+        # prioritized over TTL refreshes when an operator supplies a temporary
+        # --date-limit (for example during a smoke run).
         pending_dates: list[tuple[int, str, bool]] = []
 
         with session_factory() as session:
@@ -282,8 +282,9 @@ async def ingest(
             session.commit()
 
         # Date enrichment is deliberately outside the upsert transaction: a
-        # slow Caixa response must not hold database locks. Only Leilão SFI
-        # rows missing/stale by 24h are selected, and requests are concurrent.
+        # slow Caixa response must not hold database locks. All Leilão SFI
+        # rows missing/stale by 24h are selected by default. The detail adapter
+        # paces requests and opens a circuit on repeated HTTP 429 responses.
         if pending_dates and date_limit != 0:
             pending_dates.sort(key=lambda candidate: not candidate[2])
             selected_dates = (

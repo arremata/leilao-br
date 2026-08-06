@@ -149,6 +149,7 @@ The full platform will include:
 
 Every meaningful change to the project should be recorded here with a brief description.
 
+- **2026-08-06** — Removed the default 50-page auction-date enrichment cap. Production ingestion now processes every eligible Leilão SFI detail page in the run while retaining one-request-per-second pacing, bounded concurrency, retries, and the consecutive-429 circuit breaker. `--date-limit` remains available for controlled smoke runs.
 - **2026-07-29** — Added a daily/manual GitHub Actions workflow for the Caixa ingestion worker, with isolated staging/production environments, configurable UFs, optional limits/geocoding, Xvfb-backed Chrome, concurrency protection, and failure summaries. Manual runs default to staging, scheduled runs target production, and the worker exits nonzero when any UF fails so scheduled runs cannot report false success.
 - **2026-07-29** — Added Caixa auction-date and praça-price ingestion. Leilão SFI detail pages are fetched concurrently with Chrome TLS impersonation; both 1º/2º leilão dates and minimum prices are parsed and cached for 24 hours, independently from appraisal/current CSV price. Failures retry without aborting CSV ingestion, existing databases receive compatibility columns on startup, and catalog cards expose/render both praças plus the next auction as `endsAt`.
 - **2026-07-29** — Connected the lightweight Vercel backend to Supabase for read-only `GET /catalog` and `GET /catalog/{id}` endpoints, keeping the heavy ingestion and AI pipeline outside serverless functions.
