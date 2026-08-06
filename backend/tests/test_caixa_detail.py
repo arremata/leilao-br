@@ -1,3 +1,6 @@
+import asyncio
+
+import ingestion.adapters.caixa_detail as caixa_detail
 from ingestion.adapters.caixa_detail import parse_detail_html
 
 DETAIL_HTML = """
@@ -58,3 +61,56 @@ def test_parse_detail_html_accepts_missing_second_date_and_time():
 
     assert data["first_auction_at"].isoformat() == "2026-08-04T00:00:00-03:00"
     assert data["second_auction_at"] is None
+
+
+def test_parse_detail_html_extracts_licitacao_aberta_date():
+    data = parse_detail_html(
+        "<span>Data da Licitação Aberta - 05/08/2026 - 10h00</span>",
+        base_url="https://x",
+    )
+
+    assert data["first_auction_at"].isoformat() == "2026-08-05T10:00:00-03:00"
+    assert data["second_auction_at"] is None
+
+
+def test_date_batch_retries_http_200_without_dates_in_fresh_session(monkeypatch):
+    sessions_created = 0
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, text):
+            self.text = text
+
+        def raise_for_status(self):
+            return None
+
+    class Session:
+        def __init__(self, **kwargs):
+            nonlocal sessions_created
+            sessions_created += 1
+            self.number = sessions_created
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, **kwargs):
+            if self.number == 1:
+                return Response("<html>temporary bot-manager page</html>")
+            return Response("<span>Data do 1º Leilão - 24/08/2026 - 10h00</span>")
+
+    async def no_sleep(_seconds):
+        return None
+
+    monkeypatch.setattr(caixa_detail, "AsyncSession", Session)
+    monkeypatch.setattr(caixa_detail.asyncio, "sleep", no_sleep)
+
+    results = asyncio.run(caixa_detail.fetch_auction_dates_batch(
+        ["https://x/detail"], retries=0, request_interval=0, recovery_rounds=1,
+    ))
+
+    assert sessions_created == 2
+    assert results[0]["first_auction_at"].isoformat() == "2026-08-24T10:00:00-03:00"

@@ -494,6 +494,7 @@ function Meta({ lbl, val }) {
 function PricingGrid({ p }) {
   const firstBidPrice = p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid;
   const secondBidPrice = p.secondAuctionPrice || p.edital?.secondBidPrice || 0;
+  const appraisal = p.appraisal || 0;
   const has2nd = secondBidPrice > 0;
   const firstBidDate = p.edital?.firstBidDate || (p.firstAuctionAt
     ? new Date(p.firstAuctionAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -506,12 +507,29 @@ function PricingGrid({ p }) {
     : 0;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
       <div>
         <span className="uppy" style={{ color: 'var(--fg-3)' }}>1ª praça</span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(firstBidPrice)}</div>
         {firstBidDate && (
           <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{firstBidDate}</div>
+        )}
+      </div>
+      <div>
+        <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
+        {appraisal > 0 ? (
+          <>
+            <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
+            {p.auctionDiscount != null && (
+              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>
+                {Number(p.auctionDiscount).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% desconto oficial
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)', fontStyle: 'italic' }}>
+            Não informado
+          </div>
         )}
       </div>
       <div>

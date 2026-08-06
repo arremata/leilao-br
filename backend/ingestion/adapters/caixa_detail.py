@@ -24,6 +24,12 @@ _AUCTION_DATE_RE = re.compile(
     r"(?:\s*[-–—]\s*(\d{1,2})\s*h\s*(\d{2})?)?",
     re.IGNORECASE,
 )
+_OPEN_BID_DATE_RE = re.compile(
+    r"Data\s+da\s+Licita[cç][aã]o\s+Aberta\s*[-–—:]?\s*"
+    r"(\d{2}/\d{2}/\d{4})"
+    r"(?:\s*[-–—]\s*(\d{1,2})\s*h\s*(\d{2})?)?",
+    re.IGNORECASE,
+)
 _AUCTION_PRICE_RE = re.compile(
     r"Valor\s+m[ií]nimo\s+de\s+venda\s+([12])\s*[º°oªa]?\s*Leil[aã]o"
     r"\s*:\s*R\$\s*([\d.]+,\d{2})",
@@ -44,7 +50,15 @@ def _parse_auction_dates(text: str) -> tuple[datetime | None, datetime | None]:
             hour=int(hour or 0), minute=int(minute or 0), tzinfo=_SAO_PAULO
         )
         dates[number] = parsed
-    return dates.get("1"), dates.get("2")
+    first = dates.get("1")
+    if first is None:
+        open_bid = _OPEN_BID_DATE_RE.search(text)
+        if open_bid:
+            date_text, hour, minute = open_bid.groups()
+            first = datetime.strptime(date_text, "%d/%m/%Y").replace(
+                hour=int(hour or 0), minute=int(minute or 0), tzinfo=_SAO_PAULO
+            )
+    return first, dates.get("2")
 
 
 def _parse_brl(value: str) -> float:
@@ -91,6 +105,7 @@ def parse_detail_html(html: str, base_url: str) -> dict:
 async def fetch_auction_dates_batch(
     urls: list[str], concurrency: int = 2, retries: int = 1,
     request_interval: float = 1.0, max_consecutive_429: int = 3,
+    recovery_rounds: int = 2,
 ) -> list[dict | None]:
     """Fetch Caixa detail dates concurrently, preserving input order.
 
@@ -141,8 +156,8 @@ async def fetch_auction_dates_batch(
                         first = parsed["first_auction_at"]
                         second = parsed["second_auction_at"]
                         # Caixa's bot manager can return an HTML challenge with
-                        # HTTP 200. A Leilão SFI page must contain at least one
-                        # auction date, otherwise treat it as a retryable miss.
+                        # HTTP 200. An eligible scheduled-sale page must contain
+                        # at least one date, otherwise treat it as a retryable miss.
                         if first is not None or second is not None:
                             return {
                                 "first_auction_at": first,
@@ -169,10 +184,39 @@ async def fetch_auction_dates_batch(
                             return None
                     if attempt < retries:
                         await asyncio.sleep(5.0 * (attempt + 1))
-                logger.warning(f"Auction dates unavailable for {url}; will retry")
+                logger.debug(f"Auction dates unavailable for {url} in this pass")
                 return None
 
-        return await asyncio.gather(*[_one(url) for url in urls])
+        results = await asyncio.gather(*[_one(url) for url in urls])
+
+    failed_indexes = [index for index, result in enumerate(results) if result is None]
+    if failed_indexes and recovery_rounds > 0:
+        # Caixa occasionally returns an HTTP-200 bot-manager/partial page that
+        # contains no auction data. Retrying inside the same curl session often
+        # repeats that response. Start a fresh TLS/cookie session after a short
+        # cooldown and retry only the misses, preserving the original order.
+        logger.info(
+            f"Retrying {len(failed_indexes)} auction detail pages with a fresh session"
+        )
+        await asyncio.sleep(10.0)
+        recovered = await fetch_auction_dates_batch(
+            [urls[index] for index in failed_indexes],
+            concurrency=concurrency,
+            retries=retries,
+            request_interval=request_interval,
+            max_consecutive_429=max_consecutive_429,
+            recovery_rounds=recovery_rounds - 1,
+        )
+        for index, result in zip(failed_indexes, recovered):
+            results[index] = result
+
+    if recovery_rounds == 0:
+        for index in failed_indexes:
+            if results[index] is None:
+                logger.warning(
+                    f"Auction dates unavailable for {urls[index]}; will retry next run"
+                )
+    return results
 
 
 async def fetch_detail(detail_url: str, base_url: str = "https://venda-imoveis.caixa.gov.br") -> dict:

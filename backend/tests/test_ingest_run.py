@@ -307,6 +307,18 @@ def test_needs_auction_dates_only_for_missing_or_stale_caixa_sfi_rows():
     assert _needs_auction_dates(prop, now) is False
 
 
+def test_needs_auction_dates_for_licitacao_aberta_without_requiring_praca_price():
+    now = datetime(2026, 8, 6, tzinfo=ZoneInfo("UTC"))
+    prop = Property(
+        source="caixa", source_id="1", modalidade="Licitação Aberta",
+        detail_url="https://x/detail",
+    )
+    assert _needs_auction_dates(prop, now) is True
+
+    prop.dates_fetched_at = now
+    assert _needs_auction_dates(prop, now) is False
+
+
 def test_ingest_fetches_and_persists_auction_dates_without_blocking_csv_upsert():
     factory = _factory()
     row = _row("1555522441313")
@@ -386,6 +398,28 @@ def test_ingest_caps_date_enrichment_and_defers_the_rest():
     assert len(calls[0]) == 2
     assert summary.dates_failed == 2
     assert summary.dates_deferred == 3
+
+
+def test_ingest_fetches_all_auction_dates_by_default():
+    factory = _factory()
+    rows = [_row(str(i)) for i in range(55)]
+    for row in rows:
+        row.raw["modalidade"] = "Leilão SFI"
+    calls = []
+
+    async def _fetch(urls):
+        calls.append(urls)
+        return [None] * len(urls)
+
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", rows),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_fetch,
+    ))
+
+    assert len(calls[0]) == 55
+    assert summary.dates_failed == 55
+    assert summary.dates_deferred == 0
 
 
 # --- _validate_photos_concurrently ------------------------------------------

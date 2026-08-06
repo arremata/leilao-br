@@ -109,12 +109,19 @@ AUCTION_DATES_TTL = timedelta(hours=24)
 
 
 def _needs_auction_dates(prop: Property, now: datetime) -> bool:
-    """Whether a Caixa auction page should be refreshed for praça dates."""
-    if prop.source != "caixa" or prop.modalidade != "Leilão SFI" or not prop.detail_url:
+    """Whether a Caixa scheduled-sale page should be refreshed for dates."""
+    scheduled_modalities = {"Leilão SFI", "Licitação Aberta"}
+    if (
+        prop.source != "caixa"
+        or prop.modalidade not in scheduled_modalities
+        or not prop.detail_url
+    ):
         return False
-    if prop.first_auction_price is None:
-        return True
     if prop.dates_fetched_at is None:
+        return True
+    # Only Leilão SFI exposes separate first/second praça prices. Licitação
+    # Aberta has one scheduled date and uses the CSV's current minimum price.
+    if prop.modalidade == "Leilão SFI" and prop.first_auction_price is None:
         return True
     fetched_at = prop.dates_fetched_at
     if fetched_at.tzinfo is None:
@@ -144,7 +151,7 @@ async def ingest(
     adapter: SourceAdapter,
     geocoder=None,
     limit: Optional[int] = None,
-    date_limit: Optional[int] = 50,
+    date_limit: Optional[int] = None,
     validate_photo_url: Callable[[str], bool] = _default_validate_photo_url,
     fetch_auction_dates=None,
 ) -> IngestSummary:
@@ -171,8 +178,8 @@ async def ingest(
         # Radware-guarded, so parallel plain HTTP is safe.
         pending_photos: list[tuple] = []  # (prop, photo_url)
         # (property_id, detail_url, never_fetched). Never-fetched rows are
-        # prioritized over TTL refreshes so the per-run cap eventually covers
-        # the whole catalog instead of repeatedly refreshing the same prefix.
+        # prioritized over TTL refreshes when an operator supplies a temporary
+        # --date-limit (for example during a smoke run).
         pending_dates: list[tuple[int, str, bool]] = []
 
         with session_factory() as session:
@@ -282,8 +289,9 @@ async def ingest(
             session.commit()
 
         # Date enrichment is deliberately outside the upsert transaction: a
-        # slow Caixa response must not hold database locks. Only Leilão SFI
-        # rows missing/stale by 24h are selected, and requests are concurrent.
+        # slow Caixa response must not hold database locks. All Leilão SFI and
+        # Licitação Aberta rows missing/stale by 24h are selected by default. The adapter
+        # paces requests and opens a circuit on repeated HTTP 429 responses.
         if pending_dates and date_limit != 0:
             pending_dates.sort(key=lambda candidate: not candidate[2])
             selected_dates = (
