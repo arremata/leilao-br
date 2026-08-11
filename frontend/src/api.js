@@ -14,11 +14,6 @@ export async function fetchProperties() {
 }
 
 /**
- * Analyze an auction URL and return an AuctionPropertyResult object.
- * @param {string} url — auction listing URL
- * @returns {Promise<Object>} — AuctionPropertyResult JSON
- */
-/**
  * Fetch dashboard data (KPIs, activity, city signals).
  * @returns {Promise<Object|null>}
  */
@@ -61,20 +56,5 @@ export async function analyzeCatalogItem(id) {
     const detail = await res.text();
     throw new Error(detail || `Analysis failed (${res.status})`);
   }
-  return res.json();
-}
-
-export async function analyzeUrl(url) {
-  const res = await fetch('/api/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Analysis failed (${res.status})`);
-  }
-
   return res.json();
 }

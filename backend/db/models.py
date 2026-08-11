@@ -85,3 +85,44 @@ class Enrichment(Base):
     result_json: Mapped[str] = mapped_column(Text)
     pipeline_version: Mapped[str] = mapped_column(String(16), default="v1")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class RegionalMarketPrice(Base):
+    """Cached neighborhood price/m² calculated from observed listings."""
+
+    __tablename__ = "regional_market_prices"
+    __table_args__ = (
+        UniqueConstraint("uf", "city", "neighborhood", "property_type",
+                         name="uq_regional_market_price"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uf: Mapped[str] = mapped_column(String(2), index=True)
+    city: Mapped[str] = mapped_column(String(128), index=True)
+    neighborhood: Mapped[str] = mapped_column(String(128), index=True)
+    property_type: Mapped[str] = mapped_column(String(64), default="")
+    price_per_m2: Mapped[float] = mapped_column(Float)
+    sample_size: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str] = mapped_column(String(64), default="listing_median")
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class RegionalMarketComparable(Base):
+    """Listing snapshot used to calculate a regional market reference."""
+
+    __tablename__ = "regional_market_comparables"
+    __table_args__ = (
+        UniqueConstraint("reference_id", "url", name="uq_market_comparable_url"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reference_id: Mapped[int] = mapped_column(
+        ForeignKey("regional_market_prices.id", ondelete="CASCADE"), index=True,
+    )
+    address: Mapped[str] = mapped_column(Text, default="")
+    price: Mapped[float] = mapped_column(Float)
+    area_m2: Mapped[float] = mapped_column(Float)
+    price_per_m2: Mapped[float] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(64))
+    url: Mapped[str] = mapped_column(Text)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

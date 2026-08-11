@@ -25,6 +25,12 @@ def get_engine(url: str | None = None) -> Engine:
     local sqlite file. In-memory sqlite ('sqlite://') uses a StaticPool so a
     single shared connection survives across sessions (needed for tests)."""
     resolved = url or os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
+    # Hosting dashboards usually provide a driver-neutral URL. The project
+    # installs psycopg v3, so select that SQLAlchemy dialect explicitly.
+    if resolved.startswith("postgres://"):
+        resolved = "postgresql+psycopg://" + resolved.removeprefix("postgres://")
+    elif resolved.startswith("postgresql://"):
+        resolved = "postgresql+psycopg://" + resolved.removeprefix("postgresql://")
     if resolved in ("sqlite://", "sqlite:///:memory:"):
         return create_engine(
             "sqlite://",

@@ -12,8 +12,11 @@ async def test_scrape_page_returns_content():
     mock_page.goto = AsyncMock()
     mock_page.close = AsyncMock()
 
+    mock_context = AsyncMock()
+    mock_context.new_page.return_value = mock_page
+
     mock_browser = AsyncMock()
-    mock_browser.new_page.return_value = mock_page
+    mock_browser.new_context.return_value = mock_context
     mock_browser.close = AsyncMock()
 
     mock_playwright_instance = AsyncMock()

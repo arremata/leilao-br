@@ -1,13 +1,4 @@
-import { useState, useEffect } from 'react';
 import { fmtBRL } from '../utils';
-
-const STEPS = [
-  'Edital e documentação',
-  'Preço de mercado da região',
-  'Ônus e riscos na matrícula',
-  'Lance máximo e custos',
-  'Parecer de viabilidade',
-];
 
 // ============================================================
 // LiveCard — Hero card showing analysis result or animated progress
@@ -95,98 +86,6 @@ export function LiveCardHero({ entry, onClick }) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// LiveCardProgress — Animated analysis progress
-// ============================================================
-export function LiveCardProgress({ analyzing, onComplete }) {
-  const [completedSteps, setCompletedSteps] = useState([]);
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (!analyzing) {
-      setCompletedSteps([]);
-      setDone(false);
-      return;
-    }
-
-    const delays = [600, 1400, 2400, 3200, 3800];
-    const timers = delays.map((delay, i) =>
-      setTimeout(() => {
-        setCompletedSteps(prev => [...prev, i]);
-        if (i === delays.length - 1) {
-          setTimeout(() => setDone(true), 600);
-        }
-      }, delay)
-    );
-
-    return () => timers.forEach(clearTimeout);
-  }, [analyzing]);
-
-  if (!analyzing && completedSteps.length === 0) return null;
-
-  return (
-    <div className="card fade-in is-visible" style={{ marginBottom: 20, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 20px',
-        background: 'var(--bg-2)',
-        borderBottom: '1px solid var(--line-1)',
-      }}>
-        <span style={{
-          fontFamily: 'var(--f-mono)', fontSize: 11, fontWeight: 500,
-          color: 'var(--fg-3)', letterSpacing: '0.02em',
-        }}>
-          argos — análise de viabilidade
-        </span>
-        <span style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 12, fontWeight: 600,
-          color: done ? 'var(--good)' : 'var(--accent)',
-        }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: done ? 'var(--good)' : 'var(--accent)',
-            animation: done ? 'none' : 'live-blink 1.5s ease-in-out infinite',
-          }} />
-          {done ? 'Análise concluída' : 'Analisando...'}
-        </span>
-      </div>
-
-      {/* Steps */}
-      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {STEPS.map((step, i) => {
-          const isDone = completedSteps.includes(i);
-          return (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              fontSize: 13, padding: '8px 12px', borderRadius: 8,
-              background: isDone ? 'var(--good-soft)' : 'var(--bg-2)',
-              border: `1px solid ${isDone ? 'rgba(22,163,74,0.2)' : 'var(--line-1)'}`,
-              color: isDone ? 'var(--fg-1)' : 'var(--fg-3)',
-              opacity: isDone ? 1 : 0.5,
-              transition: 'all 0.35s ease',
-            }}>
-              <span style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                background: isDone ? 'var(--good)' : 'var(--line-1)',
-                color: isDone ? 'white' : 'var(--fg-3)',
-                transition: 'all 0.3s ease',
-              }}>
-                <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </span>
-              <span>{step}</span>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
