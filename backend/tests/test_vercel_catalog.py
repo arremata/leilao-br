@@ -36,6 +36,7 @@ def test_catalog_card_matches_frontend_contract():
     assert card["auctionDiscount"] == 50.0
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
+    assert card["canAnalyze"] is False
 
 
 def test_catalog_requires_database_configuration(monkeypatch):

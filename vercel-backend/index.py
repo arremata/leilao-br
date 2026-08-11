@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -21,7 +20,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-SEED_FILE = Path(__file__).with_name("seed.json")
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
 
@@ -38,12 +36,6 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str | None = None
     pdf_texts: str | None = None
-
-
-def _load_properties() -> list[dict]:
-    if not SEED_FILE.exists():
-        return []
-    return json.loads(SEED_FILE.read_text(encoding="utf-8"))
 
 
 def _get_engine():
@@ -119,6 +111,10 @@ def _catalog_card(row) -> dict:
         "photoUrl": p.get("photo_url"),
         "auctionUrl": p.get("detail_url"),
         "status": p.get("status"),
+        # Heavy analysis runs only on the dedicated FastAPI backend. Expose the
+        # capability explicitly so the public Vercel UI never offers a broken
+        # action.
+        "canAnalyze": False,
     }
 
 
@@ -162,7 +158,8 @@ def _closing_within_24h(ends_at, now) -> bool:
 
 @app.get("/properties")
 def get_properties() -> list[dict]:
-    return _load_properties()
+    """Compatibility alias backed by the production catalog."""
+    return get_catalog()
 
 
 @app.get("/catalog")
@@ -205,7 +202,7 @@ def get_catalog_item(property_id: int) -> dict:
 
 @app.get("/dashboard")
 def get_dashboard() -> dict:
-    properties = _load_properties()
+    properties = get_catalog()
     now = datetime.now(timezone.utc)
     active = [p for p in properties if _is_active(p.get("endsAt"), now)]
     active_count = len(active)
@@ -223,13 +220,6 @@ def get_dashboard() -> dict:
             {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
             {"lbl": "Desconto IA médio", "val": f"{avg_discount}%", "delta": "vs. mercado IA", "pos": avg_discount >= 15},
             {"lbl": "Desconto oficial médio", "val": f"{avg_auction_discount}%", "delta": "vs. avaliação do edital", "pos": False},
-        ],
-        "citySignals": [
-            {"city": "São Paulo / SP", "volume": "412", "delta": "+8.2%", "trend": [8.4, 8.5, 8.6, 8.7, 8.8, 9.0, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7], "pos": True},
-            {"city": "Rio de Janeiro / RJ", "volume": "218", "delta": "−2.1%", "trend": [11, 10.9, 10.8, 10.9, 10.7, 10.6, 10.5, 10.5, 10.4, 10.3, 10.4, 10.3], "pos": False},
-            {"city": "Belo Horizonte / MG", "volume": "134", "delta": "+3.7%", "trend": [6.2, 6.3, 6.4, 6.4, 6.5, 6.6, 6.6, 6.7, 6.7, 6.8, 6.8, 6.9], "pos": True},
-            {"city": "Curitiba / PR", "volume": "96", "delta": "+1.4%", "trend": [7.4, 7.4, 7.5, 7.4, 7.5, 7.5, 7.6, 7.6, 7.6, 7.7, 7.7, 7.8], "pos": True},
-            {"city": "Porto Alegre / RS", "volume": "78", "delta": "−0.4%", "trend": [6.8, 6.8, 6.7, 6.7, 6.8, 6.7, 6.7, 6.6, 6.7, 6.7, 6.6, 6.7], "pos": False},
         ],
         "activity": [
             {"time": "há 2h", "type": "price", "title": "Apto. 78 m², Vila Madalena", "text": "Lance mínimo reduzido em R$ 18.000 — agora R$ 312.000 (2ª praça)", "tone": "good"},

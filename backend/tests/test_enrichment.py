@@ -25,15 +25,15 @@ def test_metadata_from_property_maps_fields():
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):
     # Stub the three heavy nodes so no LLM/network runs.
-    monkeypatch.setattr(enrich, "market_node", lambda state: {
-        "market_result": MarketResult(price_per_m2_neighborhood=4000.0, liquidity_days=60,
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
+        "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })
     monkeypatch.setattr(enrich, "legal_node", lambda state: {
         "legal_result": LegalResult(risk_level="low", occupation_status="desocupado")
     })
     monkeypatch.setattr(enrich, "scoring_node", lambda state: {
-        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good", l="good", o="good"),
+        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good"),
                                         roi=25.0)
     })
 
@@ -60,13 +60,13 @@ def test_run_structured_enrichment_skips_legal_when_disabled(monkeypatch):
         called["legal"] = True
         return {"legal_result": LegalResult()}
 
-    monkeypatch.setattr(enrich, "market_node", lambda state: {
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
         "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })
     monkeypatch.setattr(enrich, "legal_node", _legal_spy)
     monkeypatch.setattr(enrich, "scoring_node", lambda state: {
-        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good", l="good", o="good"),
+        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good"),
                                         roi=25.0)
     })
 
@@ -85,7 +85,7 @@ def test_run_structured_enrichment_tolerates_legal_failure(monkeypatch):
     # gracefully — falling back to a default LegalResult — instead of failing
     # the whole analysis.
     monkeypatch.setattr(enrich, "LEGAL_NODE_ENABLED", True)
-    monkeypatch.setattr(enrich, "market_node", lambda state: {
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
         "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })
@@ -95,7 +95,7 @@ def test_run_structured_enrichment_tolerates_legal_failure(monkeypatch):
 
     monkeypatch.setattr(enrich, "legal_node", _legal_boom)
     monkeypatch.setattr(enrich, "scoring_node", lambda state: {
-        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good", l="good", o="good"),
+        "scoring_result": ScoringResult(risk=RiskFlags(j="good", f="good"),
                                         roi=25.0)
     })
 

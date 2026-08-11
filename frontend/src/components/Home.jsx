@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { PropertyRow, Countdown, Sparkline, RiskSummary } from './shared';
+import { PropertyRow, Countdown, RiskSummary } from './shared';
 import { LiveCardHero } from './LiveCard';
 import { fmtBRL } from '../utils';
 
 export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch, history }) {
   const topDiscounted = useMemo(() =>
-    [...properties].sort((a, b) => b.discount - a.discount).slice(0, 3),
+    [...properties].sort((a, b) =>
+      (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0)).slice(0, 3),
     [properties]);
   const watchedItems = useMemo(() =>
     properties.filter(p => watched.includes(p.id)),
@@ -62,8 +63,8 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       {/* ========== Search + Filters ========== */}
       <SearchCommand onSearch={onSearch} />
 
-      {/* ========== Section 01 — Top descontos + Market signals split ========== */}
-      <div className="home-split-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 28, marginBottom: 40 }}>
+      {/* ========== Section 01 — Top descontos ========== */}
+      <div style={{ marginBottom: 40 }}>
         <Section
           ix="01"
           title="Top oportunidades"
@@ -77,21 +78,6 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
           </div>
         </Section>
 
-        <Section
-          ix="02"
-          title="Sinais de mercado"
-          sub="Movimento agregado por cidade · 30 dias."
-          flush
-        >
-          <div className="card" style={{ padding: 18 }}>
-            {(dashboard?.citySignals || []).map((cs, i) => (
-              <div key={cs.city}>
-                {i > 0 && <div className="divider" style={{ margin: '14px 0' }}></div>}
-                <CitySignal city={cs.city} volume={cs.volume} delta={cs.delta} trend={cs.trend} pos={cs.pos} />
-              </div>
-            ))}
-          </div>
-        </Section>
       </div>
 
       {/* ========== Section 03 — Watchlist ========== */}
@@ -183,7 +169,6 @@ function SearchCommand({ onSearch }) {
   const [address, setAddress] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sf, setSf] = useState({
-    occupancy: 'Todos',
     discountMin: 0,
     judicial: 'Todos',
     praca: 'Todos',
@@ -191,14 +176,13 @@ function SearchCommand({ onSearch }) {
   });
 
   const activeCount =
-    (sf.occupancy !== 'Todos' ? 1 : 0) +
     (sf.discountMin > 0 ? 1 : 0) +
     (sf.judicial !== 'Todos' ? 1 : 0) +
     (sf.praca !== 'Todos' ? 1 : 0) +
     (sf.modalidade !== 'Todos' ? 1 : 0);
 
   const clearFilters = () => setSf({
-    occupancy: 'Todos', discountMin: 0,
+    discountMin: 0,
     judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
   });
 
@@ -259,12 +243,6 @@ function SearchCommand({ onSearch }) {
           gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
           gap: '20px 28px',
         }}>
-          <FilterGroup
-            label="Ocupação"
-            options={[['Todos', 'Todos'], ['Desocupado', 'desocupado'], ['Ocupado', 'ocupado']]}
-            value={sf.occupancy}
-            onChange={(v) => setSf(s => ({ ...s, occupancy: v }))}
-          />
           <FilterGroup
             label="Desconto mínimo"
             options={[['Todos', 0], ['≥ 20%', 20], ['≥ 30%', 30], ['≥ 40%', 40], ['≥ 50%', 50]]}
@@ -388,6 +366,8 @@ function Section({ ix, title, sub, action, children }) {
 // Compact ranked row for top-score list
 // ============================================================
 function CompactRow({ p, rank, onClick }) {
+  const discount = p.discount ?? p.auctionDiscount;
+  const discountLabel = p.discount == null ? 'desconto oficial' : 'desconto IA';
   return (
     <div
       onClick={onClick}
@@ -413,9 +393,11 @@ function CompactRow({ p, rank, onClick }) {
             <span style={{ color: 'var(--fg-2)' }}>lance </span>
             <span style={{ color: 'var(--fg-0)', fontWeight: 500 }}>R$ {fmtBRL(p.minBid)}</span>
           </span>
-          <span className="mono" style={{ fontSize: 12, color: p.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-            {p.discount >= 0 ? `−${p.discount}%` : `+${Math.abs(p.discount).toFixed(1)}%`} desconto IA
-          </span>
+          {Number.isFinite(discount) && (
+            <span className="mono" style={{ fontSize: 12, color: discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
+              {discount >= 0 ? `−${discount}%` : `+${Math.abs(discount).toFixed(1)}%`} {discountLabel}
+            </span>
+          )}
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>
@@ -425,27 +407,6 @@ function CompactRow({ p, rank, onClick }) {
         </div>
       </div>
       <span className="mono" style={{ fontSize: 14, color: 'var(--fg-3)' }}>→</span>
-    </div>
-  );
-}
-
-// ============================================================
-// City market signal row
-// ============================================================
-function CitySignal({ city, volume, delta, trend, pos }) {
-  return (
-    <div className="row between" style={{ alignItems: 'center' }}>
-      <div style={{ minWidth: 140 }}>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{city}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-          {volume} leilões
-        </div>
-      </div>
-      <Sparkline points={trend} color={pos ? 'var(--good)' : 'var(--bad)'} width={120} height={28} />
-      <div style={{ textAlign: 'right', minWidth: 70 }}>
-        <div className="num-sm" style={{ color: pos ? 'var(--good)' : 'var(--bad)' }}>{delta}</div>
-        <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>preço/m²</div>
-      </div>
     </div>
   );
 }

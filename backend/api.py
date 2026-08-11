@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -19,46 +18,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.base import get_engine, init_db, make_session_factory
-from db.models import Property, Enrichment
+from db.models import (
+    Property, Enrichment, RegionalMarketComparable, RegionalMarketPrice,
+)
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
 from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
-
-DATA_DIR = Path(__file__).parent / "data"
-RESULTS_FILE = DATA_DIR / "results.json"
-SEED_FILE = Path(__file__).parent / "data" / "seed.json"
-
-
-class AnalyzeRequest(BaseModel):
-    url: Optional[str] = None
-    pdf_texts: Optional[str] = None
-
+from graph.state import ComparableProperty
 
 class IngestRequest(BaseModel):
     source: str = "caixa"
     uf: str = "PR"
     file: Optional[str] = None
-
-
-def _load_results() -> list[dict]:
-    results = []
-    if RESULTS_FILE.exists():
-        results = json.loads(RESULTS_FILE.read_text(encoding="utf-8"))
-
-    if SEED_FILE.exists():
-        existing_ids = {r.get("id") for r in results}
-        seed_data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
-        results.extend(s for s in seed_data if s.get("id") not in existing_ids)
-
-    return results
-
-
-def _save_results(results: list[dict]) -> None:
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        RESULTS_FILE.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as e:
-        logger.warning(f"Skipping JSON persistence: {e}")
 
 
 def _parse_ends_at(value) -> Optional["datetime"]:
@@ -96,18 +67,11 @@ def _closing_within_24h(ends_at, now) -> bool:
     return now < dt <= now + timedelta(hours=24)
 
 
-def _merge_seed() -> None:
-    """Merge seed data into results.json, adding any missing entries by id."""
-    if RESULTS_FILE.exists():
-        _save_results(_load_results())
-
-
 app = FastAPI(title="Leilao AI API")
 
 
 @app.on_event("startup")
 def _startup():
-    _merge_seed()
     engine = get_engine()
     init_db(engine)
     app.state.session_factory = make_session_factory(engine)
@@ -184,6 +148,7 @@ def _property_card(p: Property) -> dict:
         "photoUrl": p.photo_url,
         "detailUrl": p.detail_url,
         "status": p.status,
+        "canAnalyze": True,
     }
 
 
@@ -196,15 +161,23 @@ app.add_middleware(
 
 
 @app.get("/properties")
-def get_properties() -> list[dict]:
-    return _load_results()
+def get_properties(session: Session = Depends(get_session)) -> list[dict]:
+    """Compatibility alias backed by the real catalog, never fixture data."""
+    props = session.execute(
+        select(Property).where(Property.status == "active")
+    ).scalars().all()
+    return [_property_card(prop) for prop in props]
 
 
 @app.get("/dashboard")
-def get_dashboard() -> dict:
+def get_dashboard(session: Session = Depends(get_session)) -> dict:
     from datetime import datetime, timezone
 
-    properties = _load_results()
+    properties = [
+        _property_card(prop) for prop in session.execute(
+            select(Property).where(Property.status == "active")
+        ).scalars().all()
+    ]
     # Active = endsAt in the future (or missing). Closed auctions don't count.
     now = datetime.now(timezone.utc)
     active = [
@@ -227,13 +200,6 @@ def get_dashboard() -> dict:
             {"lbl": "Análises restantes", "val": "3", "delta": "plano grátis"},
             {"lbl": "ROI médio · feed", "val": f"{avg_roi}%", "delta": "do portfólio", "pos": avg_roi >= 10},
         ],
-        "citySignals": [
-            {"city": "São Paulo / SP", "volume": "412", "delta": "+8.2%", "trend": [8.4, 8.5, 8.6, 8.7, 8.8, 9.0, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7], "pos": True},
-            {"city": "Rio de Janeiro / RJ", "volume": "218", "delta": "\u22122.1%", "trend": [11, 10.9, 10.8, 10.9, 10.7, 10.6, 10.5, 10.5, 10.4, 10.3, 10.4, 10.3], "pos": False},
-            {"city": "Belo Horizonte / MG", "volume": "134", "delta": "+3.7%", "trend": [6.2, 6.3, 6.4, 6.4, 6.5, 6.6, 6.6, 6.7, 6.7, 6.8, 6.8, 6.9], "pos": True},
-            {"city": "Curitiba / PR", "volume": "96", "delta": "+1.4%", "trend": [7.4, 7.4, 7.5, 7.4, 7.5, 7.5, 7.6, 7.6, 7.6, 7.7, 7.7, 7.8], "pos": True},
-            {"city": "Porto Alegre / RS", "volume": "78", "delta": "\u22120.4%", "trend": [6.8, 6.8, 6.7, 6.7, 6.8, 6.7, 6.7, 6.6, 6.7, 6.7, 6.6, 6.7], "pos": False},
-        ],
         "activity": [
             {"time": "há 2h", "type": "price", "title": "Apto. 78 m², Vila Madalena", "text": "Lance mínimo reduzido em R$ 18.000 — agora R$ 312.000 (2ª praça)", "tone": "good"},
             {"time": "há 5h", "type": "risk", "title": "Casa 220 m², Ipanema", "text": "Novo processo detectado: ação anulatória em curso (1ª instância)", "tone": "bad"},
@@ -242,52 +208,6 @@ def get_dashboard() -> dict:
             {"time": "2 dias", "type": "legal", "title": "Sala 64 m², Faria Lima", "text": "Pesquisa jurídica completa entregue — 0 ressalvas", "tone": "good"},
         ],
     }
-
-
-@app.post("/analyze")
-def analyze(req: AnalyzeRequest) -> dict:
-    if not req.url and not req.pdf_texts:
-        raise HTTPException(status_code=400, detail="Provide either 'url' or 'pdf_texts'.")
-
-    try:
-        from graph.state import AuctionState
-        from graph.workflow import run_analysis
-
-        if req.url:
-            initial_state = AuctionState(auction_url=req.url.strip())
-        else:
-            initial_state = AuctionState(pdf_texts=req.pdf_texts)
-
-        result = run_analysis(initial_state)
-
-        result_json = (
-            result.get("result_json", "")
-            if isinstance(result, dict)
-            else getattr(result, "result_json", "")
-        )
-
-        if not result_json:
-            raise HTTPException(status_code=500, detail="Analysis completed but no result was generated.")
-
-        result_data = json.loads(result_json)
-
-        # Persist: prepend if new id, update if existing
-        results = _load_results()
-        existing_ids = {r.get("id") for r in results}
-        if result_data.get("id") in existing_ids:
-            results = [result_data if r.get("id") == result_data["id"] else r for r in results]
-        else:
-            results.insert(0, result_data)
-        _save_results(results)
-
-        return result_data
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        logger.error(f"Analysis failed: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
 
 
 @app.get("/catalog")
@@ -343,10 +263,31 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     session.flush()
 
     metadata = metadata_from_property(prop)
+    regional = session.execute(select(RegionalMarketPrice).where(
+        RegionalMarketPrice.uf == (prop.uf or ""),
+        RegionalMarketPrice.city == (prop.city or ""),
+        RegionalMarketPrice.neighborhood == (prop.neighborhood or ""),
+        RegionalMarketPrice.property_type == (prop.property_type or ""),
+    )).scalar_one_or_none()
+    regional_comparables = []
+    if regional:
+        regional_comparables = [
+            ComparableProperty(
+                address=comp.address, price=comp.price, area_m2=comp.area_m2,
+                price_per_m2=comp.price_per_m2, source=comp.source, url=comp.url,
+            )
+            for comp in session.execute(
+                select(RegionalMarketComparable).where(
+                    RegionalMarketComparable.reference_id == regional.id,
+                ).order_by(RegionalMarketComparable.price_per_m2)
+            ).scalars().all()
+        ]
     # Reuse the ingested description as the legal node's document text so it
     # analyzes real source data instead of running blind on empty input.
     result = run_structured_enrichment(
         metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
+        regional_price_per_m2=regional.price_per_m2 if regional else None,
+        regional_comparables=regional_comparables,
     )
     result_json = result.model_dump_json(by_alias=True)
 

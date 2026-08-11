@@ -32,6 +32,9 @@ class PropertyMetadata:
     creditor: str = ""
     debtor: str = ""
     photo_url: str = ""
+    itbi_rate: Optional[float] = None
+    itbi_source: str = ""
+    commission_rate: Optional[float] = None
 
 
 @dataclass
@@ -47,18 +50,8 @@ class ComparableProperty:
 @dataclass
 class MarketResult:
     price_per_m2_neighborhood: float = 0.0
-    price_per_m2_city: float = 0.0
     comparable_properties: list[ComparableProperty] = field(default_factory=list)
-    reform_estimate: float = 0.0
-    area_appreciation_1y: float = 0.0
-    area_appreciation_3y: float = 0.0
-    area_appreciation_5y: float = 0.0
-    city_appreciation_1y: float = 0.0
-    liquidity_days: int = 0
-    tendencies: str = ""
     discount_percentage: float = 0.0
-    market_score: int = 0  # 1-10
-    raw_findings: str = ""
 
 
 @dataclass

@@ -39,6 +39,7 @@ def test_catalog_lists_active_properties_filtered_by_uf():
     assert len(body) == 1
     assert body[0]["sourceId"] == "1"
     assert body[0]["desconto"] == 50.0
+    assert body[0]["canAnalyze"] is True
     api.app.dependency_overrides.clear()
 
 
@@ -104,13 +105,13 @@ def test_catalog_analyze_runs_enrichment_and_persists(monkeypatch):
 
     from graph.contracts import AuctionPropertyResult, RiskFlags
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url=""):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
             neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
             auctioneer="—", court="—", discount=40.0, min_bid=100000.0, market=180000.0,
             roi=20.0, appraisal=200000.0, auction_discount=50.0, area=50.0, ends_at="",
-            occupancy="desocupado", risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            risk=RiskFlags(j="good", f="good"),
             viability=None, market_detail=None, costs=None, edital=None, auction_url=None,
         )
 
@@ -141,14 +142,14 @@ def test_catalog_analyze_feeds_ingested_description_as_pdf_texts(monkeypatch):
 
     captured = {}
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url=""):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
         captured["pdf_texts"] = pdf_texts
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
             neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
             auctioneer="—", court="—", discount=40.0, min_bid=100000.0, market=180000.0,
             roi=20.0, appraisal=200000.0, auction_discount=50.0, area=50.0, ends_at="",
-            occupancy="desocupado", risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            risk=RiskFlags(j="good", f="good"),
             viability=None, market_detail=None, costs=None, edital=None, auction_url=None,
         )
 
@@ -174,13 +175,13 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
 
     from graph.contracts import AuctionPropertyResult, RiskFlags
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url=""):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
             neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
             auctioneer="—", court="—", discount=40.0, min_bid=100000.0, market=180000.0,
             roi=20.0, appraisal=200000.0, auction_discount=50.0, area=50.0, ends_at="",
-            occupancy="desocupado", risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            risk=RiskFlags(j="good", f="good"),
             viability=None, market_detail=None, costs=None, edital=None, auction_url=None,
         )
 

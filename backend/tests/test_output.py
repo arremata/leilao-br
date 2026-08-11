@@ -34,14 +34,13 @@ def _make_full_state():
         market_result=MarketResult(
             price_per_m2_neighborhood=6923.0,
             discount_percentage=42.0,
-            reform_estimate=36000.0,
         ),
         legal_result=LegalResult(
             risk_level="low",
             occupation_status="Desocupado",
         ),
         scoring_result=ScoringResult(
-            risk=RiskFlags(j="good", f="good", l="warn", o="good"),
+            risk=RiskFlags(j="good", f="good"),
             roi=38.0,
         ),
     )
@@ -61,7 +60,8 @@ class TestBuildResult:
         assert result.type == "Apartamento"
         assert result.neighborhood == "Vila Madalena"
         assert result.city == "São Paulo, SP"
-        assert result.auction_type == "1ª praça"
+        assert result.auction_type == "Extrajudicial"
+        assert result.praca == "1ª praça"
         assert result.auctioneer == "Zukerman Leilões"
         assert result.discount == 42.0
         assert result.min_bid == 312000.0
@@ -71,7 +71,7 @@ class TestBuildResult:
         assert result.appraisal == 540000.0
         assert result.roi == 38.0
         assert result.area == 78.0
-        assert result.occupancy == "desocupado"
+        assert not hasattr(result, "occupancy")
         assert result.risk.j == "good"
 
     def test_build_result_court_judicial(self):
@@ -142,10 +142,8 @@ class TestBuildResultDetails:
         state = _make_full_state()
         result = build_result(state)
         assert result.viability is not None
-        # Jurídico dimension removed — only 3 remain
-        assert len(result.viability.risk_dimensions) == 3
-        assert result.viability.risk_dimensions[0].dim == "Financeiro"
-        assert len(result.viability.alerts) > 0
+        # No debt text means no evidence-backed financial risk dimension.
+        assert result.viability.risk_dimensions == []
         assert result.viability.description != ""
 
     def test_market_detail_populated_from_state(self):
@@ -209,11 +207,10 @@ def test_build_result_market_is_ia_not_appraisal():
         ),
         market_result=MarketResult(
             price_per_m2_neighborhood=3000.0,  # IA: 3000 * 50 = 150000
-            liquidity_days=60,
         ),
         legal_result=LegalResult(occupation_status="desocupado"),
         scoring_result=ScoringResult(
-            risk=RiskFlags(j="good", f="good", l="good", o="good"),
+            risk=RiskFlags(j="good", f="good"),
             roi=10.0,
         ),
     )

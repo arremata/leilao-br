@@ -24,8 +24,6 @@ class RiskFlags(BaseModel):
 
     j: Literal["good", "warn", "bad"]  # Jurídico — deprecated, kept for API compat
     f: Literal["good", "warn", "bad"]  # Financeiro
-    l: Literal["good", "warn", "bad"]  # Liquidez
-    o: Literal["good", "warn", "bad"]  # Ocupação
 
 
 class ScoringResult(BaseModel):
@@ -43,7 +41,7 @@ class RiskDimension(BaseModel):
     """A single risk dimension score for the viability tab."""
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
-    dim: str      # "Jurídico", "Financeiro", "Liquidez", "Ocupação"
+    dim: str      # currently "Financeiro"
     pct: int      # 0-100
     state: Literal["good", "warn", "bad"]
     note: str
@@ -61,7 +59,7 @@ class AlertItem(BaseModel):
 class ViabilityDetail(BaseModel):
     """Detail data for the viability/financial feasibility tab.
 
-    Jurídico dimension dropped — only Financeiro, Liquidez and Ocupação remain.
+    Only evidence-backed dimensions are returned.
     """
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
@@ -100,9 +98,6 @@ class MarketDetail(BaseModel):
     model_config = ConfigDict(alias_generator=_to_camel, populate_by_name=True)
 
     indicators: list[MarketIndicator]
-    trend: list[float]
-    trend_start_label: str
-    trend_end_label: str
     comparables: list[ComparableSale]
 
 
@@ -123,14 +118,12 @@ class EditalDetail(BaseModel):
     process: str
     creditor: str
     debtor: str
-    modality: str
     first_bid_date: str
     first_bid_price: float
     second_bid_date: str
     second_bid_price: float
     property_description: str
     liens: list[str]
-    payment_terms: str
     summary_note: str
 
 
@@ -172,7 +165,6 @@ class AuctionPropertyResult(BaseModel):
     parking: int | None = None
     floor: str | None = None
     ends_at: str
-    occupancy: str
     risk: RiskFlags
     viability: ViabilityDetail | None = None
     market_detail: MarketDetail | None = None
@@ -184,4 +176,3 @@ class AuctionPropertyResult(BaseModel):
     # recurring debts over the months-until-sale horizon.
     monthly_condo: float | None = None
     monthly_iptu: float | None = None
-    occupant_removal_cost: float | None = None
