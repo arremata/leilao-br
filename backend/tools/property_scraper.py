@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import random
 import re
+from urllib.parse import urlparse
 
 from loguru import logger
 from playwright.async_api import async_playwright, Browser, Page
@@ -205,6 +206,14 @@ def build_chavesnamao_url(metadata: PropertyMetadata, location_override: str = "
     return ""
 
 
+def build_imovelweb_url(metadata: PropertyMetadata, location_override: str = "") -> str:
+    city = _slug(_clean_city(metadata.city))
+    state = _slug(metadata.state or _extract_state_from_city_field(metadata.city))
+    location = _neighborhood_slug_clean(location_override or metadata.neighborhood)
+    parts = [part for part in (location, city, state) if part]
+    return f"https://www.imovelweb.com.br/imoveis-venda-{'-'.join(parts)}.html" if parts else ""
+
+
 # ---------------------------------------------------------------------------
 # Stealth browser setup
 # ---------------------------------------------------------------------------
@@ -256,7 +265,10 @@ def _parse_area(text: str) -> float:
 
 def _parse_price_from_text(text: str) -> float:
     """Extract first BRL price from free-form text like 'R$ 213.000 R$ 441 Condo.'."""
-    match = re.search(r"R\$\s*[\d.]+", text)
+    match = re.search(
+        r"R\$\s*(?:\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:,\d{2})?)",
+        text,
+    )
     if match:
         return _parse_brl(match.group(0))
     return 0.0
@@ -297,6 +309,29 @@ def _is_rental(text: str, title: str = "") -> bool:
     """Check if a listing is a rental (aluguel) rather than a sale (venda)."""
     combined = f"{text} {title}".lower()
     return "alugar" in combined or "aluguel" in combined or "/alugar/" in combined
+
+
+_SOURCE_DOMAINS = {
+    "ZAP Imóveis": "zapimoveis.com.br",
+    "Viva Real": "vivareal.com.br",
+    "QuintoAndar": "quintoandar.com.br",
+    "Chaves na Mão": "chavesnamao.com.br",
+    "ImovelWeb": "imovelweb.com.br",
+}
+
+
+def _is_usable_comparable(comp: ComparableProperty) -> bool:
+    """Reject incomplete cards and generic portal links before persistence."""
+    expected_domain = _SOURCE_DOMAINS.get(comp.source)
+    parsed = urlparse(comp.url)
+    if not expected_domain or expected_domain not in parsed.netloc.lower():
+        return False
+    if parsed.path in ("", "/"):
+        return False
+    if not comp.address.strip() or comp.price <= 0 or comp.area_m2 <= 0:
+        return False
+    price_m2 = comp.price / comp.area_m2
+    return 500 <= price_m2 <= 100_000
 
 
 # ---------------------------------------------------------------------------
@@ -490,11 +525,10 @@ async def scrape_quintoandar(page: Page, metadata: PropertyMetadata, location_ov
                         elif parts:
                             address = parts[0]
 
-                # URL: find the first link inside the card
-                href = ""
-                link_el = card.locator("a")
-                if await link_el.count() > 0:
-                    href = await link_el.first.get_attribute("href") or ""
+                # The clickable link wraps the card; it is not inside it.
+                href = await card.evaluate(
+                    "el => el.closest('a') ? el.closest('a').getAttribute('href') : ''"
+                ) or ""
 
                 results.append(ComparableProperty(
                     address=address.strip(),
@@ -524,8 +558,10 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
     url = build_chavesnamao_url(metadata, location_override=location_override)
     logger.info(f"Chaves na Mão scraper: navigating to {url}")
     try:
-        await page.goto(url, wait_until="networkidle", timeout=PAGE_TIMEOUT_MS)
-        await asyncio.sleep(3)
+        # Advertising pages keep analytics/ad requests open indefinitely, so
+        # networkidle is flaky even after all listing cards are rendered.
+        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+        await asyncio.sleep(4)
 
         # Accept cookies popup if present
         try:
@@ -607,6 +643,79 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
         return []
 
 
+async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_override: str = "") -> list[ComparableProperty]:
+    """Scrape sale cards from ImovelWeb's regional result page."""
+    url = build_imovelweb_url(metadata, location_override=location_override)
+    logger.info(f"ImovelWeb scraper: navigating to {url}")
+    if not url:
+        return []
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+        await asyncio.sleep(4)
+        try:
+            cookie_btn = page.locator('button:has-text("Aceitar"), button:has-text("Entendi")')
+            if await cookie_btn.count() > 0:
+                await cookie_btn.first.click(timeout=2000)
+        except Exception:
+            pass
+
+        cards = page.locator(
+            '[data-qa="posting PROPERTY"], div.postingCard, '
+            'div[class*="PostingCard"], div[class*="posting-card"]'
+        )
+        count = await cards.count()
+        logger.info(f"ImovelWeb scraper: found {count} cards")
+        results = []
+        for i in range(min(count, MAX_COMPS_PER_SITE * 2)):
+            card = cards.nth(i)
+            try:
+                text = await card.text_content() or ""
+                if _is_rental(text):
+                    continue
+                # ImovelWeb sometimes ignores an unsupported regional slug and
+                # returns a generic national feed. Unlike the other platforms,
+                # require the requested city in the card before trusting it.
+                expected_city = _slug(_clean_city(metadata.city))
+                if expected_city and expected_city not in _slug(text):
+                    continue
+                link = card.locator('a[href*="imovel"]')
+                href = await link.first.get_attribute("href") if await link.count() else ""
+                href = href or ""
+                # A challenge shell or malformed card can expose only the portal
+                # homepage. It is not a traceable comparable listing.
+                if not href or href in ("/", "https://www.imovelweb.com.br"):
+                    continue
+                price = _parse_price_from_text(text)
+                area = _parse_area_from_text(text)
+                if price <= 0 or area <= 0:
+                    continue
+                address_locator = card.locator(
+                    '[data-qa="POSTING_CARD_LOCATION"], '
+                    '[class*="location"], [class*="Location"]'
+                )
+                address = ""
+                if await address_locator.count():
+                    address = (await address_locator.first.text_content() or "").strip()
+                if not address:
+                    address = _parse_address_from_text(text)
+                results.append(ComparableProperty(
+                    address=address,
+                    price=price,
+                    area_m2=area,
+                    price_per_m2=round(price / area, 2),
+                    source="ImovelWeb",
+                    url=href if href.startswith("http") else f"https://www.imovelweb.com.br{href}",
+                ))
+                if len(results) >= MAX_COMPS_PER_SITE:
+                    break
+            except Exception as exc:
+                logger.debug(f"ImovelWeb scraper: error parsing card {i}: {exc}")
+        return results
+    except Exception as exc:
+        logger.warning(f"ImovelWeb scraper: failed for {url}: {exc}")
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
@@ -614,33 +723,8 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
 MIN_COMPS = 3
 
 
-def _matches_city(comp: ComparableProperty, expected_city: str) -> bool:
-    """Loose check that a comparable is in the same city as the auction property.
-
-    Discovery metadata sometimes stores city as "Campo Largo, PR" and comp
-    addresses come from varied formats. We compare slugs of the bare city
-    name (without state) to handle both. When in doubt (empty expected city
-    or address with no city token), err on the side of keeping the comp —
-    the URL filtering should already have scoped results correctly.
-    """
-    if not expected_city:
-        return True
-    expected = _slug(_clean_city(expected_city))
-    if not expected:
-        return True
-    # Addresses typically end with "City" or "City, State" or "City - State".
-    # Build a lowercased haystack and check if the expected city slug appears
-    # as a whole word (prevents "curitiba" matching "curitiba-abc" falsely,
-    # though slugifying both sides makes a simple substring check safe enough).
-    haystack = _slug(comp.address) if comp.address else ""
-    if not haystack:
-        # No address to verify — trust the URL scoping
-        return True
-    return expected in haystack
-
-
 async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparableProperty]:
-    """Try each site scraper sequentially. Stop early when >= MIN_COMPS found.
+    """Collect from all five listing platforms and deduplicate the snapshot.
 
     Searches by street first (more precise comps), then falls back to
     neighborhood if street search yields too few results.
@@ -662,6 +746,7 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
             ("QuintoAndar", scrape_quintoandar),
             ("ZAP Imóveis", scrape_zap),
             ("Chaves na Mão", scrape_chavesnamao),
+            ("ImovelWeb", scrape_imovelweb),
         ]
 
         async def _run_scraper(name, scraper, loc) -> list[ComparableProperty]:
@@ -670,35 +755,37 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
             except Exception as e:
                 logger.debug(f"Property scraper: {name} failed: {e}")
                 return []
-            # Filter out comps from a different city than the auction property
-            kept = [c for c in comps if _matches_city(c, metadata.city)]
-            dropped = len(comps) - len(kept)
-            if dropped:
-                logger.info(f"Property scraper: {name} dropped {dropped} comp(s) outside {metadata.city}")
-            logger.info(f"Property scraper: {name} returned {len(kept)} comps (location='{loc}')")
-            return kept
+            # Search URLs are already scoped by UF/city/location. Card address
+            # text is often only a street or neighborhood, so filtering again
+            # by the city name creates false negatives.
+            valid = [comp for comp in comps if _is_usable_comparable(comp)]
+            if len(valid) != len(comps):
+                logger.warning(
+                    "Property scraper: {} rejected {} incomplete/invalid cards",
+                    name, len(comps) - len(valid),
+                )
+            logger.info(f"Property scraper: {name} returned {len(valid)} valid comps (location='{loc}')")
+            return valid
 
         for name, scraper in scrapers:
-            if len(all_comps) >= MIN_COMPS:
-                logger.info(f"Property scraper: {len(all_comps)} comps found, skipping {name}")
-                break
-
             all_comps.extend(await _run_scraper(name, scraper, location))
-
-            # Random delay between scrapers to avoid rate limits
-            if len(all_comps) < MIN_COMPS:
-                await asyncio.sleep(random.uniform(1.0, 3.0))
+            await asyncio.sleep(random.uniform(1.0, 3.0))
 
         # If street search didn't yield enough, retry with neighborhood
         if len(all_comps) < MIN_COMPS and street and metadata.neighborhood and street != metadata.neighborhood:
             logger.info(f"Property scraper: street search yielded {len(all_comps)} comps, retrying with neighborhood '{metadata.neighborhood}'")
             for name, scraper in scrapers:
-                if len(all_comps) >= MIN_COMPS:
-                    break
                 all_comps.extend(await _run_scraper(name, scraper, metadata.neighborhood))
-                if len(all_comps) < MIN_COMPS:
-                    await asyncio.sleep(random.uniform(1.0, 3.0))
+                await asyncio.sleep(random.uniform(1.0, 3.0))
 
-        return all_comps
+        deduplicated: list[ComparableProperty] = []
+        seen_urls: set[str] = set()
+        for comp in all_comps:
+            key = comp.url.strip() or f"{comp.source}|{comp.address}|{comp.price}|{comp.area_m2}"
+            if key in seen_urls:
+                continue
+            seen_urls.add(key)
+            deduplicated.append(comp)
+        return deduplicated
     finally:
         await browser.close()

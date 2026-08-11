@@ -60,5 +60,5 @@ def test_planner_handles_empty_text():
 
     result = planner_node(state)
 
-    assert result["property_metadata"].address == ""
+    assert "property_metadata" not in result
     assert "errors" in result

@@ -4,16 +4,18 @@ only to extract structure from raw HTML/PDF)."""
 
 from __future__ import annotations
 
+import re
 from loguru import logger
 
-from graph.state import AuctionState, PropertyMetadata, LegalResult
+from graph.state import AuctionState, ComparableProperty, PropertyMetadata, LegalResult
 from graph.market import market_node
 from graph.legal import legal_node
 from graph.scoring import scoring_node
 from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
+from fiscal import get_itbi
 
-PIPELINE_VERSION = "v1"
+PIPELINE_VERSION = "v2-market-calc"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -24,6 +26,15 @@ LEGAL_NODE_ENABLED = False
 
 def metadata_from_property(prop) -> PropertyMetadata:
     """Build the graph's PropertyMetadata directly from a catalog Property row."""
+    itbi = get_itbi(prop.uf or "", prop.city or "")
+    description = prop.descricao_raw or ""
+    commission_match = re.search(
+        r"comiss[aã]o[^%]{0,80}?(\d+(?:[.,]\d+)?)\s*%", description, re.IGNORECASE,
+    )
+    commission_rate = (
+        float(commission_match.group(1).replace(",", ".")) / 100
+        if commission_match else None
+    )
     return PropertyMetadata(
         address=prop.address or "",
         property_type=prop.property_type or "",
@@ -36,16 +47,23 @@ def metadata_from_property(prop) -> PropertyMetadata:
         state=prop.uf or "",
         beds=prop.beds,
         photo_url=prop.photo_url or "",
+        itbi_rate=itbi["rate"] if itbi else None,
+        itbi_source=itbi["source"] if itbi else "",
+        commission_rate=commission_rate,
     )
 
 
 def run_structured_enrichment(
     metadata: PropertyMetadata, pdf_texts: str = "", auction_url: str = "",
+    regional_price_per_m2: float | None = None,
+    regional_comparables: list[ComparableProperty] | None = None,
 ) -> AuctionPropertyResult:
     state = AuctionState(
         property_metadata=metadata, pdf_texts=pdf_texts, auction_url=auction_url,
     )
-    state.market_result = market_node(state)["market_result"]
+    state.market_result = market_node(
+        state, regional_price_per_m2, regional_comparables,
+    )["market_result"]
     if LEGAL_NODE_ENABLED:
         # Best-effort: a transient LLM/proxy failure must not sink the whole
         # analysis when market + scoring succeeded. Fall back to an empty

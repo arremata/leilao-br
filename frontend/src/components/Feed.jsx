@@ -8,7 +8,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     judicial: initialFilters?.judicial || 'Todos',
     praca: initialFilters?.praca || 'Todos',
     modalidade: initialFilters?.modalidade || 'Todos',
-    occupancy: initialFilters?.occupancy || 'Todos',
     propertyType: 'Todos',
     discountMin: initialFilters?.discountMin || 0,
     city: 'Todas',
@@ -30,28 +29,30 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         p.title?.toLowerCase().includes(q)
       );
     }
-    if (filters.occupancy !== 'Todos') list = list.filter(p => p.occupancy === filters.occupancy);
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
-    if (filters.discountMin > 0) list = list.filter(p => p.discount >= filters.discountMin);
+    if (filters.discountMin > 0) list = list.filter(p => (p.discount ?? p.auctionDiscount ?? 0) >= filters.discountMin);
     if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
     if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
-    if (sort === 'discount') list.sort((a, b) => b.discount - a.discount);
+    if (sort === 'discount') list.sort((a, b) =>
+      (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0));
     else if (sort === 'soonest') list.sort((a, b) => getEndsAtMs(a.endsAt) - getEndsAtMs(b.endsAt));
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
   }, [addressQuery, filters, sort, properties]);
 
+  // Pagination is UI-derived state; resetting here is intentional whenever
+  // search/sort inputs change.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [addressQuery, filters, sort]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
   const activeFilterCount =
     (addressQuery.trim() ? 1 : 0) +
-    (filters.occupancy !== 'Todos' ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
@@ -63,7 +64,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     setAddressQuery('');
     setFilters({
       judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
-      occupancy: 'Todos', propertyType: 'Todos',
+      propertyType: 'Todos',
       discountMin: 0, city: 'Todas',
     });
   };
@@ -141,9 +142,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           <Filter label="Imóvel" value={filters.propertyType}
             options={['Todos', 'Apartamento', 'Casa', 'Comercial', 'Galpão', 'Terreno']}
             onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-          <Filter label="Ocupação" value={filters.occupancy}
-            options={['Todos', 'desocupado', 'ocupado']}
-            onChange={(v) => setFilters({ ...filters, occupancy: v })} />
           <Filter label="Modalidade" value={filters.modalidade}
             options={['Todos', 'Venda direta', 'Licitação aberta']}
             onChange={(v) => setFilters({ ...filters, modalidade: v })} />

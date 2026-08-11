@@ -6,6 +6,14 @@ from db.base import Base, get_engine, init_db, make_session_factory
 from db.models import Property, PropertyEvent, Enrichment
 
 
+def test_get_engine_uses_psycopg3_for_generic_postgres_url(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
+
+    engine = get_engine()
+
+    assert engine.dialect.driver == "psycopg"
+
+
 def test_sqlite_memory_engine_and_init_db_creates_no_error():
     engine = get_engine("sqlite://")
     # No tables registered on Base yet is fine; init_db must not raise.

@@ -35,8 +35,6 @@ def compute_risk_flags(
     tax_debts_iptu: str,
     condominium_debts: str,
     federal_state_debts: str,
-    liquidity_days: int,
-    occupation_status: str,
 ) -> RiskFlags:
     if risk_level == "low":
         j = "good"
@@ -56,38 +54,17 @@ def compute_risk_flags(
     else:
         f = "good"
 
-    if liquidity_days < 60:
-        l = "good"
-    elif liquidity_days <= 120:
-        l = "warn"
-    else:
-        l = "bad"
-
-    occ_lower = occupation_status.lower()
-    if "desocupado" in occ_lower:
-        o = "good"
-    elif any(w in occ_lower for w in ("disputado", "posseiro", "invasor")):
-        o = "bad"
-    else:
-        o = "warn"
-
-    return RiskFlags(j=j, f=f, l=l, o=o)
+    return RiskFlags(j=j, f=f)
 
 
-def compute_roi(min_bid: float, market_value: float, reform_estimate: float) -> float:
+def compute_roi(min_bid: float, market_value: float, fee_rate: float = 0.0) -> float:
     if min_bid <= 0:
         return 0.0
-    fees = min_bid * 0.078
-    total_cost = min_bid + reform_estimate + fees
+    fees = min_bid * max(fee_rate, 0.0)
+    total_cost = min_bid + fees
     if total_cost <= 0:
         return 0.0
     return round(((market_value - total_cost) / total_cost) * 100, 2)
-
-
-def _get_occupation(legal_result: Optional[LegalResult]) -> str:
-    if legal_result and legal_result.occupation_status:
-        return legal_result.occupation_status
-    return "ocupado"
 
 
 def scoring_node(state: AuctionState) -> dict:
@@ -100,15 +77,13 @@ def scoring_node(state: AuctionState) -> dict:
         logger.warning("Scoring node: no property metadata available")
         return {
             "scoring_result": ScoringResult(
-                risk=RiskFlags(j="bad", f="bad", l="bad", o="bad"),
+                risk=RiskFlags(j="bad", f="bad"),
                 roi=0.0,
             ),
             "errors": ["No property metadata for scoring"],
         }
 
-    liquidity_days = market_result.liquidity_days if market_result and market_result.liquidity_days is not None else 90
     risk_level = legal_result.risk_level if legal_result and legal_result.risk_level else "critical"
-    occupation = _get_occupation(legal_result)
 
     iptu = legal_result.tax_debts_iptu if legal_result else ""
     condo = legal_result.condominium_debts if legal_result else ""
@@ -117,17 +92,15 @@ def scoring_node(state: AuctionState) -> dict:
     risk = compute_risk_flags(
         risk_level=risk_level, tax_debts_iptu=iptu,
         condominium_debts=condo, federal_state_debts=federal,
-        liquidity_days=liquidity_days, occupation_status=occupation,
     )
 
     market_value = (
-        metadata.market_value_estimate
-        or ((market_result.price_per_m2_neighborhood or 0.0) * (metadata.area_m2 or 0.0) if market_result else 0.0)
-    ) or 0.0
-    reform_estimate = market_result.reform_estimate if market_result and market_result.reform_estimate is not None else 0.0
-
+        ((market_result.price_per_m2_neighborhood or 0.0) * (metadata.area_m2 or 0.0) if market_result else 0.0)
+        or 0.0
+    )
     auction_price = metadata.auction_price if metadata.auction_price is not None else 0.0
-    roi = compute_roi(min_bid=auction_price, market_value=market_value, reform_estimate=reform_estimate)
+    fee_rate = (metadata.itbi_rate or 0.0) + (metadata.commission_rate or 0.0)
+    roi = compute_roi(min_bid=auction_price, market_value=market_value, fee_rate=fee_rate)
 
     scoring_result = ScoringResult(risk=risk, roi=roi)
     logger.info(f"Scoring node: risk={risk.model_dump()}, roi={roi}%")

@@ -16,7 +16,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   // Occupant-removal toggle: default ON when the property exposes a removal cost.
   // Initial state must be computed from a possibly-null property, so default to false
   // and let the sim re-derive availability after the early-return guard below.
-  const [includeOccupantRemoval, setIncludeOccupantRemoval] = useState(false);
 
   // On-demand enrichment for ingested catalog items. Seed / URL-analyzed
   // properties already carry marketDetail and skip the fetch entirely.
@@ -122,8 +121,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const projectedIptu = Math.round(monthlyIptu * monthsToSale);
 
   // --- Occupant removal cost (toggle, default on when property is not vacant) ---
-  const occupantRemovalAvailable = (p.occupantRemovalCost ?? 0) > 0;
-  const occupantRemovalCost = includeOccupantRemoval && occupantRemovalAvailable ? (p.occupantRemovalCost || 0) : 0;
 
   const gainCapital = exempt === 'Pagamento integral de GC'
     ? Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15)
@@ -176,14 +173,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       value: projectedIptu,
       hint: `R$ ${monthlyIptu.toLocaleString('pt-BR')}/mês × ${monthsToSale} meses até a venda.`,
       kind: 'debt',
-    });
-  }
-  if (occupantRemovalCost > 0) {
-    dynamicRows.push({
-      label: 'Remoção de ocupante',
-      value: occupantRemovalCost,
-      hint: 'Estimativa de ação de imissão na posse — honorários advocatícios e custas.',
-      kind: 'fee',
     });
   }
   if (legalAICost > 0) {
@@ -252,7 +241,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     legalAI, setLegalAI, legalAICost,
     renoCost, renoRate, regionPricePerM2,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
-    occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval, occupantRemovalCost,
     gainCapital, dynamicTotal, dynamicRows: rebasedRows, netSale, maxBid, externalCosts,
   };
 
@@ -281,9 +269,15 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <button className="btn sm" disabled title="Em breve">
             <span className="mono">⎙</span> Exportar análise
           </button>
-          <button className="btn sm primary" onClick={() => (p.auctionUrl || p.detailUrl) && window.open(p.auctionUrl || p.detailUrl, '_blank')} disabled={!(p.auctionUrl || p.detailUrl)} title={p.auctionUrl || p.detailUrl || 'URL não disponível'}>
-            <span className="mono">↗</span> Acessar leilão
-          </button>
+          {!isEnriched && p.canAnalyze && (
+            <button
+              className="btn sm primary"
+              onClick={handleAnalyze}
+              disabled={analyzing || enrichLoading}
+            >
+              {analyzing ? 'Analisando…' : enrichLoading ? 'Carregando…' : 'Analisar imóvel'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -343,9 +337,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
             <span className="tag accent">{p.praca || p.modalidade || p.auctionType}</span>
             <span className="tag">{p.type}</span>
-            <span className={`tag dot ${p.occupancy === 'desocupado' ? 'good' : p.occupancy === 'ocupado' ? 'warn' : 'bad'}`}>
-              {p.occupancy}
-            </span>
           </div>
 
           <h1 className="h1" style={{ marginBottom: 4 }}>{p.title}</h1>
@@ -456,24 +447,28 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           analyzing={analyzing}
           loading={enrichLoading}
           error={analyzeError}
+          canAnalyze={p.canAnalyze === true}
         />
       )}
     </div>
   );
 }
 
-function AnalyzeCTA({ onAnalyze, analyzing, loading, error }) {
+function AnalyzeCTA({ onAnalyze, analyzing, loading, error, canAnalyze }) {
   return (
     <div className="card fade-in" style={{ padding: 40, textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
       <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>ANÁLISE NÃO EXECUTADA</div>
       <h2 style={{ fontSize: 18, margin: '0 0 8px', color: 'var(--fg-0)' }}>Este imóvel ainda não foi analisado</h2>
-      <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: '0 0 22px' }}>
-        Rode a análise da IA para estimar o valor de mercado por comparáveis, a viabilidade
-        financeira, os custos totais e a leitura do edital.
+      <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: canAnalyze ? '0 0 22px' : 0 }}>
+        {canAnalyze
+          ? 'Rode a análise para estimar o valor de mercado por comparáveis, a viabilidade financeira e os custos totais.'
+          : 'A análise detalhada ainda não está disponível neste ambiente. Os dados oficiais do leilão permanecem acessíveis acima.'}
       </p>
-      <button className="btn primary" onClick={onAnalyze} disabled={analyzing || loading} style={{ minWidth: 180 }}>
-        {analyzing ? 'Analisando…' : loading ? 'Carregando…' : 'Analisar imóvel'}
-      </button>
+      {canAnalyze && (
+        <button className="btn primary" onClick={onAnalyze} disabled={analyzing || loading} style={{ minWidth: 180 }}>
+          {analyzing ? 'Analisando…' : loading ? 'Carregando…' : 'Analisar imóvel'}
+        </button>
+      )}
       {error && <p style={{ marginTop: 16, fontSize: 12.5, color: 'var(--bad)' }}>{error}</p>}
     </div>
   );
@@ -623,14 +618,7 @@ function Market({ p }) {
   const desagioOficialPct = appraisal > 0 ? ((appraisal - bid) / appraisal * 100) : 0;
 
   // Valorização da região — extraída do indicador de preço/m² do bairro
-  const appreciationIndicator = md.indicators.find(i => i.lbl.toLowerCase().includes('bairro'));
-  const regionAppreciation = appreciationIndicator?.delta;
-
-  // Filtrar "Liquidez · score" dos indicadores
-  const filteredIndicators = md.indicators.filter(i => {
-    const l = i.lbl.toLowerCase();
-    return !l.includes('liquidez') && !l.includes('yield') && !l.includes('cap rate');
-  });
+  const filteredIndicators = md.indicators;
 
   return (
     <div>
@@ -764,23 +752,6 @@ function Market({ p }) {
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.02 · indicadores</span>
           <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>{p.neighborhood} · base 2024–2026</h3>
 
-          {regionAppreciation && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: '12px 14px', borderRadius: 8,
-              background: appreciationIndicator.pos ? 'var(--good-soft)' : 'var(--bad-soft)',
-              borderLeft: `3px solid ${appreciationIndicator.pos ? 'var(--good)' : 'var(--bad)'}`,
-              marginBottom: 18,
-            }}>
-              <div>
-                <div className="uppy" style={{ color: 'var(--fg-3)' }}>Valorização da região</div>
-                <div className="num-xl" style={{ color: appreciationIndicator.pos ? 'var(--good)' : 'var(--bad)', marginTop: 4 }}>
-                  {regionAppreciation}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
             {filteredIndicators.map(ind => (
               <Stat2 key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
@@ -793,7 +764,7 @@ function Market({ p }) {
       {md.comparables.length > 0 && (
         <div className="card" style={{ marginTop: 16, padding: 22 }}>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.03 · comparáveis</span>
-          <h3 className="h2" style={{ marginTop: 4, marginBottom: 16 }}>Imóveis vendidos no raio de 800m · 6 meses</h3>
+          <h3 className="h2" style={{ marginTop: 4, marginBottom: 16 }}>Anúncios usados na referência regional</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
               <thead>
@@ -856,7 +827,6 @@ function CostBreakdown({ p, sim }) {
     target, setTarget, targetCap, exempt, setExempt, legalAI, setLegalAI,
     renoCost, renoRate, regionPricePerM2,
     projectedCondo, projectedIptu,
-    occupantRemovalAvailable, includeOccupantRemoval, setIncludeOccupantRemoval,
     netSale, maxBid, dynamicRows, dynamicTotal, externalCosts,
   } = sim;
 
@@ -893,7 +863,6 @@ function CostBreakdown({ p, sim }) {
             setTarget(30);
             setExempt('Primeiro imóvel ou reinvestimento em 180 dias');
             setLegalAI(false);
-            if (occupantRemovalAvailable) setIncludeOccupantRemoval(true);
           }}>
             Resetar
           </button>
@@ -1018,38 +987,6 @@ function CostBreakdown({ p, sim }) {
           onChange={setExempt}
           hint="Isenção ou incidência do ganho de capital na venda"
         />
-
-        {/* Occupant removal toggle (only when applicable) */}
-        {occupantRemovalAvailable && (
-          <>
-            <div className="divider" style={{ margin: '20px 0' }}></div>
-            <div className="row between" style={{ alignItems: 'center' }}>
-              <div>
-                <span className="uppy" style={{ color: 'var(--fg-3)' }}>Remoção de ocupante</span>
-                <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--fg-3)' }}>
-                  Inclui R$ {fmtBRL(p.occupantRemovalCost || 0)} para ação de imissão na posse
-                </p>
-              </div>
-              <button
-                onClick={() => setIncludeOccupantRemoval(!includeOccupantRemoval)}
-                style={{
-                  width: 44, height: 24, borderRadius: 12,
-                  background: includeOccupantRemoval ? 'var(--accent)' : 'var(--bg-3)',
-                  position: 'relative', transition: 'background .2s',
-                  border: '1px solid ' + (includeOccupantRemoval ? 'var(--accent)' : 'var(--line-2)'),
-                  cursor: 'pointer', flexShrink: 0,
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 2, left: includeOccupantRemoval ? 22 : 2,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: '#fff', transition: 'left .2s',
-                  boxShadow: '0 1px 3px rgba(17,24,39,0.15)',
-                }} />
-              </button>
-            </div>
-          </>
-        )}
 
         <div className="divider" style={{ margin: '20px 0' }}></div>
         <div className="row between" style={{ alignItems: 'center' }}>
@@ -1479,7 +1416,6 @@ function Edital({ p }) {
         <Meta lbl="Processo" val={e.process || '—'} />
         <Meta lbl="Exequente" val={e.creditor || '—'} />
         <Meta lbl="Executado" val={e.debtor || '—'} />
-        <Meta lbl="Modalidade" val={e.modality || '—'} />
         <Meta lbl="1ª praça" val={e.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
         <Meta lbl="2ª praça" val={e.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
       </div>
@@ -1496,13 +1432,6 @@ function Edital({ p }) {
           <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--fg-1)' }}>
             {e.liens.map((l, i) => <li key={i}>{l}</li>)}
           </ul>
-        </>
-      )}
-      {e.paymentTerms && (
-        <>
-          <div className="divider" style={{ margin: '20px 0' }}></div>
-          <h4 className="h3" style={{ marginBottom: 10 }}>Forma de pagamento</h4>
-          <p style={{ margin: 0, color: 'var(--fg-1)' }}>{e.paymentTerms}</p>
         </>
       )}
       {e.summaryNote && (

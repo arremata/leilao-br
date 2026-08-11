@@ -33,20 +33,10 @@ def test_property_metadata_fields():
 def test_market_result_fields():
     result = MarketResult(
         price_per_m2_neighborhood=12000.0,
-        price_per_m2_city=9500.0,
         comparable_properties=[],
-        reform_estimate=25000.0,
-        area_appreciation_1y=5.0,
-        area_appreciation_3y=15.0,
-        area_appreciation_5y=30.0,
-        city_appreciation_1y=4.0,
-        liquidity_days=45,
-        tendencies="Mercado em alta com novos empreendimentos",
         discount_percentage=30.0,
-        market_score=7,
-        raw_findings="",
     )
-    assert result.market_score == 7
+    assert result.price_per_m2_neighborhood == 12000.0
     assert result.discount_percentage == 30.0
 
 
@@ -87,7 +77,7 @@ def test_auction_state_has_scoring_result_field():
 
     # score field removed from ScoringResult — only risk + roi now
     scoring = ScoringResult(
-        risk=RiskFlags(j="good", f="good", l="warn", o="good"),
+        risk=RiskFlags(j="good", f="good"),
         roi=38.0,
     )
     state = AuctionState(scoring_result=scoring)
@@ -109,4 +99,3 @@ def test_auction_state_no_report_html():
     """AuctionState should no longer have report_html field."""
     state = AuctionState()
     assert not hasattr(state, "report_html")
-

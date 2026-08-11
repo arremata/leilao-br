@@ -5,18 +5,16 @@ from pydantic import ValidationError
 def test_risk_flags_accepts_valid_values():
     from graph.contracts import RiskFlags
 
-    flags = RiskFlags(j="good", f="warn", l="bad", o="good")
+    flags = RiskFlags(j="good", f="warn")
     assert flags.j == "good"
     assert flags.f == "warn"
-    assert flags.l == "bad"
-    assert flags.o == "good"
 
 
 def test_risk_flags_rejects_invalid_values():
     from graph.contracts import RiskFlags
 
     with pytest.raises(ValidationError):
-        RiskFlags(j="excellent", f="warn", l="bad", o="good")
+        RiskFlags(j="excellent", f="warn")
 
 
 def test_auction_property_result_has_all_fields():
@@ -43,8 +41,7 @@ def test_auction_property_result_has_all_fields():
         parking=1,
         floor="7º",
         ends_at="2026-05-15T14:30:00",
-        occupancy="desocupado",
-        risk=RiskFlags(j="good", f="good", l="warn", o="good"),
+        risk=RiskFlags(j="good", f="good"),
         appraisal=0.0,
         auction_discount=0.0,
     )
@@ -78,8 +75,7 @@ def test_auction_property_result_optional_fields_can_be_none():
         parking=None,
         floor=None,
         ends_at="2026-05-18T00:00:00",
-        occupancy="disputado",
-        risk=RiskFlags(j="bad", f="warn", l="warn", o="bad"),
+        risk=RiskFlags(j="bad", f="warn"),
         appraisal=0.0,
         auction_discount=0.0,
     )
@@ -111,8 +107,7 @@ def test_auction_property_result_serializes_to_json():
         parking=None,
         floor=None,
         ends_at="2026-05-15T14:30:00",
-        occupancy="desocupado",
-        risk=RiskFlags(j="good", f="good", l="warn", o="good"),
+        risk=RiskFlags(j="good", f="good"),
         appraisal=0.0,
         auction_discount=0.0,
     )
@@ -131,8 +126,8 @@ def test_result_has_appraisal_and_auction_discount_fields():
         id="x", photo_label="", title="", address="", type="",
         neighborhood="", city="", auction_type="Judicial", auctioneer="—",
         court="—", discount=10.0, min_bid=100000.0, market=150000.0,
-        roi=0.0, area=50.0, ends_at="", occupancy="desocupado",
-        risk=RiskFlags(j="good", f="good", l="good", o="good"),
+        roi=0.0, area=50.0, ends_at="",
+        risk=RiskFlags(j="good", f="good"),
         appraisal=180000.0,
         auction_discount=44.4,
     )
@@ -145,7 +140,7 @@ def test_scoring_result_model():
     from graph.contracts import ScoringResult, RiskFlags
 
     sr = ScoringResult(
-        risk=RiskFlags(j="good", f="good", l="warn", o="good"),
+        risk=RiskFlags(j="good", f="good"),
         roi=38.0,
     )
     assert sr.roi == 38.0

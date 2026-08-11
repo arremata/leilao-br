@@ -87,32 +87,15 @@ export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', child
 }
 
 // ============================================================
-// Mini sparkline (last 12 months price trend)
-// ============================================================
-export function Sparkline({ points = [9, 9.2, 9.1, 9.5, 9.4, 9.6, 9.9, 10.2, 10.1, 10.4, 10.6, 11.0], color = 'var(--good)', width = 100, height = 28 }) {
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const x = (i) => (i / (points.length - 1)) * width;
-  const y = (v) => height - 2 - ((v - min) / range) * (height - 4);
-  const path = points.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  return (
-    <svg width={width} height={height} className="spark" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      <path d={path} fill="none" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={x(points.length - 1)} cy={y(points[points.length - 1])} r="2.2" fill={color} />
-    </svg>
-  );
-}
-
-// ============================================================
 // Risk summary — readable labels, highlights only issues
 // ============================================================
 export function RiskSummary({ flags }) {
+  if (!flags) {
+    return <span style={{ fontSize: 11, color: 'var(--fg-2)' }}>Análise pendente</span>;
+  }
   const items = [
     { k: 'j', label: 'Jurídico' },
     { k: 'f', label: 'Financeiro' },
-    { k: 'l', label: 'Liquidez' },
-    { k: 'o', label: 'Ocupação' },
   ];
   const issues = items.filter(it => flags?.[it.k] && flags[it.k] !== 'good');
   if (issues.length === 0) {
@@ -148,8 +131,6 @@ export function RiskDots({ flags }) {
   const items = [
     { k: 'j', label: 'Jurídico' },
     { k: 'f', label: 'Financeiro' },
-    { k: 'l', label: 'Liquidez' },
-    { k: 'o', label: 'Ocupação' },
   ];
   const color = (s) => s === 'good' ? 'var(--good)' : s === 'warn' ? 'var(--warn)' : s === 'bad' ? 'var(--bad)' : 'var(--bg-3)';
   return (
@@ -192,8 +173,7 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 // Property card — DENSE, lots of information
 // ============================================================
 export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex = 0 }) {
-  const occColor = p.occupancy === 'desocupado' ? 'good' :
-                   p.occupancy === 'ocupado' ? 'warn' : 'bad';
+  const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   return (
     <article
       className="card hov fade-in property-card"
@@ -237,7 +217,6 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
           <span className="tag">{p.praca || p.modalidade || p.auctionType}</span>
           <span className="tag">{p.type}</span>
-          <span className={`tag dot ${occColor}`}>{p.occupancy}</span>
         </div>
 
         {/* Title + address */}
@@ -279,18 +258,20 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
               <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
               Mercado IA
             </span>
-            <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
-              R$ {fmtBRL(p.market)}
-            </div>
-            <div className="mono" style={{
-              fontSize: 11, marginTop: 4,
-              color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
-              fontWeight: 500,
-            }}>
-              {(p.discount ?? 0) >= 0
-                ? `+${p.discount}% desconto IA`
-                : `${p.discount}% acima IA`}
-            </div>
+            {hasMarketAnalysis ? <>
+              <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
+                R$ {fmtBRL(p.market)}
+              </div>
+              <div className="mono" style={{
+                fontSize: 11, marginTop: 4,
+                color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
+                fontWeight: 500,
+              }}>
+                {p.discount >= 0 ? `+${p.discount}% desconto IA` : `${p.discount}% acima IA`}
+              </div>
+            </> : (
+              <div style={{ marginTop: 5, fontSize: 12, color: 'var(--fg-2)' }}>Análise pendente</div>
+            )}
           </div>
         </div>
 
@@ -312,6 +293,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
 // Property row (table-like dense)
 // ============================================================
 export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
+  const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   return (
     <div
       className="property-row"
@@ -355,16 +337,16 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
         </div>
       </div>
       <div>
-        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>
-          R$ {fmtBRL(p.market)}
-        </div>
-        <div className="mono" style={{
-          fontSize: 11,
-          color: (p.discount ?? 0) > 0 ? 'var(--good)' : (p.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
-          fontWeight: 500,
-        }}>
-          {(p.discount ?? 0) >= 0 ? `+${p.discount}% IA` : `${p.discount}% acima IA`}
-        </div>
+        {hasMarketAnalysis ? <>
+          <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.market)}</div>
+          <div className="mono" style={{
+            fontSize: 11,
+            color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
+            fontWeight: 500,
+          }}>
+            {p.discount >= 0 ? `+${p.discount}% IA` : `${p.discount}% acima IA`}
+          </div>
+        </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>Análise pendente</div>}
       </div>
       <RiskDots flags={p.risk} />
       <Countdown until={p.endsAt} compact />

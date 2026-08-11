@@ -9,6 +9,7 @@ venv/
 .env
 .env.*
 !.env.example
+.env.production.local
 
 # OS
 .DS_Store
