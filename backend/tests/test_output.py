@@ -93,6 +93,17 @@ class TestBuildResult:
         result = build_result(state)
         assert result.market == 6923.0 * 78.0
 
+    def test_land_has_no_market_detail_or_estimated_market(self):
+        state = _make_full_state()
+        state.property_metadata.property_type = "Terreno"
+        state.market_result = MarketResult()
+        state.scoring_result.roi = 0
+        result = build_result(state)
+        assert result.market == 0
+        assert result.discount == 0
+        assert result.roi == 0
+        assert result.market_detail is None
+
     def test_build_result_beds_baths_parking_floor_are_none(self):
         state = _make_full_state()
         result = build_result(state)

@@ -195,6 +195,10 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
     if not metadata or not market:
         return None
 
+    from graph.market import is_land_property_type
+    if is_land_property_type(metadata.property_type):
+        return None
+
     indicators = []
     if market.price_per_m2_neighborhood:
         indicators.append(MarketIndicator(

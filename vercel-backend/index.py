@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -36,6 +38,18 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str | None = None
     pdf_texts: str | None = None
+
+
+def _is_land_property_type(property_type: str | None) -> bool:
+    normalized = unicodedata.normalize("NFKD", property_type or "").encode("ascii", "ignore").decode()
+    return bool(re.search(r"\b(terreno|lote|gleba)\b", normalized.lower()))
+
+
+def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict | None:
+    result = json.loads(enrichment) if enrichment else None
+    if result and _is_land_property_type(property_type):
+        result.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
+    return result
 
 
 def _get_engine():
@@ -76,6 +90,25 @@ def _catalog_card(row) -> dict:
         (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
         comparable_dates[-1] if comparable_dates else None,
     )
+    modalidade = p.get("modalidade") or ""
+    modalidade_normalized = modalidade.lower()
+    auction_type = (
+        "Extrajudicial"
+        if any(term in modalidade_normalized for term in (
+            "leilão sfi", "leilao sfi", "licitação aberta", "licitacao aberta", "venda direta",
+        )) else None
+    )
+    praca = None
+    if "sfi" in modalidade_normalized:
+        first = p.get("first_auction_at")
+        if first is not None and first.tzinfo is None:
+            first = first.replace(tzinfo=SAO_PAULO)
+        if first and first.astimezone(timezone.utc) >= now:
+            praca = "1ª praça"
+        elif p.get("second_auction_at") is not None:
+            praca = "2ª praça"
+        elif p.get("first_auction_at") is not None:
+            praca = "1ª praça"
     property_type = p.get("property_type")
     if property_type:
         title = f"{property_type} {p.get('area_m2') or 0:.0f} m²"
@@ -101,6 +134,8 @@ def _catalog_card(row) -> dict:
         "desconto": p.get("desconto_oficial"),
         "auctionDiscount": p.get("desconto_oficial"),
         "modalidade": p.get("modalidade"),
+        "auctionType": auction_type,
+        "praca": praca,
         "firstAuctionAt": _iso(p.get("first_auction_at")),
         "secondAuctionAt": _iso(p.get("second_auction_at")),
         "firstAuctionPrice": p.get("first_auction_price"),
@@ -196,7 +231,7 @@ def get_catalog_item(property_id: int) -> dict:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
     card = _catalog_card(row)
-    card["enrichment"] = json.loads(enrichment) if enrichment else None
+    card["enrichment"] = _safe_enrichment(enrichment, row["property_type"])
     return card
 
 
@@ -211,23 +246,13 @@ def get_dashboard() -> dict:
     avg_auction_discount = round(sum(p.get("auctionDiscount", 0) for p in properties) / max(len(properties), 1))
 
     return {
-        "greeting": {
-            "name": "Felipe",
-            "subtitle": f"{len(properties)} imóveis analisados no seu portfólio.",
-        },
         "kpis": [
-            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "seu portfólio", "pos": True},
+            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "no catálogo", "pos": True},
             {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
             {"lbl": "Desconto IA médio", "val": f"{avg_discount}%", "delta": "vs. mercado IA", "pos": avg_discount >= 15},
             {"lbl": "Desconto oficial médio", "val": f"{avg_auction_discount}%", "delta": "vs. avaliação do edital", "pos": False},
         ],
-        "activity": [
-            {"time": "há 2h", "type": "price", "title": "Apto. 78 m², Vila Madalena", "text": "Lance mínimo reduzido em R$ 18.000 — agora R$ 312.000 (2ª praça)", "tone": "good"},
-            {"time": "há 5h", "type": "risk", "title": "Casa 220 m², Ipanema", "text": "Novo processo detectado: ação anulatória em curso (1ª instância)", "tone": "bad"},
-            {"time": "ontem", "type": "closing", "title": "Apto. 110 m², Savassi", "text": "Leilão encerra em 6h22 — você ainda não decidiu", "tone": "warn"},
-            {"time": "ontem", "type": "new", "title": "3 novos imóveis match com seu perfil", "text": "Itaim Bibi, Pinheiros e Vila Olímpia — score médio 84", "tone": "neutral"},
-            {"time": "2 dias", "type": "legal", "title": "Sala 64 m², Faria Lima", "text": "Pesquisa jurídica completa entregue — 0 ressalvas", "tone": "good"},
-        ],
+        "activity": [],
     }
 
 

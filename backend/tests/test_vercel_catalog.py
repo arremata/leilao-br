@@ -1,5 +1,6 @@
 """Contract tests for the lightweight Vercel catalog API."""
 
+import json
 from datetime import datetime
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -36,7 +37,22 @@ def test_catalog_card_matches_frontend_contract():
     assert card["auctionDiscount"] == 50.0
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
+    assert card["auctionUrl"] == "https://example.com/property"
     assert card["canAnalyze"] is False
+
+
+def test_stale_land_enrichment_is_suppressed():
+    stale = json.dumps({
+        "market": 185_533_656, "discount": 99, "roi": 1000,
+        "marketDetail": {"indicators": [], "comparables": []},
+    })
+
+    result = vercel_api._safe_enrichment(stale, "Terreno")
+
+    assert result["market"] == 0
+    assert result["discount"] == 0
+    assert result["roi"] == 0
+    assert result["marketDetail"] is None
 
 
 def test_catalog_requires_database_configuration(monkeypatch):

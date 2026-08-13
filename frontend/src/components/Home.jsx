@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
-import { PropertyRow, Countdown, RiskSummary } from './shared';
+import { useState, useMemo, useEffect } from 'react';
+import { PropertyRow, Countdown } from './shared';
 import { LiveCardHero } from './LiveCard';
 import { fmtBRL } from '../utils';
+import { fetchCatalogItem } from '../api';
 
 export default function Home({ go, watched, toggleWatch, properties, dashboard, onSearch, history }) {
+  const [latestDetailCache, setLatestDetailCache] = useState(null);
   const topDiscounted = useMemo(() =>
     [...properties].sort((a, b) =>
       (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0)).slice(0, 3),
@@ -11,17 +13,45 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
   const watchedItems = useMemo(() =>
     properties.filter(p => watched.includes(p.id)),
     [watched, properties]);
+  const latestHistory = history?.[0] || null;
+  const latestLive = latestHistory
+    ? properties.find(p => p.id === latestHistory.id)
+    : null;
+  const latestDetail = latestDetailCache?.catalogId === latestHistory?.id
+    ? latestDetailCache.detail
+    : null;
+  const latestEntry = latestHistory
+    ? {
+        ...latestHistory,
+        ...latestLive,
+        ...latestDetail,
+        ...(latestDetail?.enrichment || {}),
+      }
+    : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!latestHistory?.id) return undefined;
+    fetchCatalogItem(latestHistory.id)
+      .then(detail => {
+        if (!cancelled) {
+          setLatestDetailCache({ catalogId: latestHistory.id, detail });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [latestHistory?.id]);
 
   return (
     <div className="page home-page" style={{ padding: '28px 28px 80px', maxWidth: 1480, margin: '0 auto' }}>
 
-      {/* ========== Greeting + KPI strip ========== */}
+      {/* ========== Overview + KPI strip ========== */}
       <div style={{ marginBottom: 32 }}>
         <div className="row between baseline page-header fade-in" style={{ marginBottom: 18 }}>
           <div>
-            <h1 className="h1">Bom dia, {dashboard?.greeting?.name || 'Investidor'}.</h1>
+            <h1 className="h1">Visão geral dos leilões</h1>
             <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
-              {dashboard?.greeting?.subtitle || `${properties.length} imóveis no portfólio.`}
+              {properties.length} imóveis disponíveis no catálogo.
             </p>
           </div>
           <div className="row gap-2 page-actions">
@@ -41,7 +71,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
             <Kpi key={i} lbl={kpi.lbl} val={kpi.val} delta={kpi.delta} pos={kpi.pos} urgent={kpi.urgent} />
           ))}
           <Kpi
-            lbl="Sua watchlist"
+            lbl="Watchlist local"
             val={watchedItems.length.toString().padStart(2, '0')}
             delta={watchedItems.length === 0 ? 'nada salvo' : 'monitorando'}
             last
@@ -50,25 +80,26 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       </div>
 
       {/* ========== Live Card Hero — last analysis ========== */}
-      {history && history.length > 0 && (
+      {latestEntry && (
         <LiveCardHero
-          entry={history[0]}
+          entry={latestEntry}
+          analyzed={!!latestDetail?.enrichment}
           onClick={() => {
-            const live = properties.find(p => p.id === history[0].id);
+            const live = properties.find(p => p.id === latestHistory.id);
             if (live) go('detail', live);
           }}
         />
       )}
 
       {/* ========== Search + Filters ========== */}
-      <SearchCommand onSearch={onSearch} />
+      <SearchCommand onSearch={onSearch} properties={properties} />
 
       {/* ========== Section 01 — Top descontos ========== */}
       <div style={{ marginBottom: 40 }}>
         <Section
           ix="01"
           title="Top oportunidades"
-          sub="Maior desconto IA no portfólio, atualizados às 06:00."
+          sub="Maior desconto estimado no portfólio, atualizado às 06:00."
           flush
         >
           <div className="col gap-3">
@@ -84,8 +115,8 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       {watchedItems.length > 0 ? (
         <Section
           ix="03"
-          title="Sua watchlist"
-          sub="Itens salvos · monitoramos preço, riscos e prazo automaticamente."
+          title="Watchlist"
+          sub="Itens salvos neste navegador."
           action={<button className="btn ghost sm" disabled title="Em breve">Configurar alertas →</button>}
         >
           <div className="card responsive-table" style={{ overflow: 'hidden' }}>
@@ -105,7 +136,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
               <span>imóvel</span>
               <span>lance</span>
               <span>avaliação</span>
-              <span>mercado IA</span>
+              <span>mercado estimado</span>
               <span>risco</span>
               <span>encerra</span>
               <span></span>
@@ -124,7 +155,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
       ) : (
         <Section
           ix="03"
-          title="Sua watchlist está vazia"
+          title="Watchlist vazia"
           sub="Salve imóveis com a estrela para acompanhar mudanças de preço, novos riscos detectados e proximidade do leilão."
         >
           <div className="card" style={{ padding: 32, textAlign: 'center' }}>
@@ -137,26 +168,15 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
         </Section>
       )}
 
-      {/* ========== Section 04 — Activity feed ========== */}
-      <Section
-        ix="04"
-        title="Atividade recente"
-        sub="O que mudou nos imóveis que você analisou."
-      >
-        <div className="card">
-          {(dashboard?.activity || []).map((a, i, arr) => (
-            <ActivityItem
-              key={i}
-              time={a.time}
-              type={a.type}
-              title={a.title}
-              text={a.text}
-              tone={a.tone}
-              last={i === arr.length - 1}
-            />
-          ))}
-        </div>
-      </Section>
+      {(dashboard?.activity || []).length > 0 && (
+        <Section ix="04" title="Atividade recente" sub="Atualizações recentes do catálogo.">
+          <div className="card">
+            {dashboard.activity.map((a, i, arr) => (
+              <ActivityItem key={i} time={a.time} type={a.type} title={a.title} text={a.text} tone={a.tone} last={i === arr.length - 1} />
+            ))}
+          </div>
+        </Section>
+      )}
 
     </div>
   );
@@ -165,7 +185,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
 // ============================================================
 // Search command bar with expandable filter panel
 // ============================================================
-function SearchCommand({ onSearch }) {
+function SearchCommand({ onSearch, properties }) {
   const [address, setAddress] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sf, setSf] = useState({
@@ -174,6 +194,28 @@ function SearchCommand({ onSearch }) {
     praca: 'Todos',
     modalidade: 'Todos',
   });
+  const modalityOptions = useMemo(() => [
+    ['Todos', 'Todos'],
+    ...[...new Set(properties.map(p => p.modalidade).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map(value => [value, value]),
+  ], [properties]);
+  const auctionTypeOptions = useMemo(() => [
+    ['Todos', 'Todos'],
+    ...[...new Set(properties.map(p => p.auctionType).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map(value => [value, value]),
+  ], [properties]);
+  const pracaOptions = useMemo(() => {
+    const eligible = properties.filter(p =>
+      sf.modalidade === 'Todos' || p.modalidade === sf.modalidade);
+    return [
+      ['Todos', 'Todos'],
+      ...[...new Set(eligible.map(p => p.praca).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        .map(value => [value, value]),
+    ];
+  }, [properties, sf.modalidade]);
 
   const activeCount =
     (sf.discountMin > 0 ? 1 : 0) +
@@ -249,23 +291,27 @@ function SearchCommand({ onSearch }) {
             value={sf.discountMin}
             onChange={(v) => setSf(s => ({ ...s, discountMin: v }))}
           />
-          <FilterGroup
-            label="Judicial / Extrajudicial"
-            options={[['Todos', 'Todos'], ['Judicial', 'Judicial'], ['Extrajudicial', 'Extrajudicial']]}
-            value={sf.judicial}
-            onChange={(v) => setSf(s => ({ ...s, judicial: v }))}
-          />
-          <FilterGroup
-            label="Praça"
-            options={[['Todos', 'Todos'], ['1ª praça', '1ª praça'], ['2ª praça', '2ª praça']]}
-            value={sf.praca}
-            onChange={(v) => setSf(s => ({ ...s, praca: v }))}
-          />
+          {auctionTypeOptions.length > 2 && (
+            <FilterGroup
+              label="Judicial / Extrajudicial"
+              options={auctionTypeOptions}
+              value={sf.judicial}
+              onChange={(v) => setSf(s => ({ ...s, judicial: v }))}
+            />
+          )}
+          {pracaOptions.length > 1 && (
+            <FilterGroup
+              label="Praça"
+              options={pracaOptions}
+              value={sf.praca}
+              onChange={(v) => setSf(s => ({ ...s, praca: v }))}
+            />
+          )}
           <FilterGroup
             label="Modalidade"
-            options={[['Todos', 'Todos'], ['Venda direta', 'Venda direta'], ['Licitação aberta', 'Licitação aberta']]}
+            options={modalityOptions}
             value={sf.modalidade}
-            onChange={(v) => setSf(s => ({ ...s, modalidade: v }))}
+            onChange={(v) => setSf(s => ({ ...s, modalidade: v, praca: 'Todos' }))}
           />
           {activeCount > 0 && (
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
@@ -367,7 +413,7 @@ function Section({ ix, title, sub, action, children }) {
 // ============================================================
 function CompactRow({ p, rank, onClick }) {
   const discount = p.discount ?? p.auctionDiscount;
-  const discountLabel = p.discount == null ? 'desconto oficial' : 'desconto IA';
+  const discountLabel = p.discount == null ? 'desconto oficial' : 'desconto estimado';
   return (
     <div
       onClick={onClick}
@@ -403,7 +449,6 @@ function CompactRow({ p, rank, onClick }) {
       <div style={{ textAlign: 'right' }}>
         <Countdown until={p.endsAt} compact />
         <div style={{ marginTop: 6 }}>
-          <RiskSummary flags={p.risk} />
         </div>
       </div>
       <span className="mono" style={{ fontSize: 14, color: 'var(--fg-3)' }}>→</span>

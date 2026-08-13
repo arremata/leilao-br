@@ -87,66 +87,6 @@ export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', child
 }
 
 // ============================================================
-// Risk summary — readable labels, highlights only issues
-// ============================================================
-export function RiskSummary({ flags }) {
-  if (!flags) {
-    return <span style={{ fontSize: 11, color: 'var(--fg-2)' }}>Análise pendente</span>;
-  }
-  const items = [
-    { k: 'j', label: 'Jurídico' },
-    { k: 'f', label: 'Financeiro' },
-  ];
-  const issues = items.filter(it => flags?.[it.k] && flags[it.k] !== 'good');
-  if (issues.length === 0) {
-    return (
-      <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, fontFamily: 'var(--f-mono)' }}>
-        ✓ Sem riscos
-      </span>
-    );
-  }
-  return (
-    <div className="row gap-2" style={{ alignItems: 'center' }}>
-      {issues.map(it => {
-        const state = flags[it.k];
-        const color = state === 'warn' ? 'var(--warn)' : 'var(--bad)';
-        const bg = state === 'warn' ? 'var(--warn-soft)' : 'var(--bad-soft)';
-        return (
-          <span key={it.k} style={{
-            fontSize: 11, padding: '2px 7px', borderRadius: 4,
-            background: bg, color, fontWeight: 500,
-          }}>
-            {state === 'warn' ? '⚠' : '✕'} {it.label}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-// ============================================================
-// Risk flag dots — compact version for table rows
-// ============================================================
-export function RiskDots({ flags }) {
-  const items = [
-    { k: 'j', label: 'Jurídico' },
-    { k: 'f', label: 'Financeiro' },
-  ];
-  const color = (s) => s === 'good' ? 'var(--good)' : s === 'warn' ? 'var(--warn)' : s === 'bad' ? 'var(--bad)' : 'var(--bg-3)';
-  return (
-    <div className="row gap-2" style={{ alignItems: 'center' }}>
-      {items.map(it => (
-        <span key={it.k} title={it.label} style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: color(flags?.[it.k]),
-          display: 'inline-block',
-        }} />
-      ))}
-    </div>
-  );
-}
-
-// ============================================================
 // Spec inline (m², beds, baths, parking)
 // ============================================================
 export function Specs({ area, beds, baths, parking, floor, dense }) {
@@ -240,7 +180,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
           </span>
         </div>
 
-        {/* Avaliação leilão + Mercado IA — 2 colunas */}
+        {/* Avaliação do leilão + mercado estimado */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>Avaliação leilão</span>
@@ -255,8 +195,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
           </div>
           <div style={{ textAlign: 'right' }}>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-              <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
-              Mercado IA
+              Mercado estimado
             </span>
             {hasMarketAnalysis ? <>
               <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
@@ -267,7 +206,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
                 color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
                 fontWeight: 500,
               }}>
-                {p.discount >= 0 ? `+${p.discount}% desconto IA` : `${p.discount}% acima IA`}
+                {p.discount >= 0 ? `+${p.discount}% desconto estimado` : `${p.discount}% acima da estimativa`}
               </div>
             </> : (
               <div style={{ marginTop: 5, fontSize: 12, color: 'var(--fg-2)' }}>Análise pendente</div>
@@ -279,7 +218,6 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
 
         {/* Bottom row: risk summary + leiloeiro */}
         <div className="row between" style={{ alignItems: 'center' }}>
-          <RiskSummary flags={p.risk} />
           <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>
             {p.auctioneer}
           </span>
@@ -344,11 +282,10 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
             color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
             fontWeight: 500,
           }}>
-            {p.discount >= 0 ? `+${p.discount}% IA` : `${p.discount}% acima IA`}
+            {p.discount >= 0 ? `+${p.discount}% estimado` : `${p.discount}% acima da estimativa`}
           </div>
         </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>Análise pendente</div>}
       </div>
-      <RiskDots flags={p.risk} />
       <Countdown until={p.endsAt} compact />
       <button
         onClick={(e) => { e.stopPropagation(); onToggleWatch?.(p.id); }}

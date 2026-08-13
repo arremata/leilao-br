@@ -50,12 +50,14 @@ def test_catalog_card_has_title_and_auction_discount():
                        neighborhood="Batel", address="Rua X, 100",
                        property_type="Apartamento", area_m2=72.0,
                        preco=150000.0, avaliacao=300000.0,
-                       desconto_oficial=50.0, status="active"))
+                       desconto_oficial=50.0, status="active",
+                       detail_url="https://example.com/leilao/9"))
         s.commit()
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["auctionDiscount"] == 50.0
     assert card["title"] == "Apartamento 72 m², Batel"
+    assert card["auctionUrl"] == "https://example.com/leilao/9"
     api.app.dependency_overrides.clear()
 
 
@@ -90,6 +92,35 @@ def test_catalog_card_title_falls_back_to_address_without_type():
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["title"] == "Rua Y, 200"
+    api.app.dependency_overrides.clear()
+
+
+def test_catalog_detail_suppresses_stale_land_market_estimate():
+    client, factory = _client_with_db()
+    with factory() as s:
+        prop = Property(
+            source="caixa", source_id="land-old", uf="PR", city="Curitiba",
+            address="Rodovia dos Minérios", property_type="Terreno",
+            area_m2=72_600, preco=1_243_146.17, status="active",
+        )
+        s.add(prop)
+        s.flush()
+        s.add(Enrichment(
+            property_id=prop.id,
+            result_json=json.dumps({
+                "market": 185_533_656, "discount": 99, "roi": 1000,
+                "marketDetail": {"indicators": [], "comparables": []},
+            }),
+            pipeline_version="v2-market-calc",
+        ))
+        s.commit()
+        prop_id = prop.id
+
+    enrichment = client.get(f"/catalog/{prop_id}").json()["enrichment"]
+    assert enrichment["market"] == 0
+    assert enrichment["discount"] == 0
+    assert enrichment["roi"] == 0
+    assert enrichment["marketDetail"] is None
     api.app.dependency_overrides.clear()
 
 

@@ -2,20 +2,73 @@ import { useState, useMemo, useEffect } from 'react';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
+const normalizeLocation = (value) => String(value || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .trim().toUpperCase();
+
+const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
+  .replace(/(^|\s)\S/g, letter => letter.toLocaleUpperCase('pt-BR'));
+
 export default function Feed({ go, watched, toggleWatch, properties, initialAddress = '', initialFilters = null }) {
   const [addressQuery, setAddressQuery] = useState(initialAddress);
   const [filters, setFilters] = useState({
     judicial: initialFilters?.judicial || 'Todos',
     praca: initialFilters?.praca || 'Todos',
     modalidade: initialFilters?.modalidade || 'Todos',
-    propertyType: 'Todos',
+    propertyType: initialFilters?.propertyType || 'Todos',
     discountMin: initialFilters?.discountMin || 0,
-    city: 'Todas',
+    state: initialFilters?.state || initialFilters?.uf || 'Todos',
+    city: initialFilters?.city || 'Todas',
   });
   const [sort, setSort] = useState('discount');
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
+
+  const stateOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(properties.map(p => p.uf).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [properties]);
+
+  const cityOptions = useMemo(() => {
+    const selectedState = normalizeLocation(filters.state);
+    const cities = properties
+      .filter(p => filters.state === 'Todos' || normalizeLocation(p.uf) === selectedState)
+      .map(p => p.city)
+      .filter(Boolean);
+    const uniqueByNormalizedName = new Map();
+    cities.forEach(city => uniqueByNormalizedName.set(normalizeLocation(city), formatCity(city)));
+    return ['Todas', ...[...uniqueByNormalizedName.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+  }, [properties, filters.state]);
+
+  const propertyTypeOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(properties.map(p => p.type).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [properties]);
+
+  const modalityOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(properties.map(p => p.modalidade).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [properties]);
+
+  const auctionTypeOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(properties.map(p => p.auctionType).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [properties]);
+
+  const pracaOptions = useMemo(() => {
+    const eligible = properties.filter(p =>
+      filters.modalidade === 'Todos' || p.modalidade === filters.modalidade);
+    return [
+      'Todos',
+      ...[...new Set(eligible.map(p => p.praca).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    ];
+  }, [properties, filters.modalidade]);
 
   const filtered = useMemo(() => {
     let list = [...properties];
@@ -31,14 +84,19 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     }
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
     if (filters.discountMin > 0) list = list.filter(p => (p.discount ?? p.auctionDiscount ?? 0) >= filters.discountMin);
-    if (filters.city !== 'Todas') list = list.filter(p => p.city.startsWith(filters.city));
+    if (filters.state !== 'Todos') list = list.filter(p => normalizeLocation(p.uf) === normalizeLocation(filters.state));
+    if (filters.city !== 'Todas') list = list.filter(p => normalizeLocation(p.city) === normalizeLocation(filters.city));
     if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
     if (sort === 'discount') list.sort((a, b) =>
       (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0));
-    else if (sort === 'soonest') list.sort((a, b) => getEndsAtMs(a.endsAt) - getEndsAtMs(b.endsAt));
+    else if (sort === 'soonest') list.sort((a, b) => {
+      const aDate = getEndsAtMs(a.endsAt);
+      const bDate = getEndsAtMs(b.endsAt);
+      return (aDate > 0 ? aDate : Number.POSITIVE_INFINITY) - (bDate > 0 ? bDate : Number.POSITIVE_INFINITY);
+    });
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
@@ -55,6 +113,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     (addressQuery.trim() ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
+    (filters.state !== 'Todos' ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
     (filters.judicial !== 'Todos' ? 1 : 0) +
     (filters.praca !== 'Todos' ? 1 : 0) +
@@ -65,7 +124,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     setFilters({
       judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
       propertyType: 'Todos',
-      discountMin: 0, city: 'Todas',
+      discountMin: 0, state: 'Todos', city: 'Todas',
     });
   };
 
@@ -85,9 +144,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           </p>
         </div>
         <div className="row gap-2 page-actions">
-          <button className="btn" disabled title="Em breve">
+          <button className="btn" disabled title="Disponível em breve.">
             <span className="mono" style={{ color: 'var(--fg-2)' }}>↗</span>
             Exportar CSV
+            <span className="tag accent" style={{ padding: '1px 5px', fontSize: 8.5 }}>Em breve</span>
           </button>
         </div>
       </div>
@@ -133,22 +193,35 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             )}
           </div>
 
-          <Filter label="Tipo de leilão" value={filters.judicial}
-            options={['Todos', 'Judicial', 'Extrajudicial']}
-            onChange={(v) => setFilters({ ...filters, judicial: v })} />
-          <Filter label="Praça" value={filters.praca}
-            options={['Todos', '1ª praça', '2ª praça']}
-            onChange={(v) => setFilters({ ...filters, praca: v })} />
-          <Filter label="Imóvel" value={filters.propertyType}
-            options={['Todos', 'Apartamento', 'Casa', 'Comercial', 'Galpão', 'Terreno']}
-            onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-          <Filter label="Modalidade" value={filters.modalidade}
-            options={['Todos', 'Venda direta', 'Licitação aberta']}
-            onChange={(v) => setFilters({ ...filters, modalidade: v })} />
+          {auctionTypeOptions.length > 2 && (
+            <Filter label="Tipo de leilão" value={filters.judicial}
+              options={auctionTypeOptions}
+              onChange={(v) => setFilters({ ...filters, judicial: v })} />
+          )}
+          {pracaOptions.length > 1 && (
+            <Filter label="Praça" value={filters.praca}
+              options={pracaOptions}
+              onChange={(v) => setFilters({ ...filters, praca: v })} />
+          )}
+          {propertyTypeOptions.length > 2 && (
+            <Filter label="Imóvel" value={filters.propertyType}
+              options={propertyTypeOptions}
+              onChange={(v) => setFilters({ ...filters, propertyType: v })} />
+          )}
+          {modalityOptions.length > 2 && (
+            <Filter label="Modalidade" value={filters.modalidade}
+              options={modalityOptions}
+              onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
+          )}
+          {stateOptions.length > 2 && (
+            <Filter label="Estado" value={filters.state}
+              options={stateOptions}
+              onChange={(v) => setFilters({ ...filters, state: v, city: 'Todas' })} />
+          )}
           <Filter label="Cidade" value={filters.city}
-            options={['Todas', 'São Paulo', 'Rio de Janeiro', 'Belo Horizonte', 'Curitiba', 'Balneário Camboriú', 'Barueri']}
+            options={cityOptions}
             onChange={(v) => setFilters({ ...filters, city: v })} />
-          <RangeChip label="Desconto IA" suffix="%" max={60} value={filters.discountMin}
+          <RangeChip label="Desconto disponível" suffix="%" max={60} value={filters.discountMin}
             onChange={(v) => setFilters({ ...filters, discountMin: v })} />
 
           {activeFilterCount > 0 && (
@@ -172,8 +245,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       <div className="row between" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <span className="mono" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-0)' }}>{filtered.length.toString().padStart(3, '0')}</b> resultados
-          <span style={{ margin: '0 8px' }}>·</span>
-          desconto IA médio {Math.round(filtered.reduce((a, b) => a + b.discount, 0) / Math.max(filtered.length, 1))}%
           <span style={{ margin: '0 8px' }}>·</span>
           desconto oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
         </span>
@@ -220,7 +291,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             <span>imóvel</span>
             <span>lance</span>
             <span>avaliação</span>
-            <span>mercado IA</span>
+            <span>mercado estimado</span>
             <span>risco</span>
             <span>encerra em</span>
             <span></span>
@@ -277,7 +348,7 @@ function Filter({ label, value, options, onChange }) {
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 30 }}></div>
           <div className="card" style={{
             position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-            minWidth: 180, padding: 4, zIndex: 31,
+            minWidth: 180, maxHeight: 320, overflowY: 'auto', padding: 4, zIndex: 31,
             boxShadow: '0 10px 28px rgba(17,24,39,0.08)',
           }}>
             {options.map(o => (
@@ -359,7 +430,7 @@ function Sort({ value, onChange }) {
           backgroundPosition: 'right 10px center',
         }}
       >
-        <option value="discount">maior desconto IA</option>
+        <option value="discount">maior desconto estimado</option>
         <option value="soonest">encerra antes</option>
         <option value="price-asc">menor preço</option>
         <option value="price-desc">maior preço</option>
