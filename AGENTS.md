@@ -149,6 +149,7 @@ The full platform will include:
 
 Every meaningful change to the project should be recorded here with a brief description.
 
+- **2026-08-12** — Added scheduled analysis materialization after regional market refreshes. Eligible catalog properties are calculated from persisted comparables and stored once in the shared `enrichments` table, allowing the read-only Vercel detail API to serve analysis to every user without running work during page loads.
 - **2026-08-10** — Added production-safe analysis capability signaling: the full backend advertises on-demand analysis while the read-only Vercel backend disables the unavailable action. Unanalyzed catalog cards now show explicit pending states and use official discounts for feed ranking. Market-reference scheduled runs now fail visibly when selected work produces no persisted references.
 - **2026-08-10** — Hardened comparable-source validation: fixed QuintoAndar listing URLs, rejected generic ImovelWeb links and incomplete/implausible cards before caching, and made Chaves na Mão navigation resilient to never-idle advertising requests. Live checks now distinguish valid sources from Cloudflare-blocked sources.
 - **2026-08-10** — Removed Playwright and listing-site scraping from user-triggered analysis. The request path now reads only the persisted neighborhood price/m² reference; a separate daily/manual GitHub Actions worker refreshes up to 10 missing or 90-day-stale regional references.
