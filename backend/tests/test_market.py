@@ -43,6 +43,38 @@ class TestCalculateMarket:
         assert result.price_per_m2_neighborhood == 0
         assert result.discount_percentage == 0
 
+    def test_land_never_extrapolates_regional_price_per_m2(self):
+        metadata = _metadata()
+        metadata.property_type = "Terreno"
+        metadata.area_m2 = 72_600
+        result = calculate_market(
+            metadata, [_comp(1, 2_556)], regional_price_per_m2=2_556,
+        )
+        assert result.price_per_m2_neighborhood == 0
+        assert result.comparable_properties == []
+        assert result.discount_percentage == 0
+
+    def test_land_aliases_are_guarded(self):
+        for property_type in ("Lote", "Gleba rural"):
+            metadata = _metadata()
+            metadata.property_type = property_type
+            result = calculate_market(metadata, [], regional_price_per_m2=5_000)
+            assert result.price_per_m2_neighborhood == 0
+
+    def test_rejects_subject_auction_ad_and_dissimilar_area(self):
+        own_ad = ComparableProperty(
+            address="Rua das Flores, 123", price=350_000, area_m2=80,
+            price_per_m2=4_375, source="Fonte", url="https://site/imovel",
+        )
+        too_large = ComparableProperty(
+            address="Rua Vizinha, 10", price=1_600_000, area_m2=200,
+            price_per_m2=8_000, source="Fonte", url="https://site/grande",
+        )
+        valid = _comp(1, 10_000)
+        result = calculate_market(_metadata(), [own_ad, too_large, valid])
+        assert result.comparable_properties == [valid]
+        assert result.price_per_m2_neighborhood == 10_000
+
 
 class TestMarketNode:
     def test_uses_only_passed_persisted_data(self):

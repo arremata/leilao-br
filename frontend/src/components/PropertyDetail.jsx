@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Countdown, Photo, Specs, RiskSummary } from './shared';
+import { Countdown, Photo, Specs } from './shared';
 import { fmtBRL } from '../utils';
 import { fetchCatalogItem, analyzeCatalogItem } from '../api';
 
@@ -7,12 +7,11 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
 
   // Simulator state lives here so both Costs and Viability share it
-  // renoPct: 0 = leve, 60 = inter, 100 = completa (presets). Slider interpolates.
-  const [renoPct, setRenoPct] = useState(60);
+  // renoPct: 0 = sem reforma, 15 = leve, 50 = intermediária, 100 = completa.
+  const [renoPct, setRenoPct] = useState(0);
   const [monthsToSale, setMonthsToSale] = useState(12); // 3..24
   const [target, setTarget] = useState(30);
   const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
-  const [legalAI, setLegalAI] = useState(false);
   // Occupant-removal toggle: default ON when the property exposes a removal cost.
   // Initial state must be computed from a possibly-null property, so default to false
   // and let the sim re-derive availability after the early-return guard below.
@@ -51,10 +50,23 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   }
   // Effective property: an already-enriched result as-is, a thin catalog card
   // merged with its fetched enrichment, or the thin card alone (hero-only view).
-  const enriched = alreadyEnriched ? property : (enrichment ? { ...property, ...enrichment } : null);
+  const enriched = alreadyEnriched
+    ? property
+    : (enrichment ? {
+        ...property,
+        ...enrichment,
+        // Persisted enrichment may predate auction-date ingestion and contain
+        // an empty endsAt. Never let it erase the fresher catalog countdown.
+        endsAt: enrichment.endsAt || property.endsAt,
+        firstAuctionAt: enrichment.firstAuctionAt || property.firstAuctionAt,
+        secondAuctionAt: enrichment.secondAuctionAt || property.secondAuctionAt,
+      } : null);
   const isEnriched = !!enriched;
   const p = enriched || property;
   const isWatched = watched?.includes(p.id);
+  // Catalog responses historically used both names. Keep the official listing
+  // reachable while older/newer backends converge on `auctionUrl`.
+  const auctionUrl = p.auctionUrl || p.detailUrl;
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -81,35 +93,46 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     return isNaN(v) ? 0 : v;
   };
   const regionPricePerM2 = _parseBRLperM2(_neighborhoodIndicator?.val) || (p.area > 0 ? (p.market || 0) / p.area : 0);
+  const isLand = /terreno|lote/i.test(p.type || '');
 
   // Renovation rate: tier by region price/m², then interpolate by renoPct (0-100).
-  // Presets: 0 = leve, 60 = inter, 100 = completa. Slider interpolates linearly
-  // between leve→inter (0-60) and inter→completa (60-100).
-  // Taxas calibradas realisticamente — leve ~R$60/m² para pintura/ajustes leve
-  // em imóveis de leilão (R$5K para 80m² é o mercado).
-  const _renoRate = (pct, pricePerM2) => {
+  // A posição totalmente à esquerda sempre significa custo zero. O cenário
+  // Os percentuais representam somente a intensidade do cenário. A reforma
+  // leve continua estimada por área na faixa de R$ 8–12 mil.
+  const _renoRate = (pct, pricePerM2, area, land = false) => {
+    if (land || !area) return 0;
+    const lightTotal = Math.round(Math.min(12000, Math.max(8000, 8000 + ((area - 50) / 70) * 4000)));
+    const lightRate = lightTotal / area;
     const tier = pricePerM2 > 6000 ? 'high' : pricePerM2 > 3000 ? 'mid' : 'low';
     const table = {
-      high: { leve: 80,  inter: 600,  completa: 1200 },
-      mid:  { leve: 70,  inter: 500,  completa: 1100 },
-      low:  { leve: 60,  inter: 400,  completa: 1000 },
+      high: { leve: lightRate, inter: 600, completa: 1200 },
+      mid:  { leve: lightRate, inter: 500, completa: 1100 },
+      low:  { leve: lightRate, inter: 400, completa: 1000 },
     };
     const t = table[tier];
     const p = Math.max(0, Math.min(100, pct));
-    if (p <= 60) {
-      // leve → inter
-      return Math.round(t.leve + (t.inter - t.leve) * (p / 60));
+    if (p === 0) return 0;
+    if (p <= 15) {
+      // sem reforma → leve
+      return t.leve * (p / 15);
+    }
+    if (p <= 50) {
+      // leve → intermediária
+      return t.leve + (t.inter - t.leve) * ((p - 15) / 35);
     }
     // inter → completa
-    return Math.round(t.inter + (t.completa - t.inter) * ((p - 60) / 40));
+    return Math.round(t.inter + (t.completa - t.inter) * ((p - 50) / 50));
   };
-  const renoRate = _renoRate(renoPct, regionPricePerM2);
-  const renoCost = Math.round(renoRate * (p.area || 0));
+  const rawRenoRate = _renoRate(
+    renoPct, regionPricePerM2, p.area || 0, isLand,
+  );
+  const renoRate = Math.round(rawRenoRate);
+  const renoCost = Math.round(rawRenoRate * (p.area || 0));
   const _renoLevelLabel = (pct) => {
-    if (pct <= 0) return 'leve — pintura e ajustes';
-    if (pct < 30) return 'leve+ — pintura e ajustes';
-    if (pct < 60) return 'inter- — cozinha, banheiros, piso';
-    if (pct === 60) return 'intermediária — cozinha, banheiros, piso';
+    if (pct <= 0) return 'sem reforma';
+    if (pct <= 15) return 'leve — pintura e ajustes';
+    if (pct < 50) return 'inter- — cozinha, banheiros, piso';
+    if (pct === 50) return 'intermediária — cozinha, banheiros, piso';
     if (pct < 100) return 'completa- — desmontagem parcial';
     return 'completa — desmontagem e reconstrução';
   };
@@ -126,8 +149,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     ? Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15)
     : 0;
 
-  const legalAICost = legalAI ? 397 : 0;
-
   // Build the dynamic cost rows: take seed costs, replace reno + capital gains,
   // replace the condo/IPTU debt lines with projected values, add occupant removal.
   const dynamicRows = (p.costs || [])
@@ -143,7 +164,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         return {
           ...r,
           value: renoCost,
-          hint: `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m². Região: R$ ${regionPricePerM2.toLocaleString('pt-BR')}/m².`,
+          hint: `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m².`,
         };
       }
       if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) {
@@ -163,7 +184,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     dynamicRows.push({
       label: `Condomínio projetado (${monthsToSale} meses)`,
       value: projectedCondo,
-      hint: `R$ ${monthlyCondo.toLocaleString('pt-BR')}/mês × ${monthsToSale} meses até a venda.`,
+      hint: `R$ ${fmtBRL(monthlyCondo)}/mês × ${monthsToSale} meses até a venda.`,
       kind: 'debt',
     });
   }
@@ -171,19 +192,10 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     dynamicRows.push({
       label: `IPTU projetado (${monthsToSale} meses)`,
       value: projectedIptu,
-      hint: `R$ ${monthlyIptu.toLocaleString('pt-BR')}/mês × ${monthsToSale} meses até a venda.`,
+      hint: `R$ ${fmtBRL(monthlyIptu)}/mês × ${monthsToSale} meses até a venda.`,
       kind: 'debt',
     });
   }
-  if (legalAICost > 0) {
-    dynamicRows.push({
-      label: 'Assistente jurídico',
-      value: legalAICost,
-      hint: 'Diligência jurídica automatizada — matrícula, certidões, processos, protestos e parecer de nulidade.',
-      kind: 'legal',
-    });
-  }
-
   // ── Base cost model at minBid (seed values) ──
   // Used to derive fee rates and the target slider cap. The rows are then
   // rebased onto maxBid so the displayed total reflects the recommended bid.
@@ -238,8 +250,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
     target: effectiveTarget, setTarget, targetCap,
     exempt, setExempt,
-    legalAI, setLegalAI, legalAICost,
-    renoCost, renoRate, regionPricePerM2,
+    renoCost, renoRate, regionPricePerM2, isLand,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
     gainCapital, dynamicTotal, dynamicRows: rebasedRows, netSale, maxBid, externalCosts,
   };
@@ -260,14 +271,26 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
         </button>
         <div className="row gap-2 detail-actions">
+          {auctionUrl && (
+            <a
+              className="btn sm primary"
+              href={auctionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Acessar leilão <span aria-hidden="true">↗</span>
+            </a>
+          )}
           <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
             <span style={{ color: isWatched ? 'var(--accent)' : 'var(--fg-2)' }}>
               {isWatched ? '★' : '☆'}
             </span>
             {isWatched ? 'Salvo' : 'Salvar'}
           </button>
-          <button className="btn sm" disabled title="Em breve">
-            <span className="mono">⎙</span> Exportar análise
+          <button className="btn sm" disabled title="Disponível em breve.">
+            <span aria-hidden="true">✦</span>
+            Exportar análise
+            <span className="tag accent" style={{ padding: '1px 5px', fontSize: 8.5 }}>Em breve</span>
           </button>
           {!isEnriched && p.canAnalyze && (
             <button
@@ -360,7 +383,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
                 {p.endsAt ? new Date(p.endsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) + ' · ' + new Date(p.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
               </div>
             </div>
-            <RiskSummary flags={p.risk} />
           </div>
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
@@ -387,14 +409,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             </div>
           </Collapsible>
 
-          <Collapsible title="Dados do leilão" last>
-            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 12.5 }}>
-              <Meta lbl="Leiloeiro" val={p.auctioneer} />
-              <Meta lbl="Tribunal/Vara" val={p.court} />
-              <Meta lbl="Processo" val={p.edital?.process || '—'} />
-              <Meta lbl="Matrícula" val={p.viability?.features?.["Matrícula"] || "—"} />
-            </div>
-          </Collapsible>
         </div>
       </div>
 
@@ -407,10 +421,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       }}>
         {[
           { v: 'market', l: 'Mercado', ix: '01' },
-          { v: 'cost', l: 'Custos', ix: '02' },
-          { v: 'viability', l: 'Viabilidade financeira', ix: '03' },
-          { v: 'edital', l: 'Edital', ix: '04' },
-          { v: 'legal', l: 'Jurídico', ix: '05', locked: true },
+          { v: 'cost', l: 'Viabilidade financeira', ix: '02' },
+          { v: 'edital', l: 'Edital', ix: '03' },
+          { v: 'legal', l: 'Jurídico', ix: '04', comingSoon: true },
         ].map(t => (
           <button
             key={t.v}
@@ -428,7 +441,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           >
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t.ix}</span>
             <span>{t.l}</span>
-            {t.locked && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>premium</span>}
+            {t.comingSoon && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
           </button>
         ))}
       </div>
@@ -437,9 +450,8 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       <div className="fade-in" key={tab}>
         {tab === 'market' && <Market p={p} />}
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
-        {tab === 'viability' && <Viability p={p} sim={sim} />}
-        {tab === 'legal' && <LegalLocked />}
-        {tab === 'edital' && <Edital p={p} />}
+        {tab === 'legal' && <LegalComingSoon />}
+        {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} />}
       </div>
       </>) : (
         <AnalyzeCTA
@@ -604,7 +616,7 @@ function Market({ p }) {
   const market = p.market || 0;
 
   // Anchor for bar percentages: the larger of appraisal / market, so the bar
-  // can visualize all three values on the same scale even when the IA market
+  // can visualize all three values on the same scale even when the market
   // estimate is smaller than the edital appraisal (or vice versa).
   const barMax = Math.max(market, appraisal, bid, 1);
   const bidPct = (bid / barMax) * 100;
@@ -619,6 +631,9 @@ function Market({ p }) {
 
   // Valorização da região — extraída do indicador de preço/m² do bairro
   const filteredIndicators = md.indicators;
+  const mapsQuery = encodeURIComponent([p.address, p.city].filter(Boolean).join(', '));
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  const mapsEmbedUrl = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
 
   return (
     <div>
@@ -628,7 +643,7 @@ function Market({ p }) {
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
             <div>
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.01 · spread</span>
-              <h3 className="h2" style={{ marginTop: 4 }}>Lance vs. avaliação vs. mercado IA</h3>
+              <h3 className="h2" style={{ marginTop: 4 }}>Lance vs. avaliação vs. mercado estimado</h3>
             </div>
           </div>
 
@@ -650,7 +665,7 @@ function Market({ p }) {
                   background: 'var(--fg-1)', transform: 'translateX(-1px)',
                 }}></div>
               )}
-              {/* Mercado IA marker — vertical line + dot above (uses --good) */}
+              {/* Estimated-market marker — vertical line + dot above */}
               {market > 0 && (
                 <div style={{
                   position: 'absolute',
@@ -663,7 +678,7 @@ function Market({ p }) {
             {/* Tick labels under bar — only show if they fit; otherwise rely on legend below */}
           </div>
 
-          {/* Legend — three rows: bid / appraisal / mercado IA */}
+          {/* Legend — three rows: bid / appraisal / estimated market */}
           <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
             <div className="row between" style={{ alignItems: 'center' }}>
               <div className="row gap-2" style={{ alignItems: 'center' }}>
@@ -697,7 +712,6 @@ function Market({ p }) {
               <div className="row gap-2" style={{ alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--good)', display: 'inline-block' }}></span>
                 <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                  <span className="ia-chip" style={{ marginRight: 6 }}>IA</span>
                   Mercado estimado
                 </span>
               </div>
@@ -708,14 +722,14 @@ function Market({ p }) {
             </div>
           </div>
 
-          {/* Gap summary — two lines: vs mercado IA and vs avaliação (deságio oficial) */}
+          {/* Gap summary — estimated market and official appraisal */}
           <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div style={{
               padding: '11px 13px', borderRadius: 6, fontSize: 12.5,
               background: gapVsMarket >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)',
               borderLeft: `3px solid ${gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)'}`,
             }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>vs. mercado IA</div>
+              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>vs. mercado estimado</div>
               <div style={{ color: 'var(--fg-0)' }}>
                 <b style={{ color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
                   R$ {fmtBRL(Math.abs(gapVsMarket))}
@@ -723,8 +737,8 @@ function Market({ p }) {
               </div>
               <div className="mono" style={{ fontSize: 11, marginTop: 2, color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                 {discountVsMarketPct >= 0
-                  ? `−${discountVsMarketPct.toFixed(0)}% desconto IA`
-                  : `+${Math.abs(discountVsMarketPct).toFixed(1)}% acima IA`}
+                  ? `−${discountVsMarketPct.toFixed(0)}% desconto estimado`
+                  : `+${Math.abs(discountVsMarketPct).toFixed(1)}% acima da estimativa`}
               </div>
             </div>
             <div style={{
@@ -760,10 +774,27 @@ function Market({ p }) {
         </div>
       </div>
 
-      {/* § 01.03 — comparáveis (trend removida) */}
+      <div className="card" style={{ marginTop: 16, padding: 22 }}>
+        <div className="row between" style={{ alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.03 · localização</span>
+            <h3 className="h2" style={{ marginTop: 4 }}>Google Maps · vista do local</h3>
+          </div>
+          <a className="btn sm" href={mapsUrl} target="_blank" rel="noopener noreferrer">Abrir no Google ↗</a>
+        </div>
+        <iframe
+          title={`Mapa de ${p.address}`}
+          src={mapsEmbedUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          style={{ width: '100%', height: 320, border: 0, borderRadius: 8 }}
+        />
+      </div>
+
+      {/* § 01.04 — comparáveis (trend removida) */}
       {md.comparables.length > 0 && (
         <div className="card" style={{ marginTop: 16, padding: 22 }}>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.03 · comparáveis</span>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.04 · comparáveis</span>
           <h3 className="h2" style={{ marginTop: 4, marginBottom: 16 }}>Anúncios usados na referência regional</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
@@ -824,8 +855,8 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 function CostBreakdown({ p, sim }) {
   const {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
-    target, setTarget, targetCap, exempt, setExempt, legalAI, setLegalAI,
-    renoCost, renoRate, regionPricePerM2,
+    target, setTarget, targetCap, exempt, setExempt,
+    renoCost, renoRate, regionPricePerM2, isLand,
     projectedCondo, projectedIptu,
     netSale, maxBid, dynamicRows, dynamicTotal, externalCosts,
   } = sim;
@@ -838,10 +869,11 @@ function CostBreakdown({ p, sim }) {
     );
   }
 
-  // Presets snap the slider to canonical levels. Slider position 0/60/100 = leve/inter/completa.
+  // Presets snap the slider to canonical levels.
   const renoPresets = [
-    { id: 'leve',     label: 'Leve',          pct: 0 },
-    { id: 'inter',    label: 'Intermediária', pct: 60 },
+    { id: 'none',     label: 'Sem reforma',   pct: 0 },
+    { id: 'leve',     label: 'Leve',          pct: 15 },
+    { id: 'inter',    label: 'Intermediária', pct: 50 },
     { id: 'completa', label: 'Completa',      pct: 100 },
   ];
 
@@ -858,11 +890,10 @@ function CostBreakdown({ p, sim }) {
             </p>
           </div>
           <button className="btn sm" onClick={() => {
-            setRenoPct(60);
+            setRenoPct(0);
             setMonthsToSale(12);
             setTarget(30);
             setExempt('Primeiro imóvel ou reinvestimento em 180 dias');
-            setLegalAI(false);
           }}>
             Resetar
           </button>
@@ -910,11 +941,12 @@ function CostBreakdown({ p, sim }) {
             <input
               type="range" min={0} max={100} value={renoPct}
               onChange={(e) => setRenoPct(+e.target.value)}
+              disabled={isLand}
               className="slider"
               style={{ width: '100%', marginTop: 14 }}
             />
             <div className="row between" style={{ marginTop: 8 }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>leve</span>
+              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>sem reforma</span>
               <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>completa</span>
             </div>
             <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
@@ -940,7 +972,9 @@ function CostBreakdown({ p, sim }) {
               })}
             </div>
             <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
-              R$ {renoRate}/m² × {Math.round(p.area || 0)} m² · {renoPct}%
+              {isLand
+                ? 'Terreno não recebe estimativa de reforma'
+                : `R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m² · cenário ${renoPct}%`}
             </p>
           </div>
 
@@ -975,7 +1009,7 @@ function CostBreakdown({ p, sim }) {
           fontSize: 11.5, color: 'var(--fg-2)', marginBottom: 20,
         }}>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>região:</span>{' '}
-          R$ {regionPricePerM2.toLocaleString('pt-BR')}/m² · taxa de reforma aplicada: R$ {renoRate}/m²
+          R$ {fmtBRL(regionPricePerM2)}/m² · taxa de reforma aplicada: R$ {fmtBRL(renoRate)}/m²
         </div>
 
         {/* Tax scenario */}
@@ -988,32 +1022,6 @@ function CostBreakdown({ p, sim }) {
           hint="Isenção ou incidência do ganho de capital na venda"
         />
 
-        <div className="divider" style={{ margin: '20px 0' }}></div>
-        <div className="row between" style={{ alignItems: 'center' }}>
-          <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Assistente jurídico</span>
-            <p style={{ margin: '4px 0 0', fontSize: 11.5, color: 'var(--fg-3)' }}>
-              Inclui R$ 397 de análise jurídica automatizada no custo total
-            </p>
-          </div>
-          <button
-            onClick={() => setLegalAI(!legalAI)}
-            style={{
-              width: 44, height: 24, borderRadius: 12,
-              background: legalAI ? 'var(--accent)' : 'var(--bg-3)',
-              position: 'relative', transition: 'background .2s',
-              border: '1px solid ' + (legalAI ? 'var(--accent)' : 'var(--line-2)'),
-              cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            <span style={{
-              position: 'absolute', top: 2, left: legalAI ? 22 : 2,
-              width: 18, height: 18, borderRadius: '50%',
-              background: '#fff', transition: 'left .2s',
-              boxShadow: '0 1px 3px rgba(17,24,39,0.15)',
-            }} />
-          </button>
-        </div>
       </div>
 
       {/* ── Cost table ── */}
@@ -1033,7 +1041,7 @@ function CostBreakdown({ p, sim }) {
 
         <div className="card">
           <div className="cost-head" style={{
-            display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14,
+            display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
             padding: '10px 20px', background: 'var(--bg-2)',
             fontFamily: 'var(--f-mono)', fontSize: 10.5,
             textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--fg-3)',
@@ -1046,14 +1054,14 @@ function CostBreakdown({ p, sim }) {
             <CostRow key={i} l={r.label} v={r.value} hint={r.hint} pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0} />
           ))}
           <div className="cost-row" style={{
-            display: 'grid', gridTemplateColumns: '24px 1fr 100px 160px', gap: 14,
+            display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
             padding: '20px 20px', background: 'var(--bg-2)',
             alignItems: 'baseline', borderTop: '2px solid var(--line-2)',
           }}>
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
             <span style={{ fontSize: 15, fontWeight: 600 }}>Custo total — chave na mão</span>
             <span></span>
-            <span className="num-xl" style={{ textAlign: 'right', color: 'var(--accent)' }}>R$ {fmtBRL(dynamicTotal)}</span>
+            <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: 0 }}>R$ {fmtBRL(dynamicTotal)}</span>
           </div>
         </div>
         <p style={{ marginTop: 14, fontSize: 11.5, color: 'var(--fg-3)' }}>
@@ -1111,7 +1119,7 @@ function CostRow({ l, v, hint, pct }) {
       onMouseLeave={() => setOpen(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '24px 1fr 100px 160px',
+        gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)',
         gap: 14,
         padding: '14px 20px',
         borderTop: '1px solid var(--line-1)',
@@ -1144,8 +1152,9 @@ function CostRow({ l, v, hint, pct }) {
           </div>
         )}
       </div>
-      <span className="mono" style={{
+      <span className="mono cost-money-value" style={{
         fontSize: 15, textAlign: 'right',
+        minWidth: 0,
         color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
         fontWeight: 500, letterSpacing: '-0.02em',
       }}>
@@ -1205,191 +1214,26 @@ function Selector({ label, value, options, onChange, hint }) {
 }
 
 // ============================================================
-// TAB 3 — VIABILITY (simulator removed — results come from Costs tab)
+// TAB 4 — LEGAL (coming soon)
 // ============================================================
-function Viability({ p, sim }) {
-  const v = p.viability;
-  const { dynamicTotal, maxBid, target, externalCosts } = sim;
-
-  if (!v) {
-    return (
-      <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Dados de viabilidade não disponíveis para este imóvel.</p>
-      </div>
-    );
-  }
-
-  const warnCount = v.riskDimensions.filter(d => d.state === 'warn').length;
-  const badCount = v.riskDimensions.filter(d => d.state === 'bad').length;
-
+function LegalComingSoon() {
   return (
-    <div>
-      {/* Metrics from simulator */}
-      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 16 }}>
-        <Metric lbl="Custos externos" big={`R$ ${fmtBRL(externalCosts)}`} sub="Taxas, reforma, débitos — tudo além do arremate" tone="muted" />
-        <Metric lbl="Custo total estimado" big={`R$ ${fmtBRL(dynamicTotal)}`} sub="Arremate + custos externos (baseado no lance máximo)" tone="cost" />
-        <Metric lbl="Lance máximo recomendado" big={`R$ ${fmtBRL(Math.max(0, maxBid))}`} sub={`Para atingir ${target}% de retorno líquido`} tone="hero" />
-      </div>
-
-      <div style={{ marginBottom: 24, padding: '10px 16px', background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
-        ↳ Valores calculados com base no simulador da aba <b style={{ color: 'var(--fg-1)' }}>Custos</b>. Ajuste lá para recalcular.
-      </div>
-
-      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
-            <div>
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 03.01</span>
-              <h3 className="h2" style={{ marginTop: 4 }}>Riscos por dimensão</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Avaliação qualitativa nas três dimensões que mais impactam o arremate.</p>
-            </div>
-            <span className={`tag dot ${badCount > 0 ? 'bad' : warnCount > 0 ? 'warn' : 'good'}`}>
-              {badCount > 0 ? `${badCount} crítica${badCount > 1 ? 's' : ''}` : warnCount > 0 ? `${warnCount} atenção` : 'sem riscos'}
-            </span>
-          </div>
-          <div className="col gap-4" style={{ marginTop: 20 }}>
-            {v.riskDimensions.map(rd => (
-              <RiskBar key={rd.dim} dim={rd.dim} state={rd.state} note={rd.note} />
-            ))}
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
-            <div>
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 03.02</span>
-              <h3 className="h2" style={{ marginTop: 4 }}>Alertas detectados</h3>
-            </div>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>{v.alerts.length} itens</span>
-          </div>
-          <div className="col gap-3" style={{ marginTop: 20 }}>
-            {v.alerts.map((a, i) => (
-              <Alert key={i} level={a.level} title={a.title}>{a.text}</Alert>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Metric({ lbl, big, sub, tone = 'muted' }) {
-  const t = _tones[tone] || _tones.muted;
-  return (
-    <div style={{
-      padding: 22,
-      background: t.cardBg, borderRadius: 10,
-      border: `1px solid ${t.border}`,
-      boxShadow: tone === 'hero' ? '0 6px 18px rgba(124,58,237,0.22)' : 'none',
-    }}>
-      <span className="uppy" style={{ color: t.lbl, fontSize: 10.5, letterSpacing: '0.06em' }}>{lbl}</span>
-      <div className="num-xl" style={{ marginTop: 10, color: t.num, fontSize: tone === 'hero' ? 30 : 26, fontWeight: 600 }}>{big}</div>
-      <p style={{ margin: '10px 0 0', fontSize: 12, color: t.sub, lineHeight: 1.45 }}>{sub}</p>
-    </div>
-  );
-}
-
-function RiskBar({ dim, state, note }) {
-  const color = state === 'good' ? 'var(--good)' : state === 'warn' ? 'var(--warn)' : 'var(--bad)';
-  const pct = state === 'good' ? 100 : state === 'warn' ? 60 : 25;
-  return (
-    <div>
-      <div className="row between baseline" style={{ marginBottom: 8 }}>
-        <span style={{ fontSize: 13.5, color: 'var(--fg-0)', fontWeight: 500 }}>{dim}</span>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
-      </div>
-      <div className={`bar ${state}`}>
-        <i style={{ width: `${pct}%` }}></i>
-      </div>
-      <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>{note}</p>
-    </div>
-  );
-}
-
-function Alert({ level, title, children }) {
-  const color = level === 'good' ? 'var(--good)' : level === 'warn' ? 'var(--warn)' : 'var(--bad)';
-  const bg = level === 'good' ? 'var(--good-soft)' : level === 'warn' ? 'var(--warn-soft)' : 'var(--bad-soft)';
-  return (
-    <div style={{ padding: '12px 14px', background: bg, borderRadius: 6, borderLeft: `2px solid ${color}` }}>
-      <div className="row gap-2 baseline" style={{ marginBottom: 4 }}>
-        <span style={{ color, fontSize: 11 }}>●</span>
-        <span style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{title}</span>
-      </div>
-      <p style={{ margin: '0 0 0 16px', fontSize: 12, color: 'var(--fg-1)' }}>{children}</p>
-    </div>
-  );
-}
-
-// ============================================================
-// TAB 4 — LEGAL (locked)
-// ============================================================
-function LegalLocked() {
-  return (
-    <div style={{ position: 'relative', minHeight: 540 }}>
-      <div aria-hidden style={{ filter: 'blur(10px)', opacity: 0.55, pointerEvents: 'none', userSelect: 'none' }}>
-        <h3 className="h2" style={{ marginBottom: 18 }}>Matrícula 87.412 · 14º cartório de registro de imóveis</h3>
-        <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="card" style={{ padding: 22 }}>
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>Item {i}</span>
-              <div className="num-md" style={{ marginTop: 8 }}>0000000000 0000</div>
-              <p style={{ marginTop: 10, color: 'var(--fg-2)', fontSize: 13 }}>
-                Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore.
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 24 }}>
-        <div className="card" style={{
-          width: 'min(560px, 100%)', padding: 32,
-          background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)',
-          boxShadow: '0 20px 50px rgba(17,24,39,0.08)',
-        }}>
-          <div className="row gap-2 baseline" style={{ marginBottom: 18 }}>
-            <span style={{ width: 26, height: 26, display: 'grid', placeItems: 'center', border: '1.5px solid var(--accent)', borderRadius: '50%', color: 'var(--accent)', fontSize: 12, fontFamily: 'var(--f-mono)' }}>⚿</span>
-            <span className="uppy" style={{ color: 'var(--accent)' }}>conteúdo premium</span>
-          </div>
-          <h3 className="h1" style={{ marginBottom: 14 }}>Pesquisa jurídica completa</h3>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-1)' }}>
-            Diligência jurídica feita por advogados parceiros — você arremata sabendo exatamente os riscos.
-          </p>
-          <ul style={{ margin: '22px 0', padding: 0, listStyle: 'none' }}>
-            {[
-              ['Matrícula 30 anos', 'Histórico completo de transferências e ônus'],
-              ['Certidões pessoais', 'Federal, estadual, municipal, trabalhista'],
-              ['Processos cíveis e criminais', 'Pesquisa nominal nos 27 estados'],
-              ['Protestos e SCPC', 'Cartórios e órgãos de proteção'],
-              ['Parecer de nulidade', 'Probabilidade de anulação do arremate'],
-            ].map(([t, d]) => (
-              <li key={t} style={{ display: 'grid', gridTemplateColumns: '14px 1fr', gap: 12, padding: '8px 0', borderTop: '1px solid var(--line-1)', alignItems: 'baseline' }}>
-                <span style={{ color: 'var(--good)', fontSize: 11 }}>✓</span>
-                <div>
-                  <div style={{ fontSize: 13, color: 'var(--fg-0)', fontWeight: 500 }}>{t}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>{d}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="row between" style={{ alignItems: 'flex-end' }}>
-            <div>
-              <div className="num-xl" style={{ color: 'var(--fg-0)' }}>
-                R$ 397<span style={{ fontSize: 13, color: 'var(--fg-2)', fontWeight: 400, fontFamily: 'var(--f-sans)' }}> / imóvel</span>
-              </div>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 4, display: 'inline-block' }}>entrega em até 24h</span>
-            </div>
-            <button className="btn primary lg">Desbloquear agora →</button>
-          </div>
-        </div>
+    <div className="card" style={{ minHeight: 360, display: 'grid', placeItems: 'center', padding: 32, textAlign: 'center' }}>
+      <div style={{ maxWidth: 440 }}>
+        <span className="tag accent" style={{ display: 'inline-block', marginBottom: 16 }}>em breve</span>
+        <h3 className="h1" style={{ marginBottom: 12 }}>Análise jurídica</h3>
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--fg-2)' }}>
+          Estamos preparando uma análise jurídica mais clara e confiável para os imóveis de leilão.
+        </p>
       </div>
     </div>
   );
 }
 
 // ============================================================
-// TAB 5 — EDITAL
+// TAB 3 — EDITAL
 // ============================================================
-function Edital({ p }) {
+function Edital({ p, auctionUrl }) {
   const e = p.edital;
   if (!e) {
     return (
@@ -1407,9 +1251,11 @@ function Edital({ p }) {
           <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Originado em: {e.firstBidDate || 'não informado'}</p>
         </div>
         <div className="row gap-2">
-          <button className="btn sm" onClick={() => p.auctionUrl && window.open(p.auctionUrl, '_blank')} disabled={!p.auctionUrl}>
-            <span className="mono">↓</span> PDF original
-          </button>
+          {auctionUrl && (
+            <a className="btn sm" href={auctionUrl} target="_blank" rel="noopener noreferrer">
+              Acessar leilão <span aria-hidden="true">↗</span>
+            </a>
+          )}
         </div>
       </div>
       <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>

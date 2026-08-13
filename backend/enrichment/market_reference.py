@@ -17,7 +17,7 @@ from sqlalchemy import delete, select
 from db.base import get_engine, init_db, make_session_factory
 from db.models import Property, RegionalMarketComparable, RegionalMarketPrice
 from enrichment.run import metadata_from_property
-from graph.market import calculate_market
+from graph.market import calculate_market, is_land_property_type
 from tools.property_scraper import scrape_comparables
 
 
@@ -58,7 +58,7 @@ async def refresh_references(
     seen: set[tuple[str, str, str, str]] = set()
     for prop in props:
         key = _region_key(prop)
-        if key in seen or not key[1] or not key[2]:
+        if key in seen or not key[1] or not key[2] or is_land_property_type(prop.property_type):
             continue
         seen.add(key)
         ref = references.get(key)

@@ -46,3 +46,28 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         assert {item.source for item in snapshot} == {
             "ZAP Imóveis", "Viva Real", "ImovelWeb",
         }
+
+
+@pytest.mark.asyncio
+async def test_worker_does_not_scrape_land_references(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(Property(
+            source="caixa", source_id="land-1", uf="PR", city="Curitiba",
+            neighborhood="Mato Dentro", property_type="Terreno",
+            address="Rodovia dos Minérios", area_m2=72_600,
+            preco=1_243_146.17, status="active",
+        ))
+        session.commit()
+
+    async def fail_if_called(metadata):
+        raise AssertionError("land scraper should not be called")
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fail_if_called)
+    summary = await market_reference.refresh_references(factory, ["PR"], limit=10)
+
+    assert summary == {"selected": 0, "updated": 0, "empty": 0, "failed": 0}
+    with factory() as session:
+        assert session.query(RegionalMarketPrice).count() == 0

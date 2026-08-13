@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fmtBRL } from '../utils';
+import { fetchCatalogItem } from '../api';
 
 export default function History({ go, history, clearHistory, properties }) {
+  const [detailCache, setDetailCache] = useState({});
   const grouped = useMemo(() => {
     const today = new Date().setHours(0, 0, 0, 0);
     const yesterday = today - 86400000;
@@ -17,6 +19,21 @@ export default function History({ go, history, clearHistory, properties }) {
     });
     return groups.filter(g => g.entries.length > 0);
   }, [history]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const liveIds = [...new Set(
+      history
+        .map(entry => entry.id)
+        .filter(id => properties.some(property => property.id === id)),
+    )];
+    Promise.all(liveIds.map(async id => [id, await fetchCatalogItem(id)]))
+      .then(entries => {
+        if (!cancelled) setDetailCache(Object.fromEntries(entries));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [history, properties]);
 
   return (
     <div className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
@@ -48,7 +65,7 @@ export default function History({ go, history, clearHistory, properties }) {
           <div style={{ fontSize: 40, color: 'var(--fg-3)', marginBottom: 16 }}>◷</div>
           <h3 className="h3" style={{ marginBottom: 8 }}>Nenhuma visita registrada</h3>
           <p style={{ margin: '0 0 20px', color: 'var(--fg-2)', fontSize: 14 }}>
-            Quando você abrir um imóvel, ele aparecerá aqui.
+            Imóveis abertos aparecem aqui automaticamente.
           </p>
           <button className="btn" onClick={() => go('feed')}>Explorar feed</button>
         </div>
@@ -61,14 +78,15 @@ export default function History({ go, history, clearHistory, properties }) {
               </div>
               <div className="card" style={{ overflow: 'hidden' }}>
                 {group.entries.map((entry, i) => {
-                  const live = properties.find(p => p.id === entry.id);
+                  const liveProperty = properties.find(p => p.id === entry.id);
                   return (
                     <HistoryRow
                       key={entry.id + entry.ts}
                       entry={entry}
-                      live={!!live}
+                      liveProperty={liveProperty}
+                      detail={detailCache[entry.id]}
                       last={i === group.entries.length - 1}
-                      onClick={() => live && go('detail', live)}
+                      onClick={() => liveProperty && go('detail', liveProperty)}
                     />
                   );
                 })}
@@ -81,52 +99,66 @@ export default function History({ go, history, clearHistory, properties }) {
   );
 }
 
-function HistoryRow({ entry, live, last, onClick }) {
+function HistoryRow({ entry, liveProperty, detail, last, onClick }) {
+  const live = !!liveProperty;
+  const enrichment = detail?.enrichment;
+  const property = liveProperty
+    ? { ...entry, ...liveProperty, ...detail, ...(enrichment || {}), ts: entry.ts }
+    : entry;
+  const hasAnalysis = !!enrichment;
   const ts = new Date(entry.ts);
   const timeStr = ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const dateStr = ts.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
   return (
     <div
-      className="history-row"
+      className={`history-row${live ? ' is-clickable' : ''}`}
       onClick={live ? onClick : undefined}
       style={{
         display: 'grid',
-        gridTemplateColumns: '1.8fr 1fr 0.7fr 0.7fr 80px 72px',
-        gap: 14, padding: '14px 18px',
+        gridTemplateColumns: 'minmax(280px, 1.55fr) minmax(190px, .75fr) minmax(210px, .85fr) minmax(245px, 1fr) 72px',
+        gap: 24, padding: '18px 22px',
         borderBottom: last ? 'none' : '1px solid var(--line-1)',
         alignItems: 'center',
         cursor: live ? 'pointer' : 'default',
         opacity: live ? 1 : 0.55,
         transition: 'background .15s',
       }}
-      onMouseEnter={e => { if (live) e.currentTarget.style.background = 'var(--bg-2)'; }}
-      onMouseLeave={e => { if (live) e.currentTarget.style.background = ''; }}
+      role={live ? 'button' : undefined}
+      aria-label={live ? `Abrir detalhes de ${property.title || property.address || 'imóvel'}` : undefined}
+      title={live ? 'Abrir detalhes do imóvel' : undefined}
+      tabIndex={live ? 0 : undefined}
+      onKeyDown={e => { if (live && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }}
     >
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.25 }}>{entry.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.25 }}>{property.title || property.address || 'Imóvel sem título'}</div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {entry.neighborhood}, {entry.city} · {entry.type} · {entry.auctionType}
+          {[property.neighborhood, property.city, property.type, property.modalidade || property.auctionType].filter(Boolean).join(' · ') || 'Informações não disponíveis'}
         </div>
+        <div className="history-mobile-time mono" style={{ fontSize: 10.5, color: 'var(--fg-3)', marginTop: 5 }}>{dateStr} · {timeStr}</div>
       </div>
 
-      <div>
-        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(entry.minBid)}</div>
+      <div className="history-money-cell">
+        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>{property.minBid > 0 ? `R$ ${fmtBRL(property.minBid)}` : '—'}</div>
         <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>lance mín.</div>
       </div>
 
-      <div>
-        <div className="num-sm" style={{ color: entry.discount > 0 ? 'var(--good)' : 'var(--bad)' }}>
-          {entry.discount >= 0 ? `−${entry.discount}%` : `+${Math.abs(entry.discount).toFixed(1)}%`}
+      <div className="history-money-cell">
+        <div className="num-sm" style={{ color: 'var(--fg-1)' }}>{property.appraisal > 0 ? `R$ ${fmtBRL(property.appraisal)}` : '—'}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {Number.isFinite(property.auctionDiscount) ? `${property.auctionDiscount.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% oficial` : 'avaliação'}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>desconto</div>
       </div>
 
-      <div>
-        <div className="num-sm" style={{ color: entry.roi > 0 ? 'var(--good)' : entry.roi < 0 ? 'var(--bad)' : 'var(--fg-2)' }}>
-          {entry.roi >= 0 ? `+${entry.roi}%` : `${entry.roi}%`}
+      <div className="history-money-cell">
+        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>{property.market > 0 ? `R$ ${fmtBRL(property.market)}` : '—'}</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {property.market > 0 && Number.isFinite(property.discount)
+            ? `${property.discount.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% estimado`
+            : hasAnalysis
+              ? 'sem referência de mercado'
+              : 'análise pendente'}
         </div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>ROI</div>
       </div>
 
       <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', textAlign: 'right' }}>
@@ -134,12 +166,6 @@ function HistoryRow({ entry, live, last, onClick }) {
         <div style={{ marginTop: 2 }}>{dateStr}</div>
       </div>
 
-      <div style={{ textAlign: 'right' }}>
-        {live
-          ? <span className="mono" style={{ fontSize: 12, color: 'var(--accent)' }}>Ver →</span>
-          : <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>indisponível</span>
-        }
-      </div>
     </div>
   );
 }
