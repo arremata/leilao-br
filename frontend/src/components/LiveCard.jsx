@@ -3,7 +3,7 @@ import { fmtBRL } from '../utils';
 // ============================================================
 // LiveCard — Hero card showing analysis result or animated progress
 // ============================================================
-export function LiveCardHero({ entry, onClick }) {
+export function LiveCardHero({ entry, onClick, analyzed = false }) {
   if (!entry) return null;
 
   return (
@@ -27,13 +27,14 @@ export function LiveCardHero({ entry, onClick }) {
         </span>
         <span style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 12, fontWeight: 600, color: 'var(--good)',
+          fontSize: 12, fontWeight: 600,
+          color: analyzed ? 'var(--good)' : 'var(--fg-2)',
         }}>
           <span style={{
             width: 6, height: 6, borderRadius: '50%',
-            background: 'var(--good)',
+            background: analyzed ? 'var(--good)' : 'var(--fg-3)',
           }} />
-          Análise concluída
+          {analyzed ? 'Análise concluída' : 'Dados do catálogo'}
         </span>
       </div>
 
@@ -51,7 +52,7 @@ export function LiveCardHero({ entry, onClick }) {
           {entry.neighborhood ? `${entry.neighborhood}, ` : ''}{entry.city}
         </p>
 
-        {/* Pricing — 3 valores: lance, avaliação, mercado IA */}
+        {/* Pricing — lance, avaliação e mercado estimado */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
           <div>
             <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Lance mínimo</span>
@@ -62,28 +63,31 @@ export function LiveCardHero({ entry, onClick }) {
           <div>
             <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Avaliação leilão</span>
             <span className="mono" style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg-1)' }}>
-              R$ {fmtBRL(entry.appraisal)}
+              {entry.appraisal > 0 ? `R$ ${fmtBRL(entry.appraisal)}` : '—'}
             </span>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--fg-2)', marginTop: 2 }}>
-              {(entry.auctionDiscount ?? 0) >= 0
-                ? `${entry.auctionDiscount ?? 0}% deságio`
-                : `+${Math.abs(entry.auctionDiscount ?? 0).toFixed(1)}% ágio`}
-            </div>
+            {entry.appraisal > 0 && Number.isFinite(Number(entry.auctionDiscount)) && (
+              <div className="mono" style={{ fontSize: 10, color: 'var(--fg-2)', marginTop: 2 }}>
+                {Number(entry.auctionDiscount) >= 0
+                  ? `${entry.auctionDiscount}% deságio`
+                  : `+${Math.abs(entry.auctionDiscount).toFixed(1)}% ágio`}
+              </div>
+            )}
           </div>
           <div>
             <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>
-              <span className="ia-chip" style={{ marginRight: 5 }}>IA</span>
-              Mercado IA
+              Mercado estimado
             </span>
             <span className="mono" style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-0)' }}>
-              R$ {fmtBRL(entry.market)}
+              {entry.market > 0 ? `R$ ${fmtBRL(entry.market)}` : '—'}
             </span>
-            <div className="mono" style={{
-              fontSize: 10, marginTop: 2, fontWeight: 500,
-              color: (entry.discount ?? 0) > 0 ? 'var(--good)' : (entry.discount ?? 0) < 0 ? 'var(--bad)' : 'var(--fg-2)',
-            }}>
-              {(entry.discount ?? 0) >= 0 ? `+${entry.discount}% desconto IA` : `${entry.discount}% acima IA`}
-            </div>
+            {entry.market > 0 && Number.isFinite(Number(entry.discount)) && (
+              <div className="mono" style={{
+                fontSize: 10, marginTop: 2, fontWeight: 500,
+                color: Number(entry.discount) > 0 ? 'var(--good)' : Number(entry.discount) < 0 ? 'var(--bad)' : 'var(--fg-2)',
+              }}>
+                {Number(entry.discount) >= 0 ? `${entry.discount}% desconto estimado` : `${entry.discount}% acima da estimativa`}
+              </div>
+            )}
           </div>
         </div>
       </div>

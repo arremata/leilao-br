@@ -98,6 +98,14 @@ def _card_title(p: Property) -> str:
     return p.address or ""
 
 
+def _catalog_auction_type(modalidade: str | None) -> str | None:
+    """Classify only Caixa modalities with an unambiguous legal nature."""
+    value = (modalidade or "").lower()
+    if any(term in value for term in ("leilão sfi", "leilao sfi", "licitação aberta", "licitacao aberta", "venda direta")):
+        return "Extrajudicial"
+    return None
+
+
 def _property_card(p: Property) -> dict:
     def _iso(value):
         if value is None:
@@ -120,6 +128,18 @@ def _property_card(p: Property) -> dict:
         (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
         comparable_dates[-1] if comparable_dates else None,
     )
+    modalidade = p.modalidade or ""
+    praca = None
+    if "sfi" in modalidade.lower():
+        first = p.first_auction_at
+        if first is not None and first.tzinfo is None:
+            first = first.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        if first and first.astimezone(timezone.utc) >= now:
+            praca = "1ª praça"
+        elif p.second_auction_at is not None:
+            praca = "2ª praça"
+        elif p.first_auction_at is not None:
+            praca = "1ª praça"
 
     return {
         "id": p.id,
@@ -138,6 +158,8 @@ def _property_card(p: Property) -> dict:
         "desconto": p.desconto_oficial,
         "auctionDiscount": p.desconto_oficial,
         "modalidade": p.modalidade,
+        "auctionType": _catalog_auction_type(p.modalidade),
+        "praca": praca,
         "firstAuctionAt": _iso(p.first_auction_at),
         "secondAuctionAt": _iso(p.second_auction_at),
         "firstAuctionPrice": p.first_auction_price,
@@ -146,6 +168,7 @@ def _property_card(p: Property) -> dict:
         "lat": p.lat,
         "lng": p.lng,
         "photoUrl": p.photo_url,
+        "auctionUrl": p.detail_url,
         "detailUrl": p.detail_url,
         "status": p.status,
         "canAnalyze": True,
@@ -190,23 +213,13 @@ def get_dashboard(session: Session = Depends(get_session)) -> dict:
     avg_roi = round(sum(p.get("roi", 0) for p in properties) / max(len(properties), 1))
 
     return {
-        "greeting": {
-            "name": "Felipe",
-            "subtitle": f"{len(properties)} imóveis analisados no seu portfólio.",
-        },
         "kpis": [
-            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "seu portfólio", "pos": True},
+            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "no catálogo", "pos": True},
             {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
             {"lbl": "Análises restantes", "val": "3", "delta": "plano grátis"},
             {"lbl": "ROI médio · feed", "val": f"{avg_roi}%", "delta": "do portfólio", "pos": avg_roi >= 10},
         ],
-        "activity": [
-            {"time": "há 2h", "type": "price", "title": "Apto. 78 m², Vila Madalena", "text": "Lance mínimo reduzido em R$ 18.000 — agora R$ 312.000 (2ª praça)", "tone": "good"},
-            {"time": "há 5h", "type": "risk", "title": "Casa 220 m², Ipanema", "text": "Novo processo detectado: ação anulatória em curso (1ª instância)", "tone": "bad"},
-            {"time": "ontem", "type": "closing", "title": "Apto. 110 m², Savassi", "text": "Leilão encerra em 6h22 — você ainda não decidiu", "tone": "warn"},
-            {"time": "ontem", "type": "new", "title": "3 novos imóveis match com seu perfil", "text": "Itaim Bibi, Pinheiros e Vila Olímpia — ROI médio 18%", "tone": "neutral"},
-            {"time": "2 dias", "type": "legal", "title": "Sala 64 m², Faria Lima", "text": "Pesquisa jurídica completa entregue — 0 ressalvas", "tone": "good"},
-        ],
+        "activity": [],
     }
 
 
@@ -228,7 +241,13 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
     enr = session.execute(
         select(Enrichment).where(Enrichment.property_id == prop_id)
     ).scalar_one_or_none()
-    card["enrichment"] = json.loads(enr.result_json) if enr else None
+    enrichment = json.loads(enr.result_json) if enr else None
+    # Suppress invalid estimates stored by older pipeline versions. Those
+    # multiplied a neighborhood R$/m² reference by the entire land area.
+    from graph.market import is_land_property_type
+    if enrichment and is_land_property_type(prop.property_type):
+        enrichment.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
+    card["enrichment"] = enrichment
     return card
 
 

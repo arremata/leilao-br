@@ -396,12 +396,88 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.025em;
   white-space: nowrap;
 }
+
+.cost-money-value,
+.cost-total-value {
+  max-width: 100%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-money-value {
+  font-size: clamp(12px, 1.15vw, 15px) !important;
+}
+
+.cost-total-value {
+  font-size: clamp(17px, 2vw, 26px) !important;
+}
+
+@media (max-width: 1100px) and (min-width: 561px) {
+  .cost-row,
+  .cost-head {
+    grid-template-columns: 20px minmax(150px, 1fr) 90px minmax(170px, 220px) !important;
+    gap: 10px !important;
+  }
+}
 .num-sm {
   font-family: var(--f-mono);
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.01em;
   white-space: nowrap;
+}
+
+.history-row > * {
+  min-width: 0;
+}
+
+.history-row.is-clickable {
+  position: relative;
+}
+
+.history-row.is-clickable::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.history-row.is-clickable:hover,
+.history-row.is-clickable:focus-visible {
+  background: var(--bg-2);
+  outline: none;
+}
+
+.history-row.is-clickable:hover::before,
+.history-row.is-clickable:focus-visible::before {
+  opacity: 1;
+}
+
+.history-money-cell {
+  padding-inline: 4px;
+}
+
+.history-money-cell .num-sm {
+  font-size: clamp(12px, 0.95vw, 15px);
+}
+
+@media (max-width: 1280px) and (min-width: 861px) {
+  .history-row {
+    grid-template-columns: minmax(210px, 1.4fr) repeat(3, minmax(145px, 0.85fr)) 62px !important;
+    gap: 12px !important;
+    padding-inline: 16px !important;
+  }
+
+  .history-money-cell {
+    padding-inline: 0;
+  }
+
+  .history-money-cell .num-sm {
+    font-size: 12px;
+  }
 }
 
 /* ---------- Dividers ---------- */
@@ -691,14 +767,14 @@ a { color: inherit; text-decoration: none; }
   }
 
   .history-row {
-    grid-template-columns: 40px 1fr auto !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
     gap: 8px 10px !important;
     padding: 12px 14px !important;
   }
+  .history-row > :nth-child(2),
   .history-row > :nth-child(3),
   .history-row > :nth-child(4),
-  .history-row > :nth-child(5),
-  .history-row > :nth-child(7) {
+  .history-row > :nth-child(5) {
     display: none !important;
   }
 
@@ -727,6 +803,16 @@ a { color: inherit; text-decoration: none; }
     flex-direction: column;
     align-items: flex-start !important;
     gap: 12px;
+  }
+}
+
+.history-mobile-time {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .history-mobile-time {
+    display: block;
   }
 }
 
@@ -854,21 +940,4 @@ a { color: inherit; text-decoration: none; }
   .detail-actions .btn.primary {
     grid-column: 1 / -1;
   }
-}
-
-/* IA chip — labels the market value as IA-derived */
-.ia-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 16px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-family: var(--f-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }

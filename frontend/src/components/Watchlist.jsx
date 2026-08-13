@@ -14,11 +14,11 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
             <span className="ix">§ watchlist</span>
             <span>imóveis monitorados</span>
           </div>
-          <h1 className="h1">Sua Watchlist</h1>
+          <h1 className="h1">Watchlist</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
             {watchedItems.length === 0
               ? 'Nenhum imóvel salvo ainda.'
-              : `${watchedItems.length} ${watchedItems.length === 1 ? 'imóvel salvo' : 'imóveis salvos'} · monitoramos preço, riscos e prazo automaticamente.`}
+              : `${watchedItems.length} ${watchedItems.length === 1 ? 'imóvel salvo' : 'imóveis salvos'} neste navegador.`}
           </p>
         </div>
         {watchedItems.length > 0 && (

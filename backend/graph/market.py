@@ -3,10 +3,48 @@
 from __future__ import annotations
 
 from statistics import median
+import re
+import unicodedata
 
 from loguru import logger
 
 from graph.state import AuctionState, ComparableProperty, MarketResult
+
+
+def is_land_property_type(property_type: str | None) -> bool:
+    """Return whether automated price/m² extrapolation is unsafe for the type."""
+    normalized = unicodedata.normalize("NFKD", property_type or "").encode("ascii", "ignore").decode()
+    return bool(re.search(r"\b(terreno|lote|gleba)\b", normalized.lower()))
+
+
+def _normalized_address(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode()
+    value = re.sub(r"\b(rua|r|avenida|av|numero|n)\b", " ", value.lower())
+    return " ".join(re.findall(r"[a-z0-9]+", value))
+
+
+def _is_probable_auction_ad(metadata, comp: ComparableProperty) -> bool:
+    """Identify portal ads that merely publicize the property being auctioned."""
+    subject_tokens = set(_normalized_address(getattr(metadata, "address", "")).split())
+    candidate_tokens = set(_normalized_address(comp.address).split())
+    address_match = bool(subject_tokens) and len(subject_tokens & candidate_tokens) >= min(3, len(subject_tokens))
+    subject_area = float(getattr(metadata, "area_m2", 0) or 0)
+    same_area = subject_area > 0 and abs(comp.area_m2 - subject_area) / subject_area <= 0.03
+    auction_values = {
+        float(value) for value in (
+            getattr(metadata, "auction_price", 0),
+            getattr(metadata, "auction_price_2nd", 0),
+            getattr(metadata, "market_value_estimate", 0),
+        ) if value
+    }
+    same_price = any(abs(comp.price - value) / value <= 0.01 for value in auction_values)
+    auction_language = any(term in f"{comp.address} {comp.url}".lower() for term in ("leilao", "leilão", "hasta"))
+    return (address_match and same_area) or (same_area and same_price) or auction_language
+
+
+def _matches_subject_standard(metadata, comp: ComparableProperty) -> bool:
+    subject_area = float(getattr(metadata, "area_m2", 0) or 0)
+    return subject_area <= 0 or 0.65 * subject_area <= comp.area_m2 <= 1.35 * subject_area
 
 
 def calculate_market(
@@ -19,9 +57,17 @@ def calculate_market(
     A neighborhood reference is used only when no usable live comparable was
     found. The appraisal is deliberately not treated as a market comparable.
     """
+    # Land values depend heavily on zoning, buildable area, topography and the
+    # scale of the parcel. Multiplying a neighborhood-wide R$/m² reference by
+    # the full land area can produce spectacularly wrong estimates.
+    if is_land_property_type(getattr(metadata, "property_type", "")):
+        return MarketResult()
+
     usable = [
         comp for comp in comparables
         if comp.price > 0 and comp.area_m2 > 0 and comp.price_per_m2 > 0
+        and _matches_subject_standard(metadata, comp)
+        and not _is_probable_auction_ad(metadata, comp)
     ]
     if len(usable) >= 3:
         center = median(comp.price_per_m2 for comp in usable)

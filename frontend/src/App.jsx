@@ -11,43 +11,42 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const requestedScreen = params.get('screen');
     if (['home', 'feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
-    return localStorage.getItem('arremate_screen') || 'home';
+    return 'home';
   });
   const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('arremate_watched') || '[]');
+      const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
+      return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
   const [properties, setProperties] = useState([]);
   const [dashboard, setDashboard] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [history, setHistory] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('arremate_history') || '[]');
+      const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
+      return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
   const [feedSearch, setFeedSearch] = useState({ address: '', filters: null });
   const [feedKey, setFeedKey] = useState(0);
 
   useEffect(() => {
-    fetchCatalog().then(data => {
-      if (Array.isArray(data)) {
-        setProperties(data);
-        // Prune watchlist IDs that no longer exist (e.g. legacy "p1"/"p3" fallback).
-        const validIds = new Set(data.map(p => p.id));
-        setWatched(prev => {
-          const next = prev.filter(id => validIds.has(id));
-          return next.length === prev.length ? prev : next;
-        });
-      }
-    }).catch(() => {});
-    fetchDashboard().then(data => {
-      if (data) setDashboard(data);
-    }).catch(() => {});
+    let cancelled = false;
+    Promise.allSettled([fetchCatalog(), fetchDashboard()])
+      .then(([catalogResult, dashboardResult]) => {
+        if (cancelled) return;
+        const catalogData = catalogResult.status === 'fulfilled' ? catalogResult.value : [];
+        const dashboardData = dashboardResult.status === 'fulfilled' ? dashboardResult.value : null;
+        if (Array.isArray(catalogData)) setProperties(catalogData);
+        if (dashboardData) setDashboard(dashboardData);
+      })
+      .finally(() => { if (!cancelled) setInitialLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('arremate_screen', screen);
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [screen]);
 
@@ -105,8 +104,10 @@ function App() {
           title: prop.title, address: prop.address,
           city: prop.city, neighborhood: prop.neighborhood,
           risk: prop.risk, minBid: prop.minBid,
-          discount: prop.discount, roi: prop.roi,
+          appraisal: prop.appraisal, auctionDiscount: prop.auctionDiscount,
+          market: prop.market, discount: prop.discount, roi: prop.roi,
           type: prop.type, auctionType: prop.auctionType,
+          modalidade: prop.modalidade, endsAt: prop.endsAt,
         };
         setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
       }
@@ -136,18 +137,33 @@ function App() {
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
       <TopBar screen={screen} go={go} watchCount={watched.length} />
-      {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} history={history} />}
-      {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
-      {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
-      {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
-      {screen === 'detail' && <PropertyDetail key={selected?.id} property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
+      {initialLoading ? (
+        <InitialLoading />
+      ) : (<>
+        {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} history={history} />}
+        {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+        {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+        {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
+        {screen === 'detail' && <PropertyDetail key={selected?.id} property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
+      </>)}
     </div>
   );
 }
 
-function TopBar({ screen, go, watchCount }) {
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+function InitialLoading() {
+  return (
+    <main className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '72px 28px', minHeight: '65vh', display: 'grid', placeItems: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <span className="countdown" style={{ justifyContent: 'center', color: 'var(--fg-2)' }}>
+          <span className="dot" style={{ background: 'var(--accent)' }}></span>
+          <span className="mono">Carregando oportunidades…</span>
+        </span>
+      </div>
+    </main>
+  );
+}
 
+function TopBar({ screen, go, watchCount }) {
   return (
     <header className="topbar">
       <div id="argos-progress" style={{
@@ -167,65 +183,6 @@ function TopBar({ screen, go, watchCount }) {
           </a>
           <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</a>
         </nav>
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={() => setUserMenuOpen(!userMenuOpen)}
-          style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'var(--bg-3)',
-            display: 'grid', placeItems: 'center',
-            fontSize: 12, color: 'var(--fg-0)',
-            fontWeight: 600,
-            border: '1px solid var(--line-1)',
-            cursor: 'pointer',
-          }}
-        >
-          GD
-        </button>
-        {userMenuOpen && (
-          <>
-            <div onClick={() => setUserMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              minWidth: 200, padding: 6,
-              background: 'var(--bg-0)', border: '1px solid var(--line-1)',
-              borderRadius: 10, zIndex: 91,
-              boxShadow: '0 10px 28px rgba(17,24,39,0.1)',
-            }}>
-              <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-1)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>Gustavo D.</div>
-                <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>gustavo@arremate.com</div>
-              </div>
-              <button
-                onClick={() => { setUserMenuOpen(false); go('home'); }}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 12px', borderRadius: 6,
-                  fontSize: 12.5, color: 'var(--fg-1)',
-                  marginTop: 4,
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-2)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-              >
-                Minha conta
-              </button>
-              <button
-                onClick={() => setUserMenuOpen(false)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 12px', borderRadius: 6,
-                  fontSize: 12.5, color: 'var(--bad)',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-2)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-              >
-                Sair
-              </button>
-            </div>
-          </>
-        )}
       </div>
 
     </header>
