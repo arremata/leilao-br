@@ -51,3 +51,8 @@ jobs:
           --ufs "${{ github.event.inputs.ufs || 'PR' }}"
           --limit "${{ github.event.inputs.limit || '10' }}"
           --max-age-days 90
+      - name: Materialize shared property analyses
+        working-directory: backend
+        run: >-
+          python -m enrichment.materialize
+          --ufs "${{ github.event.inputs.ufs || 'PR' }}"
