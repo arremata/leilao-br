@@ -10,8 +10,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import unicodedata
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -21,6 +24,13 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
+
+BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from enrichment.run import PIPELINE_VERSION, metadata_from_property, run_structured_enrichment
+from graph.state import ComparableProperty
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
@@ -146,18 +156,14 @@ def _catalog_card(row) -> dict:
         "photoUrl": p.get("photo_url"),
         "auctionUrl": p.get("detail_url"),
         "status": p.get("status"),
-        # Heavy analysis runs only on the dedicated FastAPI backend. Expose the
-        # capability explicitly so the public Vercel UI never offers a broken
-        # action.
-        "canAnalyze": False,
+        "canAnalyze": True,
     }
-
 
 _CATALOG_COLUMNS = """
     id, source_id, source, uf, city, neighborhood, address, property_type,
     area_m2, beds, preco, avaliacao, desconto_oficial, modalidade,
     first_auction_at, second_auction_at, first_auction_price,
-    second_auction_price, lat, lng, photo_url, detail_url, status
+    second_auction_price, lat, lng, photo_url, detail_url, status, descricao_raw
 """
 
 
@@ -235,6 +241,73 @@ def get_catalog_item(property_id: int) -> dict:
     return card
 
 
+@app.post("/catalog/{property_id}/analyze")
+def analyze_catalog_item(property_id: int) -> dict:
+    """Build and persist an analysis using only the cached regional reference."""
+    property_query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
+    reference_query = """
+        SELECT id, price_per_m2
+        FROM regional_market_prices
+        WHERE uf = :uf AND city = :city AND neighborhood = :neighborhood
+          AND property_type = :property_type
+    """
+    comparable_query = """
+        SELECT address, price, area_m2, price_per_m2, source, url
+        FROM regional_market_comparables
+        WHERE reference_id = :reference_id
+        ORDER BY price_per_m2
+    """
+    try:
+        with _get_engine().begin() as connection:
+            row = connection.execute(text(property_query), {"id": property_id}).mappings().one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Property not found")
+
+            is_land = _is_land_property_type(row["property_type"])
+            reference = connection.execute(text(reference_query), {
+                "uf": row["uf"] or "", "city": row["city"] or "",
+                "neighborhood": row["neighborhood"] or "",
+                "property_type": row["property_type"] or "",
+            }).mappings().one_or_none()
+            if not is_land and (reference is None or reference["price_per_m2"] <= 0):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Não há referência de mercado persistida para esta região e tipo de imóvel.",
+                )
+
+            comparables = []
+            if reference is not None:
+                comparables = [ComparableProperty(**dict(item)) for item in connection.execute(
+                    text(comparable_query), {"reference_id": reference["id"]},
+                ).mappings().all()]
+            prop = SimpleNamespace(**dict(row))
+            result = run_structured_enrichment(
+                metadata_from_property(prop),
+                pdf_texts=prop.descricao_raw or "",
+                auction_url=prop.detail_url or "",
+                regional_price_per_m2=reference["price_per_m2"] if reference else None,
+                regional_comparables=comparables,
+            )
+            result_json = result.model_dump_json(by_alias=True)
+            connection.execute(text("""
+                INSERT INTO enrichments (property_id, result_json, pipeline_version, computed_at)
+                VALUES (:property_id, :result_json, :pipeline_version, :computed_at)
+                ON CONFLICT (property_id) DO UPDATE SET
+                    result_json = EXCLUDED.result_json,
+                    pipeline_version = EXCLUDED.pipeline_version,
+                    computed_at = EXCLUDED.computed_at
+            """), {
+                "property_id": property_id, "result_json": result_json,
+                "pipeline_version": PIPELINE_VERSION, "computed_at": datetime.now(timezone.utc),
+            })
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
+
+    return _safe_enrichment(result_json, row["property_type"])
+
+
 @app.get("/dashboard")
 def get_dashboard() -> dict:
     properties = get_catalog()
@@ -254,14 +327,3 @@ def get_dashboard() -> dict:
         ],
         "activity": [],
     }
-
-
-@app.post("/analyze")
-def analyze(_: AnalyzeRequest) -> dict:
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "A análise ao vivo usa Playwright, OCR, PDF parsing e LLMs, "
-            "e precisa rodar em um backend dedicado fora da Vercel."
-        ),
-    )
