@@ -29,8 +29,10 @@ BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from enrichment.run import PIPELINE_VERSION, metadata_from_property, run_structured_enrichment
-from graph.state import ComparableProperty
+# Use the repository-qualified import so Vercel's dependency tracer includes
+# the shared deterministic analyzer in the serverless function bundle.
+from backend.enrichment.run import PIPELINE_VERSION, metadata_from_property, run_structured_enrichment
+from backend.graph.state import ComparableProperty
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
