@@ -147,6 +147,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-08-15** — Enabled on-demand Vercel analyses using only persisted regional price/m² references and their cached comparables; results are deterministically calculated and upserted without web navigation or LLM calls.
+
 Every meaningful change to the project should be recorded here with a brief description.
 
 - **2026-08-12** — Added scheduled analysis materialization after regional market refreshes. Eligible catalog properties are calculated from persisted comparables and stored once in the shared `enrichments` table, allowing the read-only Vercel detail API to serve analysis to every user without running work during page loads.

@@ -26,7 +26,7 @@ def test_catalog_card_matches_frontend_contract():
         "second_auction_at": None, "first_auction_price": 300000.0,
         "second_auction_price": None, "lat": -25.4, "lng": -49.2,
         "photo_url": "https://example.com/photo.jpg",
-        "detail_url": "https://example.com/property", "status": "active",
+        "detail_url": "https://example.com/property", "status": "active", "descricao_raw": "",
     }
 
     card = vercel_api._catalog_card(row)
@@ -38,7 +38,7 @@ def test_catalog_card_matches_frontend_contract():
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
     assert card["auctionUrl"] == "https://example.com/property"
-    assert card["canAnalyze"] is False
+    assert card["canAnalyze"] is True
 
 
 def test_stale_land_enrichment_is_suppressed():
