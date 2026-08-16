@@ -147,6 +147,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-08-15** — Fixed the Vercel serverless bundle to include the shared deterministic analyzer, preventing catalog startup failures after persisted-reference analysis was enabled.
 - **2026-08-15** — Enabled on-demand Vercel analyses using only persisted regional price/m² references and their cached comparables; results are deterministically calculated and upserted without web navigation or LLM calls.
 
 Every meaningful change to the project should be recorded here with a brief description.
