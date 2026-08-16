@@ -9,7 +9,6 @@ from loguru import logger
 
 from graph.state import AuctionState, ComparableProperty, PropertyMetadata, LegalResult
 from graph.market import market_node
-from graph.legal import legal_node
 from graph.scoring import scoring_node
 from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
@@ -22,6 +21,13 @@ PIPELINE_VERSION = "v3-no-land"
 # True once the proxy/legal issue is fixed — the node is wired up and best-effort
 # (a transient failure falls back to an empty LegalResult, see below).
 LEGAL_NODE_ENABLED = False
+
+
+def legal_node(state):
+    """Load the optional LLM-backed node only when legal analysis is enabled."""
+    from graph.legal import legal_node as run_legal_node
+
+    return run_legal_node(state)
 
 
 def metadata_from_property(prop) -> PropertyMetadata:
