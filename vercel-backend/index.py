@@ -10,11 +10,9 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 import unicodedata
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from types import SimpleNamespace
+from statistics import median
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -25,14 +23,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-# Use the repository-qualified import so Vercel's dependency tracer includes
-# the shared deterministic analyzer in the serverless function bundle.
-from backend.enrichment.run import PIPELINE_VERSION, metadata_from_property, run_structured_enrichment
-from backend.graph.state import ComparableProperty
+PIPELINE_VERSION = "v3-no-land"
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
@@ -62,6 +53,71 @@ def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict 
     if result and _is_land_property_type(property_type):
         result.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
     return result
+
+
+def _build_persisted_enrichment(row, reference, comparable_rows) -> dict:
+    """Build the public result without importing the worker/LLM package."""
+    p = dict(row)
+    area = float(p.get("area_m2") or 0)
+    min_bid = float(p.get("preco") or 0)
+    appraisal = float(p.get("avaliacao") or min_bid)
+    is_land = _is_land_property_type(p.get("property_type"))
+    usable = [dict(item) for item in comparable_rows if (
+        float(item["price"] or 0) > 0 and float(item["area_m2"] or 0) > 0
+        and float(item["price_per_m2"] or 0) > 0
+        and (area <= 0 or area * 0.65 <= float(item["area_m2"]) <= area * 1.35)
+        and not any(term in f'{item["address"]} {item["url"]}'.lower() for term in ("leilao", "leilão", "hasta"))
+    )]
+    prices = [float(item["price_per_m2"]) for item in usable]
+    price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
+    market = round(price_per_m2 * area, 2)
+    discount = round((market - min_bid) / market * 100, 2) if market > 0 else 0
+    itbi_rate = {("PR", "CURITIBA"): 0.027, ("PR", "LONDRINA"): 0.02}.get(
+        ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
+    )
+    fee_rate = itbi_rate or 0
+    roi = round((market - min_bid * (1 + fee_rate)) / (min_bid * (1 + fee_rate)) * 100, 2) if min_bid else 0
+    market_detail = None if is_land else {
+        "indicators": ([{
+            "lbl": "Preço/m² · bairro", "val": f"R$ {price_per_m2:,.0f}".replace(",", "."),
+            "delta": "mediana dos anúncios coletados", "pos": True,
+        }] if price_per_m2 else []),
+        "comparables": [{
+            "address": item["address"], "areaM2": item["area_m2"], "beds": None,
+            "pricePerM2": item["price_per_m2"], "salePrice": item["price"],
+            "source": item["source"], "url": item["url"],
+        } for item in usable],
+    }
+    costs = [{
+        "label": "Lance de arremate", "value": min_bid,
+        "hint": "Valor declarado como mínimo no edital.", "kind": "price",
+    }]
+    if itbi_rate is not None:
+        costs.append({
+            "label": f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)",
+            "value": round(min_bid * itbi_rate), "hint": "Alíquota municipal cadastrada.", "kind": "tax",
+        })
+    costs.extend([
+        {"label": "Reforma estimada", "value": 0, "hint": "Calculada no simulador por área e faixa regional.", "kind": "reno"},
+        {"label": "Imposto sobre ganho de capital", "value": 0, "hint": "Calculado conforme o cenário de venda.", "kind": "tax"},
+    ])
+    property_type = p.get("property_type") or ""
+    neighborhood = p.get("neighborhood") or ""
+    return {
+        "id": str(p["id"]), "photoLabel": f"{property_type.upper()} · {neighborhood.upper()} · {p.get('uf') or ''}",
+        "title": f"{property_type} {area:.0f} m², {neighborhood}", "address": p.get("address") or "",
+        "type": property_type, "neighborhood": neighborhood,
+        "city": f"{p.get('city') or ''}, {p.get('uf') or ''}", "auctionType": "Extrajudicial",
+        "praca": None, "modalidade": p.get("modalidade"), "auctioneer": "—", "court": "—",
+        "discount": discount, "minBid": min_bid, "market": market, "roi": roi,
+        "appraisal": appraisal,
+        "auctionDiscount": round((appraisal - min_bid) / appraisal * 100, 2) if appraisal else 0,
+        "area": area, "beds": p.get("beds"), "endsAt": "", "risk": {"j": "bad", "f": "good"},
+        "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
+        "marketDetail": market_detail, "costs": costs, "edital": None,
+        "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
+        "monthlyCondo": None, "monthlyIptu": None,
+    }
 
 
 def _get_engine():
@@ -279,18 +335,13 @@ def analyze_catalog_item(property_id: int) -> dict:
 
             comparables = []
             if reference is not None:
-                comparables = [ComparableProperty(**dict(item)) for item in connection.execute(
+                comparables = connection.execute(
                     text(comparable_query), {"reference_id": reference["id"]},
-                ).mappings().all()]
-            prop = SimpleNamespace(**dict(row))
-            result = run_structured_enrichment(
-                metadata_from_property(prop),
-                pdf_texts=prop.descricao_raw or "",
-                auction_url=prop.detail_url or "",
-                regional_price_per_m2=reference["price_per_m2"] if reference else None,
-                regional_comparables=comparables,
+                ).mappings().all()
+            result_json = json.dumps(
+                _build_persisted_enrichment(row, reference or {"price_per_m2": 0}, comparables),
+                ensure_ascii=False,
             )
-            result_json = result.model_dump_json(by_alias=True)
             connection.execute(text("""
                 INSERT INTO enrichments (property_id, result_json, pipeline_version, computed_at)
                 VALUES (:property_id, :result_json, :pipeline_version, :computed_at)
