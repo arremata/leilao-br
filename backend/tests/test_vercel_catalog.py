@@ -55,6 +55,23 @@ def test_stale_land_enrichment_is_suppressed():
     assert result["marketDetail"] is None
 
 
+def test_persisted_city_reference_is_identified_in_market_detail():
+    row = {
+        "id": 7, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Apartamento", "area_m2": 50,
+        "beds": 2, "preco": 150_000, "avaliacao": 250_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/7",
+        "photo_url": None,
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, [],
+    )
+
+    assert result["market"] == 250_000
+    assert result["marketDetail"]["indicators"][0]["lbl"] == "Preço/m² · cidade"
+
+
 def test_catalog_requires_database_configuration(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     vercel_api._engine = None
