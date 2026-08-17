@@ -79,8 +79,9 @@ def _build_persisted_enrichment(row, reference, comparable_rows) -> dict:
     roi = round((market - min_bid * (1 + fee_rate)) / (min_bid * (1 + fee_rate)) * 100, 2) if min_bid else 0
     market_detail = None if is_land else {
         "indicators": ([{
-            "lbl": "Preço/m² · bairro", "val": f"R$ {price_per_m2:,.0f}".replace(",", "."),
-            "delta": "mediana dos anúncios coletados", "pos": True,
+            "lbl": f"Preço/m² · {'bairro' if reference.get('scope') == 'neighborhood' else 'cidade'}",
+            "val": f"R$ {price_per_m2:,.0f}".replace(",", "."),
+            "delta": "mediana das referências persistidas", "pos": True,
         }] if price_per_m2 else []),
         "comparables": [{
             "address": item["address"], "areaM2": item["area_m2"], "beds": None,
@@ -304,16 +305,10 @@ def analyze_catalog_item(property_id: int) -> dict:
     """Build and persist an analysis using only the cached regional reference."""
     property_query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
     reference_query = """
-        SELECT id, price_per_m2
+        SELECT id, neighborhood, price_per_m2
         FROM regional_market_prices
-        WHERE uf = :uf AND city = :city AND neighborhood = :neighborhood
-          AND property_type = :property_type
-    """
-    comparable_query = """
-        SELECT address, price, area_m2, price_per_m2, source, url
-        FROM regional_market_comparables
-        WHERE reference_id = :reference_id
-        ORDER BY price_per_m2
+        WHERE uf = :uf AND city = :city AND property_type = :property_type
+          AND price_per_m2 > 0
     """
     try:
         with _get_engine().begin() as connection:
@@ -322,22 +317,51 @@ def analyze_catalog_item(property_id: int) -> dict:
                 raise HTTPException(status_code=404, detail="Property not found")
 
             is_land = _is_land_property_type(row["property_type"])
-            reference = connection.execute(text(reference_query), {
+            references = connection.execute(text(reference_query), {
                 "uf": row["uf"] or "", "city": row["city"] or "",
-                "neighborhood": row["neighborhood"] or "",
                 "property_type": row["property_type"] or "",
-            }).mappings().one_or_none()
-            if not is_land and (reference is None or reference["price_per_m2"] <= 0):
+            }).mappings().all()
+            wanted_neighborhood = (row["neighborhood"] or "").strip().casefold()
+            exact = next((item for item in references if (
+                item["neighborhood"] or ""
+            ).strip().casefold() == wanted_neighborhood), None)
+            if exact:
+                reference = {**dict(exact), "scope": "neighborhood"}
+            elif references:
+                reference = {
+                    "id": None, "scope": "city",
+                    "price_per_m2": float(median(item["price_per_m2"] for item in references)),
+                }
+            else:
+                reference = None
+            if not is_land and reference is None:
                 raise HTTPException(
                     status_code=422,
-                    detail="Não há referência de mercado persistida para esta região e tipo de imóvel.",
+                    detail="Não há referência de mercado persistida para esta cidade e tipo de imóvel.",
                 )
 
             comparables = []
             if reference is not None:
-                comparables = connection.execute(
-                    text(comparable_query), {"reference_id": reference["id"]},
-                ).mappings().all()
+                if reference["scope"] == "neighborhood":
+                    comparable_query = """
+                        SELECT address, price, area_m2, price_per_m2, source, url
+                        FROM regional_market_comparables
+                        WHERE reference_id = :reference_id ORDER BY price_per_m2
+                    """
+                    comparable_params = {"reference_id": reference["id"]}
+                else:
+                    comparable_query = """
+                        SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url
+                        FROM regional_market_comparables c
+                        JOIN regional_market_prices r ON r.id = c.reference_id
+                        WHERE r.uf = :uf AND r.city = :city AND r.property_type = :property_type
+                        ORDER BY c.price_per_m2
+                    """
+                    comparable_params = {
+                        "uf": row["uf"] or "", "city": row["city"] or "",
+                        "property_type": row["property_type"] or "",
+                    }
+                comparables = connection.execute(text(comparable_query), comparable_params).mappings().all()
             result_json = json.dumps(
                 _build_persisted_enrichment(row, reference or {"price_per_m2": 0}, comparables),
                 ensure_ascii=False,

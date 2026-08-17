@@ -147,6 +147,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-08-15** — Added a persisted city/type median fallback when an exact neighborhood market reference is unavailable, while continuing to avoid live browsing and invented appraisal-based market estimates.
 - **2026-08-15** — Made persisted-reference analysis self-contained in the Vercel function, removing cross-directory worker imports that crashed every production catalog request during module startup.
 - **2026-08-15** — Fixed the Vercel serverless bundle to include the shared deterministic analyzer, preventing catalog startup failures after persisted-reference analysis was enabled.
 - **2026-08-15** — Enabled on-demand Vercel analyses using only persisted regional price/m² references and their cached comparables; results are deterministically calculated and upserted without web navigation or LLM calls.
