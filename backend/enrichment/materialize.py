@@ -61,7 +61,7 @@ def materialize_analyses(
             reference_time = reference.computed_at
             expense_reference = session.execute(select(CityExpenseReference).where(
                 CityExpenseReference.uf == (prop.uf or "").upper(),
-                CityExpenseReference.city == (prop.city or ""),
+                func.lower(CityExpenseReference.city) == (prop.city or "").casefold(),
             )).scalar_one_or_none()
             expense_reference_time = expense_reference.updated_at if expense_reference else None
             enrichment_time = existing.computed_at if existing else None
