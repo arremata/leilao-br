@@ -1,7 +1,7 @@
 import pytest
 
 from db.base import get_engine, init_db, make_session_factory
-from db.models import Property, RegionalMarketComparable, RegionalMarketPrice
+from db.models import MarketReferenceJob, Property, RegionalMarketComparable, RegionalMarketPrice
 from enrichment import market_reference
 from graph.state import ComparableProperty
 
@@ -42,6 +42,7 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         reference = session.query(RegionalMarketPrice).one()
         snapshot = session.query(RegionalMarketComparable).all()
         assert reference.price_per_m2 == 5_000
+        assert reference.neighborhood == ""
         assert reference.sample_size == 3
         assert {item.source for item in snapshot} == {
             "ZAP Imóveis", "Viva Real", "ImovelWeb",
@@ -68,6 +69,35 @@ async def test_worker_does_not_scrape_land_references(monkeypatch):
     monkeypatch.setattr(market_reference, "scrape_comparables", fail_if_called)
     summary = await market_reference.refresh_references(factory, ["PR"], limit=10)
 
-    assert summary == {"selected": 0, "updated": 0, "empty": 0, "failed": 0}
+    assert summary["selected"] == 0
+    assert summary["updated"] == 0
     with factory() as session:
         assert session.query(RegionalMarketPrice).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_empty_city_job_backs_off_without_starving_another_city(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        for source_id, city in (("1", "Cidade A"), ("2", "Cidade B")):
+            session.add(Property(
+                source="caixa", source_id=source_id, uf="PR", city=city,
+                neighborhood="Centro", property_type="APTO", address="Rua A",
+                area_m2=50, preco=100_000, status="active",
+            ))
+        session.commit()
+
+    async def no_comps(metadata):
+        return []
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", no_comps)
+    first = await market_reference.refresh_references(factory, ["PR"], limit=1)
+    second = await market_reference.refresh_references(factory, ["PR"], limit=1)
+    assert first["empty"] == second["empty"] == 1
+    with factory() as session:
+        jobs = session.query(MarketReferenceJob).order_by(MarketReferenceJob.id).all()
+        assert len(jobs) == 2
+        assert all(job.status == "empty" for job in jobs)
+        assert all(job.next_attempt_at is not None for job in jobs)

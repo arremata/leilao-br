@@ -65,6 +65,27 @@ def test_skips_property_without_market_reference():
         assert session.query(Enrichment).count() == 0
 
 
+def test_materializes_from_city_type_baseline_when_neighborhood_is_missing():
+    factory = _database()
+    with factory() as session:
+        session.add(Property(
+            source="caixa", source_id="city-fallback", uf="PR", city="Maringá",
+            neighborhood="Parque Industrial", property_type="APARTAMENTO",
+            address="Rua A", area_m2=80, preco=330_000, status="active",
+        ))
+        session.add(RegionalMarketPrice(
+            uf="PR", city="Maringá", neighborhood="", property_type="Apartamento",
+            price_per_m2=6_500, sample_size=3,
+        ))
+        session.commit()
+
+    summary = materialize_analyses(factory, ["PR"])
+    assert summary["updated"] == 1
+    with factory() as session:
+        cached = session.query(Enrichment).one()
+        assert '"market":520000.0' in cached.result_json
+
+
 def test_recomputes_after_catalog_property_change():
     factory = _database()
     with factory() as session:

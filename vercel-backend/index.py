@@ -18,12 +18,13 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v3-no-land"
+PIPELINE_VERSION = "v4-city-expenses"
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
@@ -48,6 +49,26 @@ def _is_land_property_type(property_type: str | None) -> bool:
     return bool(re.search(r"\b(terreno|lote|gleba)\b", normalized.lower()))
 
 
+def _normalize_text(value: str | None) -> str:
+    value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode()
+    return " ".join(value.casefold().split())
+
+
+def _canonical_property_type(value: str | None) -> str:
+    normalized = _normalize_text(value)
+    for pattern, canonical in (
+        (r"\b(apartamento|apto|flat|kitnet|studio)\b", "Apartamento"),
+        (r"\b(casa|sobrado|residencia)\b", "Casa"),
+        (r"\b(loja|sala|comercial|escritorio)\b", "Comercial"),
+        (r"\b(galpao|industrial|armazem)\b", "Industrial"),
+        (r"\b(rural|fazenda|sitio|chacara)\b", "Rural"),
+        (r"\b(terreno|lote|gleba)\b", "Terreno"),
+    ):
+        if re.search(pattern, normalized):
+            return canonical
+    return (value or "").strip()
+
+
 def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict | None:
     result = json.loads(enrichment) if enrichment else None
     if result and _is_land_property_type(property_type):
@@ -55,7 +76,7 @@ def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict 
     return result
 
 
-def _build_persisted_enrichment(row, reference, comparable_rows) -> dict:
+def _build_persisted_enrichment(row, reference, comparable_rows, expense_reference=None) -> dict:
     """Build the public result without importing the worker/LLM package."""
     p = dict(row)
     area = float(p.get("area_m2") or 0)
@@ -104,6 +125,18 @@ def _build_persisted_enrichment(row, reference, comparable_rows) -> dict:
     ])
     property_type = p.get("property_type") or ""
     neighborhood = p.get("neighborhood") or ""
+    expense_reference = dict(expense_reference) if expense_reference else None
+    annual_iptu = round(appraisal * float(expense_reference["annual_iptu_rate"]), 2) if expense_reference else None
+    normalized_type = _normalize_text(property_type)
+    in_condo = bool(re.search(r"\b(apartamento|apto|flat|kitnet|studio)\b", normalized_type)) or "condomin" in _normalize_text(p.get("descricao_raw"))
+    monthly_condo = round(area * float(expense_reference["condo_per_m2_monthly"]), 2) if expense_reference and in_condo else None
+    expense_estimate = ({
+        "kind": "city_reference", "uf": expense_reference["uf"],
+        "city": expense_reference["city"], "referenceYear": expense_reference["reference_year"],
+        "annualIptuRate": expense_reference["annual_iptu_rate"],
+        "condoPerM2Monthly": expense_reference["condo_per_m2_monthly"],
+        "source": expense_reference["source"],
+    } if expense_reference else None)
     return {
         "id": str(p["id"]), "photoLabel": f"{property_type.upper()} · {neighborhood.upper()} · {p.get('uf') or ''}",
         "title": f"{property_type} {area:.0f} m², {neighborhood}", "address": p.get("address") or "",
@@ -117,7 +150,9 @@ def _build_persisted_enrichment(row, reference, comparable_rows) -> dict:
         "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
         "marketDetail": market_detail, "costs": costs, "edital": None,
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
-        "monthlyCondo": None, "monthlyIptu": None,
+        "monthlyCondo": monthly_condo,
+        "monthlyIptu": round(annual_iptu / 12, 2) if annual_iptu is not None else None,
+        "annualIptu": annual_iptu, "expenseEstimate": expense_estimate,
     }
 
 
@@ -305,9 +340,9 @@ def analyze_catalog_item(property_id: int) -> dict:
     """Build and persist an analysis using only the cached regional reference."""
     property_query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
     reference_query = """
-        SELECT id, neighborhood, price_per_m2
+        SELECT id, neighborhood, property_type, price_per_m2
         FROM regional_market_prices
-        WHERE uf = :uf AND city = :city AND property_type = :property_type
+        WHERE uf = :uf AND city = :city
           AND price_per_m2 > 0
     """
     try:
@@ -317,14 +352,15 @@ def analyze_catalog_item(property_id: int) -> dict:
                 raise HTTPException(status_code=404, detail="Property not found")
 
             is_land = _is_land_property_type(row["property_type"])
-            references = connection.execute(text(reference_query), {
+            canonical_type = _canonical_property_type(row["property_type"])
+            references = [item for item in connection.execute(text(reference_query), {
                 "uf": row["uf"] or "", "city": row["city"] or "",
-                "property_type": row["property_type"] or "",
-            }).mappings().all()
-            wanted_neighborhood = (row["neighborhood"] or "").strip().casefold()
-            exact = next((item for item in references if (
-                item["neighborhood"] or ""
-            ).strip().casefold() == wanted_neighborhood), None)
+            }).mappings().all() if _canonical_property_type(item["property_type"]) == canonical_type]
+            wanted_neighborhood = _normalize_text(row["neighborhood"])
+            exact = next((item for item in references if
+                _normalize_text(item["neighborhood"]) == wanted_neighborhood
+                and bool(_normalize_text(item["neighborhood"]))
+            ), None)
             if exact:
                 reference = {**dict(exact), "scope": "neighborhood"}
             elif references:
@@ -335,9 +371,35 @@ def analyze_catalog_item(property_id: int) -> dict:
             else:
                 reference = None
             if not is_land and reference is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail="Não há referência de mercado persistida para esta cidade e tipo de imóvel.",
+                job_table_exists = connection.execute(
+                    text("SELECT to_regclass('public.market_reference_jobs')")
+                ).scalar_one_or_none()
+                if job_table_exists:
+                    connection.execute(text("""
+                        INSERT INTO market_reference_jobs
+                            (uf, city, neighborhood, property_type, representative_property_id,
+                             status, priority, attempt_count, last_error, updated_at)
+                        VALUES (:uf, :city, '', :property_type, :property_id,
+                                'pending', 0, 0, '', :updated_at)
+                        ON CONFLICT (uf, city, neighborhood, property_type) DO UPDATE SET
+                            representative_property_id = EXCLUDED.representative_property_id,
+                            priority = LEAST(market_reference_jobs.priority, 0),
+                            status = CASE WHEN market_reference_jobs.status = 'successful'
+                                          THEN 'pending' ELSE market_reference_jobs.status END,
+                            next_attempt_at = CASE WHEN market_reference_jobs.status = 'successful'
+                                                   THEN NULL ELSE market_reference_jobs.next_attempt_at END,
+                            updated_at = EXCLUDED.updated_at
+                    """), {
+                        "uf": row["uf"] or "", "city": row["city"] or "",
+                        "property_type": canonical_type, "property_id": property_id,
+                        "updated_at": datetime.now(timezone.utc),
+                    })
+                return JSONResponse(
+                    status_code=409,
+                    content={"detail": (
+                        "Referência de mercado ainda indisponível. A coleta foi priorizada "
+                        "e normalmente fica disponível em até 90 minutos."
+                    )},
                 )
 
             comparables = []
@@ -359,11 +421,26 @@ def analyze_catalog_item(property_id: int) -> dict:
                     """
                     comparable_params = {
                         "uf": row["uf"] or "", "city": row["city"] or "",
-                        "property_type": row["property_type"] or "",
+                        "property_type": canonical_type,
                     }
                 comparables = connection.execute(text(comparable_query), comparable_params).mappings().all()
+            # Rollout-safe: Vercel can be deployed before the migration worker.
+            # PostgreSQL's to_regclass avoids querying a table that does not yet exist.
+            expense_table_exists = connection.execute(
+                text("SELECT to_regclass('public.city_expense_references')")
+            ).scalar_one_or_none()
+            expense_reference = None
+            if expense_table_exists:
+                expense_reference = connection.execute(text("""
+                    SELECT uf, city, annual_iptu_rate, condo_per_m2_monthly,
+                           reference_year, source
+                    FROM city_expense_references
+                    WHERE uf = :uf AND city = :city
+                """), {"uf": row["uf"] or "", "city": row["city"] or ""}).mappings().one_or_none()
             result_json = json.dumps(
-                _build_persisted_enrichment(row, reference or {"price_per_m2": 0}, comparables),
+                _build_persisted_enrichment(
+                    row, reference or {"price_per_m2": 0}, comparables, expense_reference,
+                ),
                 ensure_ascii=False,
             )
             connection.execute(text("""
