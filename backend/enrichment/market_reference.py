@@ -90,11 +90,13 @@ def reconcile_coverage(session_factory, ufs: list[str]) -> dict[str, int]:
                 existing_jobs[key].priority = min(existing_jobs[key].priority, _property_priority(prop, True))
                 continue
             status = "successful" if key in existing_refs else "pending"
-            session.add(MarketReferenceJob(
+            job = MarketReferenceJob(
                 uf=key[0], city=key[1], neighborhood="", property_type=key[3],
                 representative_property_id=prop.id, status=status,
                 priority=_property_priority(prop, True),
-            ))
+            )
+            session.add(job)
+            existing_jobs[key] = job
             created += 1
 
         # Add refinements only in cities whose baseline is already persisted.
@@ -111,11 +113,15 @@ def reconcile_coverage(session_factory, ufs: list[str]) -> dict[str, int]:
                 existing_jobs[key].priority = min(existing_jobs[key].priority, _property_priority(prop, False))
                 continue
             status = "successful" if key in existing_refs else "pending"
-            session.add(MarketReferenceJob(
+            job = MarketReferenceJob(
                 uf=key[0], city=key[1], neighborhood=neighborhood, property_type=key[3],
                 representative_property_id=prop.id, status=status,
                 priority=_property_priority(prop, False),
-            ))
+            )
+            session.add(job)
+            # Multiple listings commonly share a neighborhood. Record staged
+            # jobs immediately so this same reconciliation pass stays idempotent.
+            existing_jobs[key] = job
             created += 1
         session.commit()
     return {"eligible_properties": len(eligible), "city_types": len(representatives), "jobs_created": created}

@@ -101,3 +101,29 @@ async def test_empty_city_job_backs_off_without_starving_another_city(monkeypatc
         assert len(jobs) == 2
         assert all(job.status == "empty" for job in jobs)
         assert all(job.next_attempt_at is not None for job in jobs)
+
+
+def test_reconcile_deduplicates_shared_neighborhood_jobs():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(RegionalMarketPrice(
+            uf="PR", city="Araucária", neighborhood="",
+            property_type="Apartamento", price_per_m2=5_000, sample_size=3,
+        ))
+        for source_id in ("apt-1", "apt-2"):
+            session.add(Property(
+                source="caixa", source_id=source_id, uf="PR", city="Araucária",
+                neighborhood="Costeira", property_type="Apartamento",
+                address=f"Rua {source_id}", area_m2=50, preco=100_000, status="active",
+            ))
+        session.commit()
+
+    summary = market_reference.reconcile_coverage(factory, ["PR"])
+    assert summary["jobs_created"] == 2  # one city baseline + one neighborhood
+    with factory() as session:
+        neighborhood_jobs = session.query(MarketReferenceJob).filter_by(
+            neighborhood="Costeira",
+        ).all()
+        assert len(neighborhood_jobs) == 1
