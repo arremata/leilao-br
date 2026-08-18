@@ -19,8 +19,10 @@ from sqlalchemy.orm import Session
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
-    Property, Enrichment, RegionalMarketComparable, RegionalMarketPrice,
+    Property, Enrichment, RegionalMarketComparable, CityExpenseReference,
 )
+from enrichment.property_expenses import apply_property_expenses
+from enrichment.market_coverage import queue_city_reference, resolve_market_reference
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
 from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
@@ -282,12 +284,17 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     session.flush()
 
     metadata = metadata_from_property(prop)
-    regional = session.execute(select(RegionalMarketPrice).where(
-        RegionalMarketPrice.uf == (prop.uf or ""),
-        RegionalMarketPrice.city == (prop.city or ""),
-        RegionalMarketPrice.neighborhood == (prop.neighborhood or ""),
-        RegionalMarketPrice.property_type == (prop.property_type or ""),
-    )).scalar_one_or_none()
+    regional = resolve_market_reference(session, prop)
+    if regional is None:
+        queue_city_reference(session, prop)
+        session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Referência de mercado ainda indisponível. A coleta foi priorizada "
+                "e normalmente fica disponível em até 90 minutos."
+            ),
+        )
     regional_comparables = []
     if regional:
         regional_comparables = [
@@ -297,7 +304,7 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
             )
             for comp in session.execute(
                 select(RegionalMarketComparable).where(
-                    RegionalMarketComparable.reference_id == regional.id,
+                    RegionalMarketComparable.reference_id.in_(regional.reference_ids),
                 ).order_by(RegionalMarketComparable.price_per_m2)
             ).scalars().all()
         ]
@@ -305,9 +312,14 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     # analyzes real source data instead of running blind on empty input.
     result = run_structured_enrichment(
         metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
-        regional_price_per_m2=regional.price_per_m2 if regional else None,
+        regional_price_per_m2=regional.price_per_m2,
         regional_comparables=regional_comparables,
     )
+    expense_reference = session.execute(select(CityExpenseReference).where(
+        CityExpenseReference.uf == (prop.uf or "").upper(),
+        CityExpenseReference.city == (prop.city or ""),
+    )).scalar_one_or_none()
+    apply_property_expenses(result, prop, expense_reference)
     result_json = result.model_dump_json(by_alias=True)
 
     from datetime import datetime, timezone

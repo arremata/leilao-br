@@ -14,7 +14,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v3-no-land"
+PIPELINE_VERSION = "v4-city-expenses"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to

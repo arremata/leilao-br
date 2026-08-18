@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 import api
 from db.base import get_engine, init_db, make_session_factory
-from db.models import Property, Enrichment
+from db.models import Enrichment, MarketReferenceJob, Property, RegionalMarketPrice
 
 
 def _client_with_db():
@@ -21,6 +21,13 @@ def _client_with_db():
 
     api.app.dependency_overrides[api.get_session] = _override
     return TestClient(api.app), factory
+
+
+def _add_city_reference(session, city="Curitiba", property_type="Casa"):
+    session.add(RegionalMarketPrice(
+        uf="PR", city=city, neighborhood="", property_type=property_type,
+        price_per_m2=5_000, sample_size=3,
+    ))
 
 
 def test_catalog_lists_active_properties_filtered_by_uf():
@@ -131,6 +138,7 @@ def test_catalog_analyze_runs_enrichment_and_persists(monkeypatch):
                        neighborhood="Centro", address="Rua A", property_type="Casa",
                        area_m2=50.0, preco=100000.0, avaliacao=200000.0,
                        modalidade="Venda Direta Online", status="active"))
+        _add_city_reference(s)
         s.commit()
         prop_id = s.query(Property).filter_by(source_id="1").one().id
 
@@ -166,6 +174,7 @@ def test_catalog_analyze_feeds_ingested_description_as_pdf_texts(monkeypatch):
                        modalidade="Venda Direta Online",
                        descricao_raw="Casa desocupada, IPTU em atraso.",
                        status="active"))
+        _add_city_reference(s)
         s.commit()
         prop_id = s.query(Property).filter_by(source_id="1").one().id
 
@@ -201,6 +210,7 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
                        modalidade="Venda Direta Online", status="active",
                        detail_url="https://venda-imoveis.caixa.gov.br/imovel/1",
                        detail_fetched=False))
+        _add_city_reference(s)
         s.commit()
         prop_id = s.query(Property).filter_by(source_id="1").one().id
 
@@ -229,6 +239,29 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
         prop = s.get(Property, prop_id)
         assert prop.photo_url == "https://venda-imoveis.caixa.gov.br/fotos/F1.jpg"
         assert prop.detail_fetched is True
+    api.app.dependency_overrides.clear()
+
+
+def test_catalog_analyze_prioritizes_missing_city_reference():
+    client, factory = _client_with_db()
+    with factory() as session:
+        prop = Property(
+            source="caixa", source_id="queued", uf="PR", city="Maringá",
+            neighborhood="Parque Industrial", property_type="APTO", address="Rua A",
+            area_m2=80, preco=330_000, status="active",
+        )
+        session.add(prop)
+        session.commit()
+        property_id = prop.id
+
+    response = client.post(f"/catalog/{property_id}/analyze")
+    assert response.status_code == 409
+    assert "priorizada" in response.json()["detail"]
+    with factory() as session:
+        job = session.query(MarketReferenceJob).one()
+        assert (job.city, job.neighborhood, job.property_type, job.priority) == (
+            "Maringá", "", "Apartamento", 0,
+        )
     api.app.dependency_overrides.clear()
 
 

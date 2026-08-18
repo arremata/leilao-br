@@ -10,15 +10,16 @@ on:
         default: staging
         options: [staging, Production]
       ufs:
-        description: Comma-separated UFs
-        required: true
-        default: PR
+        description: Comma-separated UFs (blank covers every active UF)
+        required: false
+        default: ""
       limit:
         description: Maximum regions to refresh
         required: true
-        default: "10"
+        default: "30"
   schedule:
-    - cron: "20 10 * * *"
+    # GitHub cron uses UTC. Every-hour cadence is timezone-independent.
+    - cron: "0 * * * *"
 
 permissions:
   contents: read
@@ -48,11 +49,16 @@ jobs:
         working-directory: backend
         run: >-
           python -m enrichment.market_reference
-          --ufs "${{ github.event.inputs.ufs || 'PR' }}"
-          --limit "${{ github.event.inputs.limit || '10' }}"
+          --ufs "${{ github.event.inputs.ufs || '' }}"
+          --limit "${{ github.event.inputs.limit || '30' }}"
           --max-age-days 90
       - name: Materialize shared property analyses
+        if: ${{ always() }}
         working-directory: backend
         run: >-
           python -m enrichment.materialize
-          --ufs "${{ github.event.inputs.ufs || 'PR' }}"
+          --ufs "${{ github.event.inputs.ufs || '' }}"
+      - name: Report catalog coverage
+        if: ${{ always() }}
+        working-directory: backend
+        run: python -m enrichment.coverage_report --ufs "${{ github.event.inputs.ufs || '' }}"

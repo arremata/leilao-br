@@ -15,9 +15,9 @@ from loguru import logger
 from sqlalchemy import func, select
 
 from db.base import get_engine, init_db, make_session_factory
-from db.models import (
-    Enrichment, Property, PropertyEvent, RegionalMarketComparable, RegionalMarketPrice,
-)
+from db.models import CityExpenseReference, Enrichment, Property, PropertyEvent, RegionalMarketComparable
+from enrichment.property_expenses import apply_property_expenses
+from enrichment.market_coverage import is_eligible_market_property, resolve_market_reference
 from enrichment.run import PIPELINE_VERSION, metadata_from_property, run_structured_enrichment
 from graph.state import ComparableProperty
 
@@ -42,13 +42,11 @@ def materialize_analyses(
 
     for prop in properties:
         with session_factory() as session:
-            reference = session.execute(select(RegionalMarketPrice).where(
-                RegionalMarketPrice.uf == (prop.uf or ""),
-                RegionalMarketPrice.city == (prop.city or ""),
-                RegionalMarketPrice.neighborhood == (prop.neighborhood or ""),
-                RegionalMarketPrice.property_type == (prop.property_type or ""),
-            )).scalar_one_or_none()
-            if reference is None or reference.price_per_m2 <= 0:
+            if not is_eligible_market_property(prop):
+                summary["no_reference"] += 1
+                continue
+            reference = resolve_market_reference(session, prop)
+            if reference is None:
                 summary["no_reference"] += 1
                 continue
 
@@ -61,6 +59,11 @@ def materialize_analyses(
                 )
             ).scalar_one_or_none()
             reference_time = reference.computed_at
+            expense_reference = session.execute(select(CityExpenseReference).where(
+                CityExpenseReference.uf == (prop.uf or "").upper(),
+                CityExpenseReference.city == (prop.city or ""),
+            )).scalar_one_or_none()
+            expense_reference_time = expense_reference.updated_at if expense_reference else None
             enrichment_time = existing.computed_at if existing else None
             if reference_time and reference_time.tzinfo is None:
                 reference_time = reference_time.replace(tzinfo=timezone.utc)
@@ -68,10 +71,13 @@ def materialize_analyses(
                 enrichment_time = enrichment_time.replace(tzinfo=timezone.utc)
             if property_change_time and property_change_time.tzinfo is None:
                 property_change_time = property_change_time.replace(tzinfo=timezone.utc)
+            if expense_reference_time and expense_reference_time.tzinfo is None:
+                expense_reference_time = expense_reference_time.replace(tzinfo=timezone.utc)
             is_current = (
                 existing is not None
                 and existing.pipeline_version == PIPELINE_VERSION
                 and (not reference_time or (enrichment_time and enrichment_time >= reference_time))
+                and (not expense_reference_time or (enrichment_time and enrichment_time >= expense_reference_time))
                 and (
                     not property_change_time
                     or (enrichment_time and enrichment_time >= property_change_time)
@@ -92,7 +98,7 @@ def materialize_analyses(
                     )
                     for item in session.execute(
                         select(RegionalMarketComparable).where(
-                            RegionalMarketComparable.reference_id == reference.id,
+                            RegionalMarketComparable.reference_id.in_(reference.reference_ids),
                         ).order_by(RegionalMarketComparable.price_per_m2)
                     ).scalars().all()
                 ]
@@ -103,6 +109,7 @@ def materialize_analyses(
                     regional_price_per_m2=reference.price_per_m2,
                     regional_comparables=comparables,
                 )
+                apply_property_expenses(result, prop, expense_reference)
                 result_json = result.model_dump_json(by_alias=True)
                 now = datetime.now(timezone.utc)
                 if existing:
@@ -138,6 +145,11 @@ def main(argv: list[str] | None = None) -> dict[str, int]:
     init_db(engine)
     factory = make_session_factory(engine)
     ufs = [value.strip().upper() for value in args.ufs.split(",") if value.strip()]
+    if not ufs:
+        with factory() as session:
+            ufs = list(session.execute(select(Property.uf).where(
+                Property.status == "active", Property.uf.is_not(None),
+            ).distinct()).scalars())
     return materialize_analyses(factory, ufs, args.limit, args.force)
 
 

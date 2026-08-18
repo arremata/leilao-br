@@ -1,0 +1,18 @@
+[
+  {
+    "uf": "PR",
+    "city": "Curitiba",
+    "annual_iptu_rate": 0.006,
+    "condo_per_m2_monthly": 7.5,
+    "reference_year": 2026,
+    "source": "Estimativa Arremate 2026: alíquota efetiva simplificada e referência municipal de condomínio por área"
+  },
+  {
+    "uf": "PR",
+    "city": "Londrina",
+    "annual_iptu_rate": 0.006,
+    "condo_per_m2_monthly": 6.0,
+    "reference_year": 2026,
+    "source": "Estimativa Arremate 2026: alíquota efetiva simplificada e referência municipal de condomínio por área"
+  }
+]

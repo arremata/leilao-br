@@ -176,3 +176,5 @@ class AuctionPropertyResult(BaseModel):
     # recurring debts over the months-until-sale horizon.
     monthly_condo: float | None = None
     monthly_iptu: float | None = None
+    annual_iptu: float | None = None
+    expense_estimate: dict | None = None
