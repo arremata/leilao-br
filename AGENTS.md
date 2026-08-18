@@ -147,6 +147,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-08-17** — Normalized persisted expense-reference cities case-insensitively so title-case configuration matches Caixa's uppercase production catalog without creating duplicate city rows.
 - **2026-08-17** — Added a production city-expense workflow, explicit PostgreSQL migration, versioned Curitiba/Londrina MVP assumptions, rollout-safe Vercel behavior, and an idempotent importer that rematerializes affected analyses. Backend settings now tolerate unrelated variables in the shared environment file.
 - **2026-08-17** — Changed market-reference collection from daily to hourly and added a user-facing estimate of up to 90 minutes when a missing city/type reference is prioritized.
 - **2026-08-17** — Added persisted city expense references for recurring-cost estimates. Sourced municipal IPTU rates apply to Caixa appraisal values, condominium medians apply by area only to apartments or explicitly condominium properties, materialized analyses refresh when references change, and users can locally adjust every estimate.

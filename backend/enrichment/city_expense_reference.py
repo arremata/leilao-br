@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import CityExpenseReference
@@ -21,7 +21,7 @@ def validate_reference(item: dict) -> dict:
         raise ValueError(f"Missing fields: {', '.join(sorted(missing))}")
     result = {
         "uf": str(item["uf"]).strip().upper(),
-        "city": str(item["city"]).strip(),
+        "city": str(item["city"]).strip().upper(),
         "annual_iptu_rate": float(item["annual_iptu_rate"]),
         "condo_per_m2_monthly": float(item["condo_per_m2_monthly"]),
         "reference_year": int(item["reference_year"]),
@@ -42,8 +42,8 @@ def upsert_references(session_factory, items: list[dict]) -> dict:
     with session_factory() as session:
         for item in validated:
             reference = session.execute(select(CityExpenseReference).where(
-                CityExpenseReference.uf == item["uf"],
-                CityExpenseReference.city == item["city"],
+                func.upper(CityExpenseReference.uf) == item["uf"],
+                func.lower(CityExpenseReference.city) == item["city"].casefold(),
             )).scalar_one_or_none()
             if reference is None:
                 reference = CityExpenseReference(**item)

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from dataclasses import asdict
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.base import get_engine, init_db, make_session_factory
@@ -317,7 +317,7 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     )
     expense_reference = session.execute(select(CityExpenseReference).where(
         CityExpenseReference.uf == (prop.uf or "").upper(),
-        CityExpenseReference.city == (prop.city or ""),
+        func.lower(CityExpenseReference.city) == (prop.city or "").casefold(),
     )).scalar_one_or_none()
     apply_property_expenses(result, prop, expense_reference)
     result_json = result.model_dump_json(by_alias=True)

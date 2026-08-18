@@ -435,7 +435,9 @@ def analyze_catalog_item(property_id: int) -> dict:
                     SELECT uf, city, annual_iptu_rate, condo_per_m2_monthly,
                            reference_year, source
                     FROM city_expense_references
-                    WHERE uf = :uf AND city = :city
+                    WHERE uf = :uf AND UPPER(city) = UPPER(:city)
+                    ORDER BY updated_at DESC
+                    LIMIT 1
                 """), {"uf": row["uf"] or "", "city": row["city"] or ""}).mappings().one_or_none()
             result_json = json.dumps(
                 _build_persisted_enrichment(
