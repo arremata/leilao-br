@@ -17,6 +17,7 @@ def _item(**overrides):
 
 def test_validates_and_normalizes_reference():
     assert validate_reference(_item())["uf"] == "PR"
+    assert validate_reference(_item())["city"] == "CURITIBA"
     with pytest.raises(ValueError):
         validate_reference(_item(source=""))
 
@@ -29,4 +30,20 @@ def test_upsert_is_idempotent():
     assert upsert_references(factory, [_item(condo_per_m2_monthly=8)])["updated"] == 1
     with factory() as session:
         reference = session.query(CityExpenseReference).one()
+        assert reference.city == "CURITIBA"
         assert reference.condo_per_m2_monthly == 8
+
+
+def test_upsert_updates_existing_title_case_city_without_duplicate():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(CityExpenseReference(**_item(city="Curitiba")))
+        session.commit()
+    upsert_references(factory, [_item(city="CURITIBA", condo_per_m2_monthly=9)])
+    with factory() as session:
+        references = session.query(CityExpenseReference).all()
+        assert len(references) == 1
+        assert references[0].city == "CURITIBA"
+        assert references[0].condo_per_m2_monthly == 9
