@@ -50,9 +50,9 @@ jobs:
       INGEST_GEOCODE: ${{ github.event.inputs.geocode || 'false' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -87,5 +87,5 @@ jobs:
             echo "## Caixa ingestion failed"
             echo
             echo "UFs: \`$INGEST_UFS\`"
-            echo "Review the worker logs above for the failed state and error."
+            echo "Review the worker logs for a failed UF or a date-enrichment health-budget breach."
           } >> "$GITHUB_STEP_SUMMARY"
