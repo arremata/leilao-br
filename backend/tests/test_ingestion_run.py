@@ -28,7 +28,7 @@ def _stub_validate_photo_url(url):
     return True
 
 
-def _row(source_id, preco, modalidade="Venda Online"):
+def _row(source_id, preco, modalidade="Outros"):
     return RawListing(
         source="caixa", source_id=source_id,
         raw={
@@ -140,7 +140,7 @@ def test_run_cli_with_file(tmp_path):
         "N° do imóvel;UF;Cidade;Bairro;Endereço;Preço;Valor de avaliação;Desconto;"
         "Descrição;Modalidade de venda;Link de acesso\n"
         "555;PR;CURITIBA;CENTRO;RUA Z, 9;10.000,00;20.000,00;50,0;"
-        "Casa, área total 40,00 m2, 1 quarto.;Venda Online;http://x\n"
+        "Casa, área total 40,00 m2, 1 quarto.;Outros;http://x\n"
     )
     csv_file = tmp_path / "lista.csv"
     csv_file.write_bytes(csv_text.encode("latin-1"))

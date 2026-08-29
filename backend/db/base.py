@@ -64,6 +64,7 @@ def init_db(engine: Engine) -> None:
         "matricula": "VARCHAR(128)",
         "edital_url": "TEXT",
         "matricula_url": "TEXT",
+        "edital_data": "JSONB",
     }
     with engine.begin() as connection:
         for name, postgres_type in date_columns.items():
@@ -83,6 +84,8 @@ def init_db(engine: Engine) -> None:
         for name, column_type in document_columns.items():
             if name in existing:
                 continue
+            if name == "edital_data" and engine.dialect.name == "sqlite":
+                column_type = "JSON"
             connection.execute(text(
                 f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
             ))

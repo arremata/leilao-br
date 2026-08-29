@@ -29,6 +29,7 @@ def test_catalog_card_matches_frontend_contract():
         "detail_url": "https://example.com/property", "status": "active", "descricao_raw": "",
         "matricula": "91.048", "edital_url": "https://example.com/edital.pdf",
         "matricula_url": "https://example.com/matricula.pdf",
+        "edital_data": {"lotNumber": "175", "registryOffice": "02"},
     }
 
     card = vercel_api._catalog_card(row)
@@ -43,7 +44,16 @@ def test_catalog_card_matches_frontend_contract():
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"
     assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
+    assert "editalData" not in card
     assert card["canAnalyze"] is True
+
+    detail = vercel_api._catalog_card(row, include_edital_data=True)
+    assert detail["editalData"] == {"lotNumber": "175", "registryOffice": "02"}
+
+
+def test_edital_data_is_selected_only_for_catalog_detail():
+    assert "edital_data" not in vercel_api._CATALOG_COLUMNS
+    assert "edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS
 
 
 def test_stale_land_enrichment_is_suppressed():
@@ -75,6 +85,62 @@ def test_persisted_city_reference_is_identified_in_market_detail():
 
     assert result["market"] == 250_000
     assert result["marketDetail"]["indicators"][0]["lbl"] == "Preço/m² · cidade"
+
+
+def test_persisted_enrichment_includes_dynamic_editable_costs():
+    row = {
+        "id": 7, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Apartamento", "area_m2": 50,
+        "beds": 2, "preco": 100_000, "avaliacao": 150_000,
+        "modalidade": "Leilão SFI", "detail_url": "https://example.com/7",
+        "photo_url": None, "descricao_raw": "Comissão do leiloeiro de 6% sobre o lance",
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, [],
+    )
+    costs = {item["id"]: item for item in result["costs"]}
+
+    assert costs["auctioneer_commission"]["rate"] == 0.06
+    assert costs["property_registration"]["rate"] == 0.008
+    assert costs["occupant_removal"]["value"] == 5000
+
+
+def test_persisted_enrichment_prefers_official_edital_commission():
+    row = {
+        "id": 7, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Apartamento", "area_m2": 50,
+        "beds": 2, "preco": 100_000, "avaliacao": 150_000,
+        "modalidade": "Leilão SFI", "detail_url": "https://example.com/7",
+        "photo_url": None, "descricao_raw": "Comissão estimada de 6%",
+        "edital_data": {"commissionRate": 0.05},
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, [],
+    )
+    commission = next(item for item in result["costs"] if item["id"] == "auctioneer_commission")
+
+    assert commission["rate"] == 0.05
+    assert "edital" in commission["label"]
+
+
+def test_persisted_direct_sale_has_no_auctioneer_commission():
+    row = {
+        "id": 8, "uf": "PR", "city": "Curitiba", "neighborhood": "Tingui",
+        "address": "Rua B", "property_type": "Casa", "area_m2": 100,
+        "beds": 3, "preco": 200_000, "avaliacao": 300_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/8",
+        "photo_url": None, "descricao_raw": "",
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 4_000, "scope": "city"}, [],
+    )
+    costs = {item["id"]: item for item in result["costs"]}
+
+    assert costs["auction_bid"]["label"] == "Preço de venda"
+    assert "auctioneer_commission" not in costs
 
 
 def test_catalog_requires_database_configuration(monkeypatch):

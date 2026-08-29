@@ -42,7 +42,7 @@ def test_init_db_adds_ingestion_fields_to_existing_properties_table():
     assert {
         "first_auction_at", "second_auction_at", "dates_fetched_at",
         "first_auction_price", "second_auction_price",
-        "matricula", "edital_url", "matricula_url",
+        "matricula", "edital_url", "matricula_url", "edital_data",
     }.issubset(columns)
 
 
@@ -62,6 +62,7 @@ def test_property_roundtrip_and_unique_constraint():
         descricao_raw="Apartamento", detail_url="http://x", status="active",
         matricula="91.048", edital_url="https://caixa/edital.pdf",
         matricula_url="https://caixa/matricula.pdf",
+        edital_data={"lotNumber": "175"},
         first_seen_at=now, last_seen_at=now, raw_payload={"a": 1},
     )
     session.add(p)
@@ -73,6 +74,7 @@ def test_property_roundtrip_and_unique_constraint():
     assert fetched.matricula == "91.048"
     assert fetched.edital_url == "https://caixa/edital.pdf"
     assert fetched.matricula_url == "https://caixa/matricula.pdf"
+    assert fetched.edital_data == {"lotNumber": "175"}
 
 
 def test_property_event_and_enrichment_relations():

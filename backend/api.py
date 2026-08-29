@@ -15,7 +15,7 @@ from dataclasses import asdict
 
 from fastapi import Depends
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
@@ -108,7 +108,7 @@ def _catalog_auction_type(modalidade: str | None) -> str | None:
     return None
 
 
-def _property_card(p: Property) -> dict:
+def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
     def _iso(value):
         if value is None:
             return None
@@ -143,7 +143,7 @@ def _property_card(p: Property) -> dict:
         elif p.first_auction_at is not None:
             praca = "1ª praça"
 
-    return {
+    card = {
         "id": p.id,
         "sourceId": p.source_id,
         "source": p.source,
@@ -178,6 +178,9 @@ def _property_card(p: Property) -> dict:
         "status": p.status,
         "canAnalyze": True,
     }
+    if include_edital_data:
+        card["editalData"] = p.edital_data
+    return card
 
 
 app.add_middleware(
@@ -192,7 +195,7 @@ app.add_middleware(
 def get_properties(session: Session = Depends(get_session)) -> list[dict]:
     """Compatibility alias backed by the real catalog, never fixture data."""
     props = session.execute(
-        select(Property).where(Property.status == "active")
+        select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
     ).scalars().all()
     return [_property_card(prop) for prop in props]
 
@@ -203,7 +206,7 @@ def get_dashboard(session: Session = Depends(get_session)) -> dict:
 
     properties = [
         _property_card(prop) for prop in session.execute(
-            select(Property).where(Property.status == "active")
+            select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
         ).scalars().all()
     ]
     # Active = endsAt in the future (or missing). Closed auctions don't count.
@@ -230,7 +233,7 @@ def get_dashboard(session: Session = Depends(get_session)) -> dict:
 
 @app.get("/catalog")
 def list_catalog(uf: Optional[str] = None, session: Session = Depends(get_session)) -> list[dict]:
-    stmt = select(Property).where(Property.status == "active")
+    stmt = select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
     if uf:
         stmt = stmt.where(Property.uf == uf.upper())
     props = session.execute(stmt).scalars().all()
@@ -242,7 +245,7 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
     prop = session.get(Property, prop_id)
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
-    card = _property_card(prop)
+    card = _property_card(prop, include_edital_data=True)
     enr = session.execute(
         select(Enrichment).where(Enrichment.property_id == prop_id)
     ).scalar_one_or_none()
@@ -281,6 +284,8 @@ def _maybe_fetch_detail(prop: Property) -> None:
         prop.edital_url = detail["edital_url"]
     if detail.get("matricula_url"):
         prop.matricula_url = detail["matricula_url"]
+    if detail.get("edital_data"):
+        prop.edital_data = detail["edital_data"]
     prop.detail_fetched = True
 
 

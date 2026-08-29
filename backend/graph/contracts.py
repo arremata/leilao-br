@@ -109,6 +109,10 @@ class CostLineItem(BaseModel):
     value: float
     hint: str
     kind: str  # "price" | "tax" | "fee" | "debt" | "reno"
+    id: str | None = None
+    # Decimal fraction of the considered bid when this is a percentage-based
+    # cost. The frontend uses it to keep fees dynamic as the bid changes.
+    rate: float | None = None
 
 
 class EditalDetail(BaseModel):
@@ -176,6 +180,7 @@ class AuctionPropertyResult(BaseModel):
     matricula: str | None = None
     edital_url: str | None = None
     matricula_url: str | None = None
+    edital_data: dict | None = None
     # Monthly recurring expenses used by the cost simulator to project
     # recurring debts over the months-until-sale horizon.
     monthly_condo: float | None = None

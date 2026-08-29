@@ -41,7 +41,7 @@ def _row(source_id, uf):
             "neighborhood": "Y", "address": f"RUA {source_id}",
             "preco": "100.000,00", "avaliacao": "200.000,00", "desconto_csv": "0",
             "descricao": "Casa, área total 50,00 m2, 2 quartos.",
-            "modalidade": "Venda Online", "detail_url": "http://x",
+            "modalidade": "Outros", "detail_url": "http://x",
         },
     )
 

@@ -3,6 +3,79 @@ import { Countdown, Photo, Specs } from './shared';
 import { fmtBRL } from '../utils';
 import { fetchCatalogItem, analyzeCatalogItem } from '../api';
 
+const REGISTRATION_RATES = {
+  PR: 0.008, SP: 0.009, RJ: 0.0085, MG: 0.0075, RS: 0.007,
+  SC: 0.007, DF: 0.008, BA: 0.008, GO: 0.0075,
+};
+const BRAZILIAN_UFS = new Set([
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT',
+  'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO',
+  'RR', 'SC', 'SP', 'SE', 'TO',
+]);
+
+function readStoredObject(key, fallback = {}) {
+  if (!key) return fallback;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizedCostLabel(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function isDirectSaleProperty(property) {
+  return normalizedCostLabel(property?.modalidade).includes('venda direta');
+}
+
+function costRowId(row, index = 0) {
+  if (row.id) return String(row.id);
+  const label = normalizedCostLabel(row.label);
+  if (row.kind === 'price' || label.includes('lance de arremate')) return 'auction_bid';
+  if (label.includes('itbi')) return 'itbi';
+  if (label.includes('comiss')) return 'auctioneer_commission';
+  if (label.includes('registro') || label.includes('cartorio') || label.includes('emolument')) return 'property_registration';
+  if (label.includes('desocup')) return 'occupant_removal';
+  if (row.kind === 'reno' || label.includes('reforma')) return 'renovation';
+  if (label.includes('ganho de capital')) return 'capital_gains';
+  if (label.includes('condomin')) return 'projected_condo';
+  if (label.includes('iptu')) return 'projected_iptu';
+  const slug = label.replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'cost';
+  return `source_${slug}_${index}`;
+}
+
+function propertyUf(property) {
+  const direct = String(property.uf || property.state || '').toUpperCase().trim();
+  if (BRAZILIAN_UFS.has(direct)) return direct;
+  const cityMatch = String(property.city || '').toUpperCase().match(/\b([A-Z]{2})\s*$/);
+  return cityMatch && BRAZILIAN_UFS.has(cityMatch[1]) ? cityMatch[1] : '';
+}
+
+function formatAuctionDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  });
+}
+
+function formatAuctionEvent(date, price) {
+  const parts = [];
+  const formattedDate = formatAuctionDate(date);
+  const numericPrice = Number(price);
+  if (formattedDate) parts.push(formattedDate);
+  if (Number.isFinite(numericPrice) && numericPrice > 0) parts.push(`R$ ${fmtBRL(numericPrice)}`);
+  return parts.join(' · ');
+}
+
 export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [tab, setTab] = useState('market');
 
@@ -12,22 +85,22 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [monthsToSale, setMonthsToSale] = useState(12); // 3..24
   const [target, setTarget] = useState(30);
   const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
-  const expenseStorageKey = property?.id ? `argos_property_expenses_${property.id}` : null;
+  const expenseStorageKey = property?.id ? `arremate_property_expenses_${property.id}` : null;
+  const costStorageKey = property?.id ? `arremate_property_costs_${property.id}` : null;
   const [expenseEstimates, setExpenseEstimates] = useState(() => {
     if (!property?.id) return {};
-    try {
-      const saved = JSON.parse(localStorage.getItem(`argos_property_expenses_${property.id}`) || '{}');
-      return saved && typeof saved === 'object' ? saved : {};
-    } catch {
-      return {};
-    }
+    return readStoredObject(
+      `arremate_property_expenses_${property.id}`,
+      readStoredObject(`argos_property_expenses_${property.id}`),
+    );
   });
-  // Occupant-removal toggle: default ON when the property exposes a removal cost.
-  // Initial state must be computed from a possibly-null property, so default to false
-  // and let the sim re-derive availability after the early-return guard below.
+  const [costPreferences, setCostPreferences] = useState(() => (
+    property?.id ? readStoredObject(`arremate_property_costs_${property.id}`, { overrides: {}, customCosts: [] }) : {}
+  ));
 
   // On-demand enrichment for ingested catalog items. Seed / URL-analyzed
   // properties already carry marketDetail and skip the fetch entirely.
+  const [catalogDetail, setCatalogDetail] = useState(null);
   const [enrichment, setEnrichment] = useState(null);
   // Thin catalog items start in the loading state (fetch fires on mount);
   // already-enriched or absent properties never fetch.
@@ -44,7 +117,12 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     if (!property || alreadyEnriched) return undefined;
     let cancelled = false;
     fetchCatalogItem(property.id)
-      .then(item => { if (!cancelled && item?.enrichment) setEnrichment(item.enrichment); })
+      .then(item => {
+        if (!cancelled && item) {
+          setCatalogDetail(item);
+          if (item.enrichment) setEnrichment(item.enrichment);
+        }
+      })
       .catch(() => {})
       .finally(() => { if (!cancelled) setEnrichLoading(false); });
     return () => { cancelled = true; };
@@ -58,27 +136,40 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       </div>
     );
   }
+  const catalogProperty = catalogDetail
+    ? { ...property, ...catalogDetail }
+    : property;
   // Effective property: an already-enriched result as-is, a thin catalog card
   // merged with its fetched enrichment, or the thin card alone (hero-only view).
   const enriched = alreadyEnriched
-    ? property
+    ? catalogProperty
     : (enrichment ? {
-        ...property,
+        ...catalogProperty,
         ...enrichment,
         // Persisted enrichment may predate auction-date ingestion and contain
         // an empty endsAt. Never let it erase the fresher catalog countdown.
-        endsAt: enrichment.endsAt || property.endsAt,
-        firstAuctionAt: enrichment.firstAuctionAt || property.firstAuctionAt,
-        secondAuctionAt: enrichment.secondAuctionAt || property.secondAuctionAt,
+        endsAt: enrichment.endsAt || catalogProperty.endsAt,
+        firstAuctionAt: enrichment.firstAuctionAt || catalogProperty.firstAuctionAt,
+        secondAuctionAt: enrichment.secondAuctionAt || catalogProperty.secondAuctionAt,
+        firstAuctionPrice: catalogProperty.firstAuctionPrice ?? enrichment.firstAuctionPrice,
+        secondAuctionPrice: catalogProperty.secondAuctionPrice ?? enrichment.secondAuctionPrice,
+        modalidade: catalogProperty.modalidade || enrichment.modalidade,
+        auctionType: catalogProperty.auctionType || enrichment.auctionType,
+        matricula: catalogProperty.matricula || enrichment.matricula,
+        editalUrl: catalogProperty.editalUrl || enrichment.editalUrl,
+        matriculaUrl: catalogProperty.matriculaUrl || enrichment.matriculaUrl,
+        editalData: catalogProperty.editalData || enrichment.editalData,
       } : null);
   const isEnriched = !!enriched;
-  const p = enriched || property;
+  const p = enriched || catalogProperty;
+  const isDirectSale = isDirectSaleProperty(p);
   const isWatched = watched?.includes(p.id);
   // Catalog responses historically used both names. Keep the official listing
   // reachable while older/newer backends converge on `auctionUrl`.
   const auctionUrl = p.auctionUrl || p.detailUrl;
   const editalUrl = p.editalUrl || p.edital?.editalUrl;
   const matriculaUrl = p.matriculaUrl || p.edital?.matriculaUrl;
+  const saleRulesUrl = p.editalData?.saleRulesUrl || p.edital?.editalData?.saleRulesUrl;
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -139,7 +230,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     renoPct, regionPricePerM2, p.area || 0, isLand,
   );
   const renoRate = Math.round(rawRenoRate);
-  const renoCost = Math.round(rawRenoRate * (p.area || 0));
+  const suggestedRenoCost = Math.round(rawRenoRate * (p.area || 0));
   const _renoLevelLabel = (pct) => {
     if (pct <= 0) return 'sem reforma';
     if (pct <= 15) return 'leve — pintura e ajustes';
@@ -162,39 +253,238 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const setExpenseEstimate = (kind, value) => {
     const next = { ...expenseEstimates };
     const amount = Number(value);
-    if (value === '' || !Number.isFinite(amount) || amount <= 0) delete next[kind];
-    else next[kind] = amount;
+    if (value === '' || !Number.isFinite(amount) || amount < 0) delete next[kind];
+    else next[kind] = Math.max(0, amount);
     setExpenseEstimates(next);
-    if (expenseStorageKey) localStorage.setItem(expenseStorageKey, JSON.stringify(next));
+    if (expenseStorageKey) {
+      try {
+        localStorage.setItem(expenseStorageKey, JSON.stringify(next));
+      } catch {
+        // The calculator remains usable when storage is unavailable.
+      }
+    }
   };
 
-  // --- Occupant removal cost (toggle, default on when property is not vacant) ---
+  const persistCostPreferences = (update) => {
+    setCostPreferences(current => {
+      const next = typeof update === 'function' ? update(current) : update;
+      if (costStorageKey) {
+        try {
+          localStorage.setItem(costStorageKey, JSON.stringify(next));
+        } catch {
+          // The calculator remains usable when storage is unavailable.
+        }
+      }
+      return next;
+    });
+  };
+  const legacyCostOverrides = costPreferences?.overrides && typeof costPreferences.overrides === 'object'
+    ? costPreferences.overrides
+    : {};
+  const scenarioPreferences = costPreferences?.scenario && typeof costPreferences.scenario === 'object'
+    ? costPreferences.scenario
+    : {};
+  const customCosts = Array.isArray(costPreferences?.customCosts)
+    ? costPreferences.customCosts.filter(item => item && item.id && item.label && Number.isFinite(Number(item.value)))
+    : [];
+  const setScenarioPreference = (key, value) => {
+    persistCostPreferences(current => {
+      const next = { ...(current || {}) };
+      delete next.overrides;
+      const scenario = { ...(current?.scenario || {}) };
+      if (value == null) delete scenario[key];
+      else scenario[key] = value;
+      return { ...next, scenario, customCosts: current?.customCosts || [] };
+    });
+  };
+  const addCustomCost = (label, value) => {
+    const trimmedLabel = String(label || '').trim();
+    const amount = Number(value);
+    if (!trimmedLabel || !Number.isFinite(amount) || amount < 0) return;
+    const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    persistCostPreferences(current => ({
+      ...(current || {}),
+      scenario: current?.scenario || {},
+      customCosts: [...(Array.isArray(current?.customCosts) ? current.customCosts : []), {
+        id, label: trimmedLabel, value: amount,
+      }],
+    }));
+  };
+  const removeCustomCost = (id) => {
+    persistCostPreferences(current => ({
+      ...(current || {}),
+      scenario: current?.scenario || {},
+      customCosts: (Array.isArray(current?.customCosts) ? current.customCosts : []).filter(item => item.id !== id),
+    }));
+  };
+  const resetScenarioPreferences = () => {
+    persistCostPreferences(current => {
+      const next = { ...(current || {}) };
+      delete next.overrides;
+      return { ...next, scenario: {}, customCosts: current?.customCosts || [] };
+    });
+  };
+
+  const hasScenarioValue = (key) => Object.prototype.hasOwnProperty.call(scenarioPreferences, key)
+    && Number.isFinite(Number(scenarioPreferences[key]));
+  const hasLegacyEvictionCost = Object.prototype.hasOwnProperty.call(legacyCostOverrides, 'occupant_removal')
+    && Number.isFinite(Number(legacyCostOverrides.occupant_removal));
+  const legacyEvictionCost = Number(legacyCostOverrides.occupant_removal);
+  const evictionAdjusted = hasScenarioValue('evictionCost') || hasLegacyEvictionCost;
+  const evictionCost = hasScenarioValue('evictionCost')
+    ? Math.max(0, Number(scenarioPreferences.evictionCost))
+    : (hasLegacyEvictionCost ? Math.max(0, legacyEvictionCost) : 5000);
+  const renovationAdjusted = hasScenarioValue('renovationCost');
+  const renoCost = renovationAdjusted
+    ? Math.max(0, Number(scenarioPreferences.renovationCost))
+    : suggestedRenoCost;
+
+  const marketSaleSuggestion = Math.max(0, Number(p.market) || 0);
+  const appraisalSaleSuggestion = Math.max(0, Number(p.appraisal) || 0);
+  const defaultSaleBasis = marketSaleSuggestion > 0 ? 'market' : 'appraisal';
+  const saleBasis = ['market', 'appraisal', 'custom'].includes(scenarioPreferences.saleBasis)
+    ? scenarioPreferences.saleBasis
+    : defaultSaleBasis;
+  const customSaleValue = Number(scenarioPreferences.saleValue);
+  const saleValue = saleBasis === 'custom' && Number.isFinite(customSaleValue)
+    ? Math.max(0, customSaleValue)
+    : (saleBasis === 'appraisal' ? appraisalSaleSuggestion : marketSaleSuggestion);
+  const setSaleBasis = (basis) => {
+    persistCostPreferences(current => {
+      const next = { ...(current || {}) };
+      delete next.overrides;
+      const scenario = { ...(current?.scenario || {}), saleBasis: basis };
+      delete scenario.saleValue;
+      return { ...next, scenario, customCosts: current?.customCosts || [] };
+    });
+  };
+  const setCustomSaleValue = (value) => {
+    persistCostPreferences(current => {
+      const next = { ...(current || {}) };
+      delete next.overrides;
+      return {
+        ...next,
+        scenario: { ...(current?.scenario || {}), saleBasis: 'custom', saleValue: Math.max(0, Number(value) || 0) },
+        customCosts: current?.customCosts || [],
+      };
+    });
+  };
+
+  const resetExpenseEstimates = () => {
+    setExpenseEstimates({});
+    if (expenseStorageKey) {
+      try {
+        localStorage.removeItem(expenseStorageKey);
+      } catch {
+        // The calculator remains usable when storage is unavailable.
+      }
+    }
+  };
 
   const gainCapital = exempt === 'Pagamento integral de GC'
-    ? Math.round(Math.max(0, (p.market || 0) * 0.94 - (p.minBid || 0)) * 0.15)
+    ? Math.round(Math.max(0, saleValue - (p.minBid || 0)) * 0.15)
     : 0;
 
-  // Build the dynamic cost rows: take seed costs, replace reno + capital gains,
-  // replace the condo/IPTU debt lines with projected values, add occupant removal.
-  const dynamicRows = (p.costs || [])
+  const minBidFloor = Number(p.minBid) || 0;
+  const uf = propertyUf(p);
+  const registrationRate = BRAZILIAN_UFS.has(uf) ? (REGISTRATION_RATES[uf] || 0.0075) : null;
+
+  // Normalize legacy cached cost rows and backfill the new platform estimates
+  // so the feature works before every persisted enrichment has been refreshed.
+  let sourceRows = (p.costs || [])
     .filter(r => {
-      // Drop the static condo/IPTU debt lines — replaced by projected versions below.
-      const label = r.label.toLowerCase();
+      const label = normalizedCostLabel(r.label);
       if (r.kind === 'debt' && (label.includes('condomínio') || label.includes('condominio'))) return false;
       if (r.kind === 'debt' && label.includes('iptu')) return false;
       return true;
     })
-    .map(r => {
-      if (r.kind === 'reno') {
+    .map((r, index) => ({ ...r, id: costRowId(r, index), value: Number(r.value) || 0 }))
+    .filter(r => !(isDirectSale && r.id === 'auctioneer_commission'));
+
+  const ensureCost = (row) => {
+    if (!sourceRows.some(item => item.id === row.id)) sourceRows.push(row);
+  };
+  ensureCost({
+    id: 'auction_bid', label: isDirectSale ? 'Preço de venda' : 'Lance de arremate', value: minBidFloor,
+    hint: isDirectSale
+      ? 'Preço mínimo publicado pela Caixa para a venda direta.'
+      : 'Valor mínimo informado para o leilão.',
+    kind: 'price',
+  });
+  if (!isDirectSale) {
+    ensureCost({
+      id: 'auctioneer_commission', label: 'Comissão do leiloeiro · estimativa (5%)',
+      value: Math.round(minBidFloor * 0.05), rate: 0.05,
+      hint: 'Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital.',
+      kind: 'fee',
+    });
+  }
+  if (registrationRate != null) {
+    ensureCost({
+      id: 'property_registration',
+      label: `Registro em cartório · ${uf} (${(registrationRate * 100).toLocaleString('pt-BR')}%)`,
+      value: Math.round(minBidFloor * registrationRate), rate: registrationRate,
+      hint: 'Referência simplificada baseada nas tabelas estaduais de emolumentos reunidas pelo IRIB (2025). O valor final varia por faixa e pelos atos praticados; confirme com o cartório.',
+      kind: 'fee',
+    });
+  }
+  ensureCost({
+    id: 'occupant_removal', label: 'Desocupação do imóvel · estimativa', value: 5000,
+    hint: 'Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.',
+    kind: 'fee',
+  });
+  ensureCost({
+    id: 'renovation', label: 'Reforma estimada', value: 0,
+    hint: 'Calculada no simulador por área e faixa regional.', kind: 'reno',
+  });
+  ensureCost({
+    id: 'capital_gains', label: 'Imposto sobre ganho de capital', value: 0,
+    hint: 'Calculado conforme o cenário tributário selecionado.', kind: 'tax',
+  });
+
+  sourceRows = sourceRows.map(r => {
+      if (r.id === 'auction_bid' || r.kind === 'price') {
         return {
           ...r,
-          value: renoCost,
-          hint: `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m².`,
+          id: 'auction_bid',
+          label: isDirectSale ? 'Preço de venda' : 'Lance de arremate',
+          hint: isDirectSale
+            ? 'Preço mínimo publicado pela Caixa para a venda direta.'
+            : (r.hint || 'Valor mínimo informado para o leilão.'),
         };
       }
-      if (r.kind === 'tax' && r.label.toLowerCase().includes('ganho')) {
+      if (r.id === 'property_registration' && registrationRate != null && !Number.isFinite(Number(r.rate))) {
         return {
           ...r,
+          label: `Registro em cartório · ${uf} (${(registrationRate * 100).toLocaleString('pt-BR')}%)`,
+          value: Math.round(minBidFloor * registrationRate),
+          rate: registrationRate,
+          hint: 'Referência simplificada baseada nas tabelas estaduais de emolumentos reunidas pelo IRIB (2025). O valor final varia por faixa e pelos atos praticados; confirme com o cartório.',
+        };
+      }
+      if (r.id === 'occupant_removal') {
+        return {
+          ...r,
+          value: evictionCost,
+          hint: evictionAdjusted
+            ? 'Valor de desocupação informado por você no cenário do investidor.'
+            : 'Reserva inicial de R$ 5.000. Ajuste no cenário conforme a situação do imóvel e a orientação profissional.',
+        };
+      }
+      if (r.id === 'renovation' || r.kind === 'reno') {
+        return {
+          ...r,
+          id: 'renovation',
+          value: renoCost,
+          hint: renovationAdjusted
+            ? `Valor alternativo informado por você. Sugestão da plataforma: R$ ${fmtBRL(suggestedRenoCost)}.`
+            : `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m².`,
+        };
+      }
+      if (r.id === 'capital_gains' || (r.kind === 'tax' && normalizedCostLabel(r.label).includes('ganho'))) {
+        return {
+          ...r,
+          id: 'capital_gains',
           value: gainCapital,
           hint: gainCapital === 0
             ? `Isento — ${exempt.toLowerCase()}.`
@@ -204,9 +494,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       return r;
     });
 
-  // Insert projected condo + IPTU as debt lines (only when they have a monthly value)
   if (monthlyCondo > 0) {
-    dynamicRows.push({
+    sourceRows.push({
+      id: 'projected_condo',
       label: `Condomínio projetado (${monthsToSale} meses)`,
       value: projectedCondo,
       hint: `R$ ${fmtBRL(monthlyCondo)}/mês × ${monthsToSale} meses até a venda.`,
@@ -214,71 +504,87 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     });
   }
   if (monthlyIptu > 0) {
-    dynamicRows.push({
+    sourceRows.push({
+      id: 'projected_iptu',
       label: `IPTU projetado (${monthsToSale} meses)`,
       value: projectedIptu,
       hint: `R$ ${fmtBRL(monthlyIptu)}/mês × ${monthsToSale} meses até a venda.`,
       kind: 'debt',
     });
   }
-  // ── Base cost model at minBid (seed values) ──
-  // Used to derive fee rates and the target slider cap. The rows are then
-  // rebased onto maxBid so the displayed total reflects the recommended bid.
-  const baseTotal = dynamicRows.reduce((a, r) => a + r.value, 0);
 
-  const netSale = Math.round((p.market || 0) * 0.94);
-  const minBidFloor = p.minBid || 0;
+  const rowOrder = {
+    auction_bid: 0, itbi: 10, auctioneer_commission: 20,
+    property_registration: 30, occupant_removal: 40,
+    overdue_iptu: 50, overdue_condo: 51, projected_condo: 52,
+    projected_iptu: 53, renovation: 60, capital_gains: 70,
+  };
+  sourceRows.sort((a, b) => (rowOrder[a.id] ?? 55) - (rowOrder[b.id] ?? 55));
 
-  // %-of-bid fees scale with the actual arremate price: ITBI, comissão (leiloeiro/corretor),
-  // custas judiciais, registro em cartório. Everything else (reform, debts, flat fees,
-  // projected condo/IPTU, legal, capital gains) is independent of the bid.
   const _isScalingFee = (r) => {
     if (r.kind === 'price') return false;
-    const lbl = r.label.toLowerCase();
+    if (Number.isFinite(Number(r.rate)) && Number(r.rate) > 0) return true;
+    const lbl = normalizedCostLabel(r.label);
     if (r.kind === 'tax' && lbl.includes('itbi')) return true;
-    if (r.kind === 'fee' && (lbl.includes('comiss') || lbl.includes('custas') || lbl.includes('registro'))) return true;
+    if (r.kind === 'fee' && (lbl.includes('comiss') || lbl.includes('custas') || lbl.includes('registro') || lbl.includes('emolument'))) return true;
     return false;
   };
-  const scalingFeesAtMinBid = dynamicRows.filter(_isScalingFee).reduce((a, r) => a + r.value, 0);
-  const flatCosts = baseTotal - minBidFloor - scalingFeesAtMinBid;
-  const feeRate = minBidFloor > 0 ? scalingFeesAtMinBid / minBidFloor : 0;
+  const rateForRow = (r) => Number(r.rate) > 0
+    ? Number(r.rate)
+    : (minBidFloor > 0 ? (Number(r.value) || 0) / minBidFloor : 0);
+  const scalableRows = sourceRows.filter(_isScalingFee);
+  const feeRate = scalableRows.reduce((total, row) => total + rateForRow(row), 0);
+  const flatCosts = sourceRows.reduce((total, row) => {
+    if (row.kind === 'price' || _isScalingFee(row)) return total;
+    return total + (Number(row.value) || 0);
+  }, 0) + customCosts.reduce((total, row) => total + Math.max(0, Number(row.value) || 0), 0);
+  const baseTotal = minBidFloor * (1 + feeRate) + flatCosts;
 
-  // Lance máximo recomendado nunca pode ser inferior ao lance mínimo do leilão.
-  // Slider de meta de retorno é travado no ponto onde maxBid atinge o minBid:
-  // at maxBid = minBid, total = minBid(1+feeRate) + flatCosts = baseTotal ⇒ target = (netSale/baseTotal - 1)*100
   const targetCap = baseTotal > 0
-    ? Math.max(5, Math.min(80, Math.round((netSale / baseTotal - 1) * 100)))
+    ? Math.max(5, Math.min(80, Math.round((saleValue / baseTotal - 1) * 100)))
     : 80;
   const effectiveTarget = Math.min(target, targetCap);
-  // Solve for maxBid with fee scaling: total = maxBid(1+feeRate) + flatCosts = netSale/(1+T)
-  // ⇒ maxBid = (netSale/(1+T) - flatCosts) / (1+feeRate)
   const maxBidRaw = baseTotal > 0
-    ? Math.round((netSale / (1 + effectiveTarget / 100) - flatCosts) / (1 + feeRate))
+    ? Math.round((saleValue / (1 + effectiveTarget / 100) - flatCosts) / (1 + feeRate))
     : 0;
-  const maxBid = Math.max(maxBidRaw, minBidFloor);
+  const recommendedBid = Math.max(maxBidRaw, minBidFloor);
+  const consideredBid = recommendedBid;
 
-  // Rebase the cost rows onto maxBid: price row → maxBid, scaling fees → maxBid × (orig/minBid).
-  const rebasedRows = dynamicRows.map(r => {
+  const dynamicRows = sourceRows.map(r => {
     if (r.kind === 'price') {
-      const suffix = '(lance máximo recomendado)';
-      return { ...r, value: maxBid, hint: r.hint ? `${r.hint} ${suffix}` : suffix };
+      return {
+        ...r, id: 'auction_bid', value: consideredBid,
+        hint: `${r.hint || ''} ${isDirectSale
+          ? 'Proposta máxima recomendada'
+          : 'Lance máximo recomendado'} para o cenário atual.`,
+      };
     }
-    if (_isScalingFee(r) && minBidFloor > 0) {
-      return { ...r, value: Math.round(r.value * maxBid / minBidFloor) };
-    }
+    if (_isScalingFee(r)) return { ...r, value: Math.round(consideredBid * rateForRow(r)) };
     return r;
-  });
-  const dynamicTotal = rebasedRows.reduce((a, r) => a + r.value, 0);
-  const externalCosts = Math.max(0, dynamicTotal - maxBid);
+  }).concat(customCosts.map(row => ({
+    ...row, value: Math.max(0, Number(row.value) || 0), kind: 'custom', custom: true,
+    hint: 'Custo extra salvo neste navegador.',
+  })));
+  const dynamicTotal = dynamicRows.reduce((total, row) => total + (Number(row.value) || 0), 0);
+  const externalCosts = Math.max(0, dynamicTotal - consideredBid);
 
   const sim = {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
     target: effectiveTarget, setTarget, targetCap,
     exempt, setExempt,
-    renoCost, renoRate, regionPricePerM2, isLand,
+    renoCost, suggestedRenoCost, renovationAdjusted, renoRate, regionPricePerM2, isLand,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
     expenseEstimates, setExpenseEstimate, expenseReference: p.expenseEstimate,
-    gainCapital, dynamicTotal, dynamicRows: rebasedRows, netSale, maxBid, externalCosts,
+    evictionCost, evictionAdjusted,
+    setEvictionCost: (value) => setScenarioPreference('evictionCost', value),
+    resetEvictionCost: () => setScenarioPreference('evictionCost', null),
+    setRenovationCost: (value) => setScenarioPreference('renovationCost', value),
+    resetRenovationCost: () => setScenarioPreference('renovationCost', null),
+    saleValue, saleBasis, marketSaleSuggestion, appraisalSaleSuggestion,
+    setSaleBasis, setCustomSaleValue,
+    gainCapital, dynamicTotal, dynamicRows, maxBid: consideredBid,
+    externalCosts, addCustomCost, removeCustomCost,
+    resetScenarioPreferences, resetExpenseEstimates,
   };
 
   return (
@@ -304,7 +610,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Acessar leilão <span aria-hidden="true">↗</span>
+              {isDirectSale ? 'Acessar venda' : 'Acessar leilão'} <span aria-hidden="true">↗</span>
             </a>
           )}
           {editalUrl && (
@@ -327,6 +633,16 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               download
             >
               Baixar matrícula <span aria-hidden="true">↓</span>
+            </a>
+          )}
+          {saleRulesUrl && (
+            <a
+              className="btn sm"
+              href={saleRulesUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Regras da venda <span aria-hidden="true">↗</span>
             </a>
           )}
           <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
@@ -423,19 +739,25 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           {/* Countdown + risk summary */}
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
             <div style={{ minWidth: 0 }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)' }}>Encerra em</div>
+              <div className="uppy" style={{ color: 'var(--fg-3)' }}>
+                {isDirectSale ? 'Disponibilidade' : 'Encerra em'}
+              </div>
               <div style={{ marginTop: 4 }}>
-                <Countdown until={p.endsAt} dark />
+                {isDirectSale && !p.endsAt
+                  ? <span style={{ color: 'var(--fg-2)', fontSize: 13 }}>Sem prazo divulgado</span>
+                  : <Countdown until={p.endsAt} dark />}
               </div>
               <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-                {p.endsAt ? new Date(p.endsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) + ' · ' + new Date(p.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                {p.endsAt
+                  ? new Date(p.endsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) + ' · ' + new Date(p.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                  : isDirectSale ? 'Sujeito à disponibilidade na Caixa' : '—'}
               </div>
             </div>
           </div>
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
 
-          {/* Pricing grid — always shows 1ª and 2ª praça */}
+          {/* Pricing labels follow the official sale modality. */}
           <PricingGrid p={p} />
 
           <div className="divider" style={{ margin: '16px 0 4px' }}></div>
@@ -470,7 +792,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         {[
           { v: 'market', l: 'Mercado', ix: '01' },
           { v: 'cost', l: 'Viabilidade financeira', ix: '02' },
-          { v: 'edital', l: 'Edital', ix: '03' },
+          { v: 'edital', l: isDirectSale ? 'Documentos' : 'Edital', ix: '03' },
           { v: 'legal', l: 'Jurídico', ix: '04', comingSoon: true },
         ].map(t => (
           <button
@@ -548,6 +870,10 @@ function Meta({ lbl, val }) {
 }
 
 function PricingGrid({ p }) {
+  const modality = normalizedCostLabel(p.modalidade);
+  const isDirectSale = modality.includes('venda direta');
+  const isOpenTender = modality.includes('licitacao');
+  const isSfiAuction = modality.includes('leilao sfi');
   const firstBidPrice = p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid;
   const secondBidPrice = p.secondAuctionPrice || p.edital?.secondBidPrice || 0;
   const appraisal = p.appraisal || 0;
@@ -565,7 +891,9 @@ function PricingGrid({ p }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
       <div>
-        <span className="uppy" style={{ color: 'var(--fg-3)' }}>1ª praça</span>
+        <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+          {isDirectSale ? 'Preço de venda' : isOpenTender ? 'Valor mínimo' : '1ª praça'}
+        </span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(firstBidPrice)}</div>
         {firstBidDate && (
           <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{firstBidDate}</div>
@@ -588,29 +916,31 @@ function PricingGrid({ p }) {
           </div>
         )}
       </div>
-      <div>
-        <span className="uppy" style={{ color: 'var(--fg-3)' }}>2ª praça</span>
-        {has2nd ? (
-          <>
-            <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
-              <div className="num-md">R$ {fmtBRL(secondBidPrice)}</div>
-              <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>−{secondDiscount}%</span>
-            </div>
-            {secondBidDate && (
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
-            )}
-          </>
-        ) : (
-          <>
-            <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)', fontStyle: 'italic' }}>
-              Valor ainda não divulgado
-            </div>
-            {secondBidDate && (
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
-            )}
-          </>
-        )}
-      </div>
+      {isSfiAuction && (
+        <div>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>2ª praça</span>
+          {has2nd ? (
+            <>
+              <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
+                <div className="num-md">R$ {fmtBRL(secondBidPrice)}</div>
+                <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>−{secondDiscount}%</span>
+              </div>
+              {secondBidDate && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)', fontStyle: 'italic' }}>
+                Valor ainda não divulgado
+              </div>
+              {secondBidDate && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -650,6 +980,7 @@ function Collapsible({ title, children, last }) {
 // ============================================================
 function Market({ p }) {
   const md = p.marketDetail;
+  const isDirectSale = isDirectSaleProperty(p);
 
   if (!md) {
     return (
@@ -692,7 +1023,9 @@ function Market({ p }) {
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
             <div>
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.01 · spread</span>
-              <h3 className="h2" style={{ marginTop: 4 }}>Lance vs. avaliação vs. mercado estimado</h3>
+              <h3 className="h2" style={{ marginTop: 4 }}>
+                {isDirectSale ? 'Preço de venda vs. avaliação vs. mercado estimado' : 'Lance vs. avaliação vs. mercado estimado'}
+              </h3>
             </div>
           </div>
 
@@ -732,7 +1065,9 @@ function Market({ p }) {
             <div className="row between" style={{ alignItems: 'center' }}>
               <div className="row gap-2" style={{ alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', display: 'inline-block' }}></span>
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>Lance mínimo {has2nd && '(2ª praça)'}</span>
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+                  {isDirectSale ? 'Preço de venda' : `Lance mínimo ${has2nd ? '(2ª praça)' : ''}`}
+                </span>
               </div>
               <div className="row gap-2" style={{ alignItems: 'baseline' }}>
                 <span className="num-md" style={{ color: 'var(--accent)' }}>R$ {fmtBRL(bid)}</span>
@@ -746,7 +1081,9 @@ function Market({ p }) {
             <div className="row between" style={{ alignItems: 'center' }}>
               <div className="row gap-2" style={{ alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--fg-1)', display: 'inline-block' }}></span>
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>Avaliação edital</span>
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+                  {isDirectSale ? 'Avaliação oficial' : 'Avaliação edital'}
+                </span>
               </div>
               <div className="row gap-2" style={{ alignItems: 'baseline' }}>
                 <span className="num-md" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(appraisal)}</span>
@@ -902,13 +1239,19 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 // TAB 2 — COSTS (with simulator at top)
 // ============================================================
 function CostBreakdown({ p, sim }) {
+  const isDirectSale = isDirectSaleProperty(p);
   const {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
     target, setTarget, targetCap, exempt, setExempt,
-    renoCost, renoRate, regionPricePerM2, isLand,
+    renoCost, suggestedRenoCost, renovationAdjusted, renoRate, regionPricePerM2, isLand,
     projectedCondo, projectedIptu,
     expenseEstimates, setExpenseEstimate, expenseReference,
-    netSale, maxBid, dynamicRows, dynamicTotal, externalCosts,
+    evictionCost, evictionAdjusted, setEvictionCost, resetEvictionCost,
+    setRenovationCost, resetRenovationCost,
+    saleValue, saleBasis, marketSaleSuggestion, appraisalSaleSuggestion,
+    setSaleBasis, setCustomSaleValue,
+    maxBid, dynamicRows, dynamicTotal, externalCosts,
+    addCustomCost, removeCustomCost, resetScenarioPreferences, resetExpenseEstimates,
   } = sim;
 
   if ((dynamicRows || []).length === 0) {
@@ -944,28 +1287,49 @@ function CostBreakdown({ p, sim }) {
             setMonthsToSale(12);
             setTarget(30);
             setExempt('Primeiro imóvel ou reinvestimento em 180 dias');
+            resetScenarioPreferences();
+            resetExpenseEstimates();
           }}>
             Resetar
           </button>
         </div>
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 14, padding: 16, marginBottom: 24, border: '1px solid var(--line-1)',
-          borderRadius: 10, background: 'var(--bg-2)',
-        }}>
-          <RecurringExpenseField
+        <div className="scenario-cost-panel">
+          <div className="scenario-cost-panel-head">
+            <div>
+              <span className="uppy">Custos ajustáveis</span>
+              <p>Altere somente as premissas que dependem da sua estratégia.</p>
+            </div>
+            <span className="mono scenario-saved-note">salvos neste navegador</span>
+          </div>
+          <div className="scenario-cost-grid">
+          <ScenarioMoneyField
             label="Condomínio mensal"
-            estimatedValue={expenseEstimates.condo}
-            calculatedValue={p.monthlyCondo}
-            onChange={(value) => setExpenseEstimate('condo', value)}
+            value={sim.monthlyCondo}
+            adjusted={expenseEstimates.condo != null}
+            defaultLabel={p.monthlyCondo ? 'Estimativa da cidade' : 'Sem referência cadastrada'}
+            suffix="/mês"
+            onCommit={(value) => setExpenseEstimate('condo', value)}
+            onReset={() => setExpenseEstimate('condo', '')}
           />
-          <RecurringExpenseField
+          <ScenarioMoneyField
             label="IPTU mensal"
-            estimatedValue={expenseEstimates.iptu}
-            calculatedValue={p.monthlyIptu}
-            onChange={(value) => setExpenseEstimate('iptu', value)}
+            value={sim.monthlyIptu}
+            adjusted={expenseEstimates.iptu != null}
+            defaultLabel={p.monthlyIptu ? 'Estimativa da cidade' : 'Sem referência cadastrada'}
+            suffix="/mês"
+            onCommit={(value) => setExpenseEstimate('iptu', value)}
+            onReset={() => setExpenseEstimate('iptu', '')}
           />
+          <ScenarioMoneyField
+            label="Desocupação"
+            value={evictionCost}
+            adjusted={evictionAdjusted}
+            defaultLabel="Sugestão da plataforma"
+            onCommit={setEvictionCost}
+            onReset={resetEvictionCost}
+          />
+          </div>
           <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: 11.5, color: 'var(--fg-2)' }}>
             {expenseReference
               ? `Estimativas para ${expenseReference.city}/${expenseReference.uf}, referência ${expenseReference.referenceYear}: IPTU de ${(expenseReference.annualIptuRate * 100).toLocaleString('pt-BR')}% a.a. sobre a avaliação e condomínio de R$ ${fmtBRL(expenseReference.condoPerM2Monthly)}/m²/mês. Fonte: ${expenseReference.source}`
@@ -978,27 +1342,29 @@ function CostBreakdown({ p, sim }) {
           <SimMetric
             lbl="Custos externos"
             big={`R$ ${fmtBRL(externalCosts)}`}
-            sub="Tudo além do arremate: taxas, reforma, débitos"
+            sub={isDirectSale ? 'Tudo além da compra: taxas, reforma, débitos' : 'Tudo além do arremate: taxas, reforma, débitos'}
             tone="muted"
           />
           <SimMetric
             lbl="Custo total estimado"
             big={`R$ ${fmtBRL(dynamicTotal)}`}
-            sub="Arremate + custos externos (baseado no lance máximo)"
+            sub={isDirectSale ? 'Compra + custos externos (baseado na proposta máxima)' : 'Arremate + custos externos (baseado no lance máximo)'}
             tone="cost"
           />
           <SimMetric
-            lbl="Lance máximo recomendado"
+            lbl={isDirectSale ? 'Proposta máxima recomendada' : 'Lance máximo recomendado'}
             big={`R$ ${fmtBRL(Math.max(0, maxBid))}`}
             sub={`Para atingir ${target}% de retorno líquido`}
             tone="hero"
           />
-          <SimMetric
-            lbl="Venda estimada (líq. 6%)"
-            big={`R$ ${fmtBRL(netSale)}`}
-            sub="Valor de mercado líquido de comissão de venda"
-            tone="good"
-            delta={netSale - dynamicTotal}
+          <SaleValueMetric
+            value={saleValue}
+            basis={saleBasis}
+            marketValue={marketSaleSuggestion}
+            appraisalValue={appraisalSaleSuggestion}
+            onBasisChange={setSaleBasis}
+            onValueChange={setCustomSaleValue}
+            delta={saleValue - dynamicTotal}
           />
         </div>
 
@@ -1008,8 +1374,9 @@ function CostBreakdown({ p, sim }) {
           <div>
             <div className="row between baseline">
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>Nível de reforma</span>
-              <span className="mono" style={{ fontSize: 16, fontWeight: 500, color: 'var(--accent)' }}>
+              <span className="row gap-2 mono" style={{ fontSize: 16, fontWeight: 500, color: 'var(--accent)' }}>
                 R$ {fmtBRL(renoCost)}
+                {renovationAdjusted && <span className="tag" style={{ fontSize: 8 }}>valor próprio</span>}
               </span>
             </div>
             <input
@@ -1048,8 +1415,23 @@ function CostBreakdown({ p, sim }) {
             <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
               {isLand
                 ? 'Terreno não recebe estimativa de reforma'
-                : `R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m² · cenário ${renoPct}%`}
+                : renovationAdjusted
+                  ? `Sugestão da plataforma: R$ ${fmtBRL(suggestedRenoCost)}`
+                  : `R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m² · cenário ${renoPct}%`}
             </p>
+            {!isLand && (
+              <div className="renovation-alternative">
+                <ScenarioMoneyField
+                  label="Valor alternativo de reforma"
+                  value={renoCost}
+                  adjusted={renovationAdjusted}
+                  defaultLabel="Use um orçamento próprio, se já tiver"
+                  onCommit={setRenovationCost}
+                  onReset={resetRenovationCost}
+                  compact
+                />
+              </div>
+            )}
           </div>
 
           {/* Months to sale */}
@@ -1070,7 +1452,9 @@ function CostBreakdown({ p, sim }) {
             onChange={setTarget}
             display={`${target}%`}
             description={target >= targetCap
-              ? `Limite — lance máximo = lance mínimo do leilão`
+              ? (isDirectSale
+                  ? 'Limite — proposta máxima = preço mínimo da venda'
+                  : 'Limite — lance máximo = lance mínimo do leilão')
               : `Após custos, impostos e venda projetada`}
             min={5}
             max={targetCap}
@@ -1100,16 +1484,18 @@ function CostBreakdown({ p, sim }) {
 
       {/* ── Cost table ── */}
       <div>
-        <div className="row between" style={{ alignItems: 'flex-end', marginBottom: 16 }}>
+        <div className="row between cost-section-header" style={{ alignItems: 'flex-end', marginBottom: 16 }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 02.02 · custo total</span>
-            <h3 className="h2" style={{ marginTop: 4 }}>Da batida do martelo à chave na mão</h3>
+            <h3 className="h2" style={{ marginTop: 4 }}>
+              {isDirectSale ? 'Da proposta à chave na mão' : 'Da batida do martelo à chave na mão'}
+            </h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 540 }}>
-              Cada centavo que sai do bolso, linha a linha. Passe o cursor em qualquer item para entender o porquê.
+              Valores consolidados do cenário acima. Aqui você pode acrescentar apenas custos extras.
             </p>
           </div>
           <div className="row gap-2">
-            <button className="btn sm"><span className="mono">↓</span> PDF</button>
+            <button className="btn sm" disabled title="Disponível em breve."><span className="mono">↓</span> PDF</button>
           </div>
         </div>
 
@@ -1124,9 +1510,18 @@ function CostBreakdown({ p, sim }) {
             <span style={{ textAlign: 'right' }}>% do total</span>
             <span style={{ textAlign: 'right' }}>Valor</span>
           </div>
-          {dynamicRows.map((r, i) => (
-            <CostRow key={i} l={r.label} v={r.value} hint={r.hint} pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0} />
+          {dynamicRows.map(r => (
+            <CostRow
+              key={r.id}
+              l={r.label}
+              v={r.value}
+              hint={r.hint}
+              pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0}
+              custom={r.custom}
+              onDelete={r.custom ? () => removeCustomCost(r.id) : null}
+            />
           ))}
+          <CustomCostForm onAdd={addCustomCost} />
           <div className="cost-row" style={{
             display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
             padding: '20px 20px', background: 'var(--bg-2)',
@@ -1139,39 +1534,56 @@ function CostBreakdown({ p, sim }) {
           </div>
         </div>
         <p style={{ marginTop: 14, fontSize: 11.5, color: 'var(--fg-3)' }}>
-          Condomínio e IPTU projetados pela quantidade de meses até venda. Ganho de capital varia conforme reinvestimento.
+          {isDirectSale
+            ? 'ITBI e registro acompanham a proposta recomendada. Não há comissão de leiloeiro nesta modalidade.'
+            : 'Comissão, ITBI e registro acompanham o lance recomendado. As demais premissas são ajustadas no cenário do investidor.'}
         </p>
       </div>
     </div>
   );
 }
 
-function RecurringExpenseField({ label, estimatedValue, calculatedValue, onChange }) {
-  const userAdjusted = estimatedValue != null;
-  const value = userAdjusted ? estimatedValue : (calculatedValue || '');
+function ScenarioMoneyField({
+  label, value, adjusted, defaultLabel, suffix, onCommit, onReset, compact = false,
+}) {
+  const [draft, setDraft] = useState(null);
+  const displayedValue = draft == null ? (Number.isFinite(Number(value)) ? String(value) : '') : draft;
+  const commit = () => {
+    if (draft == null) return;
+    if (draft.trim() === '') onReset?.();
+    else {
+      const amount = Number(draft);
+      if (Number.isFinite(amount) && amount >= 0) onCommit?.(amount);
+    }
+    setDraft(null);
+  };
+
   return (
-    <label style={{ display: 'block' }}>
-      <span className="row between" style={{ marginBottom: 7 }}>
-        <span className="uppy" style={{ color: 'var(--fg-2)' }}>{label}</span>
-        <span className="mono" style={{ fontSize: 10, color: userAdjusted ? 'var(--warn)' : 'var(--fg-2)' }}>
-          {userAdjusted ? 'AJUSTADO PELO USUÁRIO' : calculatedValue ? 'ESTIMATIVA DA CIDADE' : 'SEM REFERÊNCIA'}
-        </span>
-      </span>
-      <div className="row" style={{
-        height: 40, padding: '0 12px', border: '1px solid var(--line-2)',
-        borderRadius: 8, background: 'var(--bg-1)',
-      }}>
-        <span style={{ color: 'var(--fg-2)', marginRight: 6 }}>R$</span>
+    <div className={`scenario-money-field${compact ? ' compact' : ''}`}>
+      <label>
+        <span className="uppy">{label}</span>
+      <div className="scenario-money-input">
+        <span>R$</span>
         <input
           type="number" min="0" step="0.01" inputMode="decimal"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Insira uma estimativa" aria-label={label}
-          style={{ width: '100%', border: 0, outline: 0, background: 'transparent', fontFamily: 'var(--f-mono)' }}
+          value={displayedValue}
+          onFocus={() => setDraft(String(value ?? ''))}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+            if (event.key === 'Escape') setDraft(null);
+          }}
+          placeholder="0,00" aria-label={label}
         />
-        <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>/mês</span>
+        {suffix && <span className="scenario-money-suffix">{suffix}</span>}
       </div>
-    </label>
+      </label>
+      <div className="scenario-money-meta">
+        <span>{adjusted ? 'Valor informado por você' : defaultLabel}</span>
+        {adjusted && <button type="button" onClick={onReset}>Restaurar sugestão</button>}
+      </div>
+    </div>
   );
 }
 
@@ -1213,8 +1625,87 @@ function SimMetric({ lbl, big, sub, tone = 'muted', delta }) {
   );
 }
 
-function CostRow({ l, v, hint, pct }) {
+function SaleValueMetric({
+  value, basis, marketValue, appraisalValue, onBasisChange, onValueChange, delta,
+}) {
+  const [draft, setDraft] = useState(null);
+  const displayedValue = draft == null ? String(value || 0) : draft;
+  const commit = () => {
+    if (draft == null || draft.trim() === '') {
+      setDraft(null);
+      return;
+    }
+    const amount = Number(draft);
+    if (Number.isFinite(amount) && amount >= 0) onValueChange(amount);
+    setDraft(null);
+  };
+
+  return (
+    <div className="sale-value-metric">
+      <div className="row between">
+        <span className="uppy">Valor de venda no cenário</span>
+        {basis === 'custom' && <span className="sale-custom-tag">personalizado</span>}
+      </div>
+      <div className="sale-value-input">
+        {draft == null ? (
+          <button type="button" onClick={() => setDraft(String(value || 0))} aria-label="Alterar valor de venda no cenário">
+            R$ {fmtBRL(value)}
+          </button>
+        ) : (
+          <>
+            <span>R$</span>
+            <input
+              autoFocus
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={displayedValue}
+              onChange={event => setDraft(event.target.value)}
+              onBlur={commit}
+              onKeyDown={event => {
+                if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+                if (event.key === 'Escape') setDraft(null);
+              }}
+              aria-label="Valor de venda no cenário"
+            />
+          </>
+        )}
+      </div>
+      <div className={`sale-delta ${delta >= 0 ? 'positive' : 'negative'}`}>
+        <span>{delta >= 0 ? '▲' : '▼'}</span>
+        R$ {fmtBRL(Math.abs(delta))} resultado estimado
+      </div>
+      <div className="sale-basis-toggle" aria-label="Sugestão para o valor de venda">
+        <button
+          type="button"
+          className={basis === 'market' ? 'active' : ''}
+          disabled={marketValue <= 0}
+          aria-pressed={basis === 'market'}
+          onClick={() => onBasisChange('market')}
+        >
+          <span>Mercado</span>
+          <small>R$ {fmtBRL(marketValue)}</small>
+        </button>
+        <button
+          type="button"
+          className={basis === 'appraisal' ? 'active' : ''}
+          disabled={appraisalValue <= 0}
+          aria-pressed={basis === 'appraisal'}
+          onClick={() => onBasisChange('appraisal')}
+        >
+          <span>Avaliação oficial</span>
+          <small>R$ {fmtBRL(appraisalValue)}</small>
+        </button>
+      </div>
+      <p>Escolha uma sugestão ou digite o preço que pretende realizar na venda.</p>
+    </div>
+  );
+}
+
+function CostRow({ l, v, hint, pct, custom, onDelete }) {
   const [open, setOpen] = useState(false);
+
   return (
     <div
       className="cost-row"
@@ -1231,14 +1722,25 @@ function CostRow({ l, v, hint, pct }) {
         background: open ? 'var(--bg-2)' : 'transparent',
       }}
     >
-      <button style={{
+      <button
+        type="button"
+        onClick={() => setOpen(current => !current)}
+        aria-label={`Explicação de ${l}`}
+        aria-expanded={open}
+        style={{
         width: 16, height: 16, borderRadius: '50%',
         border: '1px solid var(--line-2)',
         color: 'var(--fg-3)', fontSize: 9,
         fontFamily: 'var(--f-mono)',
       }}>?</button>
       <div>
-        <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{l}</div>
+        <div className="row gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{l}</div>
+          {custom && <span className="tag" style={{ padding: '2px 5px', fontSize: 8.5, color: 'var(--accent-strong)' }}>extra</span>}
+          {custom && (
+            <button type="button" className="cost-inline-action danger" onClick={onDelete} aria-label={`Excluir ${l}`}>remover</button>
+          )}
+        </div>
         {open && hint && (
           <div style={{ marginTop: 5, fontSize: 11.5, color: 'var(--fg-2)', maxWidth: 480 }}>{hint}</div>
         )}
@@ -1256,14 +1758,70 @@ function CostRow({ l, v, hint, pct }) {
         )}
       </div>
       <span className="mono cost-money-value" style={{
-        fontSize: 15, textAlign: 'right',
-        minWidth: 0,
-        color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
+        minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
         fontWeight: 500, letterSpacing: '-0.02em',
-      }}>
-        {v === 0 ? '— isento' : `R$ ${fmtBRL(v)}`}
-      </span>
+      }}>R$ {fmtBRL(v)}</span>
     </div>
+  );
+}
+
+function CustomCostForm({ onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [value, setValue] = useState('');
+  const valid = label.trim() && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+
+  if (!open) {
+    return (
+      <button type="button" className="custom-cost-trigger" onClick={() => setOpen(true)}>
+        <span aria-hidden="true">＋</span>
+        Adicionar custo personalizado
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="custom-cost-form"
+      onSubmit={event => {
+        event.preventDefault();
+        if (!valid) return;
+        onAdd(label, Number(value));
+        setLabel('');
+        setValue('');
+        setOpen(false);
+      }}
+    >
+      <label>
+        <span className="uppy">Título do custo</span>
+        <input
+          autoFocus
+          value={label}
+          maxLength={80}
+          onChange={event => setLabel(event.target.value)}
+          placeholder="Ex.: gasolina para visitar o imóvel"
+        />
+      </label>
+      <label>
+        <span className="uppy">Valor</span>
+        <div className="custom-cost-money">
+          <span>R$</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={value}
+            onChange={event => setValue(event.target.value)}
+            placeholder="300,00"
+          />
+        </div>
+      </label>
+      <div className="row gap-2 custom-cost-actions">
+        <button type="button" className="btn sm" onClick={() => { setOpen(false); setLabel(''); setValue(''); }}>Cancelar</button>
+        <button type="submit" className="btn sm primary" disabled={!valid}>Adicionar</button>
+      </div>
+    </form>
   );
 }
 
@@ -1338,16 +1896,103 @@ function LegalComingSoon() {
 // ============================================================
 function Edital({ p, auctionUrl }) {
   const e = p.edital;
+  const d = p.editalData || e?.editalData || {};
   const editalUrl = p.editalUrl || e?.editalUrl;
   const matriculaUrl = p.matriculaUrl || e?.matriculaUrl;
-  const matricula = p.matricula || e?.matricula;
+  const matricula = p.matricula || d.matricula || e?.matricula;
+  const modality = p.modalidade || '';
+  const normalizedModality = modality.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const isDirectSale = normalizedModality.includes('venda direta');
+  const isOpenTender = normalizedModality.includes('licitacao');
+  const isSfiAuction = normalizedModality.includes('leilao sfi');
+  const saleRulesUrl = d.saleRulesUrl;
+  const firstAuctionDate = isDirectSale ? null : (p.firstAuctionAt || e?.firstBidDate || p.endsAt);
+  const secondAuctionDate = isDirectSale ? null : (p.secondAuctionAt || e?.secondBidDate);
+  const firstAuctionPrice = isDirectSale
+    ? (d.minimumSalePrice ?? p.minBid)
+    : (p.firstAuctionPrice ?? e?.firstBidPrice ?? p.minBid);
+  const secondAuctionPrice = isDirectSale ? null : (p.secondAuctionPrice ?? e?.secondBidPrice);
+  const firstAuctionEvent = formatAuctionEvent(firstAuctionDate, firstAuctionPrice);
+  const secondAuctionEvent = formatAuctionEvent(secondAuctionDate, secondAuctionPrice);
+  const propertyFacts = [
+    d.propertyNumber && { label: 'Nº do imóvel', value: d.propertyNumber },
+    !isDirectSale && d.lotNumber && { label: 'Item / lote', value: d.lotNumber },
+    matricula && { label: 'Matrícula', value: matricula },
+    d.registryOffice && { label: 'Cartório / ofício', value: d.registryOffice },
+    d.iptuRegistration && { label: 'Inscrição do IPTU', value: d.iptuRegistration },
+    d.occupancy && { label: 'Situação', value: d.occupancy },
+    d.negativeAuctionRegistration && {
+      label: isDirectSale ? 'Averbação dos leilões anteriores' : 'Averbação dos leilões negativos',
+      value: d.negativeAuctionRegistration,
+    },
+    Number(d.minimumSalePrice ?? p.minBid) > 0 && {
+      label: 'Valor mínimo', value: `R$ ${fmtBRL(Number(d.minimumSalePrice ?? p.minBid))}`,
+    },
+    Number(d.appraisalValue ?? p.appraisal) > 0 && {
+      label: 'Avaliação', value: `R$ ${fmtBRL(Number(d.appraisalValue ?? p.appraisal))}`,
+    },
+  ].filter(Boolean);
+  const auctionFacts = [
+    !isDirectSale && d.auctionNumber && { label: 'Nº da licitação', value: d.auctionNumber },
+    modality && { label: 'Modalidade', value: modality },
+    firstAuctionEvent && {
+      label: isDirectSale ? 'Preço de venda' : isOpenTender ? 'Licitação' : '1º leilão',
+      value: firstAuctionEvent,
+    },
+    isSfiAuction && secondAuctionEvent && { label: '2º leilão', value: secondAuctionEvent },
+    !isDirectSale && d.publicationDate && { label: 'Edital publicado em', value: d.publicationDate },
+    !isDirectSale && d.resultDate && { label: 'Homologação prevista', value: d.resultDate },
+    !isDirectSale && e?.process && { label: 'Processo', value: e.process },
+    !isDirectSale && e?.creditor && { label: 'Exequente', value: e.creditor },
+    !isDirectSale && e?.debtor && { label: 'Executado', value: e.debtor },
+  ].filter(Boolean);
+  const auctioneerSite = d.auctioneerSite
+    ? (/^https?:\/\//i.test(d.auctioneerSite) ? d.auctioneerSite : `https://${d.auctioneerSite}`)
+    : '';
+  const auctioneerFacts = [
+    d.auctioneerName && { label: 'Leiloeiro oficial', value: d.auctioneerName },
+    d.auctioneerRegistration && { label: 'Registro na Junta Comercial', value: d.auctioneerRegistration },
+    d.auctioneerSite && {
+      label: 'Site',
+      value: <a href={auctioneerSite} target="_blank" rel="noopener noreferrer">{d.auctioneerSite} ↗</a>,
+    },
+    d.auctioneerPhone && { label: 'Telefone', value: d.auctioneerPhone },
+    d.auctioneerEmail && {
+      label: 'E-mail',
+      value: <a href={`mailto:${d.auctioneerEmail}`}>{d.auctioneerEmail}</a>,
+    },
+  ].filter(Boolean);
+  const commissionRate = Number(d.commissionRate);
+  const paymentNotes = [
+    !isDirectSale && Number.isFinite(commissionRate) && commissionRate > 0 && {
+      label: `Comissão do leiloeiro · ${Number((commissionRate * 100).toFixed(2)).toLocaleString('pt-BR')}%`,
+      value: d.commissionTerms || 'Percentual informado no edital oficial.',
+    },
+    d.commissionPaymentDeadline && {
+      label: 'Pagamento da comissão', value: d.commissionPaymentDeadline,
+    },
+    d.paymentMethods && { label: 'Formas de pagamento aceitas', value: d.paymentMethods },
+    d.cashPaymentDeadline && { label: 'Pagamento da parte à vista', value: d.cashPaymentDeadline },
+    d.registeredInstrumentDeadline && {
+      label: 'Entrega da escritura/contrato registrado', value: d.registeredInstrumentDeadline,
+    },
+    d.expenseRules && { label: 'Responsabilidade por despesas', value: d.expenseRules },
+  ].filter(Boolean);
+  const officialAlerts = [...new Set([
+    ...(Array.isArray(d.alerts) ? d.alerts : []),
+    ...(!isDirectSale && Array.isArray(e?.liens) ? e.liens : []),
+  ].filter(Boolean))];
   const documentSource = p.source?.toLowerCase() === 'caixa'
     ? 'Caixa Econômica Federal'
     : 'Fonte oficial do leilão';
-  if (!e && !editalUrl && !matriculaUrl && !matricula) {
+  if (!e && !editalUrl && !matriculaUrl && !matricula && Object.keys(d).length === 0) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Dados do edital não disponíveis para este imóvel.</p>
+        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>
+          {isDirectSale
+            ? 'Os documentos e dados oficiais desta venda ainda não estão disponíveis.'
+            : 'Dados do edital não disponíveis para este imóvel.'}
+        </p>
       </div>
     );
   }
@@ -1356,10 +2001,12 @@ function Edital({ p, auctionUrl }) {
       <div className="row between edital-header" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
         <div>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · documentos oficiais</span>
-          <h3 className="h2" style={{ marginTop: 4 }}>Edital e matrícula do imóvel</h3>
+          <h3 className="h2" style={{ marginTop: 4 }}>
+            {isDirectSale ? 'Documentos e dados da venda' : 'Edital e matrícula do imóvel'}
+          </h3>
           <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Fonte: {documentSource}</p>
         </div>
-        <div className="row gap-2">
+        <div className="row gap-2 edital-document-actions">
           {editalUrl && (
             <a className="btn sm" href={editalUrl} target="_blank" rel="noopener noreferrer" download>
               Baixar edital <span aria-hidden="true">↓</span>
@@ -1370,41 +2017,79 @@ function Edital({ p, auctionUrl }) {
               Baixar matrícula <span aria-hidden="true">↓</span>
             </a>
           )}
+          {saleRulesUrl && (
+            <a className="btn sm" href={saleRulesUrl} target="_blank" rel="noopener noreferrer">
+              Regras da venda <span aria-hidden="true">↗</span>
+            </a>
+          )}
           {auctionUrl && (
-            <a className="btn sm" href={auctionUrl} target="_blank" rel="noopener noreferrer">
-              Acessar leilão <span aria-hidden="true">↗</span>
+            <a className="btn sm edital-auction-link" href={auctionUrl} target="_blank" rel="noopener noreferrer">
+              {isDirectSale ? 'Acessar venda' : 'Acessar leilão'} <span aria-hidden="true">↗</span>
             </a>
           )}
         </div>
       </div>
-      <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
-        <Meta lbl="Matrícula" val={matricula || '—'} />
-        <Meta lbl="Processo" val={e?.process || '—'} />
-        <Meta lbl="Exequente" val={e?.creditor || '—'} />
-        <Meta lbl="Executado" val={e?.debtor || '—'} />
-        <Meta lbl="1ª praça" val={e?.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
-        <Meta lbl="2ª praça" val={e?.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
-      </div>
-      {e?.propertyDescription && (
-        <>
+      {isDirectSale && (
+        <div className="direct-sale-document-note">
+          <strong>Venda direta não é leilão.</strong>
+          <span>
+            Esta modalidade não possui edital individual, lote, praças, leiloeiro ou comissão de leiloeiro.
+            Consulte a matrícula e as regras gerais da Caixa antes de enviar uma proposta.
+          </span>
+        </div>
+      )}
+      <EditalFacts title="Dados do imóvel" items={propertyFacts} />
+      <EditalFacts title={isDirectSale ? 'Dados da venda' : 'Dados do leilão'} items={auctionFacts} />
+      {!isDirectSale && <EditalFacts title="Leiloeiro e contatos" items={auctioneerFacts} />}
+      <EditalNotes title={isDirectSale ? 'Pagamento e responsabilidades' : 'Pagamento e prazos'} items={paymentNotes} />
+      {(d.propertyDescription || e?.propertyDescription) && (
+        <section className="edital-section">
           <h4 className="h3" style={{ marginBottom: 10 }}>Descrição do bem</h4>
-          <p style={{ margin: 0, color: 'var(--fg-1)' }}>{e.propertyDescription}</p>
-        </>
+          <p style={{ margin: 0, color: 'var(--fg-1)' }}>{d.propertyDescription || e.propertyDescription}</p>
+        </section>
       )}
-      {e?.liens?.length > 0 && (
-        <>
-          <div className="divider" style={{ margin: '20px 0' }}></div>
-          <h4 className="h3" style={{ marginBottom: 10 }}>Ônus, gravames e dívidas</h4>
-          <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--fg-1)' }}>
-            {e.liens.map((l, i) => <li key={i}>{l}</li>)}
+      {officialAlerts.length > 0 && (
+        <section className="edital-section">
+          <h4 className="h3" style={{ marginBottom: 10 }}>Alertas do documento oficial</h4>
+          <ul className="edital-alerts">
+            {officialAlerts.map((alert, index) => <li key={`${index}-${alert}`}>{alert}</li>)}
           </ul>
-        </>
+        </section>
       )}
-      {e?.summaryNote && (
+      {!isDirectSale && e?.summaryNote && (
         <div style={{ marginTop: 22, padding: 14, background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-1)' }}>↳</b> {e.summaryNote}
         </div>
       )}
     </div>
+  );
+}
+
+function EditalFacts({ title, items }) {
+  if (!items.length) return null;
+  return (
+    <section className="edital-section">
+      <h4 className="h3">{title}</h4>
+      <div className="edital-facts">
+        {items.map(item => <Meta key={item.label} lbl={item.label} val={item.value} />)}
+      </div>
+    </section>
+  );
+}
+
+function EditalNotes({ title, items }) {
+  if (!items.length) return null;
+  return (
+    <section className="edital-section">
+      <h4 className="h3">{title}</h4>
+      <div className="edital-notes">
+        {items.map(item => (
+          <div className="edital-note" key={item.label}>
+            <span className="uppy">{item.label}</span>
+            <p>{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

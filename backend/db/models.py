@@ -59,6 +59,7 @@ class Property(Base):
     matricula: Mapped[Optional[str]] = mapped_column(String(128), default=None)
     edital_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
     matricula_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    edital_data: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
     detail_fetched: Mapped[bool] = mapped_column(default=False)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
 
