@@ -12,6 +12,16 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const [monthsToSale, setMonthsToSale] = useState(12); // 3..24
   const [target, setTarget] = useState(30);
   const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
+  const expenseStorageKey = property?.id ? `argos_property_expenses_${property.id}` : null;
+  const [expenseEstimates, setExpenseEstimates] = useState(() => {
+    if (!property?.id) return {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(`argos_property_expenses_${property.id}`) || '{}');
+      return saved && typeof saved === 'object' ? saved : {};
+    } catch {
+      return {};
+    }
+  });
   // Occupant-removal toggle: default ON when the property exposes a removal cost.
   // Initial state must be computed from a possibly-null property, so default to false
   // and let the sim re-derive availability after the early-return guard below.
@@ -67,6 +77,8 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   // Catalog responses historically used both names. Keep the official listing
   // reachable while older/newer backends converge on `auctionUrl`.
   const auctionUrl = p.auctionUrl || p.detailUrl;
+  const editalUrl = p.editalUrl || p.edital?.editalUrl;
+  const matriculaUrl = p.matriculaUrl || p.edital?.matriculaUrl;
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -138,10 +150,23 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   };
 
   // --- Projected recurring debts over months-to-sale ---
-  const monthlyCondo = p.monthlyCondo || 0;
-  const monthlyIptu = p.monthlyIptu || 0;
+  const monthlyCondo = expenseEstimates.condo != null
+    ? Number(expenseEstimates.condo) || 0
+    : Number(p.monthlyCondo) || 0;
+  const monthlyIptu = expenseEstimates.iptu != null
+    ? Number(expenseEstimates.iptu) || 0
+    : Number(p.monthlyIptu) || 0;
   const projectedCondo = Math.round(monthlyCondo * monthsToSale);
   const projectedIptu = Math.round(monthlyIptu * monthsToSale);
+
+  const setExpenseEstimate = (kind, value) => {
+    const next = { ...expenseEstimates };
+    const amount = Number(value);
+    if (value === '' || !Number.isFinite(amount) || amount <= 0) delete next[kind];
+    else next[kind] = amount;
+    setExpenseEstimates(next);
+    if (expenseStorageKey) localStorage.setItem(expenseStorageKey, JSON.stringify(next));
+  };
 
   // --- Occupant removal cost (toggle, default on when property is not vacant) ---
 
@@ -252,6 +277,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     exempt, setExempt,
     renoCost, renoRate, regionPricePerM2, isLand,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
+    expenseEstimates, setExpenseEstimate, expenseReference: p.expenseEstimate,
     gainCapital, dynamicTotal, dynamicRows: rebasedRows, netSale, maxBid, externalCosts,
   };
 
@@ -279,6 +305,28 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               rel="noopener noreferrer"
             >
               Acessar leilão <span aria-hidden="true">↗</span>
+            </a>
+          )}
+          {editalUrl && (
+            <a
+              className="btn sm"
+              href={editalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+            >
+              Baixar edital <span aria-hidden="true">↓</span>
+            </a>
+          )}
+          {matriculaUrl && (
+            <a
+              className="btn sm"
+              href={matriculaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+            >
+              Baixar matrícula <span aria-hidden="true">↓</span>
             </a>
           )}
           <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
@@ -467,6 +515,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 }
 
 function AnalyzeCTA({ onAnalyze, analyzing, loading, error, canAnalyze }) {
+  const collectionQueued = error?.toLowerCase().includes('priorizada');
   return (
     <div className="card fade-in" style={{ padding: 40, textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
       <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 10 }}>ANÁLISE NÃO EXECUTADA</div>
@@ -481,7 +530,7 @@ function AnalyzeCTA({ onAnalyze, analyzing, loading, error, canAnalyze }) {
           {analyzing ? 'Analisando…' : loading ? 'Carregando…' : 'Analisar imóvel'}
         </button>
       )}
-      {error && <p style={{ marginTop: 16, fontSize: 12.5, color: 'var(--bad)' }}>{error}</p>}
+      {error && <p style={{ marginTop: 16, fontSize: 12.5, color: collectionQueued ? 'var(--fg-2)' : 'var(--bad)' }}>{error}</p>}
     </div>
   );
 }
@@ -858,6 +907,7 @@ function CostBreakdown({ p, sim }) {
     target, setTarget, targetCap, exempt, setExempt,
     renoCost, renoRate, regionPricePerM2, isLand,
     projectedCondo, projectedIptu,
+    expenseEstimates, setExpenseEstimate, expenseReference,
     netSale, maxBid, dynamicRows, dynamicTotal, externalCosts,
   } = sim;
 
@@ -897,6 +947,30 @@ function CostBreakdown({ p, sim }) {
           }}>
             Resetar
           </button>
+        </div>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 14, padding: 16, marginBottom: 24, border: '1px solid var(--line-1)',
+          borderRadius: 10, background: 'var(--bg-2)',
+        }}>
+          <RecurringExpenseField
+            label="Condomínio mensal"
+            estimatedValue={expenseEstimates.condo}
+            calculatedValue={p.monthlyCondo}
+            onChange={(value) => setExpenseEstimate('condo', value)}
+          />
+          <RecurringExpenseField
+            label="IPTU mensal"
+            estimatedValue={expenseEstimates.iptu}
+            calculatedValue={p.monthlyIptu}
+            onChange={(value) => setExpenseEstimate('iptu', value)}
+          />
+          <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: 11.5, color: 'var(--fg-2)' }}>
+            {expenseReference
+              ? `Estimativas para ${expenseReference.city}/${expenseReference.uf}, referência ${expenseReference.referenceYear}: IPTU de ${(expenseReference.annualIptuRate * 100).toLocaleString('pt-BR')}% a.a. sobre a avaliação e condomínio de R$ ${fmtBRL(expenseReference.condoPerM2Monthly)}/m²/mês. Fonte: ${expenseReference.source}`
+              : 'Ainda não há referência cadastrada para esta cidade. Você pode inserir estimativas mensais, salvas somente neste navegador.'}
+          </p>
         </div>
 
         {/* Metric tiles — tonal hierarchy: hero (maxBid) / good (venda) / cost (total) / muted (external) */}
@@ -1072,6 +1146,35 @@ function CostBreakdown({ p, sim }) {
   );
 }
 
+function RecurringExpenseField({ label, estimatedValue, calculatedValue, onChange }) {
+  const userAdjusted = estimatedValue != null;
+  const value = userAdjusted ? estimatedValue : (calculatedValue || '');
+  return (
+    <label style={{ display: 'block' }}>
+      <span className="row between" style={{ marginBottom: 7 }}>
+        <span className="uppy" style={{ color: 'var(--fg-2)' }}>{label}</span>
+        <span className="mono" style={{ fontSize: 10, color: userAdjusted ? 'var(--warn)' : 'var(--fg-2)' }}>
+          {userAdjusted ? 'AJUSTADO PELO USUÁRIO' : calculatedValue ? 'ESTIMATIVA DA CIDADE' : 'SEM REFERÊNCIA'}
+        </span>
+      </span>
+      <div className="row" style={{
+        height: 40, padding: '0 12px', border: '1px solid var(--line-2)',
+        borderRadius: 8, background: 'var(--bg-1)',
+      }}>
+        <span style={{ color: 'var(--fg-2)', marginRight: 6 }}>R$</span>
+        <input
+          type="number" min="0" step="0.01" inputMode="decimal"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Insira uma estimativa" aria-label={label}
+          style={{ width: '100%', border: 0, outline: 0, background: 'transparent', fontFamily: 'var(--f-mono)' }}
+        />
+        <span style={{ color: 'var(--fg-3)', fontSize: 11 }}>/mês</span>
+      </div>
+    </label>
+  );
+}
+
 // Tonal palette — hero (maxBid) leads, good (venda) follows, cost is neutral-bold, muted recedes.
 const _tones = {
   hero:   { cardBg: 'var(--accent)',           border: 'var(--accent-strong)', num: 'var(--accent-ink)',  lbl: 'rgba(255,255,255,0.75)', sub: 'rgba(255,255,255,0.85)', chipBg: 'rgba(255,255,255,0.18)', chipFg: '#fff' },
@@ -1235,7 +1338,13 @@ function LegalComingSoon() {
 // ============================================================
 function Edital({ p, auctionUrl }) {
   const e = p.edital;
-  if (!e) {
+  const editalUrl = p.editalUrl || e?.editalUrl;
+  const matriculaUrl = p.matriculaUrl || e?.matriculaUrl;
+  const matricula = p.matricula || e?.matricula;
+  const documentSource = p.source?.toLowerCase() === 'caixa'
+    ? 'Caixa Econômica Federal'
+    : 'Fonte oficial do leilão';
+  if (!e && !editalUrl && !matriculaUrl && !matricula) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Dados do edital não disponíveis para este imóvel.</p>
@@ -1246,11 +1355,21 @@ function Edital({ p, auctionUrl }) {
     <div className="card" style={{ padding: 24, fontSize: 13, lineHeight: 1.65 }}>
       <div className="row between edital-header" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
         <div>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · edital integral</span>
-          <h3 className="h2" style={{ marginTop: 4 }}>Edital de Leilão Judicial Eletrônico</h3>
-          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Originado em: {e.firstBidDate || 'não informado'}</p>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · documentos oficiais</span>
+          <h3 className="h2" style={{ marginTop: 4 }}>Edital e matrícula do imóvel</h3>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Fonte: {documentSource}</p>
         </div>
         <div className="row gap-2">
+          {editalUrl && (
+            <a className="btn sm" href={editalUrl} target="_blank" rel="noopener noreferrer" download>
+              Baixar edital <span aria-hidden="true">↓</span>
+            </a>
+          )}
+          {matriculaUrl && (
+            <a className="btn sm" href={matriculaUrl} target="_blank" rel="noopener noreferrer" download>
+              Baixar matrícula <span aria-hidden="true">↓</span>
+            </a>
+          )}
           {auctionUrl && (
             <a className="btn sm" href={auctionUrl} target="_blank" rel="noopener noreferrer">
               Acessar leilão <span aria-hidden="true">↗</span>
@@ -1259,19 +1378,20 @@ function Edital({ p, auctionUrl }) {
         </div>
       </div>
       <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
-        <Meta lbl="Processo" val={e.process || '—'} />
-        <Meta lbl="Exequente" val={e.creditor || '—'} />
-        <Meta lbl="Executado" val={e.debtor || '—'} />
-        <Meta lbl="1ª praça" val={e.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
-        <Meta lbl="2ª praça" val={e.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
+        <Meta lbl="Matrícula" val={matricula || '—'} />
+        <Meta lbl="Processo" val={e?.process || '—'} />
+        <Meta lbl="Exequente" val={e?.creditor || '—'} />
+        <Meta lbl="Executado" val={e?.debtor || '—'} />
+        <Meta lbl="1ª praça" val={e?.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
+        <Meta lbl="2ª praça" val={e?.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
       </div>
-      {e.propertyDescription && (
+      {e?.propertyDescription && (
         <>
           <h4 className="h3" style={{ marginBottom: 10 }}>Descrição do bem</h4>
           <p style={{ margin: 0, color: 'var(--fg-1)' }}>{e.propertyDescription}</p>
         </>
       )}
-      {e.liens.length > 0 && (
+      {e?.liens?.length > 0 && (
         <>
           <div className="divider" style={{ margin: '20px 0' }}></div>
           <h4 className="h3" style={{ marginBottom: 10 }}>Ônus, gravames e dívidas</h4>
@@ -1280,7 +1400,7 @@ function Edital({ p, auctionUrl }) {
           </ul>
         </>
       )}
-      {e.summaryNote && (
+      {e?.summaryNote && (
         <div style={{ marginTop: 22, padding: 14, background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-1)' }}>↳</b> {e.summaryNote}
         </div>

@@ -176,6 +176,8 @@ class TestBuildResultDetails:
         result = build_result(state)
         assert result.edital is not None
         assert result.edital.process != ""
+        assert result.edital.matricula == "87.412"
+        assert result.matricula == "87.412"
 
     def test_details_none_when_no_metadata(self):
         state = AuctionState()

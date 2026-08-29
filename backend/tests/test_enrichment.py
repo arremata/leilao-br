@@ -11,6 +11,7 @@ def test_metadata_from_property_maps_fields():
         neighborhood="Centro", address="Rua XV, 100", property_type="Apartamento",
         area_m2=65.0, beds=2, preco=150000.0, avaliacao=250000.0,
         modalidade="Venda Direta Online", photo_url="http://p.jpg",
+        matricula="91.048",
     )
     meta = metadata_from_property(p)
     assert meta.address == "Rua XV, 100"
@@ -21,6 +22,7 @@ def test_metadata_from_property_maps_fields():
     assert meta.city == "Curitiba"
     assert meta.state == "PR"
     assert meta.beds == 2
+    assert meta.matricula == "91.048"
 
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):

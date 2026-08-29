@@ -327,6 +327,7 @@ def _build_edital(state: AuctionState) -> EditalDetail | None:
         process=metadata.process_number or "",
         creditor=metadata.creditor or "",
         debtor=metadata.debtor or "",
+        matricula=metadata.matricula or "",
         first_bid_date=metadata.auction_date or "",
         first_bid_price=metadata.auction_price or 0,
         second_bid_date=metadata.auction_date_2nd or "",
@@ -374,13 +375,11 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
 
     discount = market_result.discount_percentage if market_value and market_result else 0.0
 
-    # Monthly recurring expenses — derived from legal findings so the frontend
-    # simulator can project condo/IPTU over the months-until-sale horizon.
-    condo_debt_total = _parse_brl(legal_result.condominium_debts) if legal_result and legal_result.condominium_debts else 0.0
-    iptu_debt_total = _parse_brl(legal_result.tax_debts_iptu) if legal_result and legal_result.tax_debts_iptu else 0.0
-    # Assume the outstanding debt covers ~12 months of back fees — so monthly = total / 12.
-    monthly_condo = round(condo_debt_total / 12) if condo_debt_total else None
-    monthly_iptu = round(iptu_debt_total / 12) if iptu_debt_total else None
+    # Outstanding debts are not recurring monthly charges. Leave these empty
+    # unless the official source exposes explicit monthly values; the frontend
+    # lets the investor supply clearly labelled local estimates when absent.
+    monthly_condo = None
+    monthly_iptu = None
 
     return AuctionPropertyResult(
         id=_generate_id(metadata.address, metadata.auction_price or 0),
@@ -417,6 +416,7 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         edital=_build_edital(state),
         auction_url=state.auction_url or None,
         photo_url=metadata.photo_url or None,
+        matricula=metadata.matricula or None,
         monthly_condo=monthly_condo,
         monthly_iptu=monthly_iptu,
     )

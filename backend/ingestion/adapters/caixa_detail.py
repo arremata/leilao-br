@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 from curl_cffi.requests import AsyncSession
@@ -15,7 +15,13 @@ from curl_cffi.requests.errors import RequestsError
 from loguru import logger
 
 _PHOTO_RE = re.compile(r'<img[^>]+src="([^"]*/fotos/[^"]+)"', re.IGNORECASE)
-_PDF_RE = re.compile(r'href="([^"]+\.pdf)"', re.IGNORECASE)
+_PDF_HREF_RE = re.compile(
+    r"href\s*=\s*['\"]([^'\"]+\.pdf(?:\?[^'\"]*)?)['\"]", re.IGNORECASE,
+)
+_EXIBE_DOC_RE = re.compile(
+    r"ExibeDoc\(\s*['\"]([^'\"]+\.pdf(?:\?[^'\"]*)?)['\"]\s*\)",
+    re.IGNORECASE,
+)
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 _AUCTION_DATE_RE = re.compile(
@@ -73,10 +79,30 @@ def _parse_auction_prices(text: str) -> tuple[float | None, float | None]:
     return prices.get("1"), prices.get("2")
 
 
+def _parse_document_urls(html: str, base_url: str) -> list[str]:
+    """Extract direct PDFs, including Caixa's JavaScript-only ExibeDoc links."""
+    matches = [*_PDF_HREF_RE.findall(html), *_EXIBE_DOC_RE.findall(html)]
+    return list(dict.fromkeys(urljoin(base_url, match) for match in matches))
+
+
+def _classify_document_urls(document_urls: list[str]) -> tuple[str | None, str | None]:
+    """Return the property-specific Caixa edital and matrícula PDFs."""
+    edital_url = None
+    matricula_url = None
+    for url in document_urls:
+        path = urlparse(url).path.casefold()
+        if "matricula" in path:
+            matricula_url = matricula_url or url
+        elif path.startswith("/editais/") and "/regras-" not in path:
+            edital_url = edital_url or url
+    return edital_url, matricula_url
+
+
 def parse_detail_html(html: str, base_url: str) -> dict:
     if not html:
         return {
             "photo_url": None, "full_description": "", "document_urls": [],
+            "matricula": None, "edital_url": None, "matricula_url": None,
             "first_auction_at": None, "second_auction_at": None,
             "first_auction_price": None, "second_auction_price": None,
         }
@@ -84,10 +110,14 @@ def parse_detail_html(html: str, base_url: str) -> dict:
     photo_match = _PHOTO_RE.search(html)
     photo_url = urljoin(base_url, photo_match.group(1)) if photo_match else None
 
-    document_urls = [urljoin(base_url, m) for m in _PDF_RE.findall(html)]
+    document_urls = _parse_document_urls(html, base_url)
+    edital_url, matricula_url = _classify_document_urls(document_urls)
 
     text = _TAG_RE.sub(" ", html)
     text = _WS_RE.sub(" ", text).strip()
+    matricula_match = re.search(
+        r"Matr[ií]cula\(s\)\s*:\s*([\d./-]+)", text, re.IGNORECASE,
+    )
     first_auction_at, second_auction_at = _parse_auction_dates(text)
     first_auction_price, second_auction_price = _parse_auction_prices(text)
 
@@ -95,6 +125,9 @@ def parse_detail_html(html: str, base_url: str) -> dict:
         "photo_url": photo_url,
         "full_description": text,
         "document_urls": document_urls,
+        "matricula": matricula_match.group(1) if matricula_match else None,
+        "edital_url": edital_url,
+        "matricula_url": matricula_url,
         "first_auction_at": first_auction_at,
         "second_auction_at": second_auction_at,
         "first_auction_price": first_auction_price,
@@ -107,11 +140,10 @@ async def fetch_auction_dates_batch(
     request_interval: float = 1.0, max_consecutive_429: int = 3,
     recovery_rounds: int = 2,
 ) -> list[dict | None]:
-    """Fetch Caixa detail dates concurrently, preserving input order.
+    """Fetch Caixa detail metadata concurrently, preserving input order.
 
-    None means the request did not yield a valid auction page and should be
-    retried on a future ingestion. A tuple (including a missing second date)
-    means the page was parsed successfully.
+    None means the request did not yield dates or official documents and
+    should be retried on a future ingestion.
     """
     if not urls:
         return []
@@ -156,14 +188,21 @@ async def fetch_auction_dates_batch(
                         first = parsed["first_auction_at"]
                         second = parsed["second_auction_at"]
                         # Caixa's bot manager can return an HTML challenge with
-                        # HTTP 200. An eligible scheduled-sale page must contain
-                        # at least one date, otherwise treat it as a retryable miss.
-                        if first is not None or second is not None:
+                        # HTTP 200. A real property page contains auction dates
+                        # and/or official documents; document-only modalities
+                        # are valid even when no scheduled date is published.
+                        if (
+                            first is not None or second is not None
+                            or parsed["edital_url"] or parsed["matricula_url"]
+                        ):
                             return {
                                 "first_auction_at": first,
                                 "second_auction_at": second,
                                 "first_auction_price": parsed["first_auction_price"],
                                 "second_auction_price": parsed["second_auction_price"],
+                                "matricula": parsed["matricula"],
+                                "edital_url": parsed["edital_url"],
+                                "matricula_url": parsed["matricula_url"],
                             }
                     except (RequestsError, ValueError) as exc:
                         response = getattr(exc, "response", None)

@@ -1,0 +1,45 @@
+name: City expense references
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Database environment
+        type: choice
+        required: true
+        default: staging
+        options: [staging, Production]
+      reference_file:
+        description: Versioned JSON reference file
+        required: true
+        default: backend/data/city-expense-references.json
+  schedule:
+    - cron: "30 9 1 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: city-expense-reference
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target_environment || 'Production' }}
+    env:
+      DATABASE_URL: ${{ secrets.INGEST_DATABASE_URL }}
+      REFERENCE_FILE: ${{ github.event.inputs.reference_file || 'backend/data/city-expense-references.json' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: Validate database configuration
+        run: test -n "$DATABASE_URL"
+      - name: Persist references and refresh affected analyses
+        working-directory: backend
+        run: python -m enrichment.city_expense_reference --file "../$REFERENCE_FILE" --materialize

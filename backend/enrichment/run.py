@@ -14,7 +14,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v3-no-land"
+PIPELINE_VERSION = "v4-city-expenses"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -48,6 +48,7 @@ def metadata_from_property(prop) -> PropertyMetadata:
         auction_price=prop.preco or 0.0,
         market_value_estimate=prop.avaliacao,
         auction_type=prop.modalidade or "",
+        matricula=prop.matricula or "",
         city=prop.city or "",
         neighborhood=prop.neighborhood or "",
         state=prop.uf or "",

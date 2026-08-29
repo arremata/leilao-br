@@ -2,7 +2,11 @@ from db.base import get_engine, init_db, make_session_factory
 from db.models import Property
 from ingestion.adapters.base import RawListing
 from ingestion.adapters.caixa_csv import CaixaCsvAdapter
-from ingestion.worker import UFResult, parse_ufs, report_exit_code, run_worker
+from ingestion.run import IngestSummary
+from ingestion.worker import (
+    UFResult, date_enrichment_is_degraded, parse_ufs, report_exit_code,
+    run_worker,
+)
 
 
 class _StubAdapter(CaixaCsvAdapter):
@@ -120,8 +124,25 @@ def test_limited_worker_run_does_not_remove_unseen_rows():
 
 
 def test_worker_exit_code_reflects_per_uf_failures():
-    assert report_exit_code({"PR": UFResult(uf="PR")}) == 0
+    healthy = IngestSummary(dates_updated=95, dates_failed=5)
+    degraded = IngestSummary(dates_updated=224, dates_failed=132)
+
+    assert report_exit_code({"PR": UFResult(uf="PR", summary=healthy)}) == 0
     assert report_exit_code({
-        "PR": UFResult(uf="PR"),
+        "PR": UFResult(uf="PR", summary=healthy),
         "SP": UFResult(uf="SP", error="boom"),
     }) == 1
+    assert report_exit_code({"PR": UFResult(uf="PR", summary=degraded)}) == 1
+    assert report_exit_code({}) == 1
+
+
+def test_date_enrichment_health_budget_requires_material_loss():
+    assert not date_enrichment_is_degraded(
+        IngestSummary(dates_updated=95, dates_failed=5)
+    )
+    assert not date_enrichment_is_degraded(
+        IngestSummary(dates_updated=90, dates_failed=10)
+    )
+    assert date_enrichment_is_degraded(
+        IngestSummary(dates_updated=89, dates_failed=11)
+    )

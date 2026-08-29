@@ -14,13 +14,15 @@ from pydantic import BaseModel
 from dataclasses import asdict
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
-    Property, Enrichment, RegionalMarketComparable, RegionalMarketPrice,
+    Property, Enrichment, RegionalMarketComparable, CityExpenseReference,
 )
+from enrichment.property_expenses import apply_property_expenses
+from enrichment.market_coverage import queue_city_reference, resolve_market_reference
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
 from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
@@ -170,6 +172,9 @@ def _property_card(p: Property) -> dict:
         "photoUrl": p.photo_url,
         "auctionUrl": p.detail_url,
         "detailUrl": p.detail_url,
+        "matricula": p.matricula,
+        "editalUrl": p.edital_url,
+        "matriculaUrl": p.matricula_url,
         "status": p.status,
         "canAnalyze": True,
     }
@@ -252,7 +257,7 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
 
 
 def _maybe_fetch_detail(prop: Property) -> None:
-    """Lazily scrape the Caixa detail page once to fill photo_url.
+    """Lazily scrape the Caixa detail page to fill official detail fields.
 
     The CSV feed has no photo; the picture only exists on the per-property
     detail page. We scrape it on first analyze (best-effort): a failure leaves
@@ -260,7 +265,8 @@ def _maybe_fetch_detail(prop: Property) -> None:
     """
     import asyncio
 
-    if prop.detail_fetched or not prop.detail_url:
+    has_documents = bool(prop.edital_url or prop.matricula_url)
+    if (prop.detail_fetched and has_documents) or not prop.detail_url:
         return
     try:
         detail = asyncio.run(fetch_detail(prop.detail_url))
@@ -269,6 +275,12 @@ def _maybe_fetch_detail(prop: Property) -> None:
         return
     if detail.get("photo_url"):
         prop.photo_url = detail["photo_url"]
+    if detail.get("matricula"):
+        prop.matricula = detail["matricula"]
+    if detail.get("edital_url"):
+        prop.edital_url = detail["edital_url"]
+    if detail.get("matricula_url"):
+        prop.matricula_url = detail["matricula_url"]
     prop.detail_fetched = True
 
 
@@ -282,12 +294,17 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     session.flush()
 
     metadata = metadata_from_property(prop)
-    regional = session.execute(select(RegionalMarketPrice).where(
-        RegionalMarketPrice.uf == (prop.uf or ""),
-        RegionalMarketPrice.city == (prop.city or ""),
-        RegionalMarketPrice.neighborhood == (prop.neighborhood or ""),
-        RegionalMarketPrice.property_type == (prop.property_type or ""),
-    )).scalar_one_or_none()
+    regional = resolve_market_reference(session, prop)
+    if regional is None:
+        queue_city_reference(session, prop)
+        session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Referência de mercado ainda indisponível. A coleta foi priorizada "
+                "e normalmente fica disponível em até 90 minutos."
+            ),
+        )
     regional_comparables = []
     if regional:
         regional_comparables = [
@@ -297,7 +314,7 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
             )
             for comp in session.execute(
                 select(RegionalMarketComparable).where(
-                    RegionalMarketComparable.reference_id == regional.id,
+                    RegionalMarketComparable.reference_id.in_(regional.reference_ids),
                 ).order_by(RegionalMarketComparable.price_per_m2)
             ).scalars().all()
         ]
@@ -305,9 +322,17 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     # analyzes real source data instead of running blind on empty input.
     result = run_structured_enrichment(
         metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
-        regional_price_per_m2=regional.price_per_m2 if regional else None,
+        regional_price_per_m2=regional.price_per_m2,
         regional_comparables=regional_comparables,
     )
+    result.matricula = prop.matricula
+    result.edital_url = prop.edital_url
+    result.matricula_url = prop.matricula_url
+    expense_reference = session.execute(select(CityExpenseReference).where(
+        CityExpenseReference.uf == (prop.uf or "").upper(),
+        func.lower(CityExpenseReference.city) == (prop.city or "").casefold(),
+    )).scalar_one_or_none()
+    apply_property_expenses(result, prop, expense_reference)
     result_json = result.model_dump_json(by_alias=True)
 
     from datetime import datetime, timezone

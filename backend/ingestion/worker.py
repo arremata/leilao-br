@@ -22,6 +22,13 @@ from ingestion.adapters.base import SourceAdapter
 from ingestion.run import IngestSummary, ingest
 
 
+# Date pages are an enrichment layered on top of the authoritative CSV. A
+# handful of transient misses is expected, but a large loss must make the
+# scheduled run red instead of being hidden behind a successful CSV import.
+MAX_DATE_FAILURES = 10
+MAX_DATE_FAILURE_RATE = 0.10
+
+
 @dataclass
 class UFResult:
     uf: str
@@ -34,9 +41,31 @@ def parse_ufs(raw: str) -> list[str]:
     return [part.strip().upper() for part in raw.split(",") if part.strip()]
 
 
+def date_enrichment_is_degraded(
+    summary: IngestSummary,
+    max_failures: int = MAX_DATE_FAILURES,
+    max_failure_rate: float = MAX_DATE_FAILURE_RATE,
+) -> bool:
+    """Whether date misses exceed both the absolute and percentage budgets."""
+    attempted = summary.dates_updated + summary.dates_failed
+    if attempted == 0:
+        return False
+    return (
+        summary.dates_failed > max_failures
+        and summary.dates_failed / attempted > max_failure_rate
+    )
+
+
 def report_exit_code(report: dict[str, UFResult]) -> int:
-    """Return a scheduler-friendly exit code for a completed worker report."""
-    return 1 if any(result.error is not None for result in report.values()) else 0
+    """Return nonzero for UF failures or materially degraded date enrichment."""
+    if not report:
+        return 1
+    for result in report.values():
+        if result.error is not None or result.summary is None:
+            return 1
+        if date_enrichment_is_degraded(result.summary):
+            return 1
+    return 0
 
 
 def _default_adapter_factory(uf: str) -> SourceAdapter:
@@ -134,7 +163,29 @@ def main(argv=None) -> dict[str, UFResult]:  # pragma: no cover - thin CLI wrapp
 
     ok = sum(1 for r in report.values() if r.error is None)
     failed = [uf for uf, r in report.items() if r.error is not None]
-    logger.info(f"Worker done: {ok}/{len(report)} UFs ok; failed={failed}")
+    degraded_dates = []
+    for uf, result in report.items():
+        if result.summary is None or result.summary.dates_failed == 0:
+            continue
+        attempted = result.summary.dates_updated + result.summary.dates_failed
+        failure_rate = result.summary.dates_failed / attempted if attempted else 0
+        message = (
+            f"Auction-date enrichment incomplete for {uf}: "
+            f"{result.summary.dates_failed}/{attempted} failed "
+            f"({failure_rate:.1%})"
+        )
+        if date_enrichment_is_degraded(result.summary):
+            degraded_dates.append(uf)
+            logger.error(
+                f"{message}; health budget is {MAX_DATE_FAILURES} failures "
+                f"and {MAX_DATE_FAILURE_RATE:.0%}"
+            )
+        else:
+            logger.warning(message)
+    logger.info(
+        f"Worker done: {ok}/{len(report)} UFs ok; failed={failed}; "
+        f"degraded_dates={degraded_dates}"
+    )
     return report
 
 

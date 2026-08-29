@@ -53,8 +53,12 @@ export async function fetchCatalogItem(id) {
 export async function analyzeCatalogItem(id) {
   const res = await fetch(`/api/catalog/${id}/analyze`, { method: 'POST' });
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || `Analysis failed (${res.status})`);
+    let detail;
+    try {
+      const body = await res.json();
+      detail = typeof body?.detail === 'string' ? body.detail : '';
+    } catch { /* response was not JSON */ }
+    throw new Error(detail || `Não foi possível iniciar a análise (${res.status}).`);
   }
   return res.json();
 }

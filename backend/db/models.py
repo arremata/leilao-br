@@ -56,6 +56,9 @@ class Property(Base):
 
     descricao_raw: Mapped[str] = mapped_column(Text, default="")
     detail_url: Mapped[str] = mapped_column(Text, default="")
+    matricula: Mapped[Optional[str]] = mapped_column(String(128), default=None)
+    edital_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    matricula_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
     detail_fetched: Mapped[bool] = mapped_column(default=False)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
 
@@ -126,3 +129,45 @@ class RegionalMarketComparable(Base):
     source: Mapped[str] = mapped_column(String(64))
     url: Mapped[str] = mapped_column(Text)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class CityExpenseReference(Base):
+    """Persisted city assumptions used for recurring property-cost estimates."""
+
+    __tablename__ = "city_expense_references"
+    __table_args__ = (
+        UniqueConstraint("uf", "city", name="uq_city_expense_reference"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uf: Mapped[str] = mapped_column(String(2), index=True)
+    city: Mapped[str] = mapped_column(String(128), index=True)
+    annual_iptu_rate: Mapped[float] = mapped_column(Float)
+    condo_per_m2_monthly: Mapped[float] = mapped_column(Float)
+    reference_year: Mapped[int] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class MarketReferenceJob(Base):
+    """Durable, fair queue for city and neighborhood market coverage."""
+
+    __tablename__ = "market_reference_jobs"
+    __table_args__ = (
+        UniqueConstraint("uf", "city", "neighborhood", "property_type",
+                         name="uq_market_reference_job"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uf: Mapped[str] = mapped_column(String(2), index=True)
+    city: Mapped[str] = mapped_column(String(128), index=True)
+    neighborhood: Mapped[str] = mapped_column(String(128), default="")
+    property_type: Mapped[str] = mapped_column(String(64))
+    representative_property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    priority: Mapped[int] = mapped_column(Integer, default=100, index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_attempted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
+    next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None, index=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
