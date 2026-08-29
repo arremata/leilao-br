@@ -138,7 +138,7 @@ def _row(source_id, uf="PR", detail_url="https://x/detalhe?hdnimovel=1"):
             "neighborhood": "Y", "address": f"RUA {source_id}",
             "preco": "100.000,00", "avaliacao": "200.000,00", "desconto_csv": "0",
             "descricao": "Casa, área total 50,00 m2, 2 quartos.",
-            "modalidade": "Venda Online", "detail_url": detail_url,
+            "modalidade": "Outros", "detail_url": detail_url,
         },
     )
 
@@ -331,6 +331,25 @@ def test_needs_documents_until_caixa_official_links_are_collected():
     assert _needs_documents(prop) is True
 
     prop.edital_url = "https://x/edital.pdf"
+    assert _needs_documents(prop) is True
+
+    prop.edital_data = {"auctionNumber": "001/2026", "commissionRate": 0.05}
+    assert _needs_documents(prop) is False
+
+
+def test_needs_documents_collects_direct_sale_once_without_requiring_edital():
+    prop = Property(
+        source="caixa", source_id="1", modalidade="Venda Direta Online",
+        detail_url="https://x/detail",
+    )
+    assert _needs_documents(prop) is True
+
+    prop.matricula_url = "https://x/matricula.pdf"
+    prop.edital_data = {
+        "propertyNumber": "0001", "paymentMethods": "Recursos próprios",
+        "saleRulesUrl": "https://x/regras.pdf",
+    }
+    assert prop.edital_url is None
     assert _needs_documents(prop) is False
 
 
@@ -383,6 +402,10 @@ def test_ingest_persists_caixa_documents_from_detail_metadata():
             "matricula": "91.048",
             "edital_url": "https://venda-imoveis.caixa.gov.br/editais/EL1.PDF",
             "matricula_url": "https://venda-imoveis.caixa.gov.br/editais/matricula/PR/8444415531323.pdf",
+            "edital_data": {
+                "auctionNumber": "001/2026", "lotNumber": "10",
+                "commissionRate": 0.05,
+            },
         }]
 
     summary = asyncio.run(ingest(
@@ -395,7 +418,9 @@ def test_ingest_persists_caixa_documents_from_detail_metadata():
     assert prop.matricula == "91.048"
     assert prop.edital_url.endswith("EL1.PDF")
     assert prop.matricula_url.endswith("8444415531323.pdf")
+    assert prop.edital_data["lotNumber"] == "10"
     assert summary.documents_updated == 1
+    assert summary.edital_data_updated == 1
 
 
 def test_document_backfill_does_not_erase_fresh_auction_dates():

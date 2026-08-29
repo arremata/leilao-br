@@ -17,7 +17,7 @@ export default function Home({ go, watched, toggleWatch, properties, dashboard, 
   const latestLive = latestHistory
     ? properties.find(p => p.id === latestHistory.id)
     : null;
-  const latestDetail = latestDetailCache?.catalogId === latestHistory?.id
+  const latestDetail = latestDetailCache && latestDetailCache.catalogId === latestHistory?.id
     ? latestDetailCache.detail
     : null;
   const latestEntry = latestHistory

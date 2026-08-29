@@ -136,9 +136,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>
             <span className="ix">§ feed</span>
-            <span>todos os leilões ativos</span>
+            <span>todas as oportunidades ativas</span>
           </div>
-          <h1 className="h1">Feed de leilões</h1>
+          <h1 className="h1">Feed de oportunidades</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
             {properties.length} imóveis no portfólio
           </p>

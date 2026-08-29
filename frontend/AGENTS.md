@@ -65,7 +65,8 @@ Each property matches the `AuctionPropertyResult` shape from the backend (`backe
   auctionUrl,          // original auction listing URL
   matricula,           // official property registration number, when published
   editalUrl,           // official auction notice PDF
-  matriculaUrl         // official property registration PDF
+  matriculaUrl,        // official property registration PDF
+  editalData           // structured official auction/property/payment facts
 }
 ```
 

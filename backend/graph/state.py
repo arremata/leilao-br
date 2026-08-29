@@ -12,12 +12,16 @@ class PropertyMetadata:
     property_type: str = ""
     area_m2: float = 0.0
     auction_price: float = 0.0
+    auction_price_1st: float = 0.0
     auction_price_2nd: float = 0.0
     market_value_estimate: Optional[float] = None
     auction_date: str = ""
     auction_date_2nd: str = ""
     auction_type: str = ""
     matricula: str = ""
+    edital_url: str = ""
+    matricula_url: str = ""
+    edital_data: dict | None = None
     process_number: str = ""
     court_or_leiloeiro: str = ""
     auctioneer_name: str = ""

@@ -171,6 +171,24 @@ class TestBuildResultDetails:
         assert len(result.costs) > 0
         assert result.costs[0].kind in ("price", "tax", "fee", "debt", "reno")
 
+    def test_costs_include_editable_platform_estimates(self):
+        state = _make_full_state()
+        result = build_result(state)
+        costs = {item.id: item for item in result.costs}
+
+        assert costs["auctioneer_commission"].rate == 0.05
+        assert costs["property_registration"].rate == 0.009
+        assert costs["occupant_removal"].value == 5000
+
+    def test_direct_sale_uses_sale_price_and_has_no_auctioneer_commission(self):
+        state = _make_full_state()
+        state.property_metadata.auction_type = "Venda Direta Online"
+
+        costs = {item.id: item for item in build_result(state).costs}
+
+        assert costs["auction_bid"].label == "Preço de venda"
+        assert "auctioneer_commission" not in costs
+
     def test_edital_populated_from_state(self):
         state = _make_full_state()
         result = build_result(state)

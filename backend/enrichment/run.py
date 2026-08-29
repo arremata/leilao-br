@@ -5,6 +5,7 @@ only to extract structure from raw HTML/PDF)."""
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from loguru import logger
 
 from graph.state import AuctionState, ComparableProperty, PropertyMetadata, LegalResult
@@ -14,7 +15,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v4-city-expenses"
+PIPELINE_VERSION = "v8-direct-sale-documents"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -30,25 +31,56 @@ def legal_node(state):
     return run_legal_node(state)
 
 
+def extract_commission_rate(description: str | None) -> float | None:
+    """Extract a plausible auctioneer commission written on either side of %."""
+    text = description or ""
+    patterns = (
+        r"comiss[aã]o[^%\n]{0,80}?(\d+(?:[.,]\d+)?)\s*%",
+        r"(\d+(?:[.,]\d+)?)\s*%[^\n.]{0,80}?comiss[aã]o",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        percentage = float(match.group(1).replace(",", "."))
+        if 0 < percentage <= 30:
+            return percentage / 100
+    return None
+
+
 def metadata_from_property(prop) -> PropertyMetadata:
     """Build the graph's PropertyMetadata directly from a catalog Property row."""
+    def _iso(value: datetime | None) -> str:
+        return value.isoformat() if value else ""
+
     itbi = get_itbi(prop.uf or "", prop.city or "")
     description = prop.descricao_raw or ""
-    commission_match = re.search(
-        r"comiss[aã]o[^%]{0,80}?(\d+(?:[.,]\d+)?)\s*%", description, re.IGNORECASE,
-    )
+    edital_data = getattr(prop, "edital_data", None) or {}
+    official_commission_rate = edital_data.get("commissionRate")
+    is_direct_sale = "venda direta" in (prop.modalidade or "").casefold()
     commission_rate = (
-        float(commission_match.group(1).replace(",", ".")) / 100
-        if commission_match else None
+        float(official_commission_rate)
+        if not is_direct_sale
+        and isinstance(official_commission_rate, (int, float))
+        and 0 < float(official_commission_rate) <= 0.3
+        else (None if is_direct_sale else extract_commission_rate(description))
     )
     return PropertyMetadata(
         address=prop.address or "",
         property_type=prop.property_type or "",
         area_m2=prop.area_m2 or 0.0,
         auction_price=prop.preco or 0.0,
+        auction_price_1st=getattr(prop, "first_auction_price", None) or prop.preco or 0.0,
+        auction_price_2nd=getattr(prop, "second_auction_price", None) or 0.0,
         market_value_estimate=prop.avaliacao,
+        auction_date=_iso(getattr(prop, "first_auction_at", None)),
+        auction_date_2nd=_iso(getattr(prop, "second_auction_at", None)),
         auction_type=prop.modalidade or "",
+        auctioneer_name=edital_data.get("auctioneerName", ""),
         matricula=prop.matricula or "",
+        edital_url=getattr(prop, "edital_url", None) or "",
+        matricula_url=getattr(prop, "matricula_url", None) or "",
+        edital_data=edital_data or None,
         city=prop.city or "",
         neighborhood=prop.neighborhood or "",
         state=prop.uf or "",
