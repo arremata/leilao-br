@@ -150,17 +150,21 @@ async def test_scrape_comparables_calls_all_five_sources():
          patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]) as mock_iw, \
-         patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
+        patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
         mock_browser.close = AsyncMock()
         mock_page = AsyncMock()
-        mock_launch.return_value = (mock_browser, mock_page)
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
 
         result = await scrape_comparables(_make_metadata())
 
     assert len(result) == 1  # duplicate URLs are collapsed
     mock_iw.assert_called_once()
+    mock_browser.close.assert_awaited_once()
+    mock_playwright.stop.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -181,10 +185,12 @@ async def test_scrape_comparables_falls_through_when_first_fails():
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
         mock_browser.close = AsyncMock()
         mock_page = AsyncMock()
-        mock_launch.return_value = (mock_browser, mock_page)
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
 
         result = await scrape_comparables(_make_metadata())
 
@@ -201,10 +207,12 @@ async def test_scrape_comparables_returns_empty_when_all_fail():
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
         mock_browser.close = AsyncMock()
         mock_page = AsyncMock()
-        mock_launch.return_value = (mock_browser, mock_page)
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
 
         result = await scrape_comparables(_make_metadata())
 
@@ -223,10 +231,12 @@ async def test_scrape_comparables_merges_partial_results():
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
         mock_browser.close = AsyncMock()
         mock_page = AsyncMock()
-        mock_launch.return_value = (mock_browser, mock_page)
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
 
         result = await scrape_comparables(_make_metadata())
 

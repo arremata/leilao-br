@@ -6,7 +6,7 @@ import re
 from urllib.parse import urlparse
 
 from loguru import logger
-from playwright.async_api import async_playwright, Browser, Page
+from playwright.async_api import async_playwright, Browser, Page, Playwright
 from playwright_stealth import Stealth
 
 from graph.state import PropertyMetadata, ComparableProperty
@@ -224,17 +224,26 @@ STEALTH_USER_AGENT = (
 )
 
 
-async def _launch_stealth_browser() -> tuple[Browser, Page]:
-    """Launch a Chromium browser with stealth patches applied."""
+async def _launch_stealth_browser() -> tuple[Playwright, Browser, Page]:
+    """Launch Chromium and retain the Playwright owner for clean shutdown."""
     pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True)
-    context = await browser.new_context(
-        user_agent=STEALTH_USER_AGENT,
-        viewport={"width": 1920, "height": 1080},
-    )
-    page = await context.new_page()
-    await Stealth().apply_stealth_async(page)
-    return browser, page
+    browser = None
+    try:
+        browser = await pw.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=STEALTH_USER_AGENT,
+            viewport={"width": 1920, "height": 1080},
+        )
+        page = await context.new_page()
+        await Stealth().apply_stealth_async(page)
+        return pw, browser, page
+    except BaseException:
+        try:
+            if browser is not None:
+                await browser.close()
+        finally:
+            await pw.stop()
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -729,10 +738,10 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
     Searches by street first (more precise comps), then falls back to
     neighborhood if street search yields too few results.
 
-    Manages the browser lifecycle: launches one browser, reuses the page
-    across scrapers, closes when done.
+    Manages the complete Playwright lifecycle: launches one browser, reuses
+    the page across scrapers, and stops the driver after closing the browser.
     """
-    browser, page = await _launch_stealth_browser()
+    playwright, browser, page = await _launch_stealth_browser()
     try:
         all_comps: list[ComparableProperty] = []
 
@@ -788,4 +797,10 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
             deduplicated.append(comp)
         return deduplicated
     finally:
-        await browser.close()
+        try:
+            await browser.close()
+        finally:
+            # browser.close() does not stop the Playwright transport. Leaving
+            # it alive until asyncio.run() exits produces misleading
+            # "Event loop is closed" errors in otherwise-green Actions runs.
+            await playwright.stop()

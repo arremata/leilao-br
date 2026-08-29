@@ -18,8 +18,9 @@ on:
         required: true
         default: "30"
   schedule:
-    # GitHub cron uses UTC. Every-hour cadence is timezone-independent.
-    - cron: "0 * * * *"
+    # GitHub cron uses UTC. Avoid the top of the hour, where GitHub documents
+    # heavier scheduler load and possible delayed or dropped runs.
+    - cron: "17 * * * *"
 
 permissions:
   contents: read
@@ -37,8 +38,8 @@ jobs:
       DATABASE_URL: ${{ secrets.INGEST_DATABASE_URL }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
