@@ -27,6 +27,8 @@ def test_catalog_card_matches_frontend_contract():
         "second_auction_price": None, "lat": -25.4, "lng": -49.2,
         "photo_url": "https://example.com/photo.jpg",
         "detail_url": "https://example.com/property", "status": "active", "descricao_raw": "",
+        "matricula": "91.048", "edital_url": "https://example.com/edital.pdf",
+        "matricula_url": "https://example.com/matricula.pdf",
     }
 
     card = vercel_api._catalog_card(row)
@@ -38,6 +40,9 @@ def test_catalog_card_matches_frontend_contract():
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
     assert card["auctionUrl"] == "https://example.com/property"
+    assert card["matricula"] == "91.048"
+    assert card["editalUrl"] == "https://example.com/edital.pdf"
+    assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
     assert card["canAnalyze"] is True
 
 

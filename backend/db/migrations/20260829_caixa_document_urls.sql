@@ -1,0 +1,4 @@
+ALTER TABLE properties
+    ADD COLUMN IF NOT EXISTS matricula VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS edital_url TEXT,
+    ADD COLUMN IF NOT EXISTS matricula_url TEXT;

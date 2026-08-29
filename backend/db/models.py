@@ -56,6 +56,9 @@ class Property(Base):
 
     descricao_raw: Mapped[str] = mapped_column(Text, default="")
     detail_url: Mapped[str] = mapped_column(Text, default="")
+    matricula: Mapped[Optional[str]] = mapped_column(String(128), default=None)
+    edital_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    matricula_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
     detail_fetched: Mapped[bool] = mapped_column(default=False)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
 

@@ -147,6 +147,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-08-29** — Added official Caixa auction documents to property details. Ingestion now extracts JavaScript-only edital and matrícula PDFs plus the matrícula number, persists them with a rollout-safe migration, exposes them through both APIs, and renders direct download actions before or after analysis.
 - **2026-08-29** — Hardened GitHub Actions health: market scraping now stops the Playwright transport cleanly, materially degraded Caixa date enrichment fails the scheduled run, cron avoids the top-of-hour congestion window, action runtimes were upgraded, and pull requests/main now run backend tests plus frontend lint/build CI.
 - **2026-08-17** — Made market-coverage reconciliation idempotent within a run by deduplicating staged neighborhood jobs shared by multiple catalog properties, preventing production unique-key collisions on subsequent hourly runs.
 - **2026-08-17** — Normalized persisted expense-reference cities case-insensitively so title-case configuration matches Caixa's uppercase production catalog without creating duplicate city rows.

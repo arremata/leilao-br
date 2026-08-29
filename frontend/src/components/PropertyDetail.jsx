@@ -77,6 +77,8 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   // Catalog responses historically used both names. Keep the official listing
   // reachable while older/newer backends converge on `auctionUrl`.
   const auctionUrl = p.auctionUrl || p.detailUrl;
+  const editalUrl = p.editalUrl || p.edital?.editalUrl;
+  const matriculaUrl = p.matriculaUrl || p.edital?.matriculaUrl;
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -303,6 +305,28 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
               rel="noopener noreferrer"
             >
               Acessar leilão <span aria-hidden="true">↗</span>
+            </a>
+          )}
+          {editalUrl && (
+            <a
+              className="btn sm"
+              href={editalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+            >
+              Baixar edital <span aria-hidden="true">↓</span>
+            </a>
+          )}
+          {matriculaUrl && (
+            <a
+              className="btn sm"
+              href={matriculaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+            >
+              Baixar matrícula <span aria-hidden="true">↓</span>
             </a>
           )}
           <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
@@ -1314,7 +1338,13 @@ function LegalComingSoon() {
 // ============================================================
 function Edital({ p, auctionUrl }) {
   const e = p.edital;
-  if (!e) {
+  const editalUrl = p.editalUrl || e?.editalUrl;
+  const matriculaUrl = p.matriculaUrl || e?.matriculaUrl;
+  const matricula = p.matricula || e?.matricula;
+  const documentSource = p.source?.toLowerCase() === 'caixa'
+    ? 'Caixa Econômica Federal'
+    : 'Fonte oficial do leilão';
+  if (!e && !editalUrl && !matriculaUrl && !matricula) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Dados do edital não disponíveis para este imóvel.</p>
@@ -1325,11 +1355,21 @@ function Edital({ p, auctionUrl }) {
     <div className="card" style={{ padding: 24, fontSize: 13, lineHeight: 1.65 }}>
       <div className="row between edital-header" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
         <div>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · edital integral</span>
-          <h3 className="h2" style={{ marginTop: 4 }}>Edital de Leilão Judicial Eletrônico</h3>
-          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Originado em: {e.firstBidDate || 'não informado'}</p>
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 04 · documentos oficiais</span>
+          <h3 className="h2" style={{ marginTop: 4 }}>Edital e matrícula do imóvel</h3>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>Fonte: {documentSource}</p>
         </div>
         <div className="row gap-2">
+          {editalUrl && (
+            <a className="btn sm" href={editalUrl} target="_blank" rel="noopener noreferrer" download>
+              Baixar edital <span aria-hidden="true">↓</span>
+            </a>
+          )}
+          {matriculaUrl && (
+            <a className="btn sm" href={matriculaUrl} target="_blank" rel="noopener noreferrer" download>
+              Baixar matrícula <span aria-hidden="true">↓</span>
+            </a>
+          )}
           {auctionUrl && (
             <a className="btn sm" href={auctionUrl} target="_blank" rel="noopener noreferrer">
               Acessar leilão <span aria-hidden="true">↗</span>
@@ -1338,19 +1378,20 @@ function Edital({ p, auctionUrl }) {
         </div>
       </div>
       <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 22 }}>
-        <Meta lbl="Processo" val={e.process || '—'} />
-        <Meta lbl="Exequente" val={e.creditor || '—'} />
-        <Meta lbl="Executado" val={e.debtor || '—'} />
-        <Meta lbl="1ª praça" val={e.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
-        <Meta lbl="2ª praça" val={e.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
+        <Meta lbl="Matrícula" val={matricula || '—'} />
+        <Meta lbl="Processo" val={e?.process || '—'} />
+        <Meta lbl="Exequente" val={e?.creditor || '—'} />
+        <Meta lbl="Executado" val={e?.debtor || '—'} />
+        <Meta lbl="1ª praça" val={e?.firstBidDate ? `${e.firstBidDate} · R$ ${fmtBRL(e.firstBidPrice)}` : '—'} />
+        <Meta lbl="2ª praça" val={e?.secondBidDate ? `${e.secondBidDate} · R$ ${fmtBRL(e.secondBidPrice)}` : '—'} />
       </div>
-      {e.propertyDescription && (
+      {e?.propertyDescription && (
         <>
           <h4 className="h3" style={{ marginBottom: 10 }}>Descrição do bem</h4>
           <p style={{ margin: 0, color: 'var(--fg-1)' }}>{e.propertyDescription}</p>
         </>
       )}
-      {e.liens.length > 0 && (
+      {e?.liens?.length > 0 && (
         <>
           <div className="divider" style={{ margin: '20px 0' }}></div>
           <h4 className="h3" style={{ marginBottom: 10 }}>Ônus, gravames e dívidas</h4>
@@ -1359,7 +1400,7 @@ function Edital({ p, auctionUrl }) {
           </ul>
         </>
       )}
-      {e.summaryNote && (
+      {e?.summaryNote && (
         <div style={{ marginTop: 22, padding: 14, background: 'var(--bg-2)', borderRadius: 6, fontSize: 12, color: 'var(--fg-2)' }}>
           <b style={{ color: 'var(--fg-1)' }}>↳</b> {e.summaryNote}
         </div>

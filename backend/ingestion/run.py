@@ -78,6 +78,7 @@ class IngestSummary:
     dates_updated: int = 0
     dates_failed: int = 0
     dates_deferred: int = 0
+    documents_updated: int = 0
 
 
 def _preco_changed(old: float | None, new: float | None) -> bool:
@@ -129,6 +130,17 @@ def _needs_auction_dates(prop: Property, now: datetime) -> bool:
     return now - fetched_at >= AUCTION_DATES_TTL
 
 
+def _needs_documents(prop: Property) -> bool:
+    """Whether scheduled-auction Caixa documents are still incomplete."""
+    document_modalities = {"Leilão SFI", "Licitação Aberta"}
+    return bool(
+        prop.source == "caixa"
+        and prop.modalidade in document_modalities
+        and prop.detail_url
+        and (prop.edital_url is None or prop.matricula_url is None)
+    )
+
+
 def _apply_fields(prop: Property, n: NormalizedProperty) -> None:
     prop.uf = n.uf
     prop.city = n.city
@@ -177,10 +189,12 @@ async def ingest(
         # took ~11 min; bounded concurrency cuts that to ~1 min. /fotos/ is not
         # Radware-guarded, so parallel plain HTTP is safe.
         pending_photos: list[tuple] = []  # (prop, photo_url)
-        # (property_id, detail_url, never_fetched). Never-fetched rows are
-        # prioritized over TTL refreshes when an operator supplies a temporary
-        # --date-limit (for example during a smoke run).
-        pending_dates: list[tuple[int, str, bool]] = []
+        # (property_id, detail_url, never_fetched_date, requires_date).
+        # Never-fetched dates are prioritized over TTL refreshes when an
+        # operator supplies a temporary --date-limit.
+        # Document-only modalities use the same paced detail-page request but
+        # do not affect auction-date health metrics.
+        pending_details: list[tuple[int, str, bool, bool]] = []
 
         with session_factory() as session:
             for raw in raws:
@@ -247,9 +261,12 @@ async def ingest(
                 # unset so the next run retries.
                 if _needs_detail_fetch(existing, n) and n.photo_url:
                     pending_photos.append((prop, n.photo_url))
-                if _needs_auction_dates(prop, now):
-                    pending_dates.append((
-                        prop.id, prop.detail_url, prop.dates_fetched_at is None,
+                requires_date = _needs_auction_dates(prop, now)
+                if requires_date or _needs_documents(prop):
+                    pending_details.append((
+                        prop.id, prop.detail_url,
+                        requires_date and prop.dates_fetched_at is None,
+                        requires_date,
                     ))
 
             # Removed detection is valid only for a complete source snapshot.
@@ -292,34 +309,62 @@ async def ingest(
         # slow Caixa response must not hold database locks. All Leilão SFI and
         # Licitação Aberta rows missing/stale by 24h are selected by default. The adapter
         # paces requests and opens a circuit on repeated HTTP 429 responses.
-        if pending_dates and date_limit != 0:
-            pending_dates.sort(key=lambda candidate: not candidate[2])
-            selected_dates = (
-                pending_dates if date_limit is None else pending_dates[:date_limit]
+        if pending_details and date_limit != 0:
+            pending_details.sort(key=lambda candidate: not candidate[2])
+            selected_details = (
+                pending_details if date_limit is None else pending_details[:date_limit]
             )
-            summary.dates_deferred = len(pending_dates) - len(selected_dates)
+            summary.dates_deferred = sum(
+                1 for candidate in pending_details[len(selected_details):]
+                if candidate[3]
+            )
             if fetch_auction_dates is None:
                 from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
                 fetch_auction_dates = fetch_auction_dates_batch
-            urls = [url for _, url, _ in selected_dates]
-            date_results = await fetch_auction_dates(urls)
+            urls = [url for _, url, _, _ in selected_details]
+            detail_results = await fetch_auction_dates(urls)
             with session_factory() as session:
-                for (property_id, _, _), result in zip(selected_dates, date_results):
+                for (property_id, _, _, requires_date), result in zip(
+                    selected_details, detail_results,
+                ):
                     if result is None:
-                        summary.dates_failed += 1
+                        if requires_date:
+                            summary.dates_failed += 1
                         continue
                     prop = session.get(Property, property_id)
                     if prop is None:
                         continue
                     if isinstance(result, tuple):  # compatibility for injected adapters
                         prop.first_auction_at, prop.second_auction_at = result
+                        returned_dates = any(result)
                     else:
-                        prop.first_auction_at = result["first_auction_at"]
-                        prop.second_auction_at = result["second_auction_at"]
-                        prop.first_auction_price = result.get("first_auction_price")
-                        prop.second_auction_price = result.get("second_auction_price")
-                    prop.dates_fetched_at = now
-                    summary.dates_updated += 1
+                        returned_dates = bool(
+                            result.get("first_auction_at")
+                            or result.get("second_auction_at")
+                        )
+                        if returned_dates:
+                            prop.first_auction_at = result.get("first_auction_at")
+                            prop.second_auction_at = result.get("second_auction_at")
+                            prop.first_auction_price = result.get("first_auction_price")
+                            prop.second_auction_price = result.get("second_auction_price")
+                        previous_documents = (
+                            prop.matricula, prop.edital_url, prop.matricula_url,
+                        )
+                        prop.matricula = result.get("matricula") or prop.matricula
+                        prop.edital_url = result.get("edital_url") or prop.edital_url
+                        prop.matricula_url = (
+                            result.get("matricula_url") or prop.matricula_url
+                        )
+                        if previous_documents != (
+                            prop.matricula, prop.edital_url, prop.matricula_url,
+                        ):
+                            summary.documents_updated += 1
+                    if requires_date:
+                        if not returned_dates:
+                            summary.dates_failed += 1
+                        else:
+                            prop.dates_fetched_at = now
+                            summary.dates_updated += 1
                 session.commit()
     finally:
         # Adapters that own a browser session (CaixaCsvAdapter) expose close_async
@@ -338,7 +383,7 @@ async def ingest(
         f"+{summary.inserted} ~{summary.updated} -{summary.removed} "
         f"={summary.unchanged} events={summary.events_created} "
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
-        f"{summary.dates_deferred}deferred"
+        f"{summary.dates_deferred}deferred documents={summary.documents_updated}"
     )
     return summary
 

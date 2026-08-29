@@ -62,7 +62,10 @@ Each property matches the `AuctionPropertyResult` shape from the backend (`backe
   occupancy,           // "desocupado" | "ocupado" | "disputado"
   risk: { j, f, l, o }, // "good" | "warn" | "bad"
   photoUrl,            // "/photos/auction1.jpg" — real property photo
-  auctionUrl           // original auction listing URL
+  auctionUrl,          // original auction listing URL
+  matricula,           // official property registration number, when published
+  editalUrl,           // official auction notice PDF
+  matriculaUrl         // official property registration PDF
 }
 ```
 

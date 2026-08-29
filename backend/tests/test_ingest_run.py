@@ -18,7 +18,8 @@ from db.models import Property
 from ingestion.adapters.base import NormalizedProperty, RawListing
 from ingestion.adapters.caixa_csv import CaixaCsvAdapter, build_photo_url
 from ingestion.run import (
-    _needs_auction_dates, _needs_detail_fetch, _validate_photos_concurrently,
+    _needs_auction_dates, _needs_detail_fetch, _needs_documents,
+    _validate_photos_concurrently,
     ingest,
 )
 
@@ -319,6 +320,20 @@ def test_needs_auction_dates_for_licitacao_aberta_without_requiring_praca_price(
     assert _needs_auction_dates(prop, now) is False
 
 
+def test_needs_documents_until_caixa_official_links_are_collected():
+    prop = Property(
+        source="caixa", source_id="1", modalidade="Leilão SFI",
+        detail_url="https://x/detail",
+    )
+    assert _needs_documents(prop) is True
+
+    prop.matricula_url = "https://x/matricula.pdf"
+    assert _needs_documents(prop) is True
+
+    prop.edital_url = "https://x/edital.pdf"
+    assert _needs_documents(prop) is False
+
+
 def test_ingest_fetches_and_persists_auction_dates_without_blocking_csv_upsert():
     factory = _factory()
     row = _row("1555522441313")
@@ -352,6 +367,82 @@ def test_ingest_fetches_and_persists_auction_dates_without_blocking_csv_upsert()
     assert prop.dates_fetched_at is not None
     assert summary.dates_updated == 1
     assert summary.dates_failed == 0
+
+
+def test_ingest_persists_caixa_documents_from_detail_metadata():
+    factory = _factory()
+    row = _row("8444415531323")
+    row.raw["modalidade"] = "Leilão SFI"
+
+    async def _fetch_details(urls):
+        return [{
+            "first_auction_at": datetime(2026, 10, 14, 10, 0),
+            "second_auction_at": datetime(2026, 10, 20, 10, 0),
+            "first_auction_price": 200_000,
+            "second_auction_price": 120_000,
+            "matricula": "91.048",
+            "edital_url": "https://venda-imoveis.caixa.gov.br/editais/EL1.PDF",
+            "matricula_url": "https://venda-imoveis.caixa.gov.br/editais/matricula/PR/8444415531323.pdf",
+        }]
+
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", [row]),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_fetch_details,
+    ))
+
+    prop = _get_prop(factory, "8444415531323")
+    assert prop.matricula == "91.048"
+    assert prop.edital_url.endswith("EL1.PDF")
+    assert prop.matricula_url.endswith("8444415531323.pdf")
+    assert summary.documents_updated == 1
+
+
+def test_document_backfill_does_not_erase_fresh_auction_dates():
+    factory = _factory()
+    row = _row("8444415531323")
+    row.raw["modalidade"] = "Leilão SFI"
+    first_date = datetime(2026, 10, 14, 10, 0)
+
+    async def _initial_dates(urls):
+        return [{
+            "first_auction_at": first_date,
+            "second_auction_at": None,
+            "first_auction_price": 200_000,
+            "second_auction_price": None,
+            "matricula": None,
+            "edital_url": None,
+            "matricula_url": None,
+        }]
+
+    asyncio.run(ingest(
+        factory, _StubAdapter("PR", [row]),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_initial_dates,
+    ))
+
+    async def _documents_only(urls):
+        return [{
+            "first_auction_at": None,
+            "second_auction_at": None,
+            "first_auction_price": None,
+            "second_auction_price": None,
+            "matricula": "91.048",
+            "edital_url": "https://venda-imoveis.caixa.gov.br/editais/EL1.PDF",
+            "matricula_url": "https://venda-imoveis.caixa.gov.br/editais/matricula/PR/8444415531323.pdf",
+        }]
+
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", [row]),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_documents_only,
+    ))
+
+    prop = _get_prop(factory, "8444415531323")
+    assert prop.first_auction_at == first_date
+    assert prop.edital_url.endswith("EL1.PDF")
+    assert summary.dates_failed == 0
+    assert summary.documents_updated == 1
 
 
 def test_ingest_date_failure_is_non_fatal_and_retried():

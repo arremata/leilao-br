@@ -118,6 +118,7 @@ class EditalDetail(BaseModel):
     process: str
     creditor: str
     debtor: str
+    matricula: str = ""
     first_bid_date: str
     first_bid_price: float
     second_bid_date: str
@@ -172,6 +173,9 @@ class AuctionPropertyResult(BaseModel):
     edital: EditalDetail | None = None
     auction_url: str | None = None
     photo_url: str | None = None
+    matricula: str | None = None
+    edital_url: str | None = None
+    matricula_url: str | None = None
     # Monthly recurring expenses used by the cost simulator to project
     # recurring debts over the months-until-sale horizon.
     monthly_condo: float | None = None

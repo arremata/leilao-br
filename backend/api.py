@@ -172,6 +172,9 @@ def _property_card(p: Property) -> dict:
         "photoUrl": p.photo_url,
         "auctionUrl": p.detail_url,
         "detailUrl": p.detail_url,
+        "matricula": p.matricula,
+        "editalUrl": p.edital_url,
+        "matriculaUrl": p.matricula_url,
         "status": p.status,
         "canAnalyze": True,
     }
@@ -254,7 +257,7 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
 
 
 def _maybe_fetch_detail(prop: Property) -> None:
-    """Lazily scrape the Caixa detail page once to fill photo_url.
+    """Lazily scrape the Caixa detail page to fill official detail fields.
 
     The CSV feed has no photo; the picture only exists on the per-property
     detail page. We scrape it on first analyze (best-effort): a failure leaves
@@ -262,7 +265,8 @@ def _maybe_fetch_detail(prop: Property) -> None:
     """
     import asyncio
 
-    if prop.detail_fetched or not prop.detail_url:
+    has_documents = bool(prop.edital_url or prop.matricula_url)
+    if (prop.detail_fetched and has_documents) or not prop.detail_url:
         return
     try:
         detail = asyncio.run(fetch_detail(prop.detail_url))
@@ -271,6 +275,12 @@ def _maybe_fetch_detail(prop: Property) -> None:
         return
     if detail.get("photo_url"):
         prop.photo_url = detail["photo_url"]
+    if detail.get("matricula"):
+        prop.matricula = detail["matricula"]
+    if detail.get("edital_url"):
+        prop.edital_url = detail["edital_url"]
+    if detail.get("matricula_url"):
+        prop.matricula_url = detail["matricula_url"]
     prop.detail_fetched = True
 
 
@@ -315,6 +325,9 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
         regional_price_per_m2=regional.price_per_m2,
         regional_comparables=regional_comparables,
     )
+    result.matricula = prop.matricula
+    result.edital_url = prop.edital_url
+    result.matricula_url = prop.matricula_url
     expense_reference = session.execute(select(CityExpenseReference).where(
         CityExpenseReference.uf == (prop.uf or "").upper(),
         func.lower(CityExpenseReference.city) == (prop.city or "").casefold(),

@@ -48,6 +48,7 @@ def metadata_from_property(prop) -> PropertyMetadata:
         auction_price=prop.preco or 0.0,
         market_value_estimate=prop.avaliacao,
         auction_type=prop.modalidade or "",
+        matricula=prop.matricula or "",
         city=prop.city or "",
         neighborhood=prop.neighborhood or "",
         state=prop.uf or "",

@@ -327,6 +327,7 @@ def _build_edital(state: AuctionState) -> EditalDetail | None:
         process=metadata.process_number or "",
         creditor=metadata.creditor or "",
         debtor=metadata.debtor or "",
+        matricula=metadata.matricula or "",
         first_bid_date=metadata.auction_date or "",
         first_bid_price=metadata.auction_price or 0,
         second_bid_date=metadata.auction_date_2nd or "",
@@ -415,6 +416,7 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         edital=_build_edital(state),
         auction_url=state.auction_url or None,
         photo_url=metadata.photo_url or None,
+        matricula=metadata.matricula or None,
         monthly_condo=monthly_condo,
         monthly_iptu=monthly_iptu,
     )
