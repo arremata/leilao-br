@@ -29,7 +29,7 @@ def test_make_session_factory_yields_working_session():
         assert session.execute.__call__ is not None
 
 
-def test_init_db_adds_auction_dates_to_existing_properties_table():
+def test_init_db_adds_ingestion_fields_to_existing_properties_table():
     engine = get_engine("sqlite://")
     with engine.begin() as connection:
         connection.execute(text(
@@ -42,6 +42,7 @@ def test_init_db_adds_auction_dates_to_existing_properties_table():
     assert {
         "first_auction_at", "second_auction_at", "dates_fetched_at",
         "first_auction_price", "second_auction_price",
+        "matricula", "edital_url", "matricula_url",
     }.issubset(columns)
 
 
@@ -59,6 +60,8 @@ def test_property_roundtrip_and_unique_constraint():
         neighborhood="Centro", address="Rua XV, 100", preco=150000.0,
         avaliacao=250000.0, desconto_oficial=40.0, modalidade="Venda Online",
         descricao_raw="Apartamento", detail_url="http://x", status="active",
+        matricula="91.048", edital_url="https://caixa/edital.pdf",
+        matricula_url="https://caixa/matricula.pdf",
         first_seen_at=now, last_seen_at=now, raw_payload={"a": 1},
     )
     session.add(p)
@@ -67,6 +70,9 @@ def test_property_roundtrip_and_unique_constraint():
     assert fetched.source_id == "123"
     assert fetched.raw_payload == {"a": 1}
     assert fetched.geocode_status == "pending"
+    assert fetched.matricula == "91.048"
+    assert fetched.edital_url == "https://caixa/edital.pdf"
+    assert fetched.matricula_url == "https://caixa/matricula.pdf"
 
 
 def test_property_event_and_enrichment_relations():

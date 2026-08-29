@@ -150,6 +150,8 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
         "marketDetail": market_detail, "costs": costs, "edital": None,
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
+        "matricula": p.get("matricula"), "editalUrl": p.get("edital_url"),
+        "matriculaUrl": p.get("matricula_url"),
         "monthlyCondo": monthly_condo,
         "monthlyIptu": round(annual_iptu / 12, 2) if annual_iptu is not None else None,
         "annualIptu": annual_iptu, "expenseEstimate": expense_estimate,
@@ -249,6 +251,9 @@ def _catalog_card(row) -> dict:
         "lng": p.get("lng"),
         "photoUrl": p.get("photo_url"),
         "auctionUrl": p.get("detail_url"),
+        "matricula": p.get("matricula"),
+        "editalUrl": p.get("edital_url"),
+        "matriculaUrl": p.get("matricula_url"),
         "status": p.get("status"),
         "canAnalyze": True,
     }
@@ -257,7 +262,10 @@ _CATALOG_COLUMNS = """
     id, source_id, source, uf, city, neighborhood, address, property_type,
     area_m2, beds, preco, avaliacao, desconto_oficial, modalidade,
     first_auction_at, second_auction_at, first_auction_price,
-    second_auction_price, lat, lng, photo_url, detail_url, status, descricao_raw
+    second_auction_price, lat, lng, photo_url, detail_url, status, descricao_raw,
+    to_jsonb(properties)->>'matricula' AS matricula,
+    to_jsonb(properties)->>'edital_url' AS edital_url,
+    to_jsonb(properties)->>'matricula_url' AS matricula_url
 """
 
 

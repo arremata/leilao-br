@@ -49,7 +49,7 @@ def init_db(engine: Engine) -> None:
 
     # v1 predates migrations and create_all() does not add columns to an
     # existing table. Keep this small compatibility migration here so deployed
-    # SQLite/Postgres catalogs gain the auction-date fields on next startup.
+    # SQLite/Postgres catalogs gain ingestion fields on next startup.
     existing = {column["name"] for column in inspect(engine).get_columns("properties")}
     date_columns = {
         "first_auction_at": "TIMESTAMP WITH TIME ZONE",
@@ -59,6 +59,11 @@ def init_db(engine: Engine) -> None:
     price_columns = {
         "first_auction_price": "DOUBLE PRECISION",
         "second_auction_price": "DOUBLE PRECISION",
+    }
+    document_columns = {
+        "matricula": "VARCHAR(128)",
+        "edital_url": "TEXT",
+        "matricula_url": "TEXT",
     }
     with engine.begin() as connection:
         for name, postgres_type in date_columns.items():
@@ -72,6 +77,12 @@ def init_db(engine: Engine) -> None:
             if name in existing:
                 continue
             column_type = "FLOAT" if engine.dialect.name == "sqlite" else postgres_type
+            connection.execute(text(
+                f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
+            ))
+        for name, column_type in document_columns.items():
+            if name in existing:
+                continue
             connection.execute(text(
                 f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
             ))

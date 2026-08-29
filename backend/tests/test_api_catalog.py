@@ -58,13 +58,19 @@ def test_catalog_card_has_title_and_auction_discount():
                        property_type="Apartamento", area_m2=72.0,
                        preco=150000.0, avaliacao=300000.0,
                        desconto_oficial=50.0, status="active",
-                       detail_url="https://example.com/leilao/9"))
+                       detail_url="https://example.com/leilao/9",
+                       matricula="91.048",
+                       edital_url="https://example.com/edital.pdf",
+                       matricula_url="https://example.com/matricula.pdf"))
         s.commit()
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["auctionDiscount"] == 50.0
     assert card["title"] == "Apartamento 72 m², Batel"
     assert card["auctionUrl"] == "https://example.com/leilao/9"
+    assert card["matricula"] == "91.048"
+    assert card["editalUrl"] == "https://example.com/edital.pdf"
+    assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
     api.app.dependency_overrides.clear()
 
 
@@ -228,7 +234,10 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
 
     async def _fake_fetch_detail(detail_url, base_url="https://venda-imoveis.caixa.gov.br"):
         return {"photo_url": "https://venda-imoveis.caixa.gov.br/fotos/F1.jpg",
-                "full_description": "Casa ampla", "document_urls": []}
+                "full_description": "Casa ampla", "document_urls": [],
+                "matricula": "91.048",
+                "edital_url": "https://venda-imoveis.caixa.gov.br/editais/EL1.PDF",
+                "matricula_url": "https://venda-imoveis.caixa.gov.br/editais/matricula/PR/1.pdf"}
 
     monkeypatch.setattr(api, "run_structured_enrichment", _fake_enrich)
     monkeypatch.setattr(api, "fetch_detail", _fake_fetch_detail)
@@ -238,6 +247,9 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
     with factory() as s:
         prop = s.get(Property, prop_id)
         assert prop.photo_url == "https://venda-imoveis.caixa.gov.br/fotos/F1.jpg"
+        assert prop.matricula == "91.048"
+        assert prop.edital_url.endswith("EL1.PDF")
+        assert prop.matricula_url.endswith("/PR/1.pdf")
         assert prop.detail_fetched is True
     api.app.dependency_overrides.clear()
 
