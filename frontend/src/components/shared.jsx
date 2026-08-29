@@ -114,6 +114,7 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 // ============================================================
 export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex = 0 }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
+  const isDirectSale = /venda direta/i.test(p.modalidade || '');
   return (
     <article
       className="card hov fade-in property-card"
@@ -174,7 +175,9 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
 
         {/* Lance mínimo — compact header */}
         <div className="row between baseline" style={{ marginBottom: 16 }}>
-          <span className="uppy" style={{ color: 'var(--fg-2)' }}>lance mínimo</span>
+          <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+            {isDirectSale ? 'preço de venda' : 'lance mínimo'}
+          </span>
           <span className="num-md" style={{ color: 'var(--fg-0)' }}>
             R$ {fmtBRL(p.minBid)}
           </span>
@@ -183,7 +186,9 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
         {/* Avaliação do leilão + mercado estimado */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Avaliação leilão</span>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+              {isDirectSale ? 'Avaliação oficial' : 'Avaliação leilão'}
+            </span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
@@ -232,6 +237,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
 // ============================================================
 export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
+  const isDirectSale = /venda direta/i.test(p.modalidade || '');
   return (
     <div
       className="property-row"
@@ -266,7 +272,9 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.minBid)}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>lance mínimo</div>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {isDirectSale ? 'preço de venda' : 'lance mínimo'}
+        </div>
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>

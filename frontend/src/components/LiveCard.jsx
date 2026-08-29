@@ -5,6 +5,7 @@ import { fmtBRL } from '../utils';
 // ============================================================
 export function LiveCardHero({ entry, onClick, analyzed = false }) {
   if (!entry) return null;
+  const isDirectSale = /venda direta/i.test(entry.modalidade || '');
 
   return (
     <div
@@ -42,7 +43,7 @@ export function LiveCardHero({ entry, onClick, analyzed = false }) {
       <div style={{ padding: 20 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <span className="tag">
-            {entry.auctionType || 'Leilão Judicial'}
+            {entry.praca || entry.modalidade || entry.auctionType || 'Modalidade não informada'}
           </span>
           <span className="tag">{entry.type || 'Imóvel'}</span>
         </div>
@@ -55,13 +56,17 @@ export function LiveCardHero({ entry, onClick, analyzed = false }) {
         {/* Pricing — lance, avaliação e mercado estimado */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
           <div>
-            <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Lance mínimo</span>
+            <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>
+              {isDirectSale ? 'Preço de venda' : 'Lance mínimo'}
+            </span>
             <span className="mono" style={{ fontSize: 17, fontWeight: 600, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(entry.minBid)}
             </span>
           </div>
           <div>
-            <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>Avaliação leilão</span>
+            <span style={{ display: 'block', fontSize: 11, color: 'var(--fg-3)', marginBottom: 2 }}>
+              {isDirectSale ? 'Avaliação oficial' : 'Avaliação leilão'}
+            </span>
             <span className="mono" style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg-1)' }}>
               {entry.appraisal > 0 ? `R$ ${fmtBRL(entry.appraisal)}` : '—'}
             </span>

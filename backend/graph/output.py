@@ -240,33 +240,76 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
 
     legal = state.legal_result
     min_bid = metadata.auction_price or 0
+    is_direct_sale = "venda direta" in (metadata.auction_type or "").casefold()
+
+    from fiscal import get_registration_fee
 
     costs = [
-        CostLineItem(label="Lance de arremate", value=min_bid, hint="Valor declarado como mínimo no edital.", kind="price"),
+        CostLineItem(
+            id="auction_bid",
+            label="Preço de venda" if is_direct_sale else "Lance de arremate",
+            value=min_bid,
+            hint=(
+                "Preço mínimo publicado pela Caixa para a venda direta."
+                if is_direct_sale else "Valor declarado como mínimo no edital."
+            ),
+            kind="price",
+        ),
     ]
 
     if metadata.itbi_rate is not None:
         rate_pct = metadata.itbi_rate * 100
         costs.append(CostLineItem(
+            id="itbi",
             label=f"ITBI · {metadata.city} ({rate_pct:g}%)",
             value=round(min_bid * metadata.itbi_rate),
             hint=metadata.itbi_source,
             kind="tax",
+            rate=metadata.itbi_rate,
         ))
 
-    if metadata.commission_rate is not None:
-        rate_pct = metadata.commission_rate * 100
+    if not is_direct_sale:
+        commission_rate = metadata.commission_rate if metadata.commission_rate is not None else 0.05
+        rate_pct = commission_rate * 100
+        commission_is_official = metadata.commission_rate is not None
         costs.append(CostLineItem(
-            label=f"Comissão informada ({rate_pct:g}%)",
-            value=round(min_bid * metadata.commission_rate),
-            hint="Percentual extraído da descrição oficial do imóvel.",
+            id="auctioneer_commission",
+            label=f"Comissão do leiloeiro · {'edital' if commission_is_official else 'estimativa'} ({rate_pct:g}%)",
+            value=round(min_bid * commission_rate),
+            hint=(
+                "Percentual extraído do edital ou da descrição oficial do imóvel."
+                if commission_is_official else
+                "Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital."
+            ),
             kind="fee",
+            rate=commission_rate,
         ))
+
+    registration = get_registration_fee(metadata.state)
+    if registration:
+        registration_rate = registration["rate"]
+        costs.append(CostLineItem(
+            id="property_registration",
+            label=f"Registro em cartório · {metadata.state.upper()} ({registration_rate * 100:g}%)",
+            value=round(min_bid * registration_rate),
+            hint=registration["source"],
+            kind="fee",
+            rate=registration_rate,
+        ))
+
+    costs.append(CostLineItem(
+        id="occupant_removal",
+        label="Desocupação do imóvel · estimativa",
+        value=5000,
+        hint="Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.",
+        kind="fee",
+    ))
 
     iptu_debt = 0
     if legal and legal.tax_debts_iptu:
         iptu_debt = _parse_brl(legal.tax_debts_iptu)
     costs.append(CostLineItem(
+        id="overdue_iptu",
         label="IPTU em atraso assumido",
         value=iptu_debt,
         hint="IPTU vencido até a data do arremate." if iptu_debt else "IPTU em dia.",
@@ -277,6 +320,7 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
     if legal and legal.condominium_debts:
         condo_debt = _parse_brl(legal.condominium_debts)
     costs.append(CostLineItem(
+        id="overdue_condo",
         label="Condomínio em atraso",
         value=condo_debt,
         hint="Débito condominial cobrado pelo síndico." if condo_debt else "Sem débito condominial.",
@@ -284,6 +328,7 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
     ))
 
     costs.append(CostLineItem(
+        id="renovation",
         label="Reforma estimada",
         value=0,
         hint="Calculada no simulador por área e faixa regional.",
@@ -291,6 +336,7 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
     ))
 
     costs.append(CostLineItem(
+        id="capital_gains",
         label="Imposto sobre ganho de capital",
         value=0,
         hint="Isento · primeiro imóvel · até R$ 35k.",
@@ -329,7 +375,7 @@ def _build_edital(state: AuctionState) -> EditalDetail | None:
         debtor=metadata.debtor or "",
         matricula=metadata.matricula or "",
         first_bid_date=metadata.auction_date or "",
-        first_bid_price=metadata.auction_price or 0,
+        first_bid_price=metadata.auction_price_1st or metadata.auction_price or 0,
         second_bid_date=metadata.auction_date_2nd or "",
         second_bid_price=second_bid_price,
         property_description=property_description,
@@ -417,6 +463,9 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         auction_url=state.auction_url or None,
         photo_url=metadata.photo_url or None,
         matricula=metadata.matricula or None,
+        edital_url=metadata.edital_url or None,
+        matricula_url=metadata.matricula_url or None,
+        edital_data=metadata.edital_data,
         monthly_condo=monthly_condo,
         monthly_iptu=monthly_iptu,
     )

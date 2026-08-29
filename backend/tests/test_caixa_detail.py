@@ -83,6 +83,82 @@ def test_parse_detail_html_extracts_licitacao_aberta_date():
     assert data["second_auction_at"] is None
 
 
+def test_parse_detail_html_extracts_property_specific_edital_facts():
+    html = """
+      Valor de avaliação: R$ 730.000,00
+      Valor mínimo de venda: R$ 406.733,59 (desconto de 44,28%)
+      Situação: Desocupado Quartos: 3
+      Número do imóvel: 000001014506-9 Matrícula(s): 69127
+      Comarca: CURITIBA-PR Ofício: 02 Inscrição imobiliária: 50100390294000
+      Averbação dos leilões negativos: Em tratamento Área privativa = 161,52m2
+      Licitação Aberta Edital: 0027/0326 - CPVE/RE Número do item: 175
+      Leiloeiro(a): PATRÍCIA AVELAR MONTEIRO FIDALGO
+      Data da Licitação Aberta - 01/09/2026 - 10h00
+      Descrição: Casa com três quartos e duas vagas.
+      FORMAS DE PAGAMENTO ACEITAS: Recursos próprios. Permite financiamento - somente SBPE.
+      REGRAS PARA PAGAMENTO DAS DESPESAS (caso existam): Condomínio sob responsabilidade
+      do comprador. Baixar edital e anexos (Edital publicado em: 26/08/2026 10:21:22)
+    """
+
+    data = parse_detail_html(html, base_url="https://x")["edital_data"]
+
+    assert data["auctionNumber"] == "0027/0326 - CPVE/RE"
+    assert data["lotNumber"] == "175"
+    assert data["propertyNumber"] == "000001014506-9"
+    assert data["auctioneerName"] == "PATRÍCIA AVELAR MONTEIRO FIDALGO"
+    assert data["minimumSalePrice"] == 406733.59
+    assert data["appraisalValue"] == 730000.0
+    assert data["iptuRegistration"] == "50100390294000"
+    assert data["registryOffice"] == "02"
+    assert data["occupancy"] == "Desocupado"
+    assert data["negativeAuctionRegistration"] == "Em tratamento"
+    assert data["propertyDescription"] == "Casa com três quartos e duas vagas"
+    assert "somente SBPE" in data["paymentMethods"]
+    assert data["publicationDate"] == "26/08/2026 10:21:22"
+
+
+def test_parse_detail_html_extracts_direct_sale_documents_without_script_noise():
+    html = """
+      <span>Número do imóvel: 155552855307-5</span>
+      <span>Matrícula(s): 52166</span>
+      <span>Ofício: 02</span>
+      <span>Inscrição imobiliária: 54000410306003</span>
+      <span>Situação: Ocupado Quartos: 3</span>
+      Valor de avaliação: R$ 2.280.000,00
+      Valor mínimo de venda: R$ 1.416.749,68
+      Descrição: Casa com 3 quartos.
+      FORMAS DE PAGAMENTO ACEITAS: Recursos próprios. Permite financiamento - somente SBPE.
+      REGRAS PARA PAGAMENTO DAS DESPESAS (caso existam): Condomínio sob responsabilidade
+      do comprador. Tributos sob responsabilidade do comprador. Corretores credenciados
+      Regras da Venda Online Formas de pagamento Fazer uma proposta
+      <a onclick="ExibeDoc('/editais/matricula/PR/1555528553075.pdf')">Matrícula</a>
+      <script>
+        function regrasVendaOnline() {
+          //window.open('/editais/regras-VOL/comocomprar.pdf?v=011');
+          window.open('/editais/regras-VOL/comocomprar.pdf?v=01');
+        }
+        function abrirUrlPiloto() { window.open('https://example.com'); }
+      </script>
+    """
+
+    parsed = parse_detail_html(
+        html, base_url="https://venda-imoveis.caixa.gov.br",
+    )
+    data = parsed["edital_data"]
+
+    assert parsed["edital_url"] is None
+    assert parsed["matricula_url"].endswith("1555528553075.pdf")
+    assert data["saleRulesUrl"].endswith("comocomprar.pdf?v=01")
+    assert data["matricula"] == "52166"
+    assert data["occupancy"] == "Ocupado"
+    assert data["minimumSalePrice"] == 1416749.68
+    assert data["expenseRules"] == (
+        "Condomínio sob responsabilidade do comprador. "
+        "Tributos sob responsabilidade do comprador"
+    )
+    assert "function" not in data["expenseRules"]
+
+
 def test_date_batch_retries_http_200_without_dates_in_fresh_session(monkeypatch):
     sessions_created = 0
 
@@ -161,3 +237,70 @@ def test_detail_batch_accepts_document_only_caixa_page(monkeypatch):
     assert results[0]["first_auction_at"] is None
     assert results[0]["matricula"] == "7159"
     assert results[0]["matricula_url"].endswith("0000000007159.pdf")
+
+
+def test_detail_batch_downloads_shared_edital_once_and_associates_each_property(monkeypatch):
+    pdf_calls = 0
+    edital_text = """
+      LICITAÇÃO CAIXA Nº 0027/0326 - CPVE/RE
+      COMISSÃO: 5% da proposta.
+      175
+      IPTU: 111 Matrícula: 69127 Ofício: 02.
+      10145069
+      406.733,59
+      730.000,00
+      176
+      IPTU: 222 Matrícula: 9988 Ofício: 03.
+      8787705662369
+      153.717,24
+      262.500,00
+    """
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, text="", content=b""):
+            self.text = text
+            self.content = content
+
+        def raise_for_status(self):
+            return None
+
+    class Session:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, **kwargs):
+            nonlocal pdf_calls
+            if url.endswith("edital.pdf"):
+                pdf_calls += 1
+                return Response(content=b"%PDF-fake")
+            return Response(text="""
+              <span>Data da Licitação Aberta - 05/09/2026 - 10h00</span>
+              <a onclick="ExibeDoc('/editais/edital.pdf')">Edital</a>
+            """)
+
+    monkeypatch.setattr(caixa_detail, "AsyncSession", Session)
+    monkeypatch.setattr(caixa_detail, "extract_pdf_text", lambda _content: edital_text)
+
+    results = asyncio.run(caixa_detail.fetch_auction_dates_batch(
+        [
+            "https://x/detail?hdnimovel=10145069",
+            "https://x/detail?hdnimovel=8787705662369",
+        ],
+        retries=0,
+        request_interval=0,
+        recovery_rounds=0,
+    ))
+
+    assert pdf_calls == 1
+    assert results[0]["edital_data"]["lotNumber"] == "175"
+    assert results[0]["edital_data"]["iptuRegistration"] == "111"
+    assert results[1]["edital_data"]["lotNumber"] == "176"
+    assert results[1]["edital_data"]["iptuRegistration"] == "222"

@@ -61,7 +61,8 @@ def test_catalog_card_has_title_and_auction_discount():
                        detail_url="https://example.com/leilao/9",
                        matricula="91.048",
                        edital_url="https://example.com/edital.pdf",
-                       matricula_url="https://example.com/matricula.pdf"))
+                       matricula_url="https://example.com/matricula.pdf",
+                       edital_data={"lotNumber": "175", "registryOffice": "02"}))
         s.commit()
 
     card = client.get("/catalog?uf=PR").json()[0]
@@ -71,6 +72,10 @@ def test_catalog_card_has_title_and_auction_discount():
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"
     assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
+    assert "editalData" not in card
+
+    detail = client.get(f"/catalog/{card['id']}").json()
+    assert detail["editalData"] == {"lotNumber": "175", "registryOffice": "02"}
     api.app.dependency_overrides.clear()
 
 

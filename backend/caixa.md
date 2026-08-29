@@ -151,22 +151,27 @@ append-only and form the audit trail (and the basis for future alerts).
 
 ---
 
-## 5. Lazy detail scraping (`caixa_detail.py`)
+## 5. Official detail and edital enrichment (`caixa_detail.py`)
 
-The CSV has **no photo** — the picture and the edital/matrícula PDFs live only
-on each property's detail page. Scraping every page during ingest would be slow
-and hostile to the bot gate, so it's **lazy and per-property**:
+The CSV has **no photo** and omits the structured facts published on each
+property page and its edital. Scheduled ingestion fetches paced detail pages for
+Caixa auctions, open tenders, and online direct sales. Direct sales do not
+require a nonexistent property-specific edital or auctioneer; their property
+facts, matrícula, and generic Caixa sale-rules PDF are collected instead. The
+detail pipeline:
 
-- Triggered on the first `POST /catalog/{id}/analyze` for a property that has a
-  `detail_url` and `detail_fetched == False`.
-- `fetch_detail` scrapes the page via the shared stealth Playwright scraper;
-  `parse_detail_html` extracts:
+- `parse_detail_html` extracts:
   - `photo_url` — first `/fotos/…` image, absolutized against the base URL.
   - `document_urls` — all `.pdf` links (edital, matrícula).
   - `full_description` — tag-stripped page text.
-- **Best-effort & once:** on success we set `photo_url` and flip
-  `detail_fetched=True`; on failure we log and leave the flag `False` so a later
-  analyze retries. It never blocks or fails the analyze request.
+  - property-specific edital facts such as item, IPTU registration, registry
+    office, occupancy, accepted payment methods, and expense rules.
+- Each shared edital PDF is downloaded once per run. Its text is parsed without
+  an LLM, and Annex II rows are matched by Caixa property number to recover the
+  official auction number, auctioneer contacts, commission, deadlines, values,
+  and documented regularization alerts.
+- The merged payload is persisted in `properties.edital_data`; extraction is
+  best-effort and incomplete rows remain eligible for retry.
 
 ---
 

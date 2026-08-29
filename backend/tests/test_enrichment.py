@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import enrichment.run as enrich
 from db.models import Property
 from graph.state import MarketResult, LegalResult
@@ -11,7 +13,16 @@ def test_metadata_from_property_maps_fields():
         neighborhood="Centro", address="Rua XV, 100", property_type="Apartamento",
         area_m2=65.0, beds=2, preco=150000.0, avaliacao=250000.0,
         modalidade="Venda Direta Online", photo_url="http://p.jpg",
-        matricula="91.048",
+        matricula="91.048", first_auction_price=175000.0,
+        second_auction_price=150000.0,
+        first_auction_at=datetime(2026, 9, 1, 13, tzinfo=timezone.utc),
+        second_auction_at=datetime(2026, 9, 3, 13, tzinfo=timezone.utc),
+        edital_url="https://example.com/edital.pdf",
+        matricula_url="https://example.com/matricula.pdf",
+        edital_data={
+            "auctionNumber": "0027/0326", "lotNumber": "175",
+            "commissionRate": 0.05,
+        },
     )
     meta = metadata_from_property(p)
     assert meta.address == "Rua XV, 100"
@@ -23,6 +34,24 @@ def test_metadata_from_property_maps_fields():
     assert meta.state == "PR"
     assert meta.beds == 2
     assert meta.matricula == "91.048"
+    assert meta.auction_price_1st == 175000.0
+    assert meta.auction_price_2nd == 150000.0
+    assert meta.auction_date == "2026-09-01T13:00:00+00:00"
+    assert meta.auction_date_2nd == "2026-09-03T13:00:00+00:00"
+    assert meta.edital_url == "https://example.com/edital.pdf"
+    assert meta.matricula_url == "https://example.com/matricula.pdf"
+    assert meta.edital_data["lotNumber"] == "175"
+    assert meta.commission_rate is None
+
+    result = run_structured_enrichment(meta, auction_url="http://x")
+    assert result.edital.first_bid_date == "2026-09-01T13:00:00+00:00"
+    assert result.edital.first_bid_price == 175000.0
+    assert result.edital.second_bid_date == "2026-09-03T13:00:00+00:00"
+    assert result.edital.second_bid_price == 150000.0
+    assert result.edital_url == "https://example.com/edital.pdf"
+    assert result.matricula_url == "https://example.com/matricula.pdf"
+    assert result.edital_data["commissionRate"] == 0.05
+    assert all(item.id != "auctioneer_commission" for item in result.costs)
 
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):

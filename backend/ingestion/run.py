@@ -79,6 +79,7 @@ class IngestSummary:
     dates_failed: int = 0
     dates_deferred: int = 0
     documents_updated: int = 0
+    edital_data_updated: int = 0
 
 
 def _preco_changed(old: float | None, new: float | None) -> bool:
@@ -131,13 +132,30 @@ def _needs_auction_dates(prop: Property, now: datetime) -> bool:
 
 
 def _needs_documents(prop: Property) -> bool:
-    """Whether scheduled-auction Caixa documents are still incomplete."""
-    document_modalities = {"Leilão SFI", "Licitação Aberta"}
-    return bool(
+    """Whether the official Caixa documents/facts are still incomplete."""
+    document_modalities = {"Leilão SFI", "Licitação Aberta", "Venda Direta Online"}
+    if not (
         prop.source == "caixa"
         and prop.modalidade in document_modalities
         and prop.detail_url
-        and (prop.edital_url is None or prop.matricula_url is None)
+    ):
+        return False
+
+    edital_data = prop.edital_data or {}
+    if prop.modalidade == "Venda Direta Online":
+        # Direct sales have no property-specific auction notice or auctioneer.
+        # Collect the matrícula, page facts and generic Caixa sale rules once.
+        return bool(
+            prop.matricula_url is None
+            or not edital_data.get("propertyNumber")
+            or not edital_data.get("paymentMethods")
+        )
+
+    return bool(
+        prop.edital_url is None
+        or prop.matricula_url is None
+        or not edital_data
+        or edital_data.get("commissionRate") is None
     )
 
 
@@ -350,15 +368,19 @@ async def ingest(
                         previous_documents = (
                             prop.matricula, prop.edital_url, prop.matricula_url,
                         )
+                        previous_edital_data = prop.edital_data
                         prop.matricula = result.get("matricula") or prop.matricula
                         prop.edital_url = result.get("edital_url") or prop.edital_url
                         prop.matricula_url = (
                             result.get("matricula_url") or prop.matricula_url
                         )
+                        prop.edital_data = result.get("edital_data") or prop.edital_data
                         if previous_documents != (
                             prop.matricula, prop.edital_url, prop.matricula_url,
                         ):
                             summary.documents_updated += 1
+                        if previous_edital_data != prop.edital_data:
+                            summary.edital_data_updated += 1
                     if requires_date:
                         if not returned_dates:
                             summary.dates_failed += 1
@@ -383,7 +405,8 @@ async def ingest(
         f"+{summary.inserted} ~{summary.updated} -{summary.removed} "
         f"={summary.unchanged} events={summary.events_created} "
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
-        f"{summary.dates_deferred}deferred documents={summary.documents_updated}"
+        f"{summary.dates_deferred}deferred documents={summary.documents_updated} "
+        f"edital_data={summary.edital_data_updated}"
     )
     return summary
 

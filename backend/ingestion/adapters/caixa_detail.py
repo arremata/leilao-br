@@ -5,14 +5,19 @@ reuses the existing Playwright scraper."""
 from __future__ import annotations
 
 import asyncio
+import html as html_lib
 import re
 from datetime import datetime
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 from curl_cffi.requests import AsyncSession
 from curl_cffi.requests.errors import RequestsError
 from loguru import logger
+
+from ingestion.adapters.caixa_edital import (
+    extract_pdf_text, merge_edital_data, parse_edital_text,
+)
 
 _PHOTO_RE = re.compile(r'<img[^>]+src="([^"]*/fotos/[^"]+)"', re.IGNORECASE)
 _PDF_HREF_RE = re.compile(
@@ -21,6 +26,14 @@ _PDF_HREF_RE = re.compile(
 _EXIBE_DOC_RE = re.compile(
     r"ExibeDoc\(\s*['\"]([^'\"]+\.pdf(?:\?[^'\"]*)?)['\"]\s*\)",
     re.IGNORECASE,
+)
+_WINDOW_OPEN_PDF_RE = re.compile(
+    r"window\.open\(\s*['\"]([^'\"]+\.pdf(?:\?[^'\"]*)?)['\"]",
+    re.IGNORECASE,
+)
+_SCRIPT_STYLE_RE = re.compile(
+    r"<(?:script|style)\b[^>]*>.*?</(?:script|style)>",
+    re.IGNORECASE | re.DOTALL,
 )
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
@@ -79,23 +92,83 @@ def _parse_auction_prices(text: str) -> tuple[float | None, float | None]:
     return prices.get("1"), prices.get("2")
 
 
+def _detail_value(text: str, pattern: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE)
+    return _WS_RE.sub(" ", match.group(1)).strip(" .") if match else ""
+
+
+def _parse_detail_edital_data(text: str) -> dict:
+    """Extract property-specific official facts exposed on the Caixa page."""
+    if not text:
+        return {}
+    appraisal = _detail_value(text, r"Valor\s+de\s+avalia[cç][aã]o\s*:\s*R\$\s*([\d.]+,\d{2})")
+    minimum = _detail_value(text, r"Valor\s+m[ií]nimo\s+de\s+venda(?:\s+[12][º°oªa]?\s*Leil[aã]o)?\s*:\s*R\$\s*([\d.]+,\d{2})")
+    payment_methods = _detail_value(
+        text,
+        r"FORMAS\s+DE\s+PAGAMENTO\s+ACEITAS\s*:\s*(.*?)\s*REGRAS\s+PARA\s+PAGAMENTO\s+DAS\s+DESPESAS",
+    )
+    expense_rules = _detail_value(
+        text,
+        r"REGRAS\s+PARA\s+PAGAMENTO\s+DAS\s+DESPESAS\s*\(caso\s+existam\)\s*:\s*(.*?)"
+        r"(?:\s+Baixar\s+edital|\s+D[eê]\s+seu\s+lance|\s+Corretores\s+credenciados|"
+        r"\s+Regras\s+da\s+Venda\s+Online|\s+Fazer\s+uma\s+proposta|$)",
+    )
+    details = {
+        "auctionNumber": _detail_value(text, r"Edital\s*:\s*(.*?)\s+N[uú]mero\s+do\s+item\s*:"),
+        "lotNumber": _detail_value(text, r"N[uú]mero\s+do\s+item\s*:\s*(\d+)"),
+        "auctioneerName": _detail_value(text, r"Leiloeiro\(a\)\s*:\s*(.*?)\s+Data\s+(?:da|do)"),
+        "propertyNumber": _detail_value(text, r"N[uú]mero\s+do\s+im[oó]vel\s*:\s*([\d.-]+)"),
+        "matricula": _detail_value(text, r"Matr[ií]cula\(s\)\s*:\s*([\d./-]+)"),
+        "iptuRegistration": _detail_value(text, r"Inscri[cç][aã]o\s+imobili[aá]ria\s*:\s*([^\s]+)"),
+        "registryOffice": _detail_value(text, r"Of[ií]cio\s*:\s*([^\s]+)"),
+        "occupancy": _detail_value(
+            text,
+            r"Situa[cç][aã]o\s*:\s*(.*?)(?:\s+Quartos\s*:|\s+Garagem\s*:|\s+N[uú]mero\s+do\s+im[oó]vel\s*:)",
+        ),
+        "minimumSalePrice": _parse_brl(minimum) if minimum else None,
+        "appraisalValue": _parse_brl(appraisal) if appraisal else None,
+        "paymentMethods": payment_methods,
+        "expenseRules": expense_rules,
+        "publicationDate": _detail_value(text, r"Edital\s+publicado\s+em\s*:\s*([^)]+)"),
+        "propertyDescription": _detail_value(
+            text, r"Descri[cç][aã]o\s*:\s*(.*?)\s*FORMAS\s+DE\s+PAGAMENTO\s+ACEITAS",
+        ),
+        "negativeAuctionRegistration": _detail_value(
+            text,
+            r"Averba[cç][aã]o\s+dos\s+leil[oõ]es\s+negativos\s*:\s*(.*?)(?:\s+[ÁA]rea\s|\s+Licita[cç][aã]o|\s+Leil[aã]o)",
+        ),
+    }
+    return {key: value for key, value in details.items() if value not in (None, "")}
+
+
 def _parse_document_urls(html: str, base_url: str) -> list[str]:
-    """Extract direct PDFs, including Caixa's JavaScript-only ExibeDoc links."""
-    matches = [*_PDF_HREF_RE.findall(html), *_EXIBE_DOC_RE.findall(html)]
+    """Extract direct PDFs, including Caixa's JavaScript-only document links."""
+    matches = [
+        *_PDF_HREF_RE.findall(html),
+        *_EXIBE_DOC_RE.findall(html),
+        *_WINDOW_OPEN_PDF_RE.findall(html),
+    ]
     return list(dict.fromkeys(urljoin(base_url, match) for match in matches))
 
 
-def _classify_document_urls(document_urls: list[str]) -> tuple[str | None, str | None]:
-    """Return the property-specific Caixa edital and matrícula PDFs."""
+def _classify_document_urls(
+    document_urls: list[str],
+) -> tuple[str | None, str | None, str | None]:
+    """Return the property edital, matrícula and generic online-sale rules."""
     edital_url = None
     matricula_url = None
+    sale_rules_url = None
     for url in document_urls:
         path = urlparse(url).path.casefold()
         if "matricula" in path:
             matricula_url = matricula_url or url
-        elif path.startswith("/editais/") and "/regras-" not in path:
+        elif "/regras-" in path:
+            # Caixa currently leaves an obsolete URL commented immediately
+            # before the active one. Prefer the last published match.
+            sale_rules_url = url
+        elif path.startswith("/editais/"):
             edital_url = edital_url or url
-    return edital_url, matricula_url
+    return edital_url, matricula_url, sale_rules_url
 
 
 def parse_detail_html(html: str, base_url: str) -> dict:
@@ -103,6 +176,7 @@ def parse_detail_html(html: str, base_url: str) -> dict:
         return {
             "photo_url": None, "full_description": "", "document_urls": [],
             "matricula": None, "edital_url": None, "matricula_url": None,
+            "edital_data": {},
             "first_auction_at": None, "second_auction_at": None,
             "first_auction_price": None, "second_auction_price": None,
         }
@@ -111,15 +185,20 @@ def parse_detail_html(html: str, base_url: str) -> dict:
     photo_url = urljoin(base_url, photo_match.group(1)) if photo_match else None
 
     document_urls = _parse_document_urls(html, base_url)
-    edital_url, matricula_url = _classify_document_urls(document_urls)
+    edital_url, matricula_url, sale_rules_url = _classify_document_urls(document_urls)
 
-    text = _TAG_RE.sub(" ", html)
+    text_html = _SCRIPT_STYLE_RE.sub(" ", html)
+    text = html_lib.unescape(_TAG_RE.sub(" ", text_html))
     text = _WS_RE.sub(" ", text).strip()
     matricula_match = re.search(
         r"Matr[ií]cula\(s\)\s*:\s*([\d./-]+)", text, re.IGNORECASE,
     )
     first_auction_at, second_auction_at = _parse_auction_dates(text)
     first_auction_price, second_auction_price = _parse_auction_prices(text)
+
+    edital_data = _parse_detail_edital_data(text)
+    if sale_rules_url:
+        edital_data["saleRulesUrl"] = sale_rules_url
 
     return {
         "photo_url": photo_url,
@@ -128,11 +207,47 @@ def parse_detail_html(html: str, base_url: str) -> dict:
         "matricula": matricula_match.group(1) if matricula_match else None,
         "edital_url": edital_url,
         "matricula_url": matricula_url,
+        "edital_data": edital_data,
         "first_auction_at": first_auction_at,
         "second_auction_at": second_auction_at,
         "first_auction_price": first_auction_price,
         "second_auction_price": second_auction_price,
     }
+
+
+def _property_number_from_url(url: str) -> str:
+    values = parse_qs(urlparse(url).query).get("hdnimovel", [])
+    return values[0] if values else ""
+
+
+async def _attach_edital_pdf_data(client, urls: list[str], results: list[dict | None]) -> None:
+    """Download each shared notice once and merge its facts into every result."""
+    edital_urls = {
+        result["edital_url"]
+        for result in results if result and result.get("edital_url")
+    }
+    texts: dict[str, str] = {}
+    for edital_url in edital_urls:
+        try:
+            response = await client.get(edital_url, timeout=30, allow_redirects=True)
+            response.raise_for_status()
+            content = response.content
+            if not content.startswith(b"%PDF"):
+                continue
+            texts[edital_url] = await asyncio.to_thread(extract_pdf_text, content)
+        except Exception as exc:  # best-effort; a future ingestion retries missing data
+            logger.warning(f"Official notice unavailable for {edital_url}: {exc}")
+
+    for detail_url, result in zip(urls, results):
+        if not result:
+            continue
+        edital_text = texts.get(result.get("edital_url", ""))
+        property_number = (
+            result.get("edital_data", {}).get("propertyNumber")
+            or _property_number_from_url(detail_url)
+        )
+        pdf_data = parse_edital_text(edital_text, property_number) if edital_text else {}
+        result["edital_data"] = merge_edital_data(pdf_data, result.get("edital_data"))
 
 
 async def fetch_auction_dates_batch(
@@ -203,6 +318,7 @@ async def fetch_auction_dates_batch(
                                 "matricula": parsed["matricula"],
                                 "edital_url": parsed["edital_url"],
                                 "matricula_url": parsed["matricula_url"],
+                                "edital_data": parsed["edital_data"],
                             }
                     except (RequestsError, ValueError) as exc:
                         response = getattr(exc, "response", None)
@@ -227,6 +343,7 @@ async def fetch_auction_dates_batch(
                 return None
 
         results = await asyncio.gather(*[_one(url) for url in urls])
+        await _attach_edital_pdf_data(client, urls, results)
 
     failed_indexes = [index for index, result in enumerate(results) if result is None]
     if failed_indexes and recovery_rounds > 0:

@@ -24,7 +24,19 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v4-city-expenses"
+PIPELINE_VERSION = "v8-direct-sale-documents"
+
+_REGISTRATION_RATES = {
+    "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
+    "RS": 0.007, "SC": 0.007, "DF": 0.008, "BA": 0.008,
+    "GO": 0.0075,
+}
+_DEFAULT_REGISTRATION_RATE = 0.0075
+_BRAZILIAN_UFS = {
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+    "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+    "RR", "SC", "SP", "SE", "TO",
+}
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
@@ -52,6 +64,26 @@ def _is_land_property_type(property_type: str | None) -> bool:
 def _normalize_text(value: str | None) -> str:
     value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode()
     return " ".join(value.casefold().split())
+
+
+def _extract_commission_rate(description: str | None) -> float | None:
+    for pattern in (
+        r"comiss[aã]o[^%\n]{0,80}?(\d+(?:[.,]\d+)?)\s*%",
+        r"(\d+(?:[.,]\d+)?)\s*%[^\n.]{0,80}?comiss[aã]o",
+    ):
+        match = re.search(pattern, description or "", re.IGNORECASE)
+        if match:
+            percentage = float(match.group(1).replace(",", "."))
+            if 0 < percentage <= 30:
+                return percentage / 100
+    return None
+
+
+def _registration_rate(uf: str | None) -> float | None:
+    normalized_uf = (uf or "").upper().strip()
+    if normalized_uf not in _BRAZILIAN_UFS:
+        return None
+    return _REGISTRATION_RATES.get(normalized_uf, _DEFAULT_REGISTRATION_RATE)
 
 
 def _canonical_property_type(value: str | None) -> str:
@@ -97,6 +129,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
     )
     fee_rate = itbi_rate or 0
+    is_direct_sale = "venda direta" in _normalize_text(p.get("modalidade"))
     roi = round((market - min_bid * (1 + fee_rate)) / (min_bid * (1 + fee_rate)) * 100, 2) if min_bid else 0
     market_detail = None if is_land else {
         "indicators": ([{
@@ -111,17 +144,65 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         } for item in usable],
     }
     costs = [{
-        "label": "Lance de arremate", "value": min_bid,
-        "hint": "Valor declarado como mínimo no edital.", "kind": "price",
+        "id": "auction_bid",
+        "label": "Preço de venda" if is_direct_sale else "Lance de arremate",
+        "value": min_bid,
+        "hint": (
+            "Preço mínimo publicado pela Caixa para a venda direta."
+            if is_direct_sale else "Valor declarado como mínimo no edital."
+        ),
+        "kind": "price",
     }]
     if itbi_rate is not None:
         costs.append({
+            "id": "itbi",
             "label": f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)",
             "value": round(min_bid * itbi_rate), "hint": "Alíquota municipal cadastrada.", "kind": "tax",
+            "rate": itbi_rate,
+        })
+    edital_data = p.get("edital_data") if isinstance(p.get("edital_data"), dict) else {}
+    official_commission_rate = edital_data.get("commissionRate")
+    commission_rate = (
+        float(official_commission_rate)
+        if isinstance(official_commission_rate, (int, float))
+        and 0 < float(official_commission_rate) <= 0.3
+        else _extract_commission_rate(p.get("descricao_raw"))
+    )
+    if not is_direct_sale:
+        commission_is_official = commission_rate is not None
+        commission_rate = commission_rate if commission_rate is not None else 0.05
+        costs.append({
+            "id": "auctioneer_commission",
+            "label": f"Comissão do leiloeiro · {'edital' if commission_is_official else 'estimativa'} ({commission_rate * 100:g}%)",
+            "value": round(min_bid * commission_rate),
+            "hint": (
+                "Percentual extraído do edital ou da descrição oficial do imóvel."
+                if commission_is_official else
+                "Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital."
+            ),
+            "kind": "fee", "rate": commission_rate,
+        })
+    registration_rate = _registration_rate(p.get("uf"))
+    if registration_rate is not None:
+        costs.append({
+            "id": "property_registration",
+            "label": f"Registro em cartório · {(p.get('uf') or '').upper()} ({registration_rate * 100:g}%)",
+            "value": round(min_bid * registration_rate),
+            "hint": (
+                "Referência simplificada Arremate baseada nas tabelas estaduais de emolumentos "
+                "reunidas pelo IRIB (2025). O valor final varia por faixa e pelos atos praticados; "
+                "confirme com o cartório."
+            ),
+            "kind": "fee", "rate": registration_rate,
         })
     costs.extend([
-        {"label": "Reforma estimada", "value": 0, "hint": "Calculada no simulador por área e faixa regional.", "kind": "reno"},
-        {"label": "Imposto sobre ganho de capital", "value": 0, "hint": "Calculado conforme o cenário de venda.", "kind": "tax"},
+        {
+            "id": "occupant_removal", "label": "Desocupação do imóvel · estimativa", "value": 5000,
+            "hint": "Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.",
+            "kind": "fee",
+        },
+        {"id": "renovation", "label": "Reforma estimada", "value": 0, "hint": "Calculada no simulador por área e faixa regional.", "kind": "reno"},
+        {"id": "capital_gains", "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Calculado conforme o cenário de venda.", "kind": "tax"},
     ])
     property_type = p.get("property_type") or ""
     neighborhood = p.get("neighborhood") or ""
@@ -152,6 +233,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
         "matricula": p.get("matricula"), "editalUrl": p.get("edital_url"),
         "matriculaUrl": p.get("matricula_url"),
+        "editalData": p.get("edital_data"),
         "monthlyCondo": monthly_condo,
         "monthlyIptu": round(annual_iptu / 12, 2) if annual_iptu is not None else None,
         "annualIptu": annual_iptu, "expenseEstimate": expense_estimate,
@@ -181,7 +263,7 @@ def _iso(value) -> Optional[str]:
     return value.isoformat()
 
 
-def _catalog_card(row) -> dict:
+def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     p = dict(row)
     auction_dates = [
         value for value in (p.get("first_auction_at"), p.get("second_auction_at"))
@@ -223,7 +305,7 @@ def _catalog_card(row) -> dict:
     else:
         title = p.get("address") or ""
 
-    return {
+    card = {
         "id": p["id"],
         "sourceId": p.get("source_id"),
         "source": p.get("source"),
@@ -257,6 +339,9 @@ def _catalog_card(row) -> dict:
         "status": p.get("status"),
         "canAnalyze": True,
     }
+    if include_edital_data:
+        card["editalData"] = p.get("edital_data")
+    return card
 
 _CATALOG_COLUMNS = """
     id, source_id, source, uf, city, neighborhood, address, property_type,
@@ -266,6 +351,10 @@ _CATALOG_COLUMNS = """
     to_jsonb(properties)->>'matricula' AS matricula,
     to_jsonb(properties)->>'edital_url' AS edital_url,
     to_jsonb(properties)->>'matricula_url' AS matricula_url
+"""
+
+_CATALOG_DETAIL_COLUMNS = _CATALOG_COLUMNS + """,
+    to_jsonb(properties)->'edital_data' AS edital_data
 """
 
 
@@ -323,7 +412,7 @@ def get_catalog(uf: Optional[str] = None) -> list[dict]:
 
 @app.get("/catalog/{property_id}")
 def get_catalog_item(property_id: int) -> dict:
-    query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
+    query = f"SELECT {_CATALOG_DETAIL_COLUMNS} FROM properties WHERE id = :id"
     try:
         with _get_engine().connect() as connection:
             row = connection.execute(text(query), {"id": property_id}).mappings().one_or_none()
@@ -338,7 +427,7 @@ def get_catalog_item(property_id: int) -> dict:
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
-    card = _catalog_card(row)
+    card = _catalog_card(row, include_edital_data=True)
     card["enrichment"] = _safe_enrichment(enrichment, row["property_type"])
     return card
 
@@ -346,7 +435,7 @@ def get_catalog_item(property_id: int) -> dict:
 @app.post("/catalog/{property_id}/analyze")
 def analyze_catalog_item(property_id: int) -> dict:
     """Build and persist an analysis using only the cached regional reference."""
-    property_query = f"SELECT {_CATALOG_COLUMNS} FROM properties WHERE id = :id"
+    property_query = f"SELECT {_CATALOG_DETAIL_COLUMNS} FROM properties WHERE id = :id"
     reference_query = """
         SELECT id, neighborhood, property_type, price_per_m2
         FROM regional_market_prices
