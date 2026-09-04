@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from loguru import logger
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, select
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
@@ -25,6 +25,9 @@ from enrichment.run import metadata_from_property
 from graph.market import calculate_market
 from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
+
+
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v1"
 
 
 def _now() -> datetime:
@@ -142,10 +145,12 @@ async def refresh_references(
     now = _now()
     cutoff = now - timedelta(days=max_age_days)
     with session_factory() as session:
-        stmt = select(MarketReferenceJob).where(
-            MarketReferenceJob.uf.in_(ufs),
-            or_(MarketReferenceJob.next_attempt_at.is_(None), MarketReferenceJob.next_attempt_at <= now),
-        )
+        # Load every job in scope so successful legacy snapshots can bypass a
+        # future next_attempt_at once. Their comparables predate the confidence
+        # inputs (type, bedrooms and coordinates), so treating them as fresh
+        # would leave every rematerialized analysis artificially low until the
+        # normal 90-day expiry.
+        stmt = select(MarketReferenceJob).where(MarketReferenceJob.uf.in_(ufs))
         if property_id is not None:
             stmt = stmt.where(MarketReferenceJob.representative_property_id == property_id)
         jobs = session.execute(stmt.order_by(
@@ -159,8 +164,21 @@ async def refresh_references(
                 RegionalMarketPrice.neighborhood == job.neighborhood,
                 RegionalMarketPrice.property_type == job.property_type,
             )).scalar_one_or_none()
+            legacy_snapshot = bool(
+                reference
+                and job.status == "successful"
+                and reference.source != MARKET_REFERENCE_SOURCE
+            )
+            attempt_due = job.next_attempt_at is None or _aware(job.next_attempt_at) <= now
+            if not attempt_due and not legacy_snapshot:
+                continue
             fresh = reference and _aware(reference.computed_at) >= cutoff
-            if property_id is None and job.status == "successful" and fresh:
+            if (
+                property_id is None
+                and job.status == "successful"
+                and fresh
+                and not legacy_snapshot
+            ):
                 continue
             candidates.append(job.id)
             if limit and len(candidates) >= limit:
@@ -208,7 +226,7 @@ async def refresh_references(
                     session.add(reference)
                 reference.price_per_m2 = result.price_per_m2_neighborhood
                 reference.sample_size = len(result.comparable_properties)
-                reference.source = "listing_median"
+                reference.source = MARKET_REFERENCE_SOURCE
                 reference.computed_at = now
                 session.flush()
                 session.execute(delete(RegionalMarketComparable).where(

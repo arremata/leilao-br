@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from db.base import get_engine, init_db, make_session_factory
@@ -47,6 +49,51 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         assert {item.source for item in snapshot} == {
             "ZAP Imóveis", "Viva Real", "ImovelWeb",
         }
+
+
+@pytest.mark.asyncio
+async def test_worker_refreshes_fresh_legacy_snapshot_once(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    now = datetime.now(timezone.utc)
+    with factory() as session:
+        prop = Property(
+            source="caixa", source_id="legacy-1", uf="PR", city="Curitiba",
+            neighborhood="", property_type="Apartamento",
+            address="Rua A", area_m2=50, preco=100_000, status="active",
+        )
+        session.add(prop)
+        session.flush()
+        session.add(RegionalMarketPrice(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", price_per_m2=5_000, sample_size=3,
+            source="listing_median", computed_at=now,
+        ))
+        session.add(MarketReferenceJob(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", representative_property_id=prop.id,
+            status="successful", next_attempt_at=now + timedelta(days=90),
+        ))
+        session.commit()
+
+    async def fake_scrape(metadata, **kwargs):
+        return [ComparableProperty(
+            address="Rua B", property_type="Apartamento", price=250_000,
+            area_m2=50, beds=2, price_per_m2=5_000, source="Portal",
+            url="https://portal/1", lat=-25.4284, lng=-49.2733,
+        )]
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
+
+    first = await market_reference.refresh_references(factory, ["PR"], limit=10)
+    second = await market_reference.refresh_references(factory, ["PR"], limit=10)
+
+    assert first["updated"] == 1
+    assert second["selected"] == 0
+    with factory() as session:
+        reference = session.query(RegionalMarketPrice).one()
+        assert reference.source == market_reference.MARKET_REFERENCE_SOURCE
 
 
 @pytest.mark.asyncio
