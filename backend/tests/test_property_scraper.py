@@ -4,6 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from graph.state import PropertyMetadata, ComparableProperty
 from tools.property_scraper import (
     _extract_street,
+    _filter_to_subject_radius,
+    _parse_beds_from_text,
+    _parse_property_type,
     _parse_price_from_text,
     _is_usable_comparable,
     build_zap_url,
@@ -52,6 +55,44 @@ def test_extract_street_empty():
 
 def test_price_parser_stops_before_concatenated_area():
     assert _parse_price_from_text("R$ 650.000262 m²") == 650_000
+
+
+def test_comparable_card_extracts_bedrooms_and_canonical_type():
+    text = "Apartamento à venda com 3 dormitórios e 82 m²"
+
+    assert _parse_beds_from_text(text) == 3
+    assert _parse_property_type(text) == "Apartamento"
+
+
+@pytest.mark.asyncio
+async def test_radius_filter_keeps_only_five_nearby_comparables():
+    class FakeGeocoder:
+        def geocode(self, address):
+            if "Distante" in address:
+                return -25.4284, -49.2433
+            index = int(address.split("Rua ", 1)[1].split(",", 1)[0])
+            return -25.4284, -49.2733 + index * 0.001
+
+    metadata = _make_metadata(lat=-25.4284, lng=-49.2733, beds=2, area_m2=80)
+    candidates = [
+        ComparableProperty(
+            address=f"Rua {index}", property_type="Apartamento",
+            price=400_000, area_m2=80, beds=2, price_per_m2=5_000,
+            source="Portal", url=f"https://portal/{index}",
+        )
+        for index in range(7)
+    ]
+    candidates.append(ComparableProperty(
+        address="Rua Distante", property_type="Apartamento",
+        price=400_000, area_m2=80, beds=2, price_per_m2=5_000,
+        source="Portal", url="https://portal/far",
+    ))
+
+    result = await _filter_to_subject_radius(metadata, candidates, FakeGeocoder())
+
+    assert len(result) == 5
+    assert all(item.distance_km <= 2 for item in result)
+    assert all(item.address != "Rua Distante" for item in result)
 
 
 def test_comparable_validation_rejects_portal_homepage():

@@ -31,7 +31,7 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         ])
     ]
 
-    async def fake_scrape(metadata):
+    async def fake_scrape(metadata, **kwargs):
         return comps
 
     monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
@@ -89,7 +89,7 @@ async def test_empty_city_job_backs_off_without_starving_another_city(monkeypatc
             ))
         session.commit()
 
-    async def no_comps(metadata):
+    async def no_comps(metadata, **kwargs):
         return []
 
     monkeypatch.setattr(market_reference, "scrape_comparables", no_comps)

@@ -87,7 +87,9 @@ class Enrichment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     property_id: Mapped[int] = mapped_column(ForeignKey("properties.id"), unique=True, index=True)
     result_json: Mapped[str] = mapped_column(Text)
-    pipeline_version: Mapped[str] = mapped_column(String(16), default="v1")
+    # Human-readable pipeline labels are useful operationally and have already
+    # outgrown the original 16-character v1 allocation.
+    pipeline_version: Mapped[str] = mapped_column(String(64), default="v1")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
@@ -124,11 +126,15 @@ class RegionalMarketComparable(Base):
         ForeignKey("regional_market_prices.id", ondelete="CASCADE"), index=True,
     )
     address: Mapped[str] = mapped_column(Text, default="")
+    property_type: Mapped[str] = mapped_column(String(64), default="")
     price: Mapped[float] = mapped_column(Float)
     area_m2: Mapped[float] = mapped_column(Float)
+    beds: Mapped[Optional[int]] = mapped_column(Integer, default=None)
     price_per_m2: Mapped[float] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(64))
     url: Mapped[str] = mapped_column(Text)
+    lat: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    lng: Mapped[Optional[float]] = mapped_column(Float, default=None)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

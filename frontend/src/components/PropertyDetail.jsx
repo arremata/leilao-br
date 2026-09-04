@@ -1011,6 +1011,11 @@ function Market({ p }) {
 
   // Valorização da região — extraída do indicador de preço/m² do bairro
   const filteredIndicators = md.indicators;
+  const confidence = {
+    low: { label: 'Baixa', tone: 'bad' },
+    medium: { label: 'Média', tone: 'warn' },
+    high: { label: 'Alta', tone: 'good' },
+  }[md.confidenceLevel];
   const mapsQuery = encodeURIComponent([p.address, p.city].filter(Boolean).join(', '));
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
   const mapsEmbedUrl = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
@@ -1149,8 +1154,17 @@ function Market({ p }) {
 
         {/* § 01.02 — indicadores + valorização */}
         <div className="card" style={{ padding: 22 }}>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.02 · indicadores</span>
-          <h3 className="h2" style={{ marginTop: 4, marginBottom: 14 }}>{p.neighborhood} · base 2024–2026</h3>
+          <div className="row between" style={{ alignItems: 'flex-start', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div>
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 01.02 · indicadores</span>
+              <h3 className="h2" style={{ marginTop: 4 }}>{p.neighborhood} · base 2024–2026</h3>
+            </div>
+            {confidence && (
+              <span className={`tag dot ${confidence.tone}`}>
+                Confiabilidade {confidence.label}
+              </span>
+            )}
+          </div>
 
           <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
             {filteredIndicators.map(ind => (

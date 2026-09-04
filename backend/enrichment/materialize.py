@@ -93,8 +93,10 @@ def materialize_analyses(
             try:
                 comparables = [
                     ComparableProperty(
-                        address=item.address, price=item.price, area_m2=item.area_m2,
+                        address=item.address, property_type=item.property_type,
+                        price=item.price, area_m2=item.area_m2, beds=item.beds,
                         price_per_m2=item.price_per_m2, source=item.source, url=item.url,
+                        lat=item.lat, lng=item.lng,
                     )
                     for item in session.execute(
                         select(RegionalMarketComparable).where(

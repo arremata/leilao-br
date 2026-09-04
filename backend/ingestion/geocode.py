@@ -49,3 +49,8 @@ class NominatimClient:
             return (float(data[0]["lat"]), float(data[0]["lon"]))
         except (KeyError, ValueError, IndexError):
             return None
+
+    def close(self) -> None:
+        close = getattr(self._http, "close", None)
+        if close is not None:
+            close()

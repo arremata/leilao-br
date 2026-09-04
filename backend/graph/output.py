@@ -220,7 +220,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
         comparables.append(ComparableSale(
             address=cp.address,
             area_m2=cp.area_m2,
-            beds=None,
+            beds=cp.beds,
             price_per_m2=cp.price_per_m2,
             sale_price=cp.price,
             source=cp.source,
@@ -230,6 +230,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
     return MarketDetail(
         indicators=indicators,
         comparables=comparables,
+        confidence_level=market.confidence_level,
     )
 
 

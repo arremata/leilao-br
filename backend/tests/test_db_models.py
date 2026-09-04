@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import inspect, text
 
 from db.base import Base, get_engine, init_db, make_session_factory
-from db.models import Property, PropertyEvent, Enrichment
+from db.models import Property, PropertyEvent, Enrichment, RegionalMarketComparable
+from enrichment.run import PIPELINE_VERSION
 
 
 def test_get_engine_uses_psycopg3_for_generic_postgres_url(monkeypatch):
@@ -44,6 +45,23 @@ def test_init_db_adds_ingestion_fields_to_existing_properties_table():
         "first_auction_price", "second_auction_price",
         "matricula", "edital_url", "matricula_url", "edital_data",
     }.issubset(columns)
+
+
+def test_init_db_adds_confidence_inputs_to_existing_comparable_table():
+    engine = get_engine("sqlite://")
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE TABLE regional_market_comparables (id INTEGER PRIMARY KEY)"
+        ))
+
+    init_db(engine)
+
+    columns = {
+        column["name"] for column in inspect(engine).get_columns(
+            "regional_market_comparables"
+        )
+    }
+    assert {"property_type", "beds", "lat", "lng"}.issubset(columns)
 
 
 def _session():
@@ -91,3 +109,16 @@ def test_property_event_and_enrichment_relations():
     assert ev.event_type == "new"
     enr = session.query(Enrichment).filter_by(property_id=p.id).one()
     assert enr.pipeline_version == "v1"
+
+
+def test_enrichment_pipeline_version_column_fits_current_label():
+    capacity = Enrichment.__table__.c.pipeline_version.type.length
+
+    assert capacity == 64
+    assert len(PIPELINE_VERSION) <= capacity
+
+
+def test_market_comparable_stores_confidence_inputs():
+    columns = RegionalMarketComparable.__table__.c
+
+    assert {"property_type", "beds", "lat", "lng"}.issubset(columns.keys())

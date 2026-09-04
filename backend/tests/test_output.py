@@ -163,6 +163,7 @@ class TestBuildResultDetails:
         assert result.market_detail is not None
         assert len(result.market_detail.indicators) > 0
         assert len(result.market_detail.comparables) >= 0
+        assert result.market_detail.confidence_level == "low"
 
     def test_costs_populated_from_state(self):
         state = _make_full_state()
@@ -217,6 +218,8 @@ class TestBuildResultDetails:
         parsed = json.loads(result["result_json"])
         assert "viability" in parsed
         assert "marketDetail" in parsed
+        assert parsed["marketDetail"]["confidenceLevel"] == "low"
+        assert "confidenceScore" not in parsed["marketDetail"]
         assert "costs" in parsed
         assert "edital" in parsed
         assert "riskDimensions" in parsed["viability"]
