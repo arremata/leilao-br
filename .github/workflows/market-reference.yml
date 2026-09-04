@@ -17,6 +17,10 @@ on:
         description: Maximum regions to refresh
         required: true
         default: "30"
+      property_id:
+        description: Optional representative property ID for a targeted refresh
+        required: false
+        default: ""
   schedule:
     # GitHub cron uses UTC. Avoid the top of the hour, where GitHub documents
     # heavier scheduler load and possible delayed or dropped runs.
@@ -36,6 +40,7 @@ jobs:
     environment: ${{ github.event.inputs.target_environment || 'Production' }}
     env:
       DATABASE_URL: ${{ secrets.INGEST_DATABASE_URL }}
+      PROPERTY_ID: ${{ github.event.inputs.property_id || '' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -48,11 +53,16 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Refresh missing or stale references
         working-directory: backend
-        run: >-
-          python -m enrichment.market_reference
-          --ufs "${{ github.event.inputs.ufs || '' }}"
-          --limit "${{ github.event.inputs.limit || '30' }}"
-          --max-age-days 90
+        run: |
+          args=(
+            --ufs "${{ github.event.inputs.ufs || '' }}"
+            --limit "${{ github.event.inputs.limit || '30' }}"
+            --max-age-days 90
+          )
+          if [[ "$PROPERTY_ID" =~ ^[0-9]+$ ]]; then
+            args+=(--property-id "$PROPERTY_ID")
+          fi
+          python -m enrichment.market_reference "${args[@]}"
       - name: Materialize shared property analyses
         if: ${{ always() }}
         working-directory: backend
