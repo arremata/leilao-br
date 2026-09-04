@@ -27,7 +27,7 @@ from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
 
 
-MARKET_REFERENCE_SOURCE = "listing_median_confidence_v1"
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v2"
 
 
 def _now() -> datetime:
@@ -36,6 +36,24 @@ def _now() -> datetime:
 
 def _aware(value):
     return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
+
+
+async def _ensure_subject_coordinates(metadata, geocoder) -> None:
+    """Geocode the representative before a city job clears its search street."""
+    if metadata.lat is not None and metadata.lng is not None:
+        return
+    if not metadata.address.strip():
+        return
+    query = ", ".join(part for part in (
+        metadata.address.strip(), metadata.city.strip(), metadata.state.strip(), "Brasil",
+    ) if part)
+    try:
+        coordinates = await asyncio.to_thread(geocoder.geocode, query)
+    except Exception as exc:
+        logger.warning("Market reference subject geocoding failed: {}", exc)
+        return
+    if coordinates:
+        metadata.lat, metadata.lng = coordinates
 
 
 def _closing_at(prop):
@@ -138,10 +156,11 @@ def _retry_delay(attempt_count: int, empty: bool = False) -> timedelta:
 
 async def refresh_references(
     session_factory, ufs: list[str], limit: int = 10, max_age_days: int = 90,
-    property_id: int | None = None,
+    property_id: int | None = None, geocoder=None,
 ) -> dict[str, int]:
     coverage = reconcile_coverage(session_factory, ufs)
-    geocoder = NominatimClient()
+    owns_geocoder = geocoder is None
+    geocoder = geocoder or NominatimClient()
     now = _now()
     cutoff = now - timedelta(days=max_age_days)
     with session_factory() as session:
@@ -195,6 +214,7 @@ async def refresh_references(
                 metadata = metadata_from_property(prop)
                 metadata.property_type = job.property_type
                 metadata.neighborhood = job.neighborhood
+                await _ensure_subject_coordinates(metadata, geocoder)
                 if not job.neighborhood:  # city baseline must not accidentally search one street
                     metadata.address = ""
                 comparables = await scrape_comparables(metadata, geocoder=geocoder)
@@ -259,7 +279,8 @@ async def refresh_references(
                     session.commit()
                 summary["failed"] += 1
                 logger.exception("Market reference job {} failed: {}", job_id, exc)
-    geocoder.close()
+    if owns_geocoder:
+        geocoder.close()
     logger.info("Market coverage refresh: {}", json.dumps(summary))
     return summary
 
