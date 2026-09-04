@@ -314,8 +314,10 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     if regional:
         regional_comparables = [
             ComparableProperty(
-                address=comp.address, price=comp.price, area_m2=comp.area_m2,
+                address=comp.address, property_type=comp.property_type,
+                price=comp.price, area_m2=comp.area_m2, beds=comp.beds,
                 price_per_m2=comp.price_per_m2, source=comp.source, url=comp.url,
+                lat=comp.lat, lng=comp.lng,
             )
             for comp in session.execute(
                 select(RegionalMarketComparable).where(

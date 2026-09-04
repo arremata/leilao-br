@@ -85,6 +85,31 @@ def test_persisted_city_reference_is_identified_in_market_detail():
 
     assert result["market"] == 250_000
     assert result["marketDetail"]["indicators"][0]["lbl"] == "Preço/m² · cidade"
+    assert result["marketDetail"]["confidenceLevel"] == "low"
+
+
+def test_persisted_enrichment_exposes_only_high_confidence_level():
+    row = {
+        "id": 9, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Apartamento", "area_m2": 70,
+        "beds": 2, "lat": -25.4284, "lng": -49.2733,
+        "preco": 150_000, "avaliacao": 250_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/9",
+        "photo_url": None,
+    }
+    comparables = [{
+        "address": f"Rua {index}", "property_type": "Apartamento",
+        "price": 350_000, "area_m2": 70, "beds": 2,
+        "price_per_m2": 5_000, "source": "Portal",
+        "url": f"https://portal/{index}", "lat": -25.4284, "lng": -49.2733,
+    } for index in range(5)]
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, comparables,
+    )
+
+    assert result["marketDetail"]["confidenceLevel"] == "high"
+    assert "confidenceScore" not in result["marketDetail"]
 
 
 def test_persisted_enrichment_includes_dynamic_editable_costs():

@@ -15,7 +15,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v8-direct-sale-documents"
+PIPELINE_VERSION = "v9-market-confidence"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -84,6 +84,8 @@ def metadata_from_property(prop) -> PropertyMetadata:
         city=prop.city or "",
         neighborhood=prop.neighborhood or "",
         state=prop.uf or "",
+        lat=getattr(prop, "lat", None),
+        lng=getattr(prop, "lng", None),
         beds=prop.beds,
         photo_url=prop.photo_url or "",
         itbi_rate=itbi["rate"] if itbi else None,

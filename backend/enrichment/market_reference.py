@@ -23,6 +23,7 @@ from db.models import (
 from enrichment.market_coverage import canonical_property_type, is_eligible_market_property
 from enrichment.run import metadata_from_property
 from graph.market import calculate_market
+from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
 
 
@@ -137,6 +138,7 @@ async def refresh_references(
     property_id: int | None = None,
 ) -> dict[str, int]:
     coverage = reconcile_coverage(session_factory, ufs)
+    geocoder = NominatimClient()
     now = _now()
     cutoff = now - timedelta(days=max_age_days)
     with session_factory() as session:
@@ -177,7 +179,10 @@ async def refresh_references(
                 metadata.neighborhood = job.neighborhood
                 if not job.neighborhood:  # city baseline must not accidentally search one street
                     metadata.address = ""
-                comparables = await scrape_comparables(metadata)
+                comparables = await scrape_comparables(metadata, geocoder=geocoder)
+                if metadata.lat is not None and metadata.lng is not None:
+                    prop.lat, prop.lng = metadata.lat, metadata.lng
+                    prop.geocode_status = "ok"
                 result = calculate_market(metadata, comparables)
                 job.attempt_count += 1
                 job.last_attempted_at = now
@@ -211,9 +216,12 @@ async def refresh_references(
                 ))
                 for comp in result.comparable_properties:
                     session.add(RegionalMarketComparable(
-                        reference_id=reference.id, address=comp.address, price=comp.price,
-                        area_m2=comp.area_m2, price_per_m2=comp.price_per_m2,
+                        reference_id=reference.id, address=comp.address,
+                        property_type=comp.property_type, price=comp.price,
+                        area_m2=comp.area_m2, beds=comp.beds,
+                        price_per_m2=comp.price_per_m2,
                         source=comp.source, url=comp.url,
+                        lat=comp.lat, lng=comp.lng,
                     ))
                 job.status = "successful"
                 job.last_error = ""
@@ -233,6 +241,7 @@ async def refresh_references(
                     session.commit()
                 summary["failed"] += 1
                 logger.exception("Market reference job {} failed: {}", job_id, exc)
+    geocoder.close()
     logger.info("Market coverage refresh: {}", json.dumps(summary))
     return summary
 

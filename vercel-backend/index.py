@@ -12,6 +12,8 @@ import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
+from itertools import combinations
+from math import asin, cos, radians, sin, sqrt
 from statistics import median
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -24,7 +26,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v8-direct-sale-documents"
+PIPELINE_VERSION = "v9-market-confidence"
 
 _REGISTRATION_RATES = {
     "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
@@ -101,6 +103,181 @@ def _canonical_property_type(value: str | None) -> str:
     return (value or "").strip()
 
 
+def _haversine_km(lat1, lng1, lat2, lng2) -> float:
+    earth_radius_km = 6371.0088
+    lat1_rad, lat2_rad = radians(float(lat1)), radians(float(lat2))
+    delta_lat = radians(float(lat2) - float(lat1))
+    delta_lng = radians(float(lng2) - float(lng1))
+    value = (
+        sin(delta_lat / 2) ** 2
+        + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lng / 2) ** 2
+    )
+    return earth_radius_km * 2 * asin(sqrt(value))
+
+
+def _relative_difference(left, right) -> float | None:
+    left, right = float(left or 0), float(right or 0)
+    return abs(left - right) / left if left > 0 and right > 0 else None
+
+
+def _pair_relative_difference(left, right) -> float | None:
+    left, right = float(left or 0), float(right or 0)
+    midpoint = (left + right) / 2
+    return abs(left - right) / midpoint if left > 0 and right > 0 else None
+
+
+def _similarity_band(difference, *, price=False) -> float:
+    if difference is None:
+        return 0.0
+    if difference <= 0.10:
+        return 1.0
+    if difference <= 0.20:
+        return 0.75
+    if difference <= (0.30 if price else 0.35):
+        return 0.50
+    return 0.0
+
+
+def _bed_similarity(left, right) -> float:
+    if left is None or right is None:
+        return 0.0
+    difference = abs(int(left) - int(right))
+    return 1.0 if difference == 0 else 0.5 if difference == 1 else 0.0
+
+
+def _pair_proximity(left, right) -> float:
+    coordinates = (left.get("lat"), left.get("lng"), right.get("lat"), right.get("lng"))
+    if any(value is None for value in coordinates):
+        return 0.0
+    distance = _haversine_km(*coordinates)
+    if distance <= 1:
+        return 1.0
+    if distance <= 2:
+        return 0.75
+    if distance <= 4:
+        return 0.50
+    return 0.0
+
+
+def _prepare_market_comparables(property_row, comparable_rows) -> list[dict]:
+    p = dict(property_row)
+    area = float(p.get("area_m2") or 0)
+    subject_type = _canonical_property_type(p.get("property_type"))
+    has_subject_coordinates = p.get("lat") is not None and p.get("lng") is not None
+    usable = []
+    for row in comparable_rows:
+        item = dict(row)
+        item_area = float(item.get("area_m2") or 0)
+        item_price = float(item.get("price") or 0)
+        price_per_m2 = float(item.get("price_per_m2") or 0)
+        if item_price <= 0 or item_area <= 0 or price_per_m2 <= 0:
+            continue
+        if area > 0 and not area * 0.65 <= item_area <= area * 1.35:
+            continue
+        if any(term in f'{item.get("address", "")} {item.get("url", "")}'.lower()
+               for term in ("leilao", "leilão", "hasta")):
+            continue
+        item_type = _canonical_property_type(item.get("property_type"))
+        if subject_type and item_type and subject_type != item_type:
+            continue
+        if has_subject_coordinates:
+            if item.get("lat") is None or item.get("lng") is None:
+                continue
+            item["distance_km"] = _haversine_km(
+                p["lat"], p["lng"], item["lat"], item["lng"],
+            )
+            if item["distance_km"] > 2:
+                continue
+        else:
+            item["distance_km"] = None
+        usable.append(item)
+
+    if len(usable) >= 3:
+        center = median(float(item["price_per_m2"]) for item in usable)
+        usable = [
+            item for item in usable
+            if center * 0.5 <= float(item["price_per_m2"]) <= center * 2
+        ]
+    subject_beds = p.get("beds")
+    usable.sort(key=lambda item: (
+        not _canonical_property_type(item.get("property_type"))
+        or _canonical_property_type(item.get("property_type")) != subject_type,
+        item.get("distance_km") is None,
+        item.get("distance_km") if item.get("distance_km") is not None else float("inf"),
+        abs(float(item["area_m2"]) - area) / area if area > 0 else 1,
+        abs(int(item["beds"]) - int(subject_beds))
+        if item.get("beds") is not None and subject_beds is not None else 99,
+        item.get("url") or "",
+    ))
+    return usable[:5]
+
+
+def _market_confidence_level(property_row, comparables: list[dict]) -> str:
+    p = dict(property_row)
+    subject_complete = all(p.get(field) not in (None, "") for field in (
+        "property_type", "area_m2", "beds", "lat", "lng",
+    ))
+    comparables = [
+        item for item in comparables
+        if subject_complete
+        and all(item.get(field) not in (None, "") for field in (
+            "property_type", "area_m2", "beds", "price_per_m2", "lat", "lng",
+        ))
+        and _canonical_property_type(item.get("property_type"))
+        == _canonical_property_type(p.get("property_type"))
+        and item.get("distance_km") is not None
+        and item["distance_km"] <= 2
+    ][:5]
+    count = len(comparables)
+    prices = [float(item.get("price_per_m2") or 0) for item in comparables]
+    price_median = float(median(prices)) if prices else 0.0
+    subject_similarity = 0.0
+    for item in comparables:
+        distance = item.get("distance_km")
+        proximity = 0.0 if distance is None or distance > 2 else 1.0 if distance <= 1 else 0.75
+        subject_similarity += (
+            2.10 * proximity
+            + 2.40 * _similarity_band(_relative_difference(p.get("area_m2"), item.get("area_m2")))
+            + 0.90 * _bed_similarity(p.get("beds"), item.get("beds"))
+            + 0.60 * _similarity_band(
+                _relative_difference(price_median, item.get("price_per_m2")), price=True,
+            )
+        )
+
+    group_score = 0.0
+    if count >= 2:
+        pairs = list(combinations(comparables, 2))
+        average = sum(
+            0.50 * _similarity_band(
+                _pair_relative_difference(left.get("price_per_m2"), right.get("price_per_m2")), price=True,
+            )
+            + 0.25 * _similarity_band(
+                _pair_relative_difference(left.get("area_m2"), right.get("area_m2")),
+            )
+            + 0.15 * _bed_similarity(left.get("beds"), right.get("beds"))
+            + 0.10 * _pair_proximity(left, right)
+            for left, right in pairs
+        ) / len(pairs)
+        group_score = 20 * ((count - 1) / 4) * average
+
+    score = count * 10 + subject_similarity + group_score
+    complete = all(p.get(field) not in (None, "") for field in (
+        "property_type", "area_m2", "beds", "lat", "lng",
+    )) and all(
+        all(item.get(field) not in (None, "") for field in (
+            "property_type", "area_m2", "beds", "price_per_m2", "lat", "lng",
+        ))
+        and _canonical_property_type(item.get("property_type"))
+        == _canonical_property_type(p.get("property_type"))
+        for item in comparables
+    )
+    if score <= 30:
+        return "low"
+    if score <= 70:
+        return "medium"
+    return "high" if count >= 4 and subject_similarity >= 21 and group_score >= 12 and complete else "medium"
+
+
 def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict | None:
     result = json.loads(enrichment) if enrichment else None
     if result and _is_land_property_type(property_type):
@@ -115,12 +292,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     min_bid = float(p.get("preco") or 0)
     appraisal = float(p.get("avaliacao") or min_bid)
     is_land = _is_land_property_type(p.get("property_type"))
-    usable = [dict(item) for item in comparable_rows if (
-        float(item["price"] or 0) > 0 and float(item["area_m2"] or 0) > 0
-        and float(item["price_per_m2"] or 0) > 0
-        and (area <= 0 or area * 0.65 <= float(item["area_m2"]) <= area * 1.35)
-        and not any(term in f'{item["address"]} {item["url"]}'.lower() for term in ("leilao", "leilão", "hasta"))
-    )]
+    usable = _prepare_market_comparables(p, comparable_rows)
     prices = [float(item["price_per_m2"]) for item in usable]
     price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
     market = round(price_per_m2 * area, 2)
@@ -138,10 +310,11 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             "delta": "mediana das referências persistidas", "pos": True,
         }] if price_per_m2 else []),
         "comparables": [{
-            "address": item["address"], "areaM2": item["area_m2"], "beds": None,
+            "address": item["address"], "areaM2": item["area_m2"], "beds": item.get("beds"),
             "pricePerM2": item["price_per_m2"], "salePrice": item["price"],
             "source": item["source"], "url": item["url"],
         } for item in usable],
+        "confidenceLevel": _market_confidence_level(p, usable),
     }
     costs = [{
         "id": "auction_bid",
@@ -503,14 +676,22 @@ def analyze_catalog_item(property_id: int) -> dict:
             if reference is not None:
                 if reference["scope"] == "neighborhood":
                     comparable_query = """
-                        SELECT address, price, area_m2, price_per_m2, source, url
+                        SELECT address, price, area_m2, price_per_m2, source, url,
+                               to_jsonb(regional_market_comparables)->>'property_type' AS property_type,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'beds', '')::INTEGER AS beds,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'lat', '')::DOUBLE PRECISION AS lat,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'lng', '')::DOUBLE PRECISION AS lng
                         FROM regional_market_comparables
                         WHERE reference_id = :reference_id ORDER BY price_per_m2
                     """
                     comparable_params = {"reference_id": reference["id"]}
                 else:
                     comparable_query = """
-                        SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url
+                        SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url,
+                               to_jsonb(c)->>'property_type' AS property_type,
+                               NULLIF(to_jsonb(c)->>'beds', '')::INTEGER AS beds,
+                               NULLIF(to_jsonb(c)->>'lat', '')::DOUBLE PRECISION AS lat,
+                               NULLIF(to_jsonb(c)->>'lng', '')::DOUBLE PRECISION AS lng
                         FROM regional_market_comparables c
                         JOIN regional_market_prices r ON r.id = c.reference_id
                         WHERE r.uf = :uf AND r.city = :city AND r.property_type = :property_type

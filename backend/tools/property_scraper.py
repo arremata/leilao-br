@@ -9,6 +9,12 @@ from loguru import logger
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 from playwright_stealth import Stealth
 
+from graph.market_confidence import (
+    MAX_COMPARABLES,
+    MAX_RADIUS_KM,
+    canonical_property_type,
+    haversine_km,
+)
 from graph.state import PropertyMetadata, ComparableProperty
 
 # ---------------------------------------------------------------------------
@@ -251,6 +257,7 @@ async def _launch_stealth_browser() -> tuple[Playwright, Browser, Page]:
 # ---------------------------------------------------------------------------
 
 MAX_COMPS_PER_SITE = 5
+MAX_GEOCODE_CANDIDATES = 15
 PAGE_TIMEOUT_MS = 15000
 
 
@@ -291,13 +298,28 @@ def _parse_area_from_text(text: str) -> float:
     return 0.0
 
 
+def _parse_beds_from_text(text: str) -> int | None:
+    """Extract bedrooms/dormitories from a listing card or URL slug."""
+    normalized = _slug(text).replace("-", " ")
+    match = re.search(r"\b(\d+)\s*(?:quartos?|dormitorios?|dorms?|qtos?)\b", normalized)
+    return int(match.group(1)) if match else None
+
+
+def _parse_property_type(text: str) -> str:
+    """Return a canonical property type only when the listing states one."""
+    parsed = canonical_property_type(text)
+    return parsed if parsed in {
+        "Apartamento", "Casa", "Comercial", "Industrial", "Rural", "Terreno",
+    } else ""
+
+
 def _parse_address_from_text(text: str) -> str:
     """Extract address from card text like 'Rua Walace Landal, Santa Cândida · Curitiba'."""
     # Try to find "Rua/Av/Avenida/Alameda ..." stopping at:
     # - · (bullet), newline (hard boundaries)
     # - "m²"/"m2", "R$", "Condomínio" (noise boundaries)
     match = re.search(
-        r"(Rua|Av\.|Avenida|Alameda|Travessa|Rod\.|Estrada)[^·\n]+?(?=\s*\d+\s*m[²2]|\s*R\$|\s*Condomínio)",
+        r"(Rua|R\.|Av\.|Avenida|Alameda|Travessa|Rod\.|Rodovia|Estrada)[^·\n]+?(?=\s*\d+\s*m[²2]|\s*R\$|\s*Condomínio)",
         text, re.IGNORECASE,
     )
     if match:
@@ -305,7 +327,7 @@ def _parse_address_from_text(text: str) -> str:
         return addr
     # Fallback: match up to · or newline (simple, covers most cases)
     match = re.search(
-        r"(Rua|Av\.|Avenida|Alameda|Travessa|Rod\.|Estrada)[^·\n]+",
+        r"(Rua|R\.|Av\.|Avenida|Alameda|Travessa|Rod\.|Rodovia|Estrada)[^·\n]+",
         text, re.IGNORECASE,
     )
     if match:
@@ -341,6 +363,98 @@ def _is_usable_comparable(comp: ComparableProperty) -> bool:
         return False
     price_m2 = comp.price / comp.area_m2
     return 500 <= price_m2 <= 100_000
+
+
+def _physical_similarity_key(metadata: PropertyMetadata, comp: ComparableProperty):
+    area = float(metadata.area_m2 or 0)
+    area_difference = abs(comp.area_m2 - area) / area if area > 0 else 1.0
+    bed_difference = (
+        abs(comp.beds - metadata.beds)
+        if comp.beds is not None and metadata.beds is not None else 99
+    )
+    expected_type = canonical_property_type(metadata.property_type)
+    candidate_type = canonical_property_type(comp.property_type)
+    return (candidate_type != expected_type, area_difference, bed_difference, comp.url)
+
+
+def _geocode_query(address: str, metadata: PropertyMetadata) -> str:
+    city = _clean_city(metadata.city)
+    parts = [address.strip(), city, metadata.state.strip(), "Brasil"]
+    return ", ".join(part for part in parts if part)
+
+
+def _has_street_reference(address: str) -> bool:
+    normalized = _slug(address).replace("-", " ")
+    return bool(re.search(
+        r"\b(?:rua|r|av|avenida|alameda|travessa|rod|rodovia|estrada)\b",
+        normalized,
+    ))
+
+
+async def _filter_to_subject_radius(
+    metadata: PropertyMetadata,
+    comparables: list[ComparableProperty],
+    geocoder,
+) -> list[ComparableProperty]:
+    """Geocode candidates and retain the five closest within two kilometres."""
+    if geocoder is None:
+        return comparables
+
+    if (metadata.lat is None or metadata.lng is None) and metadata.address.strip():
+        try:
+            subject_coordinates = await asyncio.to_thread(
+                geocoder.geocode, _geocode_query(metadata.address, metadata),
+            )
+        except Exception as exc:
+            logger.warning("Property scraper: subject geocoding failed: {}", exc)
+            subject_coordinates = None
+        if subject_coordinates:
+            metadata.lat, metadata.lng = subject_coordinates
+
+    if metadata.lat is None or metadata.lng is None:
+        logger.warning(
+            "Property scraper: no subject coordinates; retaining candidates "
+            "without a radius guarantee"
+        )
+        return comparables
+
+    candidates = sorted(
+        comparables, key=lambda item: _physical_similarity_key(metadata, item),
+    )[:MAX_GEOCODE_CANDIDATES]
+    coordinates_by_address: dict[str, tuple[float, float] | None] = {}
+    located: list[ComparableProperty] = []
+    for comp in candidates:
+        # Neighborhood centroids are not precise enough to prove a 2 km radius.
+        if not _has_street_reference(comp.address):
+            continue
+        query = _geocode_query(comp.address, metadata)
+        cache_key = _slug(query)
+        coordinates = coordinates_by_address.get(cache_key)
+        if cache_key not in coordinates_by_address:
+            try:
+                coordinates = await asyncio.to_thread(geocoder.geocode, query)
+            except Exception as exc:
+                logger.debug("Property scraper: comparable geocoding failed: {}", exc)
+                coordinates = None
+            coordinates_by_address[cache_key] = coordinates
+        if not coordinates:
+            continue
+        comp.lat, comp.lng = coordinates
+        comp.distance_km = haversine_km(
+            metadata.lat, metadata.lng, comp.lat, comp.lng,
+        )
+        if comp.distance_km <= MAX_RADIUS_KM:
+            located.append(comp)
+
+    located.sort(key=lambda item: (
+        item.distance_km if item.distance_km is not None else float("inf"),
+        *_physical_similarity_key(metadata, item),
+    ))
+    logger.info(
+        "Property scraper: {} candidates geocoded within {:.1f} km",
+        len(located), MAX_RADIUS_KM,
+    )
+    return located[:MAX_COMPARABLES]
 
 
 # ---------------------------------------------------------------------------
@@ -385,14 +499,21 @@ async def scrape_zap(page: Page, metadata: PropertyMetadata, location_override: 
                 if _is_rental(card_text, title):
                     continue
 
-                address = title if title else _parse_address_from_text(card_text)
+                address = (
+                    _parse_address_from_text(title)
+                    or _parse_address_from_text(card_text)
+                    or title
+                )
                 price = _parse_price_from_text(card_text)
                 area = _parse_area_from_text(card_text)
+                details = f"{title} {card_text} {href}"
 
                 results.append(ComparableProperty(
                     address=address.strip(),
+                    property_type=_parse_property_type(details),
                     price=price,
                     area_m2=area,
+                    beds=_parse_beds_from_text(details),
                     price_per_m2=round(price / area, 2) if area > 0 else 0.0,
                     source="ZAP Imóveis",
                     url=href if href.startswith("http") else f"https://www.zapimoveis.com.br{href}",
@@ -445,14 +566,21 @@ async def scrape_vivareal(page: Page, metadata: PropertyMetadata, location_overr
                 if _is_rental(card_text, title):
                     continue
 
-                address = title if title else _parse_address_from_text(card_text)
+                address = (
+                    _parse_address_from_text(title)
+                    or _parse_address_from_text(card_text)
+                    or title
+                )
                 price = _parse_price_from_text(card_text)
                 area = _parse_area_from_text(card_text)
+                details = f"{title} {card_text} {href}"
 
                 results.append(ComparableProperty(
                     address=address.strip(),
+                    property_type=_parse_property_type(details),
                     price=price,
                     area_m2=area,
+                    beds=_parse_beds_from_text(details),
                     price_per_m2=round(price / area, 2) if area > 0 else 0.0,
                     source="Viva Real",
                     url=href if href.startswith("http") else f"https://www.vivareal.com.br{href}",
@@ -538,11 +666,14 @@ async def scrape_quintoandar(page: Page, metadata: PropertyMetadata, location_ov
                 href = await card.evaluate(
                     "el => el.closest('a') ? el.closest('a').getAttribute('href') : ''"
                 ) or ""
+                details = f"{aria_label} {card_text} {href}"
 
                 results.append(ComparableProperty(
                     address=address.strip(),
+                    property_type=_parse_property_type(details),
                     price=price,
                     area_m2=area,
+                    beds=_parse_beds_from_text(details),
                     price_per_m2=round(price / area, 2) if area > 0 else 0.0,
                     source="QuintoAndar",
                     url=f"https://www.quintoandar.com.br{href}" if href.startswith("/") else href,
@@ -630,11 +761,14 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
                 # Skip if no price (can't be a useful comp)
                 if price == 0:
                     continue
+                details = f"{title} {card_text} {href}"
 
                 results.append(ComparableProperty(
                     address=address.strip(),
+                    property_type=_parse_property_type(details),
                     price=price,
                     area_m2=area,
+                    beds=_parse_beds_from_text(details),
                     price_per_m2=round(price / area, 2) if area > 0 else 0.0,
                     source="Chaves na Mão",
                     url=f"https://www.chavesnamao.com.br{href}" if href.startswith("/") else href,
@@ -707,10 +841,13 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
                     address = (await address_locator.first.text_content() or "").strip()
                 if not address:
                     address = _parse_address_from_text(text)
+                details = f"{text} {href}"
                 results.append(ComparableProperty(
                     address=address,
+                    property_type=_parse_property_type(details),
                     price=price,
                     area_m2=area,
+                    beds=_parse_beds_from_text(details),
                     price_per_m2=round(price / area, 2),
                     source="ImovelWeb",
                     url=href if href.startswith("http") else f"https://www.imovelweb.com.br{href}",
@@ -732,7 +869,10 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
 MIN_COMPS = 3
 
 
-async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparableProperty]:
+async def scrape_comparables(
+    metadata: PropertyMetadata,
+    geocoder=None,
+) -> list[ComparableProperty]:
     """Collect from all five listing platforms and deduplicate the snapshot.
 
     Searches by street first (more precise comps), then falls back to
@@ -789,13 +929,18 @@ async def scrape_comparables(metadata: PropertyMetadata) -> list[ComparablePrope
 
         deduplicated: list[ComparableProperty] = []
         seen_urls: set[str] = set()
+        seen_fingerprints: set[tuple[str, int, int]] = set()
         for comp in all_comps:
-            key = comp.url.strip() or f"{comp.source}|{comp.address}|{comp.price}|{comp.area_m2}"
-            if key in seen_urls:
+            url_key = comp.url.strip()
+            fingerprint = (
+                _slug(comp.address), round(comp.price), round(comp.area_m2),
+            )
+            if url_key in seen_urls or fingerprint in seen_fingerprints:
                 continue
-            seen_urls.add(key)
+            seen_urls.add(url_key)
+            seen_fingerprints.add(fingerprint)
             deduplicated.append(comp)
-        return deduplicated
+        return await _filter_to_subject_radius(metadata, deduplicated, geocoder)
     finally:
         try:
             await browser.close()
