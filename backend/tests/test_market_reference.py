@@ -8,6 +8,11 @@ from enrichment import market_reference
 from graph.state import ComparableProperty
 
 
+class _FakeGeocoder:
+    def geocode(self, _address):
+        return -25.4284, -49.2733
+
+
 @pytest.mark.asyncio
 async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
     engine = get_engine("sqlite://")
@@ -23,8 +28,10 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
 
     comps = [
         ComparableProperty(
-            address=f"Rua {index}, Curitiba", price=price, area_m2=50,
-            price_per_m2=price / 50, source=source, url=f"https://site/{index}",
+            address=f"Rua {index}, Curitiba", property_type="Apartamento",
+            price=price, area_m2=50, beds=2, price_per_m2=price / 50,
+            source=source, url=f"https://site/{index}",
+            lat=-25.4284, lng=-49.2733,
         )
         for index, (price, source) in enumerate([
             (200_000, "ZAP Imóveis"),
@@ -34,10 +41,14 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
     ]
 
     async def fake_scrape(metadata, **kwargs):
+        assert metadata.lat == -25.4284
+        assert metadata.lng == -49.2733
         return comps
 
     monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
-    summary = await market_reference.refresh_references(factory, ["PR"], limit=10)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+    )
 
     assert summary["updated"] == 1
     with factory() as session:
@@ -86,8 +97,12 @@ async def test_worker_refreshes_fresh_legacy_snapshot_once(monkeypatch):
 
     monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
 
-    first = await market_reference.refresh_references(factory, ["PR"], limit=10)
-    second = await market_reference.refresh_references(factory, ["PR"], limit=10)
+    first = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+    )
+    second = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+    )
 
     assert first["updated"] == 1
     assert second["selected"] == 0
@@ -140,8 +155,12 @@ async def test_empty_city_job_backs_off_without_starving_another_city(monkeypatc
         return []
 
     monkeypatch.setattr(market_reference, "scrape_comparables", no_comps)
-    first = await market_reference.refresh_references(factory, ["PR"], limit=1)
-    second = await market_reference.refresh_references(factory, ["PR"], limit=1)
+    first = await market_reference.refresh_references(
+        factory, ["PR"], limit=1, geocoder=_FakeGeocoder(),
+    )
+    second = await market_reference.refresh_references(
+        factory, ["PR"], limit=1, geocoder=_FakeGeocoder(),
+    )
     assert first["empty"] == second["empty"] == 1
     with factory() as session:
         jobs = session.query(MarketReferenceJob).order_by(MarketReferenceJob.id).all()
