@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -27,7 +28,7 @@ from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
 
 
-MARKET_REFERENCE_SOURCE = "listing_median_confidence_v2"
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v3"
 
 
 def _now() -> datetime:
@@ -44,16 +45,42 @@ async def _ensure_subject_coordinates(metadata, geocoder) -> None:
         return
     if not metadata.address.strip():
         return
-    query = ", ".join(part for part in (
-        metadata.address.strip(), metadata.city.strip(), metadata.state.strip(), "Brasil",
-    ) if part)
-    try:
-        coordinates = await asyncio.to_thread(geocoder.geocode, query)
-    except Exception as exc:
-        logger.warning("Market reference subject geocoding failed: {}", exc)
-        return
-    if coordinates:
-        metadata.lat, metadata.lng = coordinates
+    raw_address = metadata.address.strip()
+    first_part = raw_address.split(",", 1)[0].strip()
+    # Caixa commonly separates the number as `N. 1076` and appends apartment,
+    # block and parking details. Nominatim resolves the civic address once that
+    # unit noise is removed.
+    number_match = re.search(
+        r"(?:^|,)\s*(?:N(?:UMERO|[ºO.]*)\s*\.?\s*)?(\d{1,6})(?:\s|,|$)",
+        raw_address,
+        flags=re.IGNORECASE,
+    )
+    street = re.split(
+        r"\s+N(?:UMERO|[ºO.]*)\s*\.?\s*(?:\d+|SN)\b",
+        first_part,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+    civic_address = street
+    if number_match and not re.search(r"\b\d{1,6}\s*$", street):
+        civic_address = f"{street} {number_match.group(1)}"
+    queries = [
+        ", ".join(part for part in (
+            civic_address, metadata.city.strip(), metadata.state.strip(), "Brasil",
+        ) if part),
+        ", ".join(part for part in (
+            street, metadata.city.strip(), metadata.state.strip(), "Brasil",
+        ) if part),
+    ]
+    for query in dict.fromkeys(queries):
+        try:
+            coordinates = await asyncio.to_thread(geocoder.geocode, query)
+        except Exception as exc:
+            logger.warning("Market reference subject geocoding failed: {}", exc)
+            return
+        if coordinates:
+            metadata.lat, metadata.lng = coordinates
+            return
 
 
 def _closing_at(prop):

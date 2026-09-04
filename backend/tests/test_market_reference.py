@@ -9,7 +9,11 @@ from graph.state import ComparableProperty
 
 
 class _FakeGeocoder:
+    def __init__(self):
+        self.calls = []
+
     def geocode(self, _address):
+        self.calls.append(_address)
         return -25.4284, -49.2733
 
 
@@ -46,11 +50,13 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         return comps
 
     monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
+    geocoder = _FakeGeocoder()
     summary = await market_reference.refresh_references(
-        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+        factory, ["PR"], limit=10, geocoder=geocoder,
     )
 
     assert summary["updated"] == 1
+    assert geocoder.calls == ["Rua A, Curitiba, PR, Brasil"]
     with factory() as session:
         reference = session.query(RegionalMarketPrice).one()
         snapshot = session.query(RegionalMarketComparable).all()
@@ -60,6 +66,22 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         assert {item.source for item in snapshot} == {
             "ZAP Imóveis", "Viva Real", "ImovelWeb",
         }
+
+
+@pytest.mark.asyncio
+async def test_subject_geocoder_removes_caixa_unit_noise():
+    metadata = type("Metadata", (), {
+        "address": "RUA RUBENS SEBASTIAO MARIN, N. 1076, Apto 201, BL-B, VG47",
+        "city": "MARINGA", "state": "PR", "lat": None, "lng": None,
+    })()
+    geocoder = _FakeGeocoder()
+
+    await market_reference._ensure_subject_coordinates(metadata, geocoder)
+
+    assert geocoder.calls == [
+        "RUA RUBENS SEBASTIAO MARIN 1076, MARINGA, PR, Brasil",
+    ]
+    assert (metadata.lat, metadata.lng) == (-25.4284, -49.2733)
 
 
 @pytest.mark.asyncio
