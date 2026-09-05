@@ -45,6 +45,22 @@ _engine = None
 
 app = FastAPI(title="Arremate Demo API")
 
+
+class ApiPrefixMiddleware:
+    """Accept the public `/api` prefix used by the Vercel service router."""
+
+    def __init__(self, application):
+        self.application = application
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope.get("type") == "http" and (path == "/api" or path.startswith("/api/")):
+            stripped_path = path[4:] or "/"
+            scope = {**scope, "path": stripped_path, "raw_path": stripped_path.encode()}
+        await self.application(scope, receive, send)
+
+
+app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -242,6 +242,17 @@ def test_catalog_requires_database_configuration(monkeypatch):
     assert response.json()["detail"] == "Catalog database is not configured"
 
 
+def test_public_api_prefix_routes_to_catalog(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("PREVIEW_DATABASE_URL", raising=False)
+    vercel_api._engine = None
+
+    response = TestClient(vercel_api.app).get("/api/catalog")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Catalog database is not configured"
+
+
 def test_preview_prefers_separately_scoped_database_credentials(monkeypatch):
     monkeypatch.setenv("VERCEL_ENV", "preview")
     monkeypatch.setenv("DATABASE_URL", "postgresql://writer.example/catalog")
