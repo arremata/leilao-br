@@ -30,7 +30,10 @@ Abra o preview e use o produto normalmente. Responda no chat com o que percebeu:
 
 Quando o PR estiver pronto e todos os testes estiverem válidos, `GustavoAdamee`
 clica em Merge no GitHub. Esse clique manual é a aprovação e o comando de
-publicação. O agente nunca faz o merge nem habilita merge automático.
+publicação quando o próprio Gustavo abriu o PR. Quando outra pessoa abriu o PR,
+ela precisa aguardar a aprovação de Gustavo no commit atual; qualquer novo push
+exige uma nova aprovação. O agente nunca faz o merge nem habilita merge
+automático.
 
 ## Limites de segurança
 

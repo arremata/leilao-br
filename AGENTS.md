@@ -51,11 +51,13 @@ answers would materially change product behavior or risk.
 
 `GustavoAdamee` is the production release owner. Because GitHub does not count a
 PR author's review of their own PR, the protected workflow uses Gustavo's manual
-merge after every required check rather than a required review approval. Changes
-to database models or migrations, ingestion, enrichment or financial rules,
-authentication, secrets, permissions, GitHub Actions, or Vercel configuration
-must be called out as sensitive in the PR even when the requested behavior is
-otherwise simple.
+merge after every required check for PRs authored by Gustavo. A PR authored by
+anyone else requires a fresh approving review from Gustavo for its current head
+commit; a later push invalidates that approval. The required `Owner approval`
+status enforces both cases. Changes to database models or migrations, ingestion,
+enrichment or financial rules, authentication, secrets, permissions, GitHub
+Actions, or Vercel configuration must be called out as sensitive in the PR even
+when the requested behavior is otherwise simple.
 
 The human playbook is in `docs/SHIP_WITH_AGENT.md`.
 
@@ -205,6 +207,8 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-05** — Added a conditional production-owner status gate. Gustavo-authored PRs retain the established manual self-merge flow, while every PR from another author requires Gustavo's approving review on the current head commit; any later push resets the status to pending.
 
 - **2026-09-05** — Restored Gustavo's established self-merge release flow while retaining mandatory PRs and backend, frontend, and Vercel checks. Agents must leave merge disabled; Gustavo's manual merge after validation is the explicit production approval because GitHub cannot count an author's review of their own PR.
 
