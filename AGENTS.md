@@ -203,7 +203,7 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-05** — Migrated the Vercel multi-service configuration from the retired `experimentalServices` key to the supported `services` key so newly created Vercel projects can deploy the frontend and FastAPI backend.
+- **2026-09-05** — Migrated the Vercel multi-service configuration from the retired `experimentalServices` model to supported service roots and explicit public rewrites, allowing newly created Vercel projects to build and route the Vite frontend and FastAPI backend together.
 
 - **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible production-data warning, and an explicit Vercel flag that permits preview writes to the shared production catalog only when intentionally enabled.
 

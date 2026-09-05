@@ -1,17 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && VITE_DEPLOY_ENV=$VERCEL_ENV VITE_PREVIEW_WRITES=$ARREMATE_PREVIEW_ALLOW_WRITES npm run build",
-  "outputDirectory": "frontend/dist",
   "services": {
     "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
+      "root": "frontend/",
+      "framework": "vite",
+      "installCommand": "npm ci",
+      "buildCommand": "VITE_DEPLOY_ENV=$VERCEL_ENV VITE_PREVIEW_WRITES=$ARREMATE_PREVIEW_ALLOW_WRITES npm run build",
+      "outputDirectory": "dist"
     },
     "backend": {
-      "entrypoint": "vercel-backend/index.py",
-      "routePrefix": "/api",
-      "framework": "fastapi"
+      "root": "vercel-backend/",
+      "framework": "fastapi",
+      "entrypoint": "index:app"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
+  ]
 }
