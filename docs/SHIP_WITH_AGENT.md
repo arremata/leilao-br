@@ -15,7 +15,7 @@ Exemplos:
 1. Entender o pedido e transformá-lo em critérios objetivos de aceite.
 2. Investigar o produto e implementar a mudança em uma branch isolada.
 3. Testar a mudança e corrigir problemas encontrados.
-4. Publicar um preview da Vercel usando dados reais em modo somente leitura.
+4. Publicar um preview da Vercel usando os dados reais de produção.
 5. Entregar o link com instruções curtas sobre o que validar.
 6. Depois da sua confirmação, abrir o PR para `main` e habilitar o merge automático.
 
@@ -33,10 +33,12 @@ preview estiverem todos válidos.
 
 ## Limites de segurança
 
-O preview lê o mesmo catálogo usado em produção para representar fielmente o
-produto, mas não deve alterar esse catálogo. Ingestão, migrações de banco,
-credenciais, permissões, automações e infraestrutura sempre precisam ser
-destacadas para revisão especial do responsável técnico.
+O preview usa o mesmo catálogo de produção para representar fielmente o produto.
+Quando a escrita estiver habilitada, ações persistentes no preview também alteram
+produção. Por isso, use apenas os fluxos necessários para validar a mudança e não
+execute testes destrutivos. Ingestão, migrações de banco, credenciais, permissões,
+automações e infraestrutura sempre precisam ser destacadas para revisão especial
+do responsável técnico.
 
 Cada pessoa usa sua própria conta do GitHub. Ninguém compartilha senha, token ou
 credencial de produção com outra pessoa ou com o chat.

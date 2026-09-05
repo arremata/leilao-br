@@ -6,6 +6,7 @@ import History from './components/History';
 import { fetchCatalog } from './api';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
+const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
   const [screen, setScreen] = useState(() => {
@@ -126,7 +127,8 @@ function App() {
     <div className="app-shell" data-screen-label={screenLabel}>
       {isPreview && (
         <div className="preview-banner" role="status">
-          Ambiente de validação · dados reais · alterações não são salvas
+          Ambiente de validação · dados reais de produção
+          {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
       <TopBar screen={screen} go={go} watchCount={watched.length} />

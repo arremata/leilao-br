@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && VITE_DEPLOY_ENV=$VERCEL_ENV npm run build",
+  "buildCommand": "cd frontend && npm ci && VITE_DEPLOY_ENV=$VERCEL_ENV VITE_PREVIEW_WRITES=$ARREMATE_PREVIEW_ALLOW_WRITES npm run build",
   "outputDirectory": "frontend/dist",
   "experimentalServices": {
     "frontend": {

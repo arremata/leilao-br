@@ -36,17 +36,16 @@ answers would materially change product behavior or risk.
 
 - Vercel previews must run the branch's code against the real production catalog
   so product validation uses representative data.
-- Preview database access must use `PREVIEW_DATABASE_URL` with a PostgreSQL role
-  limited to `CONNECT`, schema `USAGE`, and table `SELECT`. `DATABASE_URL` remains
-  the production runtime credential. The fallback exists only for rollout and
-  must be removed after the scoped credential is configured.
-- The Vercel backend treats `VERCEL_ENV=preview` as read-only and must not enqueue
-  collection work or persist analyses. Add tests for every new preview-accessible
-  write path.
-- Never run ingestion, migrations, destructive commands, or production writes
-  from a preview. Never expose database credentials to the browser or PR logs.
-- Preview UI must visibly identify itself as an environment using real data where
-  changes are not saved.
+- Preview may use `PREVIEW_DATABASE_URL` or a `DATABASE_URL` scoped to Preview;
+  this project intentionally points it at the production transaction pooler.
+- Preview writes are disabled by default in code and enabled only when
+  `ARREMATE_PREVIEW_ALLOW_WRITES=true`. When enabled, treat every persistent
+  preview action exactly like a production action and test new write paths.
+- Never run ingestion, migrations, destructive commands, or broad data repair
+  from a preview without an explicit user request. Never expose database
+  credentials to the browser or PR logs.
+- Keep previews protected to authorized team members. The preview UI must visibly
+  state that it uses production data and that actions may alter production.
 
 ### Review ownership
 
@@ -204,7 +203,7 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible preview banner, and preview-mode write suppression while preferring separately scoped read-only credentials for real production catalog data.
+- **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible production-data warning, and an explicit Vercel flag that permits preview writes to the shared production catalog only when intentionally enabled.
 
 - **2026-09-05** — Removed the temporary market-confidence debug panel and its public API payload end to end. The numeric 50/30/20 calculation remains internal, persisted legacy debug data is stripped on read, stale analyses still refresh their low/medium/high level, and the product now exposes only the user-facing confidence classification.
 - **2026-09-05** — Replaced bucketed area scoring in market confidence with a continuous, symmetric `smaller area ÷ larger area` similarity for both subject-to-comparable and comparable-group calculations. The audit UI now labels percentages as weights and explains the area formula, both APIs use pipeline v13, and persisted analyses are refreshed under the new rule.

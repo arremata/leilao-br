@@ -58,25 +58,31 @@ class AnalyzeRequest(BaseModel):
     pdf_texts: str | None = None
 
 
-def _is_read_only_preview() -> bool:
-    """Keep branch previews from persisting changes to the shared catalog."""
-    return (
-        os.environ.get("VERCEL_ENV", "").casefold() == "preview"
-        or os.environ.get("ARREMATE_PREVIEW_READ_ONLY", "").casefold()
-        in {"1", "true", "yes"}
-    )
+def _is_preview() -> bool:
+    return os.environ.get("VERCEL_ENV", "").casefold() == "preview"
+
+
+def _preview_allows_writes() -> bool:
+    """Require an explicit project setting before previews write production."""
+    return os.environ.get("ARREMATE_PREVIEW_ALLOW_WRITES", "").casefold() in {
+        "1", "true", "yes",
+    }
+
+
+def _should_persist_changes() -> bool:
+    return not _is_preview() or _preview_allows_writes()
 
 
 def _database_url() -> str | None:
-    """Prefer separately scoped, read-only credentials for branch previews."""
-    if _is_read_only_preview():
+    """Allow Vercel to scope a separate connection string to previews."""
+    if _is_preview():
         return os.environ.get("PREVIEW_DATABASE_URL") or os.environ.get("DATABASE_URL")
     return os.environ.get("DATABASE_URL")
 
 
 def _execute_persistent_write(connection, statement: str, params: dict) -> bool:
-    """Execute a catalog write outside previews and report whether it ran."""
-    if _is_read_only_preview():
+    """Execute a write only when the current deployment explicitly permits it."""
+    if not _should_persist_changes():
         return False
     connection.execute(text(statement), params)
     return True
@@ -742,7 +748,7 @@ def analyze_catalog_item(property_id: int) -> dict:
                 detail = (
                     "Referência de mercado ainda indisponível neste preview. "
                     "Nenhuma alteração foi salva."
-                    if _is_read_only_preview()
+                    if _is_preview() and not _preview_allows_writes()
                     else (
                         "Referência de mercado ainda indisponível. A coleta foi priorizada "
                         "e normalmente fica disponível em até 90 minutos."

@@ -15,8 +15,8 @@
 
 ## Segurança e dados
 
-- [ ] O preview usa o catálogo real em modo somente leitura.
-- [ ] Nenhuma ação do preview persiste alterações em produção.
+- [ ] O preview usa o catálogo real de produção.
+- [ ] O comportamento de escrita do preview foi declarado; ações persistentes foram validadas com cuidado.
 - [ ] A mudança não contém segredo, credencial ou dado pessoal.
 - [ ] Migrações, ingestão, permissões ou infraestrutura foram destacadas para revisão especial, quando aplicável.
 
