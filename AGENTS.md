@@ -203,6 +203,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-05** — Normalized standard Supabase `postgresql://` and legacy `postgres://` connection strings to SQLAlchemy's installed Psycopg 3 dialect, preventing new Vercel services from attempting to import the absent Psycopg 2 driver.
+
 - **2026-09-05** — Migrated the Vercel multi-service configuration from the retired `experimentalServices` model to supported service roots and explicit public rewrites, and normalized the external `/api` prefix before FastAPI routing so newly created Vercel projects can serve the frontend and backend together.
 
 - **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible production-data warning, and an explicit Vercel flag that permits preview writes to the shared production catalog only when intentionally enabled.

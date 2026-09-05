@@ -258,7 +258,14 @@ def test_preview_prefers_separately_scoped_database_credentials(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://writer.example/catalog")
     monkeypatch.setenv("PREVIEW_DATABASE_URL", "postgresql://reader.example/catalog")
 
-    assert vercel_api._database_url() == "postgresql://reader.example/catalog"
+    assert vercel_api._database_url() == "postgresql+psycopg://reader.example/catalog"
+
+
+def test_database_url_normalizes_legacy_postgres_scheme(monkeypatch):
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("DATABASE_URL", "postgres://writer.example/catalog")
+
+    assert vercel_api._database_url() == "postgresql+psycopg://writer.example/catalog"
 
 
 def test_preview_never_executes_persistent_writes(monkeypatch):

@@ -92,8 +92,14 @@ def _should_persist_changes() -> bool:
 def _database_url() -> str | None:
     """Allow Vercel to scope a separate connection string to previews."""
     if _is_preview():
-        return os.environ.get("PREVIEW_DATABASE_URL") or os.environ.get("DATABASE_URL")
-    return os.environ.get("DATABASE_URL")
+        database_url = os.environ.get("PREVIEW_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    else:
+        database_url = os.environ.get("DATABASE_URL")
+    if database_url and database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if database_url and database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    return database_url
 
 
 def _execute_persistent_write(connection, statement: str, params: dict) -> bool:
