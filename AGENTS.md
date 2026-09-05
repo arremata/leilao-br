@@ -15,6 +15,9 @@ answers would materially change product behavior or risk.
    `main`.
 2. Restate the desired outcome and infer concise acceptance criteria.
 3. Implement the complete change, including relevant tests and this changelog.
+   Keep `docs/PRODUCT_CONTEXT.md` aligned when current user-facing capabilities
+   or constraints change. Record accepted durable product choices in
+   `docs/PRODUCT_DECISIONS.md`, but keep implementation details out of it.
 4. Run proportionate verification. Backend changes require relevant pytest
    coverage; frontend changes require lint, a production build, and browser
    validation at relevant desktop/mobile sizes. Check the browser console.
@@ -211,6 +214,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-05** — Added concise Portuguese product memory for ordinary Claude conversations and a durable product-decision log. Agent instructions now require user-facing changes to keep the current context aligned and accepted long-term choices to be recorded without leaking implementation detail into the product documents.
 - **2026-09-05** — Added automatic Vercel cleanup when a PR closes or merges. The workflow paginates ARGOS Preview deployments for the exact branch, verifies the ARGOS project and matching GitHub PR metadata before deletion, and cannot target Production or Luigi's separate Vercel project.
 - **2026-09-05** — Made ARGOS Production and Preview deployment URLs public by disabling Vercel Authentication. Public previews still use the production catalog with explicitly enabled writes, currently limited to upserting deterministic property enrichments and prioritizing missing market-reference jobs; future write paths must be reviewed as public production operations.
 
