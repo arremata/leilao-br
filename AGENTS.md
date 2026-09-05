@@ -204,7 +204,7 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-05** — Added the plain-language agent delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added code ownership and PR evidence templates, a preview URL helper, a visible preview banner, and preview-mode write suppression while preferring separately scoped read-only credentials for real production catalog data.
+- **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible preview banner, and preview-mode write suppression while preferring separately scoped read-only credentials for real production catalog data.
 
 - **2026-09-05** — Removed the temporary market-confidence debug panel and its public API payload end to end. The numeric 50/30/20 calculation remains internal, persisted legacy debug data is stripped on read, stale analyses still refresh their low/medium/high level, and the product now exposes only the user-facing confidence classification.
 - **2026-09-05** — Replaced bucketed area scoring in market confidence with a continuous, symmetric `smaller area ÷ larger area` similarity for both subject-to-comparable and comparable-group calculations. The audit UI now labels percentages as weights and explains the area formula, both APIs use pipeline v13, and persisted analyses are refreshed under the new rule.
