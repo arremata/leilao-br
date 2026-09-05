@@ -5,6 +5,8 @@ import Watchlist from './components/Watchlist';
 import History from './components/History';
 import { fetchCatalog } from './api';
 
+const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
+
 function App() {
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -122,6 +124,11 @@ function App() {
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
+      {isPreview && (
+        <div className="preview-banner" role="status">
+          Ambiente de validação · dados reais · alterações não são salvas
+        </div>
+      )}
       <TopBar screen={screen} go={go} watchCount={watched.length} />
       {initialLoading ? (
         <InitialLoading />

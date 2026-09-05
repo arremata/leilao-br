@@ -235,7 +235,49 @@ def test_persisted_open_tender_uses_edital_commission():
 
 def test_catalog_requires_database_configuration(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("PREVIEW_DATABASE_URL", raising=False)
     vercel_api._engine = None
     response = TestClient(vercel_api.app).get("/catalog")
     assert response.status_code == 503
     assert response.json()["detail"] == "Catalog database is not configured"
+
+
+def test_preview_prefers_separate_read_only_database_credentials(monkeypatch):
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://writer.example/catalog")
+    monkeypatch.setenv("PREVIEW_DATABASE_URL", "postgresql://reader.example/catalog")
+
+    assert vercel_api._database_url() == "postgresql://reader.example/catalog"
+
+
+def test_preview_never_executes_persistent_writes(monkeypatch):
+    class FailingConnection:
+        def execute(self, *_args, **_kwargs):
+            raise AssertionError("preview attempted a persistent database write")
+
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+
+    executed = vercel_api._execute_persistent_write(
+        FailingConnection(), "INSERT INTO enrichments VALUES (:id)", {"id": 1},
+    )
+
+    assert executed is False
+
+
+def test_production_executes_persistent_writes(monkeypatch):
+    class RecordingConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, statement, params):
+            self.calls.append((str(statement), params))
+
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    connection = RecordingConnection()
+
+    executed = vercel_api._execute_persistent_write(
+        connection, "INSERT INTO enrichments VALUES (:id)", {"id": 1},
+    )
+
+    assert executed is True
+    assert len(connection.calls) == 1

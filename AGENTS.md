@@ -1,5 +1,62 @@
 # Arremate — Project Vision & Architecture
 
+## Plain-language product delivery
+
+The people requesting changes may describe only what they want to experience in
+the product. Do not require them to provide technical specifications, file names,
+test commands, or implementation details. Translate their product language into
+measurable acceptance criteria, inspect the relevant code and data contracts, and
+make reasonable product-consistent decisions. Ask a question only when different
+answers would materially change product behavior or risk.
+
+### Required delivery workflow
+
+1. Work in an isolated feature branch or worktree; never commit directly to
+   `main`.
+2. Restate the desired outcome and infer concise acceptance criteria.
+3. Implement the complete change, including relevant tests and this changelog.
+4. Run proportionate verification. Backend changes require relevant pytest
+   coverage; frontend changes require lint, a production build, and browser
+   validation at relevant desktop/mobile sizes. Check the browser console.
+5. Commit and push the feature branch. Wait for the Vercel branch preview and
+   retrieve its URL with `scripts/preview-url.sh` when useful.
+6. Verify the preview before presenting it. Give the requester a plain-language
+   summary, the preview link, and a short click-by-click validation checklist.
+7. Do not open the production PR until the requester confirms the preview is
+   correct. After confirmation, open a PR to `main`, complete every section of
+   the PR template, and enable squash auto-merge when repository protections
+   allow it.
+8. Never merge directly, bypass a rule, dismiss a failed check, or deploy around
+   the PR. `GustavoAdamee` approval plus all required checks is the production
+   release gate.
+9. After deployment, smoke-test production and report the result. If it fails,
+   stop and recommend reverting the PR to the last healthy deployment.
+
+### Preview production-data contract
+
+- Vercel previews must run the branch's code against the real production catalog
+  so product validation uses representative data.
+- Preview database access must use `PREVIEW_DATABASE_URL` with a PostgreSQL role
+  limited to `CONNECT`, schema `USAGE`, and table `SELECT`. `DATABASE_URL` remains
+  the production runtime credential. The fallback exists only for rollout and
+  must be removed after the scoped credential is configured.
+- The Vercel backend treats `VERCEL_ENV=preview` as read-only and must not enqueue
+  collection work or persist analyses. Add tests for every new preview-accessible
+  write path.
+- Never run ingestion, migrations, destructive commands, or production writes
+  from a preview. Never expose database credentials to the browser or PR logs.
+- Preview UI must visibly identify itself as an environment using real data where
+  changes are not saved.
+
+### Review ownership
+
+Every production PR requires the repository code owner. Changes to database
+models or migrations, ingestion, enrichment or financial rules, authentication,
+secrets, permissions, GitHub Actions, or Vercel configuration must be called out
+as sensitive in the PR even when the requested behavior is otherwise simple.
+
+The human playbook is in `docs/SHIP_WITH_AGENT.md`.
+
 ## Product Vision
 
 **Arremate** is a demo of a future Brazilian real estate auction intelligence platform. The goal is to map all real estate auctions in Brazil and provide AI-powered analysis that makes auction investing accessible and safer. Properties are sold at 30-70% below market value but carry complex legal risks — Arremate automates the research that today takes a full day and R$ 200-800 in legal fees into a 3-minute analysis.
@@ -146,6 +203,8 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-05** — Added the plain-language agent delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added code ownership and PR evidence templates, a preview URL helper, a visible preview banner, and preview-mode write suppression while preferring separately scoped read-only credentials for real production catalog data.
 
 - **2026-09-05** — Removed the temporary market-confidence debug panel and its public API payload end to end. The numeric 50/30/20 calculation remains internal, persisted legacy debug data is stripped on read, stale analyses still refresh their low/medium/high level, and the product now exposes only the user-facing confidence classification.
 - **2026-09-05** — Replaced bucketed area scoring in market confidence with a continuous, symmetric `smaller area ÷ larger area` similarity for both subject-to-comparable and comparable-group calculations. The audit UI now labels percentages as weights and explains the area formula, both APIs use pipeline v13, and persisted analyses are refreshed under the new rule.

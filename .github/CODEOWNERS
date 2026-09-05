@@ -1,0 +1,11 @@
+# The product owner is the production release approver for every change.
+* @GustavoAdamee
+
+# Security-sensitive surfaces are listed explicitly so their ownership remains
+# obvious even if the repository-wide rule changes later.
+/.github/ @GustavoAdamee
+/backend/db/ @GustavoAdamee
+/backend/ingestion/ @GustavoAdamee
+/backend/enrichment/ @GustavoAdamee
+/vercel-backend/ @GustavoAdamee
+/vercel.json @GustavoAdamee
