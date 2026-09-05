@@ -33,7 +33,9 @@ clica em Merge no GitHub. Esse clique manual é a aprovação e o comando de
 publicação quando o próprio Gustavo abriu o PR. Quando outra pessoa abriu o PR,
 ela precisa aguardar a aprovação de Gustavo no commit atual; qualquer novo push
 exige uma nova aprovação. O agente nunca faz o merge nem habilita merge
-automático.
+automático. Quando um PR é fechado ou publicado, uma automação apaga os previews
+daquele PR no projeto ARGOS; o endereço deixa de funcionar, mas a implantação de
+produção permanece intacta.
 
 ## Limites de segurança
 

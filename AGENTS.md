@@ -211,6 +211,7 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-05** — Added automatic Vercel cleanup when a PR closes or merges. The workflow paginates ARGOS Preview deployments for the exact branch, verifies the ARGOS project and matching GitHub PR metadata before deletion, and cannot target Production or Luigi's separate Vercel project.
 - **2026-09-05** — Made ARGOS Production and Preview deployment URLs public by disabling Vercel Authentication. Public previews still use the production catalog with explicitly enabled writes, currently limited to upserting deterministic property enrichments and prioritizing missing market-reference jobs; future write paths must be reviewed as public production operations.
 
 - **2026-09-05** — Added a conditional production-owner status gate. Gustavo-authored PRs retain the established manual self-merge flow, while every PR from another author requires Gustavo's approving review on the current head commit; any later push resets the status to pending.
