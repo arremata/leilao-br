@@ -1,0 +1,58 @@
+name: Owner approval gate
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  update-owner-approval:
+    if: github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set owner approval status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const productionOwner = 'GustavoAdamee';
+            const pullRequest = context.payload.pull_request;
+            const ownerAuthored = pullRequest.user.login.toLowerCase()
+              === productionOwner.toLowerCase();
+
+            let approved = ownerAuthored;
+            if (!ownerAuthored) {
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullRequest.number,
+                per_page: 100,
+              });
+              const decisiveOwnerReviews = reviews
+                .filter((review) => review.user?.login.toLowerCase()
+                  === productionOwner.toLowerCase())
+                .filter((review) => review.commit_id === pullRequest.head.sha)
+                .filter((review) => ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']
+                  .includes(review.state));
+              const latestReview = decisiveOwnerReviews.at(-1);
+              approved = latestReview?.state === 'APPROVED';
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: pullRequest.head.sha,
+              state: approved ? 'success' : 'pending',
+              context: 'Owner approval',
+              description: ownerAuthored
+                ? 'Owner-authored PR; manual merge is the approval'
+                : approved
+                  ? 'Approved by Gustavo for this commit'
+                  : 'Waiting for Gustavo to approve this commit',
+              target_url: pullRequest.html_url,
+            });

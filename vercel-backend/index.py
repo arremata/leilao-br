@@ -45,6 +45,22 @@ _engine = None
 
 app = FastAPI(title="Arremate Demo API")
 
+
+class ApiPrefixMiddleware:
+    """Accept the public `/api` prefix used by the Vercel service router."""
+
+    def __init__(self, application):
+        self.application = application
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope.get("type") == "http" and (path == "/api" or path.startswith("/api/")):
+            stripped_path = path[4:] or "/"
+            scope = {**scope, "path": stripped_path, "raw_path": stripped_path.encode()}
+        await self.application(scope, receive, send)
+
+
+app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -56,6 +72,42 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str | None = None
     pdf_texts: str | None = None
+
+
+def _is_preview() -> bool:
+    return os.environ.get("VERCEL_ENV", "").casefold() == "preview"
+
+
+def _preview_allows_writes() -> bool:
+    """Require an explicit project setting before previews write production."""
+    return os.environ.get("ARREMATE_PREVIEW_ALLOW_WRITES", "").casefold() in {
+        "1", "true", "yes",
+    }
+
+
+def _should_persist_changes() -> bool:
+    return not _is_preview() or _preview_allows_writes()
+
+
+def _database_url() -> str | None:
+    """Allow Vercel to scope a separate connection string to previews."""
+    if _is_preview():
+        database_url = os.environ.get("PREVIEW_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    else:
+        database_url = os.environ.get("DATABASE_URL")
+    if database_url and database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if database_url and database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    return database_url
+
+
+def _execute_persistent_write(connection, statement: str, params: dict) -> bool:
+    """Execute a write only when the current deployment explicitly permits it."""
+    if not _should_persist_changes():
+        return False
+    connection.execute(text(statement), params)
+    return True
 
 
 def _is_land_property_type(property_type: str | None) -> bool:
@@ -467,7 +519,7 @@ def _get_engine():
     """Return the cached Supabase engine without opening a connection eagerly."""
     global _engine
     if _engine is None:
-        database_url = os.environ.get("DATABASE_URL")
+        database_url = _database_url()
         if not database_url:
             raise HTTPException(status_code=503, detail="Catalog database is not configured")
         # Supabase supplies the pool; avoid retaining serverless client-side
@@ -658,7 +710,7 @@ def get_catalog_item(property_id: int) -> dict:
 
 @app.post("/catalog/{property_id}/analyze")
 def analyze_catalog_item(property_id: int) -> dict:
-    """Build and persist an analysis using only the cached regional reference."""
+    """Build an analysis and persist it only outside branch previews."""
     property_query = f"SELECT {_CATALOG_DETAIL_COLUMNS} FROM properties WHERE id = :id"
     reference_query = """
         SELECT id, neighborhood, property_type, price_per_m2
@@ -696,7 +748,7 @@ def analyze_catalog_item(property_id: int) -> dict:
                     text("SELECT to_regclass('public.market_reference_jobs')")
                 ).scalar_one_or_none()
                 if job_table_exists:
-                    connection.execute(text("""
+                    _execute_persistent_write(connection, """
                         INSERT INTO market_reference_jobs
                             (uf, city, neighborhood, property_type, representative_property_id,
                              status, priority, attempt_count, last_error, updated_at)
@@ -710,17 +762,23 @@ def analyze_catalog_item(property_id: int) -> dict:
                             next_attempt_at = CASE WHEN market_reference_jobs.status = 'successful'
                                                    THEN NULL ELSE market_reference_jobs.next_attempt_at END,
                             updated_at = EXCLUDED.updated_at
-                    """), {
+                    """, {
                         "uf": row["uf"] or "", "city": row["city"] or "",
                         "property_type": canonical_type, "property_id": property_id,
                         "updated_at": datetime.now(timezone.utc),
                     })
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": (
+                detail = (
+                    "Referência de mercado ainda indisponível neste preview. "
+                    "Nenhuma alteração foi salva."
+                    if _is_preview() and not _preview_allows_writes()
+                    else (
                         "Referência de mercado ainda indisponível. A coleta foi priorizada "
                         "e normalmente fica disponível em até 90 minutos."
-                    )},
+                    )
+                )
+                return JSONResponse(
+                    status_code=409,
+                    content={"detail": detail},
                 )
 
             comparables = []
@@ -774,14 +832,14 @@ def analyze_catalog_item(property_id: int) -> dict:
                 ),
                 ensure_ascii=False,
             )
-            connection.execute(text("""
+            _execute_persistent_write(connection, """
                 INSERT INTO enrichments (property_id, result_json, pipeline_version, computed_at)
                 VALUES (:property_id, :result_json, :pipeline_version, :computed_at)
                 ON CONFLICT (property_id) DO UPDATE SET
                     result_json = EXCLUDED.result_json,
                     pipeline_version = EXCLUDED.pipeline_version,
                     computed_at = EXCLUDED.computed_at
-            """), {
+            """, {
                 "property_id": property_id, "result_json": result_json,
                 "pipeline_version": PIPELINE_VERSION, "computed_at": datetime.now(timezone.utc),
             })

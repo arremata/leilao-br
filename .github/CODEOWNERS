@@ -1,0 +1,12 @@
+# The product owner is documented here as the release owner. Production approval
+# is Gustavo's manual merge after required checks, including for his own PRs.
+* @GustavoAdamee
+
+# Security-sensitive surfaces are listed explicitly so their ownership remains
+# obvious even if the repository-wide rule changes later.
+/.github/ @GustavoAdamee
+/backend/db/ @GustavoAdamee
+/backend/ingestion/ @GustavoAdamee
+/backend/enrichment/ @GustavoAdamee
+/vercel-backend/ @GustavoAdamee
+/vercel.json @GustavoAdamee

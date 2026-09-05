@@ -1,5 +1,66 @@
 # Arremate — Project Vision & Architecture
 
+## Plain-language product delivery
+
+The people requesting changes may describe only what they want to experience in
+the product. Do not require them to provide technical specifications, file names,
+test commands, or implementation details. Translate their product language into
+measurable acceptance criteria, inspect the relevant code and data contracts, and
+make reasonable product-consistent decisions. Ask a question only when different
+answers would materially change product behavior or risk.
+
+### Required delivery workflow
+
+1. Work in an isolated feature branch or worktree; never commit directly to
+   `main`.
+2. Restate the desired outcome and infer concise acceptance criteria.
+3. Implement the complete change, including relevant tests and this changelog.
+4. Run proportionate verification. Backend changes require relevant pytest
+   coverage; frontend changes require lint, a production build, and browser
+   validation at relevant desktop/mobile sizes. Check the browser console.
+5. Commit and push the feature branch. Wait for the Vercel branch preview and
+   retrieve its URL with `scripts/preview-url.sh` when useful.
+6. Verify the preview before presenting it. Give the requester a plain-language
+   summary, the preview link, and a short click-by-click validation checklist.
+7. Do not open the production PR until the requester confirms the preview is
+   correct. After confirmation, open a PR to `main`, complete every section of
+   the PR template, and leave it unmerged for the production owner.
+8. Never press Merge, enable auto-merge, bypass a rule, dismiss a failed check,
+   or deploy around the PR. All required checks must pass, then
+   `GustavoAdamee` manually merges the PR; that explicit merge action is the
+   production approval.
+9. After deployment, smoke-test production and report the result. If it fails,
+   stop and recommend reverting the PR to the last healthy deployment.
+
+### Preview production-data contract
+
+- Vercel previews must run the branch's code against the real production catalog
+  so product validation uses representative data.
+- Preview may use `PREVIEW_DATABASE_URL` or a `DATABASE_URL` scoped to Preview;
+  this project intentionally points it at the production transaction pooler.
+- Preview writes are disabled by default in code and enabled only when
+  `ARREMATE_PREVIEW_ALLOW_WRITES=true`. When enabled, treat every persistent
+  preview action exactly like a production action and test new write paths.
+- Never run ingestion, migrations, destructive commands, or broad data repair
+  from a preview without an explicit user request. Never expose database
+  credentials to the browser or PR logs.
+- Keep previews protected to authorized team members. The preview UI must visibly
+  state that it uses production data and that actions may alter production.
+
+### Review ownership
+
+`GustavoAdamee` is the production release owner. Because GitHub does not count a
+PR author's review of their own PR, the protected workflow uses Gustavo's manual
+merge after every required check for PRs authored by Gustavo. A PR authored by
+anyone else requires a fresh approving review from Gustavo for its current head
+commit; a later push invalidates that approval. The required `Owner approval`
+status enforces both cases. Changes to database models or migrations, ingestion,
+enrichment or financial rules, authentication, secrets, permissions, GitHub
+Actions, or Vercel configuration must be called out as sensitive in the PR even
+when the requested behavior is otherwise simple.
+
+The human playbook is in `docs/SHIP_WITH_AGENT.md`.
+
 ## Product Vision
 
 **Arremate** is a demo of a future Brazilian real estate auction intelligence platform. The goal is to map all real estate auctions in Brazil and provide AI-powered analysis that makes auction investing accessible and safer. Properties are sold at 30-70% below market value but carry complex legal risks — Arremate automates the research that today takes a full day and R$ 200-800 in legal fees into a 3-minute analysis.
@@ -146,6 +207,16 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-05** — Added a conditional production-owner status gate. Gustavo-authored PRs retain the established manual self-merge flow, while every PR from another author requires Gustavo's approving review on the current head commit; any later push resets the status to pending.
+
+- **2026-09-05** — Restored Gustavo's established self-merge release flow while retaining mandatory PRs and backend, frontend, and Vercel checks. Agents must leave merge disabled; Gustavo's manual merge after validation is the explicit production approval because GitHub cannot count an author's review of their own PR.
+
+- **2026-09-05** — Normalized standard Supabase `postgresql://` and legacy `postgres://` connection strings to SQLAlchemy's installed Psycopg 3 dialect, preventing new Vercel services from attempting to import the absent Psycopg 2 driver.
+
+- **2026-09-05** — Migrated the Vercel multi-service configuration from the retired `experimentalServices` model to supported service roots and explicit public rewrites, and normalized the external `/api` prefix before FastAPI routing so newly created Vercel projects can serve the frontend and backend together.
+
+- **2026-09-05** — Added the plain-language Codex/Claude delivery paved road: agents now translate product requests into acceptance criteria, publish and verify branch previews before opening production PRs, and hand off a nontechnical validation checklist. Added shared agent instructions, code ownership and PR evidence templates, a preview URL helper, a visible production-data warning, and an explicit Vercel flag that permits preview writes to the shared production catalog only when intentionally enabled.
 
 - **2026-09-05** — Removed the temporary market-confidence debug panel and its public API payload end to end. The numeric 50/30/20 calculation remains internal, persisted legacy debug data is stripped on read, stale analyses still refresh their low/medium/high level, and the product now exposes only the user-facing confidence classification.
 - **2026-09-05** — Replaced bucketed area scoring in market confidence with a continuous, symmetric `smaller area ÷ larger area` similarity for both subject-to-comparable and comparable-group calculations. The audit UI now labels percentages as weights and explains the area formula, both APIs use pipeline v13, and persisted analyses are refreshed under the new rule.
