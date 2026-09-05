@@ -36,7 +36,7 @@ npm run preview      # preview production build
 - Components in `src/components/` with named exports
 - Entry point: `src/main.jsx` → `src/App.jsx`
 - React 19 + StrictMode
-- Five-screen SPA: `home`/`feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`
+- Four-screen SPA: `feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`
 - Screen and watchlist persist to `localStorage` (keys: `arremate_screen`, `arremate_watched`)
 
 ### Data model

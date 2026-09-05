@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 
 import api
 from db.base import get_engine, init_db, make_session_factory
-from db.models import Enrichment, MarketReferenceJob, Property, RegionalMarketPrice
+from db.models import (
+    Enrichment, MarketReferenceJob, Property,
+    RegionalMarketComparable, RegionalMarketPrice,
+)
 
 
 def _client_with_db():
@@ -139,6 +142,50 @@ def test_catalog_detail_suppresses_stale_land_market_estimate():
     assert enrichment["discount"] == 0
     assert enrichment["roi"] == 0
     assert enrichment["marketDetail"] is None
+    api.app.dependency_overrides.clear()
+
+
+def test_catalog_detail_refreshes_legacy_confidence_without_exposing_debug():
+    client, factory = _client_with_db()
+    with factory() as s:
+        prop = Property(
+            source="caixa", source_id="legacy-confidence", uf="PR", city="Curitiba",
+            neighborhood="Centro", address="Rua A", property_type="Apartamento",
+            area_m2=70, beds=2, lat=-25.4284, lng=-49.2733,
+            preco=150_000, avaliacao=250_000, status="active",
+        )
+        reference = RegionalMarketPrice(
+            uf="PR", city="Curitiba", neighborhood="", property_type="Apartamento",
+            price_per_m2=5_000, sample_size=5,
+        )
+        s.add_all([prop, reference])
+        s.flush()
+        s.add(Enrichment(
+            property_id=prop.id,
+            result_json=json.dumps({
+                "market": 350_000,
+                "marketDetail": {
+                    "indicators": [], "comparables": [], "confidenceLevel": "low",
+                },
+            }),
+            pipeline_version="v10-cost-simulator",
+        ))
+        s.add_all([
+            RegionalMarketComparable(
+                reference_id=reference.id, address=f"Rua {index}",
+                property_type="Apartamento", price=350_000, area_m2=70,
+                beds=2, price_per_m2=5_000, source="Portal",
+                url=f"https://portal/{index}", lat=-25.4284, lng=-49.2733,
+            )
+            for index in range(5)
+        ])
+        s.commit()
+        prop_id = prop.id
+
+    enrichment = client.get(f"/catalog/{prop_id}").json()["enrichment"]
+
+    assert enrichment["marketDetail"]["confidenceLevel"] == "high"
+    assert "confidenceDebug" not in enrichment["marketDetail"]
     api.app.dependency_overrides.clear()
 
 

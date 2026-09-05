@@ -18,10 +18,15 @@ MAX_RADIUS_KM = 2.0
 @dataclass(frozen=True)
 class MarketConfidence:
     score: float
+    raw_score: float
     level: Literal["low", "medium", "high"]
     quantity_score: float
     subject_similarity_score: float
     group_consistency_score: float
+    comparable_count: int
+    radius_applied: bool
+    complete_high_confidence_data: bool
+    qualifies_as_high: bool
 
 
 def _value(item, name: str, default=None):
@@ -80,22 +85,18 @@ def _relative_difference(left: float, right: float) -> float | None:
     return abs(left - right) / left
 
 
+def _area_similarity(left: float, right: float) -> float:
+    """Return a continuous, symmetric size similarity from zero to one."""
+    left, right = float(left or 0), float(right or 0)
+    if left <= 0 or right <= 0:
+        return 0.0
+    return min(left, right) / max(left, right)
+
+
 def _pair_relative_difference(left: float, right: float) -> float | None:
     left, right = float(left or 0), float(right or 0)
     midpoint = (left + right) / 2
     return abs(left - right) / midpoint if left > 0 and right > 0 else None
-
-
-def _similarity_band(difference: float | None) -> float:
-    if difference is None:
-        return 0.0
-    if difference <= 0.10:
-        return 1.0
-    if difference <= 0.20:
-        return 0.75
-    if difference <= 0.35:
-        return 0.50
-    return 0.0
 
 
 def _price_similarity_band(difference: float | None) -> float:
@@ -150,12 +151,11 @@ def _group_consistency(comparables: list) -> float:
         price_difference = _pair_relative_difference(
             _value(left, "price_per_m2"), _value(right, "price_per_m2"),
         )
-        area_difference = _pair_relative_difference(
-            _value(left, "area_m2"), _value(right, "area_m2"),
-        )
         pair_scores.append(
             0.50 * _price_similarity_band(price_difference)
-            + 0.25 * _similarity_band(area_difference)
+            + 0.25 * _area_similarity(
+                _value(left, "area_m2"), _value(right, "area_m2"),
+            )
             + 0.15 * _bed_similarity(_value(left, "beds"), _value(right, "beds"))
             + 0.10 * _pair_proximity(left, right)
         )
@@ -166,6 +166,8 @@ def _group_consistency(comparables: list) -> float:
 
 
 def _has_complete_high_confidence_data(subject, comparables: list) -> bool:
+    if not comparables:
+        return False
     if any(_value(subject, field) in (None, "") for field in (
         "property_type", "area_m2", "beds", "lat", "lng",
     )):
@@ -181,17 +183,22 @@ def _has_complete_high_confidence_data(subject, comparables: list) -> bool:
 
 
 def _is_scoreable(subject, comparable) -> bool:
-    if any(_value(subject, field) in (None, "") for field in (
-        "property_type", "area_m2", "beds", "lat", "lng",
+    if any(_value(comparable, field) in (None, "", 0) for field in (
+        "area_m2", "price_per_m2",
     )):
         return False
-    if any(_value(comparable, field) in (None, "") for field in (
-        "property_type", "area_m2", "beds", "price_per_m2", "lat", "lng",
-    )):
+    subject_type = canonical_property_type(_value(subject, "property_type"))
+    comparable_type = canonical_property_type(_value(comparable, "property_type"))
+    if subject_type and comparable_type and subject_type != comparable_type:
         return False
-    if canonical_property_type(_value(subject, "property_type")) != canonical_property_type(
-        _value(comparable, "property_type")
-    ):
+    subject_has_coordinates = all(
+        _value(subject, field) not in (None, "") for field in ("lat", "lng")
+    )
+    if not subject_has_coordinates:
+        # Missing location evidence removes the proximity points and blocks a
+        # high rating, but must not erase otherwise valid market evidence.
+        return True
+    if any(_value(comparable, field) in (None, "") for field in ("lat", "lng")):
         return False
     distance = comparable_distance_km(subject, comparable)
     return distance is not None and distance <= MAX_RADIUS_KM
@@ -199,13 +206,13 @@ def _is_scoreable(subject, comparable) -> bool:
 
 def calculate_market_confidence(subject, comparables: list) -> MarketConfidence:
     """Apply the 50/30/20 business rule to at most five comparables.
-
-    The numeric result remains internal. Public consumers receive only the
-    low/medium/high level derived from it.
     """
     selected = [
         item for item in comparables if _is_scoreable(subject, item)
     ][:MAX_COMPARABLES]
+    radius_applied = all(
+        _value(subject, field) not in (None, "") for field in ("lat", "lng")
+    )
     count = len(selected)
     quantity_score = count * 10.0
     price_values = [
@@ -217,9 +224,6 @@ def calculate_market_confidence(subject, comparables: list) -> MarketConfidence:
     subject_similarity_score = 0.0
     for item in selected:
         distance = comparable_distance_km(subject, item)
-        area_difference = _relative_difference(
-            _value(subject, "area_m2"), _value(item, "area_m2"),
-        )
         price_difference = _relative_difference(
             group_price_median, _value(item, "price_per_m2"),
         )
@@ -227,18 +231,21 @@ def calculate_market_confidence(subject, comparables: list) -> MarketConfidence:
         # 40% area, 15% bedrooms and 10% price/m².
         subject_similarity_score += (
             2.10 * _subject_proximity(distance)
-            + 2.40 * _similarity_band(area_difference)
+            + 2.40 * _area_similarity(
+                _value(subject, "area_m2"), _value(item, "area_m2"),
+            )
             + 0.90 * _bed_similarity(_value(subject, "beds"), _value(item, "beds"))
             + 0.60 * _price_similarity_band(price_difference)
         )
 
     group_consistency_score = _group_consistency(selected)
     raw_score = quantity_score + subject_similarity_score + group_consistency_score
+    complete_high_confidence_data = _has_complete_high_confidence_data(subject, selected)
     qualifies_as_high = (
         count >= 4
         and subject_similarity_score >= 21.0
         and group_consistency_score >= 12.0
-        and _has_complete_high_confidence_data(subject, selected)
+        and complete_high_confidence_data
     )
     score = min(raw_score, 100.0)
     if score <= 30:
@@ -251,8 +258,13 @@ def calculate_market_confidence(subject, comparables: list) -> MarketConfidence:
 
     return MarketConfidence(
         score=round(score, 2),
+        raw_score=round(raw_score, 2),
         level=level,
         quantity_score=round(quantity_score, 2),
         subject_similarity_score=round(subject_similarity_score, 2),
         group_consistency_score=round(group_consistency_score, 2),
+        comparable_count=count,
+        radius_applied=radius_applied,
+        complete_high_confidence_data=complete_high_confidence_data,
+        qualifies_as_high=qualifies_as_high,
     )

@@ -144,7 +144,6 @@ def calculate_market(
         price_per_m2_neighborhood=round(price_per_m2, 2),
         comparable_properties=usable,
         discount_percentage=discount,
-        confidence_score=confidence.score,
         confidence_level=confidence.level,
     )
 

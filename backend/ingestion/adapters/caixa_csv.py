@@ -203,6 +203,28 @@ class CaixaCsvAdapter:
             return ""
         return await self._fetch_detail_html(detail_url)
 
+    async def recover_detail_results_async(
+        self, detail_urls: list[str],
+    ) -> list[dict | None]:
+        """Retry unresolved detail pages through the trusted CSV browser.
+
+        The curl-based batch is substantially faster, but Caixa frequently
+        serves unusable HTTP-200 bodies to hosted-runner clients. The headed
+        Chrome session that successfully downloaded the authoritative CSV has
+        already passed the bot manager, so it is a reliable, deliberately
+        sequential fallback for only the unresolved URLs.
+        """
+        if self._page is None:
+            return [None] * len(detail_urls)
+
+        from ingestion.adapters.caixa_detail import detail_result_from_html
+
+        results: list[dict | None] = []
+        for detail_url in detail_urls:
+            html = await self._fetch_detail_html(detail_url)
+            results.append(detail_result_from_html(html))
+        return results
+
     def fetch_detail_html(self, detail_url: Optional[str]) -> str:
         """Sync wrapper around _fetch_detail_html. Returns HTML or '' (never
         raises). Returns '' immediately when detail_url is blank or the browser

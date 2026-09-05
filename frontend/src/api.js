@@ -14,16 +14,6 @@ export async function fetchProperties() {
 }
 
 /**
- * Fetch dashboard data (KPIs, activity, city signals).
- * @returns {Promise<Object|null>}
- */
-export async function fetchDashboard() {
-  const res = await fetch('/api/dashboard');
-  if (!res.ok) return null;
-  return res.json();
-}
-
-/**
  * Fetch the ingested catalog (real listings from the DB).
  * @param {string} [uf] — optional state filter, e.g. 'PR'
  * @returns {Promise<Object[]>} — array of thin catalog cards

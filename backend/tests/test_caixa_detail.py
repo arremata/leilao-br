@@ -1,7 +1,9 @@
 import asyncio
 
 import ingestion.adapters.caixa_detail as caixa_detail
-from ingestion.adapters.caixa_detail import parse_detail_html
+from ingestion.adapters.caixa_detail import (
+    detail_result_from_html, parse_detail_html, unusable_detail_reason,
+)
 
 DETAIL_HTML = """
 <html><body>
@@ -42,6 +44,20 @@ def test_parse_detail_html_empty_is_safe():
     assert data["full_description"] == ""
     assert data["first_auction_at"] is None
     assert data["second_auction_at"] is None
+
+
+def test_detail_result_and_unusable_response_classification_share_boundary():
+    valid = "<span>Data do 1º Leilão - 24/08/2026 - 10h00</span>"
+
+    assert detail_result_from_html(valid)["first_auction_at"] is not None
+    assert detail_result_from_html("<html>temporary partial page</html>") is None
+    assert unusable_detail_reason("") == "empty"
+    assert unusable_detail_reason(
+        "<p>Nenhum imóvel encontrado para o filtro selecionado.</p>"
+    ) == "not-found"
+    assert unusable_detail_reason("<html>Radware Bot Manager CAPTCHA</html>") == (
+        "bot-challenge"
+    )
 
 
 def test_parse_detail_html_extracts_both_caixa_auction_dates():
@@ -304,3 +320,26 @@ def test_detail_batch_downloads_shared_edital_once_and_associates_each_property(
     assert results[0]["edital_data"]["iptuRegistration"] == "111"
     assert results[1]["edital_data"]["lotNumber"] == "176"
     assert results[1]["edital_data"]["iptuRegistration"] == "222"
+
+
+def test_caixa_csv_adapter_recovers_details_with_live_browser(monkeypatch):
+    from ingestion.adapters.caixa_csv import CaixaCsvAdapter
+
+    adapter = CaixaCsvAdapter("PR", csv_bytes=b"unused")
+    adapter._page = object()
+
+    async def fetch_html(url):
+        if url.endswith("/valid"):
+            return "<span>Data da Licitação Aberta - 05/09/2026 - 10h00</span>"
+        return "<p>Nenhum imóvel encontrado para o filtro selecionado.</p>"
+
+    monkeypatch.setattr(adapter, "_fetch_detail_html", fetch_html)
+
+    results = asyncio.run(adapter.recover_detail_results_async([
+        "https://x/valid", "https://x/missing",
+    ]))
+
+    assert results[0]["first_auction_at"].isoformat() == (
+        "2026-09-05T10:00:00-03:00"
+    )
+    assert results[1] is None

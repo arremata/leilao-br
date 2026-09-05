@@ -34,41 +34,6 @@ class IngestRequest(BaseModel):
     file: Optional[str] = None
 
 
-def _parse_ends_at(value) -> Optional["datetime"]:
-    """Parse endsAt (ISO string or epoch ms) into a timezone-aware datetime."""
-    from datetime import datetime, timezone
-    if value is None or value == "":
-        return None
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
-    try:
-        s = str(value).strip()
-        # ISO 8601 — FastAPI/seed format. Accept trailing Z or offset.
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        return None
-
-
-def _is_active(ends_at, now) -> bool:
-    """A property is active when endsAt is missing or still in the future."""
-    dt = _parse_ends_at(ends_at)
-    return dt is None or dt > now
-
-
-def _closing_within_24h(ends_at, now) -> bool:
-    """Active and ending within the next 24 hours."""
-    from datetime import timedelta
-    dt = _parse_ends_at(ends_at)
-    if dt is None:
-        return False
-    return now < dt <= now + timedelta(hours=24)
-
-
 app = FastAPI(title="Leilao AI API")
 
 
@@ -83,6 +48,43 @@ def get_session():
     factory = app.state.session_factory
     with factory() as session:
         yield session
+
+
+def _refresh_confidence_level(
+    enrichment: dict | None, prop: Property, session: Session, *, force: bool = False,
+) -> dict | None:
+    """Refresh stale confidence levels without exposing internal score details."""
+    market_detail = enrichment.get("marketDetail") if isinstance(enrichment, dict) else None
+    if not isinstance(market_detail, dict):
+        return enrichment
+    market_detail.pop("confidenceDebug", None)
+    if market_detail.get("confidenceLevel") and not force:
+        return enrichment
+
+    reference = resolve_market_reference(session, prop)
+    comparables = []
+    if reference:
+        comparables = [
+            ComparableProperty(
+                address=item.address, property_type=item.property_type,
+                price=item.price, area_m2=item.area_m2, beds=item.beds,
+                price_per_m2=item.price_per_m2, source=item.source, url=item.url,
+                lat=item.lat, lng=item.lng,
+            )
+            for item in session.execute(
+                select(RegionalMarketComparable).where(
+                    RegionalMarketComparable.reference_id.in_(reference.reference_ids),
+                ).order_by(RegionalMarketComparable.price_per_m2)
+            ).scalars().all()
+        ]
+
+    from graph.market import calculate_market
+    market = calculate_market(
+        metadata_from_property(prop), comparables,
+        reference.price_per_m2 if reference else None,
+    )
+    market_detail["confidenceLevel"] = market.confidence_level
+    return enrichment
 
 
 def _card_title(p: Property) -> str:
@@ -200,37 +202,6 @@ def get_properties(session: Session = Depends(get_session)) -> list[dict]:
     return [_property_card(prop) for prop in props]
 
 
-@app.get("/dashboard")
-def get_dashboard(session: Session = Depends(get_session)) -> dict:
-    from datetime import datetime, timezone
-
-    properties = [
-        _property_card(prop) for prop in session.execute(
-            select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
-        ).scalars().all()
-    ]
-    # Active = endsAt in the future (or missing). Closed auctions don't count.
-    now = datetime.now(timezone.utc)
-    active = [
-        p for p in properties
-        if _is_active(p.get("endsAt"), now)
-    ]
-    active_count = len(active)
-    closing_soon = sum(1 for p in active if _closing_within_24h(p.get("endsAt"), now))
-    # Score field removed — use ROI average as the portfolio health KPI
-    avg_roi = round(sum(p.get("roi", 0) for p in properties) / max(len(properties), 1))
-
-    return {
-        "kpis": [
-            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "no catálogo", "pos": True},
-            {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
-            {"lbl": "Análises restantes", "val": "3", "delta": "plano grátis"},
-            {"lbl": "ROI médio · feed", "val": f"{avg_roi}%", "delta": "do portfólio", "pos": avg_roi >= 10},
-        ],
-        "activity": [],
-    }
-
-
 @app.get("/catalog")
 def list_catalog(uf: Optional[str] = None, session: Session = Depends(get_session)) -> list[dict]:
     stmt = select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
@@ -255,6 +226,11 @@ def get_catalog_item(prop_id: int, session: Session = Depends(get_session)) -> d
     from graph.market import is_land_property_type
     if enrichment and is_land_property_type(prop.property_type):
         enrichment.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
+    else:
+        enrichment = _refresh_confidence_level(
+            enrichment, prop, session,
+            force=bool(enr and enr.pipeline_version != PIPELINE_VERSION),
+        )
     card["enrichment"] = enrichment
     return card
 

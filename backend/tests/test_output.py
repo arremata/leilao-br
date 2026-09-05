@@ -30,10 +30,12 @@ def _make_full_state():
             city="São Paulo",
             neighborhood="Vila Madalena",
             state="SP",
+            commission_rate=0.05,
         ),
         market_result=MarketResult(
             price_per_m2_neighborhood=6923.0,
             discount_percentage=42.0,
+            confidence_level="medium",
         ),
         legal_result=LegalResult(
             risk_level="low",
@@ -163,7 +165,7 @@ class TestBuildResultDetails:
         assert result.market_detail is not None
         assert len(result.market_detail.indicators) > 0
         assert len(result.market_detail.comparables) >= 0
-        assert result.market_detail.confidence_level == "low"
+        assert result.market_detail.confidence_level == "medium"
 
     def test_costs_populated_from_state(self):
         state = _make_full_state()
@@ -181,14 +183,24 @@ class TestBuildResultDetails:
         assert costs["property_registration"].rate == 0.009
         assert costs["occupant_removal"].value == 5000
 
-    def test_direct_sale_uses_sale_price_and_has_no_auctioneer_commission(self):
+    def test_direct_sale_uses_sale_price_and_marks_commission_exempt(self):
         state = _make_full_state()
         state.property_metadata.auction_type = "Venda Direta Online"
 
         costs = {item.id: item for item in build_result(state).costs}
 
         assert costs["auction_bid"].label == "Preço de venda"
-        assert "auctioneer_commission" not in costs
+        assert costs["auctioneer_commission"].label == "Comissão isenta"
+        assert costs["auctioneer_commission"].value == 0
+
+    def test_open_tender_uses_edital_commission(self):
+        state = _make_full_state()
+        state.property_metadata.auction_type = "Licitação Aberta"
+
+        costs = {item.id: item for item in build_result(state).costs}
+
+        assert "edital" in costs["auctioneer_commission"].label
+        assert costs["auctioneer_commission"].rate == 0.05
 
     def test_edital_populated_from_state(self):
         state = _make_full_state()
@@ -218,8 +230,8 @@ class TestBuildResultDetails:
         parsed = json.loads(result["result_json"])
         assert "viability" in parsed
         assert "marketDetail" in parsed
-        assert parsed["marketDetail"]["confidenceLevel"] == "low"
-        assert "confidenceScore" not in parsed["marketDetail"]
+        assert parsed["marketDetail"]["confidenceLevel"] == "medium"
+        assert "confidenceDebug" not in parsed["marketDetail"]
         assert "costs" in parsed
         assert "edital" in parsed
         assert "riskDimensions" in parsed["viability"]

@@ -63,7 +63,6 @@ class MarketResult:
     price_per_m2_neighborhood: float = 0.0
     comparable_properties: list[ComparableProperty] = field(default_factory=list)
     discount_percentage: float = 0.0
-    confidence_score: float = 0.0
     confidence_level: str = "low"
 
 

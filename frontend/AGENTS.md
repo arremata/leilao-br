@@ -15,13 +15,14 @@ npm run preview    # preview production build
 
 ## Architecture
 
-### Three-Screen SPA
+### Four-Screen SPA
 
 | Screen | Component | Route Key | Description |
 |--------|-----------|-----------|-------------|
-| Dashboard | `Home.jsx` | `home` | Hero + stats + top picks + recent activity |
 | Feed | `Feed.jsx` | `feed` | Property grid/list with filters |
 | Detail | `PropertyDetail.jsx` | `detail` | Full analysis modal with tabs |
+| Watchlist | `Watchlist.jsx` | `watchlist` | Locally saved properties |
+| History | `History.jsx` | `history` | Locally viewed properties |
 
 Navigation via `go(screen, prop)` in `App.jsx`. Screen and watchlist persist to `localStorage`.
 
@@ -33,7 +34,6 @@ Navigation via `go(screen, prop)` in `App.jsx`. Screen and watchlist persist to 
 | `src/main.jsx` | Entry point (React 19 + StrictMode) |
 | `src/api.js` | `fetchProperties()` and `analyzeUrl()` — calls proxied via `/api` |
 | `src/components/shared.jsx` | Reusable components (`Countdown`, `Photo` (supports `photoUrl`), `Sparkline`, `RiskSummary`, `RiskDots`, `Specs`, `PropertyCard`, `PropertyRow`) + fixtures + helpers (`fmtBRL`, `getEndsAtMs`) |
-| `src/components/Home.jsx` | Dashboard screen |
 | `src/components/Feed.jsx` | Feed screen with grid/list toggle, filters |
 | `src/components/PropertyDetail.jsx` | Property detail with tabs (Viabilidade, Mercado, Encargos, Juridico) |
 | `src/styles.css` | Layout primitives, typography, CSS custom properties |
@@ -63,6 +63,10 @@ Each property matches the `AuctionPropertyResult` shape from the backend (`backe
   risk: { j, f, l, o }, // "good" | "warn" | "bad"
   photoUrl,            // "/photos/auction1.jpg" — real property photo
   auctionUrl,          // original auction listing URL
+  marketDetail: {
+    confidenceLevel,   // "low" | "medium" | "high"; numeric score stays internal
+    indicators, comparables
+  },
   matricula,           // official property registration number, when published
   editalUrl,           // official auction notice PDF
   matriculaUrl,        // official property registration PDF

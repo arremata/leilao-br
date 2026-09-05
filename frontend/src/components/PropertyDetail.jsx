@@ -33,6 +33,10 @@ function isDirectSaleProperty(property) {
   return normalizedCostLabel(property?.modalidade).includes('venda direta');
 }
 
+function isOpenTenderProperty(property) {
+  return normalizedCostLabel(property?.modalidade).includes('licitacao aberta');
+}
+
 function costRowId(row, index = 0) {
   if (row.id) return String(row.id);
   const label = normalizedCostLabel(row.label);
@@ -81,7 +85,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 
   // Simulator state lives here so both Costs and Viability share it
   // renoPct: 0 = sem reforma, 15 = leve, 50 = intermediária, 100 = completa.
-  const [renoPct, setRenoPct] = useState(0);
+  const [renoPct, setRenoPct] = useState(() => (
+    /terreno|lote|gleba/i.test(property?.type || '') ? 0 : 15
+  ));
   const [monthsToSale, setMonthsToSale] = useState(12); // 3..24
   const [target, setTarget] = useState(30);
   const [exempt, setExempt] = useState('Primeiro imóvel ou reinvestimento em 180 dias');
@@ -163,6 +169,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const isEnriched = !!enriched;
   const p = enriched || catalogProperty;
   const isDirectSale = isDirectSaleProperty(p);
+  const commissionExempt = isDirectSale;
   const isWatched = watched?.includes(p.id);
   // Catalog responses historically used both names. Keep the official listing
   // reachable while older/newer backends converge on `auctionUrl`.
@@ -184,7 +191,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     }
   };
 
-  // --- Renovation cost: button-based, scaled by region's R$/m² ---
+  // --- Renovation cost: slider or direct value, scaled by region's R$/m² ---
   // Region price/m² from the market indicators; fall back to market/area.
   const _neighborhoodIndicator = p.marketDetail?.indicators?.find(
     i => i.lbl.toLowerCase().includes('bairro') && i.val
@@ -338,6 +345,28 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const renoCost = renovationAdjusted
     ? Math.max(0, Number(scenarioPreferences.renovationCost))
     : suggestedRenoCost;
+  const appliedRenoRate = p.area > 0 ? Math.round(renoCost / p.area) : 0;
+  const setRenoLevel = (value) => {
+    setRenoPct(Math.max(0, Math.min(100, Number(value) || 0)));
+    setScenarioPreference('renovationCost', null);
+  };
+  const setRenovationBudget = (value) => {
+    const amount = Math.max(0, Number(value) || 0);
+    if (!isLand && p.area > 0) {
+      let closestPct = 0;
+      let closestDistance = Infinity;
+      for (let pct = 0; pct <= 100; pct += 1) {
+        const candidate = _renoRate(pct, regionPricePerM2, p.area, false) * p.area;
+        const distance = Math.abs(candidate - amount);
+        if (distance < closestDistance) {
+          closestPct = pct;
+          closestDistance = distance;
+        }
+      }
+      setRenoPct(closestPct);
+    }
+    setScenarioPreference('renovationCost', amount);
+  };
 
   const marketSaleSuggestion = Math.max(0, Number(p.market) || 0);
   const appraisalSaleSuggestion = Math.max(0, Number(p.appraisal) || 0);
@@ -399,7 +428,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       return true;
     })
     .map((r, index) => ({ ...r, id: costRowId(r, index), value: Number(r.value) || 0 }))
-    .filter(r => !(isDirectSale && r.id === 'auctioneer_commission'));
+    // Commission is rebuilt from the current structured edital below. This
+    // prevents a stale materialized 5% estimate from overriding official data.
+    .filter(r => r.id !== 'auctioneer_commission');
 
   const ensureCost = (row) => {
     if (!sourceRows.some(item => item.id === row.id)) sourceRows.push(row);
@@ -411,11 +442,26 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
       : 'Valor mínimo informado para o leilão.',
     kind: 'price',
   });
-  if (!isDirectSale) {
+  const editalData = p.editalData || p.edital?.editalData || {};
+  const officialCommissionRate = Number(editalData.commissionRate);
+  if (commissionExempt) {
     ensureCost({
-      id: 'auctioneer_commission', label: 'Comissão do leiloeiro · estimativa (5%)',
-      value: Math.round(minBidFloor * 0.05), rate: 0.05,
-      hint: 'Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital.',
+      id: 'auctioneer_commission', label: 'Comissão isenta', value: 0, rate: 0,
+      hint: `${isDirectSale ? 'Venda direta' : 'Licitação aberta'} não prevê comissão de leiloeiro.`,
+      kind: 'fee',
+    });
+  } else if (Number.isFinite(officialCommissionRate) && officialCommissionRate > 0 && officialCommissionRate <= 0.3) {
+    ensureCost({
+      id: 'auctioneer_commission',
+      label: `Comissão do leiloeiro · edital (${(officialCommissionRate * 100).toLocaleString('pt-BR')}%)`,
+      value: Math.round(minBidFloor * officialCommissionRate), rate: officialCommissionRate,
+      hint: editalData.commissionTerms || 'Percentual extraído diretamente do edital oficial.',
+      kind: 'fee',
+    });
+  } else {
+    ensureCost({
+      id: 'auctioneer_commission', label: 'Comissão do leiloeiro · não informada', value: 0,
+      hint: 'O percentual oficial não está disponível nos dados estruturados do edital. Confirme antes de ofertar.',
       kind: 'fee',
     });
   }
@@ -477,7 +523,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           id: 'renovation',
           value: renoCost,
           hint: renovationAdjusted
-            ? `Valor alternativo informado por você. Sugestão da plataforma: R$ ${fmtBRL(suggestedRenoCost)}.`
+            ? `Valor de reforma informado por você. Referência leve da plataforma: R$ ${fmtBRL(suggestedRenoCost)}.`
             : `Nível: ${_renoLevelLabel(renoPct)}. R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m².`,
         };
       }
@@ -569,21 +615,20 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const externalCosts = Math.max(0, dynamicTotal - consideredBid);
 
   const sim = {
-    renoPct, setRenoPct, monthsToSale, setMonthsToSale,
+    renoPct, setRenoPct: setRenoLevel, monthsToSale, setMonthsToSale,
     target: effectiveTarget, setTarget, targetCap,
     exempt, setExempt,
-    renoCost, suggestedRenoCost, renovationAdjusted, renoRate, regionPricePerM2, isLand,
+    renoCost, renovationAdjusted, renoRate: appliedRenoRate, regionPricePerM2, isLand,
     monthlyCondo, monthlyIptu, projectedCondo, projectedIptu,
     expenseEstimates, setExpenseEstimate, expenseReference: p.expenseEstimate,
     evictionCost, evictionAdjusted,
     setEvictionCost: (value) => setScenarioPreference('evictionCost', value),
     resetEvictionCost: () => setScenarioPreference('evictionCost', null),
-    setRenovationCost: (value) => setScenarioPreference('renovationCost', value),
-    resetRenovationCost: () => setScenarioPreference('renovationCost', null),
+    setRenovationCost: setRenovationBudget,
     saleValue, saleBasis, marketSaleSuggestion, appraisalSaleSuggestion,
     setSaleBasis, setCustomSaleValue,
     gainCapital, dynamicTotal, dynamicRows, maxBid: consideredBid,
-    externalCosts, addCustomCost, removeCustomCost,
+    externalCosts, customCosts, addCustomCost, removeCustomCost,
     resetScenarioPreferences, resetExpenseEstimates,
   };
 
@@ -1254,17 +1299,19 @@ function Stat2({ lbl, val, delta, pos, neg }) {
 // ============================================================
 function CostBreakdown({ p, sim }) {
   const isDirectSale = isDirectSaleProperty(p);
+  const isOpenTender = isOpenTenderProperty(p);
+  const commissionExempt = isDirectSale;
   const {
     renoPct, setRenoPct, monthsToSale, setMonthsToSale,
     target, setTarget, targetCap, exempt, setExempt,
-    renoCost, suggestedRenoCost, renovationAdjusted, renoRate, regionPricePerM2, isLand,
+    renoCost, renovationAdjusted, renoRate, regionPricePerM2, isLand,
     projectedCondo, projectedIptu,
     expenseEstimates, setExpenseEstimate, expenseReference,
     evictionCost, evictionAdjusted, setEvictionCost, resetEvictionCost,
-    setRenovationCost, resetRenovationCost,
+    setRenovationCost,
     saleValue, saleBasis, marketSaleSuggestion, appraisalSaleSuggestion,
     setSaleBasis, setCustomSaleValue,
-    maxBid, dynamicRows, dynamicTotal, externalCosts,
+    maxBid, dynamicRows, dynamicTotal, externalCosts, customCosts,
     addCustomCost, removeCustomCost, resetScenarioPreferences, resetExpenseEstimates,
   } = sim;
 
@@ -1276,28 +1323,31 @@ function CostBreakdown({ p, sim }) {
     );
   }
 
-  // Presets snap the slider to canonical levels.
-  const renoPresets = [
-    { id: 'none',     label: 'Sem reforma',   pct: 0 },
-    { id: 'leve',     label: 'Leve',          pct: 15 },
-    { id: 'inter',    label: 'Intermediária', pct: 50 },
-    { id: 'completa', label: 'Completa',      pct: 100 },
+  const bidFloor = Math.max(0, Number(p.minBid) || 0);
+  const bidRoom = Math.max(0, maxBid - bidFloor);
+  const floorLabel = isDirectSale
+    ? 'Preço mínimo da venda'
+    : (isOpenTender ? 'Valor mínimo da licitação' : `Valor ${p.praca ? `da ${p.praca}` : 'de praça'}`);
+  const externalCostTags = [
+    'ITBI',
+    commissionExempt ? 'Comissão isenta' : 'Comissão leiloeiro',
+    'Registro cartório',
   ];
 
   return (
     <div>
       {/* ── Simulator ── */}
-      <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-        <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 20 }}>
+      <div className="card simulator-card" style={{ padding: 24, marginBottom: 20 }}>
+        <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--line-1)' }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>§ 02.01 · simulador</span>
-            <h3 className="h2" style={{ marginTop: 4 }}>Cenário do investidor</h3>
-            <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--fg-2)' }}>
+            <h3 className="h2" style={{ marginTop: 6 }}>Cenário do investidor</h3>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-2)' }}>
               Ajuste os controles — os custos abaixo recalculam ao vivo.
             </p>
           </div>
-          <button className="btn sm" onClick={() => {
-            setRenoPct(0);
+          <button className="btn sm simulator-reset-btn" onClick={() => {
+            setRenoPct(isLand ? 0 : 15);
             setMonthsToSale(12);
             setTarget(30);
             setExempt('Primeiro imóvel ou reinvestimento em 180 dias');
@@ -1349,103 +1399,107 @@ function CostBreakdown({ p, sim }) {
               ? `Estimativas para ${expenseReference.city}/${expenseReference.uf}, referência ${expenseReference.referenceYear}: IPTU de ${(expenseReference.annualIptuRate * 100).toLocaleString('pt-BR')}% a.a. sobre a avaliação e condomínio de R$ ${fmtBRL(expenseReference.condoPerM2Monthly)}/m²/mês. Fonte: ${expenseReference.source}`
               : 'Ainda não há referência cadastrada para esta cidade. Você pode inserir estimativas mensais, salvas somente neste navegador.'}
           </p>
+          <CustomCostsEditor
+            costs={customCosts}
+            onAdd={addCustomCost}
+            onRemove={removeCustomCost}
+          />
         </div>
 
-        {/* Metric tiles — tonal hierarchy: hero (maxBid) / good (venda) / cost (total) / muted (external) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 24 }}>
+        {/* Four-card summary rail; the first three preserve the cost equation. */}
+        <div className="cost-equation" aria-label="Composição do custo total estimado">
+          <div className="cost-equation-card">
+            <SimMetric
+              lbl={isDirectSale ? 'Proposta máxima recomendada' : 'Lance máximo recomendado'}
+              big={`R$ ${fmtBRL(Math.max(0, maxBid))}`}
+              sub={`Para atingir ${target}% de retorno líquido`}
+              tone="hero"
+            >
+              <div className="bid-room">
+                <div>
+                  <span>{floorLabel}</span>
+                  <strong>R$ {fmtBRL(bidFloor)}</strong>
+                </div>
+                <div className="bid-room-delta">
+                  <span aria-hidden="true">↕</span>
+                  <strong>R$ {fmtBRL(bidRoom)}</strong>
+                  <span>{bidRoom > 0 ? 'de margem para trabalhar' : 'sem margem adicional'}</span>
+                </div>
+              </div>
+            </SimMetric>
+          </div>
+          <span className="cost-equation-operator" aria-hidden="true">+</span>
+          <div className="cost-equation-card">
           <SimMetric
             lbl="Custos externos"
             big={`R$ ${fmtBRL(externalCosts)}`}
             sub={isDirectSale ? 'Tudo além da compra: taxas, reforma, débitos' : 'Tudo além do arremate: taxas, reforma, débitos'}
             tone="muted"
-          />
+          >
+            <div className="automatic-cost-tags" aria-label="Custos calculados automaticamente">
+              {externalCostTags.map(tag => <span key={tag}>{tag}</span>)}
+            </div>
+          </SimMetric>
+          </div>
+          <span className="cost-equation-operator" aria-hidden="true">=</span>
+          <div className="cost-equation-card">
           <SimMetric
             lbl="Custo total estimado"
             big={`R$ ${fmtBRL(dynamicTotal)}`}
-            sub={isDirectSale ? 'Compra + custos externos (baseado na proposta máxima)' : 'Arremate + custos externos (baseado no lance máximo)'}
+            sub={isDirectSale ? 'Proposta máxima + demais despesas' : 'Lance máximo + demais despesas'}
             tone="cost"
-          />
-          <SimMetric
-            lbl={isDirectSale ? 'Proposta máxima recomendada' : 'Lance máximo recomendado'}
-            big={`R$ ${fmtBRL(Math.max(0, maxBid))}`}
-            sub={`Para atingir ${target}% de retorno líquido`}
-            tone="hero"
-          />
-          <SaleValueMetric
-            value={saleValue}
-            basis={saleBasis}
-            marketValue={marketSaleSuggestion}
-            appraisalValue={appraisalSaleSuggestion}
-            onBasisChange={setSaleBasis}
-            onValueChange={setCustomSaleValue}
-            delta={saleValue - dynamicTotal}
-          />
+          >
+            <div className="total-equation-copy">
+              <span>R$ {fmtBRL(maxBid)}</span>
+              <span>+</span>
+              <span>R$ {fmtBRL(externalCosts)}</span>
+            </div>
+          </SimMetric>
+          </div>
+          <div className="cost-equation-card sale-scenario-context">
+            <SaleValueMetric
+              value={saleValue}
+              basis={saleBasis}
+              marketValue={marketSaleSuggestion}
+              appraisalValue={appraisalSaleSuggestion}
+              onBasisChange={setSaleBasis}
+              onValueChange={setCustomSaleValue}
+              delta={saleValue - dynamicTotal}
+            />
+          </div>
         </div>
 
-          {/* Renovation slider + presets + months-to-sale + target */}
+          {/* Renovation control + months-to-sale + target */}
           <div className="sim-sliders" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginBottom: 24 }}>
-          {/* Renovation — slider + presets */}
+          {/* Renovation — one synchronized value + slider */}
           <div>
             <div className="row between baseline">
               <span className="uppy" style={{ color: 'var(--fg-3)' }}>Nível de reforma</span>
-              <span className="row gap-2 mono" style={{ fontSize: 16, fontWeight: 500, color: 'var(--accent)' }}>
-                R$ {fmtBRL(renoCost)}
-                {renovationAdjusted && <span className="tag" style={{ fontSize: 8 }}>valor próprio</span>}
-              </span>
+              <RenovationMoneyEditor
+                value={renoCost}
+                adjusted={renovationAdjusted}
+                disabled={isLand}
+                onCommit={setRenovationCost}
+              />
             </div>
             <input
               type="range" min={0} max={100} value={renoPct}
               onChange={(e) => setRenoPct(+e.target.value)}
               disabled={isLand}
               className="slider"
-              style={{ width: '100%', marginTop: 14 }}
+              style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
             />
             <div className="row between" style={{ marginTop: 8 }}>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>sem reforma</span>
-              <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>completa</span>
-            </div>
-            <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
-              {renoPresets.map(b => {
-                const active = renoPct === b.pct;
-                return (
-                  <button
-                    key={b.id}
-                    onClick={() => setRenoPct(b.pct)}
-                    style={{
-                      padding: '6px 10px', fontSize: 11.5, borderRadius: 6,
-                      border: '1px solid ' + (active ? 'var(--accent)' : 'var(--line-1)'),
-                      background: active ? 'var(--accent-soft)' : 'var(--bg-1)',
-                      color: active ? 'var(--accent-strong)' : 'var(--fg-1)',
-                      fontWeight: active ? 500 : 400,
-                      transition: 'all .15s',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {b.label}
-                  </button>
-                );
-              })}
+              <span className="mono" style={{ fontSize: 9.5, letterSpacing: '.06em', color: 'var(--fg-3)' }}>sem reforma</span>
+              <span className="mono" style={{ fontSize: 9.5, letterSpacing: '.06em', color: 'var(--fg-3)' }}>completa</span>
             </div>
             <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
               {isLand
                 ? 'Terreno não recebe estimativa de reforma'
                 : renovationAdjusted
-                  ? `Sugestão da plataforma: R$ ${fmtBRL(suggestedRenoCost)}`
+                  ? 'Valor digitado por você · arraste o controle para voltar ao cálculo por intensidade'
                   : `R$ ${renoRate}/m² × ${Math.round(p.area || 0)} m² · cenário ${renoPct}%`}
             </p>
-            {!isLand && (
-              <div className="renovation-alternative">
-                <ScenarioMoneyField
-                  label="Valor alternativo de reforma"
-                  value={renoCost}
-                  adjusted={renovationAdjusted}
-                  defaultLabel="Use um orçamento próprio, se já tiver"
-                  onCommit={setRenovationCost}
-                  onReset={resetRenovationCost}
-                  compact
-                />
-              </div>
-            )}
           </div>
 
           {/* Months to sale */}
@@ -1454,6 +1508,7 @@ function CostBreakdown({ p, sim }) {
             value={monthsToSale}
             onChange={setMonthsToSale}
             display={`${monthsToSale}m`}
+            unit=""
             description={`Condomínio + IPTU projetados: R$ ${fmtBRL(projectedCondo + projectedIptu)}`}
             min={3}
             max={24}
@@ -1465,6 +1520,7 @@ function CostBreakdown({ p, sim }) {
             value={target}
             onChange={setTarget}
             display={`${target}%`}
+            unit="%"
             description={target >= targetCap
               ? (isDirectSale
                   ? 'Limite — proposta máxima = preço mínimo da venda'
@@ -1476,12 +1532,12 @@ function CostBreakdown({ p, sim }) {
         </div>
 
         {/* Region price/m² context */}
-        <div style={{
-          padding: '10px 14px', background: 'var(--bg-2)', borderRadius: 6,
-          fontSize: 11.5, color: 'var(--fg-2)', marginBottom: 20,
-        }}>
-          <span className="mono" style={{ color: 'var(--fg-3)' }}>região:</span>{' '}
-          R$ {fmtBRL(regionPricePerM2)}/m² · taxa de reforma aplicada: R$ {fmtBRL(renoRate)}/m²
+        <div className="sim-region-strip">
+          <span style={{ color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontSize: 10 }}>região</span>
+          <b>R$ {fmtBRL(regionPricePerM2)}/m²</b>
+          <span className="sep" aria-hidden="true"></span>
+          <span style={{ color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontSize: 10 }}>taxa de reforma aplicada</span>
+          <b>R$ {fmtBRL(renoRate)}/m²</b>
         </div>
 
         {/* Tax scenario */}
@@ -1505,7 +1561,7 @@ function CostBreakdown({ p, sim }) {
               {isDirectSale ? 'Da proposta à chave na mão' : 'Da batida do martelo à chave na mão'}
             </h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 540 }}>
-              Valores consolidados do cenário acima. Aqui você pode acrescentar apenas custos extras.
+              Valores consolidados do cenário acima. Para incluir ou remover gastos adicionais, use “Custos ajustáveis” no § 02.01.
             </p>
           </div>
           <div className="row gap-2">
@@ -1532,10 +1588,8 @@ function CostBreakdown({ p, sim }) {
               hint={r.hint}
               pct={dynamicTotal > 0 ? r.value / dynamicTotal * 100 : 0}
               custom={r.custom}
-              onDelete={r.custom ? () => removeCustomCost(r.id) : null}
             />
           ))}
-          <CustomCostForm onAdd={addCustomCost} />
           <div className="cost-row" style={{
             display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
             padding: '20px 20px', background: 'var(--bg-2)',
@@ -1549,8 +1603,8 @@ function CostBreakdown({ p, sim }) {
         </div>
         <p style={{ marginTop: 14, fontSize: 11.5, color: 'var(--fg-3)' }}>
           {isDirectSale
-            ? 'ITBI e registro acompanham a proposta recomendada. Não há comissão de leiloeiro nesta modalidade.'
-            : 'Comissão, ITBI e registro acompanham o lance recomendado. As demais premissas são ajustadas no cenário do investidor.'}
+            ? 'ITBI e registro acompanham a proposta recomendada. A comissão é isenta nesta modalidade.'
+            : 'Comissão do edital, ITBI e registro acompanham o lance recomendado. As demais premissas são ajustadas no cenário do investidor.'}
         </p>
       </div>
     </div>
@@ -1558,7 +1612,7 @@ function CostBreakdown({ p, sim }) {
 }
 
 function ScenarioMoneyField({
-  label, value, adjusted, defaultLabel, suffix, onCommit, onReset, compact = false,
+  label, value, adjusted, defaultLabel, suffix, onCommit, onReset,
 }) {
   const [draft, setDraft] = useState(null);
   const displayedValue = draft == null ? (Number.isFinite(Number(value)) ? String(value) : '') : draft;
@@ -1573,7 +1627,7 @@ function ScenarioMoneyField({
   };
 
   return (
-    <div className={`scenario-money-field${compact ? ' compact' : ''}`}>
+    <div className="scenario-money-field">
       <label>
         <span className="uppy">{label}</span>
       <div className="scenario-money-input">
@@ -1601,32 +1655,76 @@ function ScenarioMoneyField({
   );
 }
 
+function RenovationMoneyEditor({ value, adjusted, disabled, onCommit }) {
+  const [draft, setDraft] = useState(null);
+  const displayedValue = draft == null ? String(Math.round(Number(value) || 0)) : draft;
+  const commit = () => {
+    if (draft == null) return;
+    const amount = Number(draft);
+    if (Number.isFinite(amount) && amount >= 0) onCommit(amount);
+    setDraft(null);
+  };
+
+  return (
+    <label className={`renovation-money-editor${adjusted ? ' adjusted' : ''}`}>
+      <span>R$</span>
+      <input
+        type="number"
+        min="0"
+        step="100"
+        inputMode="decimal"
+        value={displayedValue}
+        disabled={disabled}
+        onFocus={event => {
+          setDraft(String(Math.round(Number(value) || 0)));
+          event.currentTarget.select();
+        }}
+        onChange={event => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={event => {
+          if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+          if (event.key === 'Escape') setDraft(null);
+        }}
+        aria-label="Valor da reforma"
+      />
+      {adjusted && <span className="renovation-money-status">digitado</span>}
+    </label>
+  );
+}
+
 // Tonal palette — hero (maxBid) leads, good (venda) follows, cost is neutral-bold, muted recedes.
 const _tones = {
-  hero:   { cardBg: 'var(--accent)',           border: 'var(--accent-strong)', num: 'var(--accent-ink)',  lbl: 'rgba(255,255,255,0.75)', sub: 'rgba(255,255,255,0.85)', chipBg: 'rgba(255,255,255,0.18)', chipFg: '#fff' },
+  hero:   { cardBg: 'var(--accent)',           border: 'var(--accent-strong)', num: '#fff',                 lbl: 'rgba(255,255,255,0.72)', sub: 'rgba(255,255,255,0.78)', chipBg: 'rgba(255,255,255,0.18)', chipFg: '#fff' },
   good:   { cardBg: 'var(--good-soft)',         border: 'var(--good)',           num: 'var(--good)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-2)',            chipBg: 'var(--good)',           chipFg: '#fff' },
   cost:   { cardBg: 'var(--bg-1)',              border: 'var(--line-2)',         num: 'var(--fg-0)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-2)',            chipBg: 'var(--bg-3)',           chipFg: 'var(--fg-1)' },
-  muted:  { cardBg: 'var(--bg-2)',              border: 'var(--line-1)',         num: 'var(--fg-1)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-3)',            chipBg: 'transparent',          chipFg: 'var(--fg-2)' },
+  muted:  { cardBg: 'var(--bg-1)',              border: 'var(--line-1)',         num: 'var(--fg-1)',         lbl: 'var(--fg-3)',            sub: 'var(--fg-3)',            chipBg: 'transparent',          chipFg: 'var(--fg-2)' },
 };
-function SimMetric({ lbl, big, sub, tone = 'muted', delta }) {
+function SimMetric({ lbl, big, sub, tone = 'muted', delta, children }) {
   const t = _tones[tone] || _tones.muted;
   const showDelta = typeof delta === 'number';
   const deltaPos = delta >= 0;
   return (
-    <div style={{
-      padding: '16px 18px',
-      background: t.cardBg, borderRadius: 10,
+    <div className={`sim-metric ${tone}`} style={{
+      padding: '16px',
+      background: t.cardBg,
+      borderRadius: 12,
       border: `1px solid ${t.border}`,
-      boxShadow: tone === 'hero' ? '0 6px 18px rgba(124,58,237,0.22)' : 'none',
+      boxShadow: tone === 'hero' ? '0 8px 28px rgba(124,58,237,0.26)' : '0 1px 3px rgba(17,24,39,0.04)',
     }}>
-      <span className="uppy" style={{ color: t.lbl, fontSize: 10.5, letterSpacing: '0.06em' }}>{lbl}</span>
-      <div className="num-xl" style={{ marginTop: 8, color: t.num, fontSize: tone === 'hero' ? 30 : 26, fontWeight: 600 }}>{big}</div>
+      <span className="uppy" style={{ color: t.lbl, fontSize: 10, letterSpacing: '0.09em' }}>{lbl}</span>
+      <div className="num-xl" style={{
+        marginTop: 8,
+        color: t.num,
+        fontSize: tone === 'hero' ? 28 : tone === 'cost' ? 25 : 24,
+        fontWeight: tone === 'hero' || tone === 'cost' ? 600 : 500,
+        letterSpacing: tone === 'hero' ? '-0.03em' : '-0.02em',
+      }}>{big}</div>
       {showDelta && (
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          marginTop: 6, padding: '3px 8px', borderRadius: 6,
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          marginTop: 8, padding: '4px 10px', borderRadius: 999,
           background: deltaPos ? 'var(--good)' : 'var(--bad)',
-          color: '#fff', fontSize: 11.5, fontWeight: 600,
+          color: '#fff', fontSize: 11, fontWeight: 600,
           fontFamily: 'var(--f-mono)',
         }}>
           <span>{deltaPos ? '▲' : '▼'}</span>
@@ -1634,7 +1732,8 @@ function SimMetric({ lbl, big, sub, tone = 'muted', delta }) {
           <span style={{ fontWeight: 400, opacity: 0.85 }}>lucro líq.</span>
         </div>
       )}
-      {sub && <p style={{ margin: showDelta ? '8px 0 0' : '6px 0 0', fontSize: 11.5, color: t.sub, lineHeight: 1.4 }}>{sub}</p>}
+      {sub && <p style={{ margin: showDelta ? '8px 0 0' : '7px 0 0', fontSize: 11.5, color: t.sub, lineHeight: 1.45 }}>{sub}</p>}
+      {children}
     </div>
   );
 }
@@ -1751,7 +1850,7 @@ function CostRow({ l, v, hint, pct, custom, onDelete }) {
         <div className="row gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{l}</div>
           {custom && <span className="tag" style={{ padding: '2px 5px', fontSize: 8.5, color: 'var(--accent-strong)' }}>extra</span>}
-          {custom && (
+          {custom && onDelete && (
             <button type="button" className="cost-inline-action danger" onClick={onDelete} aria-label={`Excluir ${l}`}>remover</button>
           )}
         </div>
@@ -1779,17 +1878,47 @@ function CostRow({ l, v, hint, pct, custom, onDelete }) {
   );
 }
 
+function CustomCostsEditor({ costs, onAdd, onRemove }) {
+  return (
+    <section className="scenario-extra-costs" aria-labelledby="additional-costs-title">
+      <div className="scenario-extra-costs-head">
+        <div>
+          <span className="uppy" id="additional-costs-title">Gastos adicionais</span>
+          <p>Inclua quantos gastos precisar; eles entram automaticamente nos custos externos.</p>
+        </div>
+        {costs.length > 0 && <span className="mono">{costs.length} {costs.length === 1 ? 'item' : 'itens'}</span>}
+      </div>
+      <div className="scenario-extra-costs-grid">
+        {costs.map(cost => (
+          <div className="scenario-extra-cost-item" key={cost.id}>
+            <div>
+              <span>{cost.label}</span>
+              <strong>R$ {fmtBRL(cost.value)}</strong>
+            </div>
+            <button type="button" onClick={() => onRemove(cost.id)} aria-label={`Remover ${cost.label}`}>×</button>
+          </div>
+        ))}
+        <CustomCostForm onAdd={onAdd} />
+      </div>
+    </section>
+  );
+}
+
 function CustomCostForm({ onAdd }) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
   const [value, setValue] = useState('');
   const valid = label.trim() && value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+  const suggestions = ['Gasolina', 'Transporte', 'Diligências', 'Outras despesas'];
 
   if (!open) {
     return (
       <button type="button" className="custom-cost-trigger" onClick={() => setOpen(true)}>
-        <span aria-hidden="true">＋</span>
-        Adicionar custo personalizado
+        <span className="custom-cost-plus" aria-hidden="true">＋</span>
+        <span>
+          <strong>Adicionar gasto</strong>
+          <small>Gasolina, transporte, diligências ou outro</small>
+        </span>
       </button>
     );
   }
@@ -1806,8 +1935,18 @@ function CustomCostForm({ onAdd }) {
         setOpen(false);
       }}
     >
+      <div className="custom-cost-suggestions">
+        <span className="uppy">Sugestões rápidas</span>
+        <div className="row gap-2 wrap">
+          {suggestions.map(suggestion => (
+            <button type="button" key={suggestion} onClick={() => setLabel(suggestion)}>
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      </div>
       <label>
-        <span className="uppy">Título do custo</span>
+        <span className="uppy">Descrição do gasto</span>
         <input
           autoFocus
           value={label}
@@ -1839,24 +1978,25 @@ function CustomCostForm({ onAdd }) {
   );
 }
 
-function SliderField({ label, value, onChange, display, description, min = 0, max = 100 }) {
+function SliderField({ label, value, onChange, display, unit = '%', description, min = 0, max = 100 }) {
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
     <div>
       <div className="row between baseline">
         <span className="uppy" style={{ color: 'var(--fg-3)' }}>{label}</span>
-        <span className="mono" style={{ fontSize: 18, fontWeight: 500, color: 'var(--accent)' }}>{display}</span>
+        <span className="mono" style={{ fontSize: 17, fontWeight: 600, color: 'var(--accent)' }}>{display}</span>
       </div>
       <input
         type="range" min={min} max={max} value={value}
         onChange={(e) => onChange(+e.target.value)}
         className="slider"
-        style={{ width: '100%', marginTop: 14 }}
+        style={{ width: '100%', marginTop: 14, '--fill': `${pct}%` }}
       />
       <div className="row between" style={{ marginTop: 8 }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{min}%</span>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{max}%</span>
+        <span className="mono" style={{ fontSize: 9.5, letterSpacing: '.06em', color: 'var(--fg-3)' }}>{min}{unit}</span>
+        <span className="mono" style={{ fontSize: 9.5, letterSpacing: '.06em', color: 'var(--fg-3)' }}>{max}{unit}</span>
       </div>
-      <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>{description}</p>
+      <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.5 }}>{description}</p>
     </div>
   );
 }
@@ -1918,6 +2058,7 @@ function Edital({ p, auctionUrl }) {
   const normalizedModality = modality.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const isDirectSale = normalizedModality.includes('venda direta');
   const isOpenTender = normalizedModality.includes('licitacao');
+  const commissionExempt = isDirectSale;
   const isSfiAuction = normalizedModality.includes('leilao sfi');
   const saleRulesUrl = d.saleRulesUrl;
   const firstAuctionDate = isDirectSale ? null : (p.firstAuctionAt || e?.firstBidDate || p.endsAt);
@@ -1978,11 +2119,14 @@ function Edital({ p, auctionUrl }) {
   ].filter(Boolean);
   const commissionRate = Number(d.commissionRate);
   const paymentNotes = [
-    !isDirectSale && Number.isFinite(commissionRate) && commissionRate > 0 && {
+    commissionExempt && {
+      label: 'Comissão do leiloeiro', value: 'Comissão isenta nesta modalidade.',
+    },
+    !commissionExempt && Number.isFinite(commissionRate) && commissionRate > 0 && {
       label: `Comissão do leiloeiro · ${Number((commissionRate * 100).toFixed(2)).toLocaleString('pt-BR')}%`,
       value: d.commissionTerms || 'Percentual informado no edital oficial.',
     },
-    d.commissionPaymentDeadline && {
+    !commissionExempt && d.commissionPaymentDeadline && {
       label: 'Pagamento da comissão', value: d.commissionPaymentDeadline,
     },
     d.paymentMethods && { label: 'Formas de pagamento aceitas', value: d.paymentMethods },
@@ -2054,7 +2198,7 @@ function Edital({ p, auctionUrl }) {
       )}
       <EditalFacts title="Dados do imóvel" items={propertyFacts} />
       <EditalFacts title={isDirectSale ? 'Dados da venda' : 'Dados do leilão'} items={auctionFacts} />
-      {!isDirectSale && <EditalFacts title="Leiloeiro e contatos" items={auctioneerFacts} />}
+      {!commissionExempt && <EditalFacts title="Leiloeiro e contatos" items={auctioneerFacts} />}
       <EditalNotes title={isDirectSale ? 'Pagamento e responsabilidades' : 'Pagamento e prazos'} items={paymentNotes} />
       {(d.propertyDescription || e?.propertyDescription) && (
         <section className="edital-section">

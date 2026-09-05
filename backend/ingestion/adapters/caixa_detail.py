@@ -37,6 +37,9 @@ _SCRIPT_STYLE_RE = re.compile(
 )
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
+_NOT_FOUND_RE = re.compile(
+    r"nenhum\s+im[oó]vel\s+encontrado", re.IGNORECASE,
+)
 _AUCTION_DATE_RE = re.compile(
     r"Data\s+do\s+([12])\s*[º°oªa]?\s*Leil[aã]o\s*[-–—:]?\s*"
     r"(\d{2}/\d{2}/\d{4})"
@@ -215,6 +218,50 @@ def parse_detail_html(html: str, base_url: str) -> dict:
     }
 
 
+def detail_result_from_html(
+    html: str,
+    base_url: str = "https://venda-imoveis.caixa.gov.br",
+) -> dict | None:
+    """Return persistable detail metadata when ``html`` is a real page.
+
+    Caixa's bot manager and its no-result screen both return HTTP 200. Keeping
+    the validity check in one place makes the fast HTTP client and the trusted
+    headed-browser fallback agree on what counts as a successful response.
+    """
+    parsed = parse_detail_html(html, base_url=base_url)
+    first = parsed["first_auction_at"]
+    second = parsed["second_auction_at"]
+    if not (
+        first is not None or second is not None
+        or parsed["edital_url"] or parsed["matricula_url"]
+    ):
+        return None
+    return {
+        "first_auction_at": first,
+        "second_auction_at": second,
+        "first_auction_price": parsed["first_auction_price"],
+        "second_auction_price": parsed["second_auction_price"],
+        "matricula": parsed["matricula"],
+        "edital_url": parsed["edital_url"],
+        "matricula_url": parsed["matricula_url"],
+        "edital_data": parsed["edital_data"],
+    }
+
+
+def unusable_detail_reason(html: str) -> str:
+    """Classify an HTTP-200 body that did not contain official detail data."""
+    if not html.strip():
+        return "empty"
+    if _NOT_FOUND_RE.search(html):
+        return "not-found"
+    folded = html.casefold()
+    if any(marker in folded for marker in (
+        "radware bot manager", "captcha", "access denied", "acesso negado",
+    )):
+        return "bot-challenge"
+    return "partial-or-unrecognized"
+
+
 def _property_number_from_url(url: str) -> str:
     values = parse_qs(urlparse(url).query).get("hdnimovel", [])
     return values[0] if values else ""
@@ -253,7 +300,7 @@ async def _attach_edital_pdf_data(client, urls: list[str], results: list[dict | 
 async def fetch_auction_dates_batch(
     urls: list[str], concurrency: int = 2, retries: int = 1,
     request_interval: float = 1.0, max_consecutive_429: int = 3,
-    recovery_rounds: int = 2,
+    recovery_rounds: int = 1,
 ) -> list[dict | None]:
     """Fetch Caixa detail metadata concurrently, preserving input order.
 
@@ -296,30 +343,21 @@ async def fetch_auction_dates_batch(
                         response.raise_for_status()
                         async with rate_limit_lock:
                             consecutive_429 = 0
-                        parsed = parse_detail_html(
+                        result = detail_result_from_html(
                             response.text,
                             base_url="https://venda-imoveis.caixa.gov.br",
                         )
-                        first = parsed["first_auction_at"]
-                        second = parsed["second_auction_at"]
                         # Caixa's bot manager can return an HTML challenge with
                         # HTTP 200. A real property page contains auction dates
                         # and/or official documents; document-only modalities
                         # are valid even when no scheduled date is published.
-                        if (
-                            first is not None or second is not None
-                            or parsed["edital_url"] or parsed["matricula_url"]
-                        ):
-                            return {
-                                "first_auction_at": first,
-                                "second_auction_at": second,
-                                "first_auction_price": parsed["first_auction_price"],
-                                "second_auction_price": parsed["second_auction_price"],
-                                "matricula": parsed["matricula"],
-                                "edital_url": parsed["edital_url"],
-                                "matricula_url": parsed["matricula_url"],
-                                "edital_data": parsed["edital_data"],
-                            }
+                        if result is not None:
+                            return result
+                        logger.debug(
+                            "Unusable Caixa detail response for {}: {} ({} chars)",
+                            url, unusable_detail_reason(response.text),
+                            len(response.text),
+                        )
                     except (RequestsError, ValueError) as exc:
                         response = getattr(exc, "response", None)
                         if getattr(response, "status_code", None) == 429:
@@ -370,7 +408,8 @@ async def fetch_auction_dates_batch(
         for index in failed_indexes:
             if results[index] is None:
                 logger.warning(
-                    f"Auction dates unavailable for {urls[index]}; will retry next run"
+                    "Auction detail unavailable through the HTTP client for "
+                    f"{urls[index]}; leaving it unresolved for the caller"
                 )
     return results
 

@@ -23,10 +23,10 @@ Cada comparável pode somar até 6 pontos:
 | Quartos | 15% | 0,90 | 4,50 |
 | Preço/m² | 10% | 0,60 | 3,00 |
 
-Faixas iniciais de similaridade:
+Regras de similaridade:
 
 - Proximidade: até 1 km = 100%; entre 1 e 2 km = 75%; acima de 2 km = inválido.
-- Área: diferença até 10% = 100%; até 20% = 75%; até 35% = 50%; acima disso = 0%.
+- Área: pontuação contínua e simétrica calculada por `menor área ÷ maior área`. Por exemplo, 171,19 m² e 212 m² têm 80,75% de similaridade e recebem 1,94 dos 2,40 pontos de área.
 - Quartos: mesma quantidade = 100%; diferença de 1 = 50%; diferença maior = 0%.
 - Preço/m²: diferença até 10% = 100%; até 20% = 75%; até 30% = 50%; acima disso = 0%.
 
@@ -38,7 +38,7 @@ Compara somente os anúncios encontrados entre si, sem considerar o imóvel do l
 score = 20 × ((quantidade - 1) / 4) × similaridade média do grupo
 ```
 
-A similaridade interna considera consistência de preço/m² (10 pontos), área (5), quartos (3) e concentração geográfica (2). O máximo por quantidade é: 1 = 0, 2 = 5, 3 = 10, 4 = 15 e 5 = 20 pontos.
+A similaridade interna considera consistência de preço/m² (10 pontos), área contínua pela mesma razão simétrica (5), quartos (3) e concentração geográfica (2). O máximo por quantidade é: 1 = 0, 2 = 5, 3 = 10, 4 = 15 e 5 = 20 pontos.
 
 ## Classificação
 

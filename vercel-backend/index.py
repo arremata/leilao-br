@@ -11,7 +11,7 @@ import json
 import os
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from itertools import combinations
 from math import asin, cos, radians, sin, sqrt
 from statistics import median
@@ -26,7 +26,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v9-market-confidence"
+PIPELINE_VERSION = "v13-area-similarity"
 
 _REGISTRATION_RATES = {
     "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
@@ -68,19 +68,6 @@ def _normalize_text(value: str | None) -> str:
     return " ".join(value.casefold().split())
 
 
-def _extract_commission_rate(description: str | None) -> float | None:
-    for pattern in (
-        r"comiss[aã]o[^%\n]{0,80}?(\d+(?:[.,]\d+)?)\s*%",
-        r"(\d+(?:[.,]\d+)?)\s*%[^\n.]{0,80}?comiss[aã]o",
-    ):
-        match = re.search(pattern, description or "", re.IGNORECASE)
-        if match:
-            percentage = float(match.group(1).replace(",", "."))
-            if 0 < percentage <= 30:
-                return percentage / 100
-    return None
-
-
 def _registration_rate(uf: str | None) -> float | None:
     normalized_uf = (uf or "").upper().strip()
     if normalized_uf not in _BRAZILIAN_UFS:
@@ -120,20 +107,28 @@ def _relative_difference(left, right) -> float | None:
     return abs(left - right) / left if left > 0 and right > 0 else None
 
 
+def _area_similarity(left, right) -> float:
+    """Return a continuous, symmetric size similarity from zero to one."""
+    left, right = float(left or 0), float(right or 0)
+    if left <= 0 or right <= 0:
+        return 0.0
+    return min(left, right) / max(left, right)
+
+
 def _pair_relative_difference(left, right) -> float | None:
     left, right = float(left or 0), float(right or 0)
     midpoint = (left + right) / 2
     return abs(left - right) / midpoint if left > 0 and right > 0 else None
 
 
-def _similarity_band(difference, *, price=False) -> float:
+def _price_similarity_band(difference) -> float:
     if difference is None:
         return 0.0
     if difference <= 0.10:
         return 1.0
     if difference <= 0.20:
         return 0.75
-    if difference <= (0.30 if price else 0.35):
+    if difference <= 0.30:
         return 0.50
     return 0.0
 
@@ -214,19 +209,23 @@ def _prepare_market_comparables(property_row, comparable_rows) -> list[dict]:
 
 def _market_confidence_level(property_row, comparables: list[dict]) -> str:
     p = dict(property_row)
-    subject_complete = all(p.get(field) not in (None, "") for field in (
-        "property_type", "area_m2", "beds", "lat", "lng",
-    ))
+    subject_has_coordinates = all(
+        p.get(field) not in (None, "") for field in ("lat", "lng")
+    )
+    subject_type = _canonical_property_type(p.get("property_type"))
     comparables = [
         item for item in comparables
-        if subject_complete
-        and all(item.get(field) not in (None, "") for field in (
-            "property_type", "area_m2", "beds", "price_per_m2", "lat", "lng",
-        ))
-        and _canonical_property_type(item.get("property_type"))
-        == _canonical_property_type(p.get("property_type"))
-        and item.get("distance_km") is not None
-        and item["distance_km"] <= 2
+        if float(item.get("area_m2") or 0) > 0
+        and float(item.get("price_per_m2") or 0) > 0
+        and (
+            not subject_type
+            or not _canonical_property_type(item.get("property_type"))
+            or _canonical_property_type(item.get("property_type")) == subject_type
+        )
+        and (
+            not subject_has_coordinates
+            or (item.get("distance_km") is not None and item["distance_km"] <= 2)
+        )
     ][:5]
     count = len(comparables)
     prices = [float(item.get("price_per_m2") or 0) for item in comparables]
@@ -237,10 +236,10 @@ def _market_confidence_level(property_row, comparables: list[dict]) -> str:
         proximity = 0.0 if distance is None or distance > 2 else 1.0 if distance <= 1 else 0.75
         subject_similarity += (
             2.10 * proximity
-            + 2.40 * _similarity_band(_relative_difference(p.get("area_m2"), item.get("area_m2")))
+            + 2.40 * _area_similarity(p.get("area_m2"), item.get("area_m2"))
             + 0.90 * _bed_similarity(p.get("beds"), item.get("beds"))
-            + 0.60 * _similarity_band(
-                _relative_difference(price_median, item.get("price_per_m2")), price=True,
+            + 0.60 * _price_similarity_band(
+                _relative_difference(price_median, item.get("price_per_m2")),
             )
         )
 
@@ -248,20 +247,19 @@ def _market_confidence_level(property_row, comparables: list[dict]) -> str:
     if count >= 2:
         pairs = list(combinations(comparables, 2))
         average = sum(
-            0.50 * _similarity_band(
-                _pair_relative_difference(left.get("price_per_m2"), right.get("price_per_m2")), price=True,
+            0.50 * _price_similarity_band(
+                _pair_relative_difference(left.get("price_per_m2"), right.get("price_per_m2")),
             )
-            + 0.25 * _similarity_band(
-                _pair_relative_difference(left.get("area_m2"), right.get("area_m2")),
-            )
+            + 0.25 * _area_similarity(left.get("area_m2"), right.get("area_m2"))
             + 0.15 * _bed_similarity(left.get("beds"), right.get("beds"))
             + 0.10 * _pair_proximity(left, right)
             for left, right in pairs
         ) / len(pairs)
         group_score = 20 * ((count - 1) / 4) * average
 
-    score = count * 10 + subject_similarity + group_score
-    complete = all(p.get(field) not in (None, "") for field in (
+    quantity_score = count * 10.0
+    raw_score = quantity_score + subject_similarity + group_score
+    complete = bool(comparables) and all(p.get(field) not in (None, "") for field in (
         "property_type", "area_m2", "beds", "lat", "lng",
     )) and all(
         all(item.get(field) not in (None, "") for field in (
@@ -271,17 +269,57 @@ def _market_confidence_level(property_row, comparables: list[dict]) -> str:
         == _canonical_property_type(p.get("property_type"))
         for item in comparables
     )
-    if score <= 30:
+    qualifies_as_high = (
+        count >= 4 and subject_similarity >= 21 and group_score >= 12 and complete
+    )
+    if raw_score <= 30:
         return "low"
-    if score <= 70:
+    if raw_score <= 70 or not qualifies_as_high:
         return "medium"
-    return "high" if count >= 4 and subject_similarity >= 21 and group_score >= 12 and complete else "medium"
+    return "high"
 
 
 def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict | None:
     result = json.loads(enrichment) if enrichment else None
+    market_detail = result.get("marketDetail") if isinstance(result, dict) else None
+    if isinstance(market_detail, dict):
+        market_detail.pop("confidenceDebug", None)
     if result and _is_land_property_type(property_type):
         result.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
+    return result
+
+
+def _refresh_confidence_level(
+    result: dict | None, property_row, comparable_rows, *, force: bool = False,
+) -> dict | None:
+    """Refresh stale confidence levels without exposing internal score details."""
+    market_detail = result.get("marketDetail") if isinstance(result, dict) else None
+    if not isinstance(market_detail, dict):
+        return result
+    market_detail.pop("confidenceDebug", None)
+    if market_detail.get("confidenceLevel") and not force:
+        return result
+
+    p = dict(property_row)
+    subject_type = _canonical_property_type(p.get("property_type"))
+    related = [
+        dict(item) for item in comparable_rows
+        if _canonical_property_type(item.get("reference_property_type")) == subject_type
+    ]
+    wanted_neighborhood = _normalize_text(p.get("neighborhood"))
+    exact_ids = {
+        item.get("reference_id") for item in related
+        if wanted_neighborhood
+        and _normalize_text(item.get("reference_neighborhood")) == wanted_neighborhood
+    }
+    city_ids = {
+        item.get("reference_id") for item in related
+        if not _normalize_text(item.get("reference_neighborhood"))
+    }
+    selected_ids = exact_ids or city_ids or {item.get("reference_id") for item in related}
+    selected = [item for item in related if item.get("reference_id") in selected_ids]
+    usable = _prepare_market_comparables(p, selected)
+    market_detail["confidenceLevel"] = _market_confidence_level(p, usable)
     return result
 
 
@@ -293,6 +331,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     appraisal = float(p.get("avaliacao") or min_bid)
     is_land = _is_land_property_type(p.get("property_type"))
     usable = _prepare_market_comparables(p, comparable_rows)
+    confidence_level = _market_confidence_level(p, usable)
     prices = [float(item["price_per_m2"]) for item in usable]
     price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
     market = round(price_per_m2 * area, 2)
@@ -301,7 +340,9 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
     )
     fee_rate = itbi_rate or 0
-    is_direct_sale = "venda direta" in _normalize_text(p.get("modalidade"))
+    normalized_modality = _normalize_text(p.get("modalidade"))
+    is_direct_sale = "venda direta" in normalized_modality
+    commission_exempt = is_direct_sale
     roi = round((market - min_bid * (1 + fee_rate)) / (min_bid * (1 + fee_rate)) * 100, 2) if min_bid else 0
     market_detail = None if is_land else {
         "indicators": ([{
@@ -314,7 +355,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             "pricePerM2": item["price_per_m2"], "salePrice": item["price"],
             "source": item["source"], "url": item["url"],
         } for item in usable],
-        "confidenceLevel": _market_confidence_level(p, usable),
+        "confidenceLevel": confidence_level,
     }
     costs = [{
         "id": "auction_bid",
@@ -337,23 +378,32 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     official_commission_rate = edital_data.get("commissionRate")
     commission_rate = (
         float(official_commission_rate)
-        if isinstance(official_commission_rate, (int, float))
+        if not commission_exempt
+        and isinstance(official_commission_rate, (int, float))
         and 0 < float(official_commission_rate) <= 0.3
-        else _extract_commission_rate(p.get("descricao_raw"))
+        else None
     )
-    if not is_direct_sale:
-        commission_is_official = commission_rate is not None
-        commission_rate = commission_rate if commission_rate is not None else 0.05
+    if commission_exempt:
         costs.append({
             "id": "auctioneer_commission",
-            "label": f"Comissão do leiloeiro · {'edital' if commission_is_official else 'estimativa'} ({commission_rate * 100:g}%)",
+            "label": "Comissão isenta", "value": 0,
+            "hint": "Esta modalidade não prevê comissão de leiloeiro.",
+            "kind": "fee", "rate": 0,
+        })
+    elif commission_rate is not None:
+        costs.append({
+            "id": "auctioneer_commission",
+            "label": f"Comissão do leiloeiro · edital ({commission_rate * 100:g}%)",
             "value": round(min_bid * commission_rate),
-            "hint": (
-                "Percentual extraído do edital ou da descrição oficial do imóvel."
-                if commission_is_official else
-                "Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital."
-            ),
+            "hint": "Percentual extraído diretamente do edital oficial.",
             "kind": "fee", "rate": commission_rate,
+        })
+    else:
+        costs.append({
+            "id": "auctioneer_commission",
+            "label": "Comissão do leiloeiro · não informada", "value": 0,
+            "hint": "O percentual oficial não está disponível nos dados estruturados do edital; confirme antes de ofertar.",
+            "kind": "fee",
         })
     registration_rate = _registration_rate(p.get("uf"))
     if registration_rate is not None:
@@ -531,36 +581,6 @@ _CATALOG_DETAIL_COLUMNS = _CATALOG_COLUMNS + """,
 """
 
 
-def _parse_ends_at(value) -> Optional[datetime]:
-    """Parse endsAt (ISO string or epoch ms) into a timezone-aware datetime."""
-    if value is None or value == "":
-        return None
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
-    try:
-        s = str(value).strip()
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        return None
-
-
-def _is_active(ends_at, now) -> bool:
-    dt = _parse_ends_at(ends_at)
-    return dt is None or dt > now
-
-
-def _closing_within_24h(ends_at, now) -> bool:
-    dt = _parse_ends_at(ends_at)
-    if dt is None:
-        return False
-    return now < dt <= now + timedelta(hours=24)
-
-
 @app.get("/properties")
 def get_properties() -> list[dict]:
     """Compatibility alias backed by the production catalog."""
@@ -591,17 +611,48 @@ def get_catalog_item(property_id: int) -> dict:
             row = connection.execute(text(query), {"id": property_id}).mappings().one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail="Property not found")
-            enrichment = connection.execute(
-                text("SELECT result_json FROM enrichments WHERE property_id = :id"),
+            enrichment_row = connection.execute(
+                text("SELECT result_json, pipeline_version FROM enrichments WHERE property_id = :id"),
                 {"id": property_id},
-            ).scalar_one_or_none()
+            ).mappings().one_or_none()
+            enrichment = enrichment_row["result_json"] if enrichment_row else None
+            parsed_enrichment = _safe_enrichment(enrichment, row["property_type"])
+            market_detail = (
+                parsed_enrichment.get("marketDetail")
+                if isinstance(parsed_enrichment, dict) else None
+            )
+            stale_confidence = bool(
+                enrichment_row and enrichment_row["pipeline_version"] != PIPELINE_VERSION
+            )
+            if isinstance(market_detail, dict) and (
+                stale_confidence or not market_detail.get("confidenceLevel")
+            ):
+                comparable_rows = connection.execute(text("""
+                    SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url,
+                           to_jsonb(c)->>'property_type' AS property_type,
+                           NULLIF(to_jsonb(c)->>'beds', '')::INTEGER AS beds,
+                           NULLIF(to_jsonb(c)->>'lat', '')::DOUBLE PRECISION AS lat,
+                           NULLIF(to_jsonb(c)->>'lng', '')::DOUBLE PRECISION AS lng,
+                           r.id AS reference_id,
+                           r.neighborhood AS reference_neighborhood,
+                           r.property_type AS reference_property_type
+                    FROM regional_market_comparables c
+                    JOIN regional_market_prices r ON r.id = c.reference_id
+                    WHERE r.uf = :uf AND r.city = :city
+                    ORDER BY c.price_per_m2
+                """), {
+                    "uf": row["uf"] or "", "city": row["city"] or "",
+                }).mappings().all()
+                parsed_enrichment = _refresh_confidence_level(
+                    parsed_enrichment, row, comparable_rows, force=stale_confidence,
+                )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
     card = _catalog_card(row, include_edital_data=True)
-    card["enrichment"] = _safe_enrichment(enrichment, row["property_type"])
+    card["enrichment"] = parsed_enrichment
     return card
 
 
@@ -740,24 +791,3 @@ def analyze_catalog_item(property_id: int) -> dict:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
     return _safe_enrichment(result_json, row["property_type"])
-
-
-@app.get("/dashboard")
-def get_dashboard() -> dict:
-    properties = get_catalog()
-    now = datetime.now(timezone.utc)
-    active = [p for p in properties if _is_active(p.get("endsAt"), now)]
-    active_count = len(active)
-    closing_soon = sum(1 for p in active if _closing_within_24h(p.get("endsAt"), now))
-    avg_discount = round(sum(p.get("discount", 0) for p in properties) / max(len(properties), 1))
-    avg_auction_discount = round(sum(p.get("auctionDiscount", 0) for p in properties) / max(len(properties), 1))
-
-    return {
-        "kpis": [
-            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "no catálogo", "pos": True},
-            {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
-            {"lbl": "Desconto IA médio", "val": f"{avg_discount}%", "delta": "vs. mercado IA", "pos": avg_discount >= 15},
-            {"lbl": "Desconto oficial médio", "val": f"{avg_auction_discount}%", "delta": "vs. avaliação do edital", "pos": False},
-        ],
-        "activity": [],
-    }
