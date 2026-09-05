@@ -11,7 +11,19 @@
     "backend": {
       "root": "vercel-backend/",
       "framework": "fastapi",
-      "entrypoint": "index:app"
+      "entrypoint": "index:app",
+      "routes": [
+        {
+          "src": "/api/(.*)",
+          "transforms": [
+            {
+              "type": "request.path",
+              "op": "set",
+              "args": "/$1"
+            }
+          ]
+        }
+      ]
     }
   },
   "rewrites": [
