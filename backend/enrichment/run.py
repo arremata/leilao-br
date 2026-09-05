@@ -4,7 +4,6 @@ only to extract structure from raw HTML/PDF)."""
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from loguru import logger
 
@@ -15,7 +14,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v8-direct-sale-documents"
+PIPELINE_VERSION = "v13-area-similarity"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -31,39 +30,22 @@ def legal_node(state):
     return run_legal_node(state)
 
 
-def extract_commission_rate(description: str | None) -> float | None:
-    """Extract a plausible auctioneer commission written on either side of %."""
-    text = description or ""
-    patterns = (
-        r"comiss[aã]o[^%\n]{0,80}?(\d+(?:[.,]\d+)?)\s*%",
-        r"(\d+(?:[.,]\d+)?)\s*%[^\n.]{0,80}?comiss[aã]o",
-    )
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if not match:
-            continue
-        percentage = float(match.group(1).replace(",", "."))
-        if 0 < percentage <= 30:
-            return percentage / 100
-    return None
-
-
 def metadata_from_property(prop) -> PropertyMetadata:
     """Build the graph's PropertyMetadata directly from a catalog Property row."""
     def _iso(value: datetime | None) -> str:
         return value.isoformat() if value else ""
 
     itbi = get_itbi(prop.uf or "", prop.city or "")
-    description = prop.descricao_raw or ""
     edital_data = getattr(prop, "edital_data", None) or {}
     official_commission_rate = edital_data.get("commissionRate")
-    is_direct_sale = "venda direta" in (prop.modalidade or "").casefold()
+    normalized_modality = (prop.modalidade or "").casefold()
+    commission_exempt = "venda direta" in normalized_modality
     commission_rate = (
         float(official_commission_rate)
-        if not is_direct_sale
+        if not commission_exempt
         and isinstance(official_commission_rate, (int, float))
         and 0 < float(official_commission_rate) <= 0.3
-        else (None if is_direct_sale else extract_commission_rate(description))
+        else None
     )
     return PropertyMetadata(
         address=prop.address or "",
@@ -84,6 +66,8 @@ def metadata_from_property(prop) -> PropertyMetadata:
         city=prop.city or "",
         neighborhood=prop.neighborhood or "",
         state=prop.uf or "",
+        lat=getattr(prop, "lat", None),
+        lng=getattr(prop, "lng", None),
         beds=prop.beds,
         photo_url=prop.photo_url or "",
         itbi_rate=itbi["rate"] if itbi else None,

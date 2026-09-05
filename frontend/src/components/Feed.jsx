@@ -21,6 +21,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     city: initialFilters?.city || 'Todas',
   });
   const [sort, setSort] = useState('discount');
+  const [sortNow, setSortNow] = useState(() => Date.now());
   const [view, setView] = useState('grid');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
@@ -92,15 +93,33 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
     if (sort === 'discount') list.sort((a, b) =>
       (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0));
-    else if (sort === 'soonest') list.sort((a, b) => {
-      const aDate = getEndsAtMs(a.endsAt);
-      const bDate = getEndsAtMs(b.endsAt);
-      return (aDate > 0 ? aDate : Number.POSITIVE_INFINITY) - (bDate > 0 ? bDate : Number.POSITIVE_INFINITY);
-    });
+    else if (sort === 'soonest') {
+      // This mode is about upcoming opportunities, not chronological history:
+      // expired listings disappear, future dates come first, and missing dates
+      // remain available only after every known upcoming deadline.
+      list = list
+        .filter(p => {
+          const endsAt = getEndsAtMs(p.endsAt);
+          return !Number.isFinite(endsAt) || endsAt <= 0 || endsAt > sortNow;
+        })
+        .sort((a, b) => {
+          const aDate = getEndsAtMs(a.endsAt);
+          const bDate = getEndsAtMs(b.endsAt);
+          const aUpcoming = Number.isFinite(aDate) && aDate > sortNow ? aDate : Number.POSITIVE_INFINITY;
+          const bUpcoming = Number.isFinite(bDate) && bDate > sortNow ? bDate : Number.POSITIVE_INFINITY;
+          return aUpcoming - bUpcoming;
+        });
+    }
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [addressQuery, filters, sort, properties]);
+  }, [addressQuery, filters, sort, sortNow, properties]);
+
+  useEffect(() => {
+    if (sort !== 'soonest') return undefined;
+    const interval = window.setInterval(() => setSortNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, [sort]);
 
   // Pagination is UI-derived state; resetting here is intentional whenever
   // search/sort inputs change.
@@ -236,7 +255,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
           <span style={{ flex: 1 }}></span>
 
-          <Sort value={sort} onChange={setSort} />
+          <Sort value={sort} onChange={(value) => {
+            if (value === 'soonest') setSortNow(Date.now());
+            setSort(value);
+          }} />
           <ViewToggle value={view} onChange={setView} />
         </div>
       </div>
@@ -431,7 +453,7 @@ function Sort({ value, onChange }) {
         }}
       >
         <option value="discount">maior desconto estimado</option>
-        <option value="soonest">encerra antes</option>
+        <option value="soonest">encerra em breve</option>
         <option value="price-asc">menor preço</option>
         <option value="price-desc">maior preço</option>
       </select>

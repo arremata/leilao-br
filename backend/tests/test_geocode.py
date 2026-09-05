@@ -21,6 +21,9 @@ class _FakeHttpClient:
         self.calls.append({"url": url, "params": params, "headers": headers})
         return _FakeResponse(self._payload)
 
+    def close(self):
+        return None
+
 
 def test_geocode_returns_lat_lng():
     fake = _FakeHttpClient([{"lat": "-25.4284", "lon": "-49.2733"}])

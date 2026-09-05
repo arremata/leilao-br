@@ -51,7 +51,9 @@ def test_metadata_from_property_maps_fields():
     assert result.edital_url == "https://example.com/edital.pdf"
     assert result.matricula_url == "https://example.com/matricula.pdf"
     assert result.edital_data["commissionRate"] == 0.05
-    assert all(item.id != "auctioneer_commission" for item in result.costs)
+    commission = next(item for item in result.costs if item.id == "auctioneer_commission")
+    assert commission.label == "Comissão isenta"
+    assert commission.value == 0
 
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):

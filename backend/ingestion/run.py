@@ -80,6 +80,7 @@ class IngestSummary:
     dates_deferred: int = 0
     documents_updated: int = 0
     edital_data_updated: int = 0
+    browser_details_recovered: int = 0
 
 
 def _preco_changed(old: float | None, new: float | None) -> bool:
@@ -341,6 +342,39 @@ async def ingest(
                 fetch_auction_dates = fetch_auction_dates_batch
             urls = [url for _, url, _, _ in selected_details]
             detail_results = await fetch_auction_dates(urls)
+
+            # The headed Chrome context used to obtain the CSV has already
+            # passed Caixa's bot manager. Retry only the fast HTTP client's
+            # unresolved pages through that trusted session, while preserving
+            # the health failure for anything that remains unavailable.
+            failed_indexes = [
+                index for index, result in enumerate(detail_results)
+                if result is None
+            ]
+            browser_recover = getattr(
+                adapter, "recover_detail_results_async", None,
+            )
+            if failed_indexes and browser_recover is not None:
+                failed_urls = [urls[index] for index in failed_indexes]
+                logger.info(
+                    "Retrying {} unresolved Caixa detail pages through the "
+                    "trusted browser session",
+                    len(failed_urls),
+                )
+                try:
+                    browser_results = await browser_recover(failed_urls)
+                except Exception as exc:
+                    logger.warning("Trusted browser detail recovery failed: {}", exc)
+                    browser_results = []
+                for index, result in zip(failed_indexes, browser_results):
+                    if result is not None:
+                        detail_results[index] = result
+                        summary.browser_details_recovered += 1
+                logger.info(
+                    "Trusted browser detail recovery: {}/{} recovered",
+                    summary.browser_details_recovered, len(failed_urls),
+                )
+
             with session_factory() as session:
                 for (property_id, _, _, requires_date), result in zip(
                     selected_details, detail_results,
@@ -406,7 +440,8 @@ async def ingest(
         f"={summary.unchanged} events={summary.events_created} "
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
         f"{summary.dates_deferred}deferred documents={summary.documents_updated} "
-        f"edital_data={summary.edital_data_updated}"
+        f"edital_data={summary.edital_data_updated} "
+        f"browser_recovered={summary.browser_details_recovered}"
     )
     return summary
 

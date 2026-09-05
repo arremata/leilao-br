@@ -99,6 +99,7 @@ class MarketDetail(BaseModel):
 
     indicators: list[MarketIndicator]
     comparables: list[ComparableSale]
+    confidence_level: Literal["low", "medium", "high"] = "low"
 
 
 class CostLineItem(BaseModel):

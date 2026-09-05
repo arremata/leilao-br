@@ -75,6 +75,43 @@ class TestCalculateMarket:
         assert result.comparable_properties == [valid]
         assert result.price_per_m2_neighborhood == 10_000
 
+    def test_limits_results_to_five_within_two_kilometres(self):
+        metadata = _metadata()
+        metadata.beds = 2
+        metadata.lat = -25.4284
+        metadata.lng = -49.2733
+        nearby = [
+            ComparableProperty(
+                address=f"Rua {index}", property_type="Apartamento",
+                price=400_000, area_m2=80, beds=2, price_per_m2=5_000,
+                source="Fonte", url=f"https://site/{index}",
+                lat=-25.4284, lng=-49.2733 + index * 0.001,
+            )
+            for index in range(7)
+        ]
+        too_far = ComparableProperty(
+            address="Rua distante", property_type="Apartamento",
+            price=400_000, area_m2=80, beds=2, price_per_m2=5_000,
+            source="Fonte", url="https://site/far",
+            lat=-25.4284, lng=-49.2433,
+        )
+
+        result = calculate_market(metadata, [too_far, *reversed(nearby)])
+
+        assert len(result.comparable_properties) == 5
+        assert too_far not in result.comparable_properties
+        assert all(item.distance_km <= 2 for item in result.comparable_properties)
+        assert result.confidence_level == "high"
+
+    def test_rejects_a_different_known_property_type(self):
+        metadata = _metadata()
+        house = _comp(1, 10_000)
+        house.property_type = "Casa"
+
+        result = calculate_market(metadata, [house])
+
+        assert result.comparable_properties == []
+
 
 class TestMarketNode:
     def test_uses_only_passed_persisted_data(self):

@@ -494,6 +494,43 @@ def test_ingest_date_failure_is_non_fatal_and_retried():
     assert prop.dates_fetched_at is None
 
 
+def test_ingest_recovers_http_detail_miss_with_trusted_browser():
+    factory = _factory()
+    row = _row("1")
+    row.raw["modalidade"] = "Leilão SFI"
+    recovered_at = datetime(2026, 10, 4, 10, 0)
+
+    class _RecoveringAdapter(_StubAdapter):
+        async def recover_detail_results_async(self, urls):
+            assert urls == [row.raw["detail_url"]]
+            return [{
+                "first_auction_at": recovered_at,
+                "second_auction_at": None,
+                "first_auction_price": 200_000,
+                "second_auction_price": None,
+                "matricula": "1234",
+                "edital_url": "https://x/edital.pdf",
+                "matricula_url": "https://x/matricula.pdf",
+                "edital_data": {"auctionNumber": "1/2026"},
+            }]
+
+    async def _http_miss(urls):
+        return [None] * len(urls)
+
+    summary = asyncio.run(ingest(
+        factory, _RecoveringAdapter("PR", [row]),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_http_miss,
+    ))
+
+    prop = _get_prop(factory, "1")
+    assert prop.first_auction_at == recovered_at
+    assert prop.dates_fetched_at is not None
+    assert summary.dates_updated == 1
+    assert summary.dates_failed == 0
+    assert summary.browser_details_recovered == 1
+
+
 def test_ingest_caps_date_enrichment_and_defers_the_rest():
     factory = _factory()
     rows = [_row(str(i)) for i in range(5)]

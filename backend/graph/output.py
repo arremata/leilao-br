@@ -220,7 +220,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
         comparables.append(ComparableSale(
             address=cp.address,
             area_m2=cp.area_m2,
-            beds=None,
+            beds=cp.beds,
             price_per_m2=cp.price_per_m2,
             sale_price=cp.price,
             source=cp.source,
@@ -230,6 +230,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
     return MarketDetail(
         indicators=indicators,
         comparables=comparables,
+        confidence_level=market.confidence_level,
     )
 
 
@@ -240,7 +241,9 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
 
     legal = state.legal_result
     min_bid = metadata.auction_price or 0
-    is_direct_sale = "venda direta" in (metadata.auction_type or "").casefold()
+    normalized_modality = (metadata.auction_type or "").casefold()
+    is_direct_sale = "venda direta" in normalized_modality
+    commission_exempt = is_direct_sale
 
     from fiscal import get_registration_fee
 
@@ -268,21 +271,33 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
             rate=metadata.itbi_rate,
         ))
 
-    if not is_direct_sale:
-        commission_rate = metadata.commission_rate if metadata.commission_rate is not None else 0.05
-        rate_pct = commission_rate * 100
-        commission_is_official = metadata.commission_rate is not None
+    if commission_exempt:
         costs.append(CostLineItem(
             id="auctioneer_commission",
-            label=f"Comissão do leiloeiro · {'edital' if commission_is_official else 'estimativa'} ({rate_pct:g}%)",
+            label="Comissão isenta",
+            value=0,
+            hint="Esta modalidade não prevê comissão de leiloeiro.",
+            kind="fee",
+            rate=0,
+        ))
+    elif metadata.commission_rate is not None:
+        commission_rate = metadata.commission_rate
+        rate_pct = commission_rate * 100
+        costs.append(CostLineItem(
+            id="auctioneer_commission",
+            label=f"Comissão do leiloeiro · edital ({rate_pct:g}%)",
             value=round(min_bid * commission_rate),
-            hint=(
-                "Percentual extraído do edital ou da descrição oficial do imóvel."
-                if commission_is_official else
-                "Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital."
-            ),
+            hint="Percentual extraído diretamente do edital oficial.",
             kind="fee",
             rate=commission_rate,
+        ))
+    else:
+        costs.append(CostLineItem(
+            id="auctioneer_commission",
+            label="Comissão do leiloeiro · não informada",
+            value=0,
+            hint="O percentual oficial não está disponível nos dados estruturados do edital; confirme antes de ofertar.",
+            kind="fee",
         ))
 
     registration = get_registration_fee(metadata.state)

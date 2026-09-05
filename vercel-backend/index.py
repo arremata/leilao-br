@@ -11,7 +11,9 @@ import json
 import os
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from itertools import combinations
+from math import asin, cos, radians, sin, sqrt
 from statistics import median
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -24,7 +26,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v8-direct-sale-documents"
+PIPELINE_VERSION = "v13-area-similarity"
 
 _REGISTRATION_RATES = {
     "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
@@ -66,19 +68,6 @@ def _normalize_text(value: str | None) -> str:
     return " ".join(value.casefold().split())
 
 
-def _extract_commission_rate(description: str | None) -> float | None:
-    for pattern in (
-        r"comiss[aã]o[^%\n]{0,80}?(\d+(?:[.,]\d+)?)\s*%",
-        r"(\d+(?:[.,]\d+)?)\s*%[^\n.]{0,80}?comiss[aã]o",
-    ):
-        match = re.search(pattern, description or "", re.IGNORECASE)
-        if match:
-            percentage = float(match.group(1).replace(",", "."))
-            if 0 < percentage <= 30:
-                return percentage / 100
-    return None
-
-
 def _registration_rate(uf: str | None) -> float | None:
     normalized_uf = (uf or "").upper().strip()
     if normalized_uf not in _BRAZILIAN_UFS:
@@ -101,10 +90,236 @@ def _canonical_property_type(value: str | None) -> str:
     return (value or "").strip()
 
 
+def _haversine_km(lat1, lng1, lat2, lng2) -> float:
+    earth_radius_km = 6371.0088
+    lat1_rad, lat2_rad = radians(float(lat1)), radians(float(lat2))
+    delta_lat = radians(float(lat2) - float(lat1))
+    delta_lng = radians(float(lng2) - float(lng1))
+    value = (
+        sin(delta_lat / 2) ** 2
+        + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lng / 2) ** 2
+    )
+    return earth_radius_km * 2 * asin(sqrt(value))
+
+
+def _relative_difference(left, right) -> float | None:
+    left, right = float(left or 0), float(right or 0)
+    return abs(left - right) / left if left > 0 and right > 0 else None
+
+
+def _area_similarity(left, right) -> float:
+    """Return a continuous, symmetric size similarity from zero to one."""
+    left, right = float(left or 0), float(right or 0)
+    if left <= 0 or right <= 0:
+        return 0.0
+    return min(left, right) / max(left, right)
+
+
+def _pair_relative_difference(left, right) -> float | None:
+    left, right = float(left or 0), float(right or 0)
+    midpoint = (left + right) / 2
+    return abs(left - right) / midpoint if left > 0 and right > 0 else None
+
+
+def _price_similarity_band(difference) -> float:
+    if difference is None:
+        return 0.0
+    if difference <= 0.10:
+        return 1.0
+    if difference <= 0.20:
+        return 0.75
+    if difference <= 0.30:
+        return 0.50
+    return 0.0
+
+
+def _bed_similarity(left, right) -> float:
+    if left is None or right is None:
+        return 0.0
+    difference = abs(int(left) - int(right))
+    return 1.0 if difference == 0 else 0.5 if difference == 1 else 0.0
+
+
+def _pair_proximity(left, right) -> float:
+    coordinates = (left.get("lat"), left.get("lng"), right.get("lat"), right.get("lng"))
+    if any(value is None for value in coordinates):
+        return 0.0
+    distance = _haversine_km(*coordinates)
+    if distance <= 1:
+        return 1.0
+    if distance <= 2:
+        return 0.75
+    if distance <= 4:
+        return 0.50
+    return 0.0
+
+
+def _prepare_market_comparables(property_row, comparable_rows) -> list[dict]:
+    p = dict(property_row)
+    area = float(p.get("area_m2") or 0)
+    subject_type = _canonical_property_type(p.get("property_type"))
+    has_subject_coordinates = p.get("lat") is not None and p.get("lng") is not None
+    usable = []
+    for row in comparable_rows:
+        item = dict(row)
+        item_area = float(item.get("area_m2") or 0)
+        item_price = float(item.get("price") or 0)
+        price_per_m2 = float(item.get("price_per_m2") or 0)
+        if item_price <= 0 or item_area <= 0 or price_per_m2 <= 0:
+            continue
+        if area > 0 and not area * 0.65 <= item_area <= area * 1.35:
+            continue
+        if any(term in f'{item.get("address", "")} {item.get("url", "")}'.lower()
+               for term in ("leilao", "leilão", "hasta")):
+            continue
+        item_type = _canonical_property_type(item.get("property_type"))
+        if subject_type and item_type and subject_type != item_type:
+            continue
+        if has_subject_coordinates:
+            if item.get("lat") is None or item.get("lng") is None:
+                continue
+            item["distance_km"] = _haversine_km(
+                p["lat"], p["lng"], item["lat"], item["lng"],
+            )
+            if item["distance_km"] > 2:
+                continue
+        else:
+            item["distance_km"] = None
+        usable.append(item)
+
+    if len(usable) >= 3:
+        center = median(float(item["price_per_m2"]) for item in usable)
+        usable = [
+            item for item in usable
+            if center * 0.5 <= float(item["price_per_m2"]) <= center * 2
+        ]
+    subject_beds = p.get("beds")
+    usable.sort(key=lambda item: (
+        not _canonical_property_type(item.get("property_type"))
+        or _canonical_property_type(item.get("property_type")) != subject_type,
+        item.get("distance_km") is None,
+        item.get("distance_km") if item.get("distance_km") is not None else float("inf"),
+        abs(float(item["area_m2"]) - area) / area if area > 0 else 1,
+        abs(int(item["beds"]) - int(subject_beds))
+        if item.get("beds") is not None and subject_beds is not None else 99,
+        item.get("url") or "",
+    ))
+    return usable[:5]
+
+
+def _market_confidence_level(property_row, comparables: list[dict]) -> str:
+    p = dict(property_row)
+    subject_has_coordinates = all(
+        p.get(field) not in (None, "") for field in ("lat", "lng")
+    )
+    subject_type = _canonical_property_type(p.get("property_type"))
+    comparables = [
+        item for item in comparables
+        if float(item.get("area_m2") or 0) > 0
+        and float(item.get("price_per_m2") or 0) > 0
+        and (
+            not subject_type
+            or not _canonical_property_type(item.get("property_type"))
+            or _canonical_property_type(item.get("property_type")) == subject_type
+        )
+        and (
+            not subject_has_coordinates
+            or (item.get("distance_km") is not None and item["distance_km"] <= 2)
+        )
+    ][:5]
+    count = len(comparables)
+    prices = [float(item.get("price_per_m2") or 0) for item in comparables]
+    price_median = float(median(prices)) if prices else 0.0
+    subject_similarity = 0.0
+    for item in comparables:
+        distance = item.get("distance_km")
+        proximity = 0.0 if distance is None or distance > 2 else 1.0 if distance <= 1 else 0.75
+        subject_similarity += (
+            2.10 * proximity
+            + 2.40 * _area_similarity(p.get("area_m2"), item.get("area_m2"))
+            + 0.90 * _bed_similarity(p.get("beds"), item.get("beds"))
+            + 0.60 * _price_similarity_band(
+                _relative_difference(price_median, item.get("price_per_m2")),
+            )
+        )
+
+    group_score = 0.0
+    if count >= 2:
+        pairs = list(combinations(comparables, 2))
+        average = sum(
+            0.50 * _price_similarity_band(
+                _pair_relative_difference(left.get("price_per_m2"), right.get("price_per_m2")),
+            )
+            + 0.25 * _area_similarity(left.get("area_m2"), right.get("area_m2"))
+            + 0.15 * _bed_similarity(left.get("beds"), right.get("beds"))
+            + 0.10 * _pair_proximity(left, right)
+            for left, right in pairs
+        ) / len(pairs)
+        group_score = 20 * ((count - 1) / 4) * average
+
+    quantity_score = count * 10.0
+    raw_score = quantity_score + subject_similarity + group_score
+    complete = bool(comparables) and all(p.get(field) not in (None, "") for field in (
+        "property_type", "area_m2", "beds", "lat", "lng",
+    )) and all(
+        all(item.get(field) not in (None, "") for field in (
+            "property_type", "area_m2", "beds", "price_per_m2", "lat", "lng",
+        ))
+        and _canonical_property_type(item.get("property_type"))
+        == _canonical_property_type(p.get("property_type"))
+        for item in comparables
+    )
+    qualifies_as_high = (
+        count >= 4 and subject_similarity >= 21 and group_score >= 12 and complete
+    )
+    if raw_score <= 30:
+        return "low"
+    if raw_score <= 70 or not qualifies_as_high:
+        return "medium"
+    return "high"
+
+
 def _safe_enrichment(enrichment: str | None, property_type: str | None) -> dict | None:
     result = json.loads(enrichment) if enrichment else None
+    market_detail = result.get("marketDetail") if isinstance(result, dict) else None
+    if isinstance(market_detail, dict):
+        market_detail.pop("confidenceDebug", None)
     if result and _is_land_property_type(property_type):
         result.update(market=0.0, discount=0.0, roi=0.0, marketDetail=None)
+    return result
+
+
+def _refresh_confidence_level(
+    result: dict | None, property_row, comparable_rows, *, force: bool = False,
+) -> dict | None:
+    """Refresh stale confidence levels without exposing internal score details."""
+    market_detail = result.get("marketDetail") if isinstance(result, dict) else None
+    if not isinstance(market_detail, dict):
+        return result
+    market_detail.pop("confidenceDebug", None)
+    if market_detail.get("confidenceLevel") and not force:
+        return result
+
+    p = dict(property_row)
+    subject_type = _canonical_property_type(p.get("property_type"))
+    related = [
+        dict(item) for item in comparable_rows
+        if _canonical_property_type(item.get("reference_property_type")) == subject_type
+    ]
+    wanted_neighborhood = _normalize_text(p.get("neighborhood"))
+    exact_ids = {
+        item.get("reference_id") for item in related
+        if wanted_neighborhood
+        and _normalize_text(item.get("reference_neighborhood")) == wanted_neighborhood
+    }
+    city_ids = {
+        item.get("reference_id") for item in related
+        if not _normalize_text(item.get("reference_neighborhood"))
+    }
+    selected_ids = exact_ids or city_ids or {item.get("reference_id") for item in related}
+    selected = [item for item in related if item.get("reference_id") in selected_ids]
+    usable = _prepare_market_comparables(p, selected)
+    market_detail["confidenceLevel"] = _market_confidence_level(p, usable)
     return result
 
 
@@ -115,12 +330,8 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     min_bid = float(p.get("preco") or 0)
     appraisal = float(p.get("avaliacao") or min_bid)
     is_land = _is_land_property_type(p.get("property_type"))
-    usable = [dict(item) for item in comparable_rows if (
-        float(item["price"] or 0) > 0 and float(item["area_m2"] or 0) > 0
-        and float(item["price_per_m2"] or 0) > 0
-        and (area <= 0 or area * 0.65 <= float(item["area_m2"]) <= area * 1.35)
-        and not any(term in f'{item["address"]} {item["url"]}'.lower() for term in ("leilao", "leilão", "hasta"))
-    )]
+    usable = _prepare_market_comparables(p, comparable_rows)
+    confidence_level = _market_confidence_level(p, usable)
     prices = [float(item["price_per_m2"]) for item in usable]
     price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
     market = round(price_per_m2 * area, 2)
@@ -129,7 +340,9 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
     )
     fee_rate = itbi_rate or 0
-    is_direct_sale = "venda direta" in _normalize_text(p.get("modalidade"))
+    normalized_modality = _normalize_text(p.get("modalidade"))
+    is_direct_sale = "venda direta" in normalized_modality
+    commission_exempt = is_direct_sale
     roi = round((market - min_bid * (1 + fee_rate)) / (min_bid * (1 + fee_rate)) * 100, 2) if min_bid else 0
     market_detail = None if is_land else {
         "indicators": ([{
@@ -138,10 +351,11 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             "delta": "mediana das referências persistidas", "pos": True,
         }] if price_per_m2 else []),
         "comparables": [{
-            "address": item["address"], "areaM2": item["area_m2"], "beds": None,
+            "address": item["address"], "areaM2": item["area_m2"], "beds": item.get("beds"),
             "pricePerM2": item["price_per_m2"], "salePrice": item["price"],
             "source": item["source"], "url": item["url"],
         } for item in usable],
+        "confidenceLevel": confidence_level,
     }
     costs = [{
         "id": "auction_bid",
@@ -164,23 +378,32 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     official_commission_rate = edital_data.get("commissionRate")
     commission_rate = (
         float(official_commission_rate)
-        if isinstance(official_commission_rate, (int, float))
+        if not commission_exempt
+        and isinstance(official_commission_rate, (int, float))
         and 0 < float(official_commission_rate) <= 0.3
-        else _extract_commission_rate(p.get("descricao_raw"))
+        else None
     )
-    if not is_direct_sale:
-        commission_is_official = commission_rate is not None
-        commission_rate = commission_rate if commission_rate is not None else 0.05
+    if commission_exempt:
         costs.append({
             "id": "auctioneer_commission",
-            "label": f"Comissão do leiloeiro · {'edital' if commission_is_official else 'estimativa'} ({commission_rate * 100:g}%)",
+            "label": "Comissão isenta", "value": 0,
+            "hint": "Esta modalidade não prevê comissão de leiloeiro.",
+            "kind": "fee", "rate": 0,
+        })
+    elif commission_rate is not None:
+        costs.append({
+            "id": "auctioneer_commission",
+            "label": f"Comissão do leiloeiro · edital ({commission_rate * 100:g}%)",
             "value": round(min_bid * commission_rate),
-            "hint": (
-                "Percentual extraído do edital ou da descrição oficial do imóvel."
-                if commission_is_official else
-                "Estimativa padrão de 5% quando a descrição oficial não informa a comissão. Confirme no edital."
-            ),
+            "hint": "Percentual extraído diretamente do edital oficial.",
             "kind": "fee", "rate": commission_rate,
+        })
+    else:
+        costs.append({
+            "id": "auctioneer_commission",
+            "label": "Comissão do leiloeiro · não informada", "value": 0,
+            "hint": "O percentual oficial não está disponível nos dados estruturados do edital; confirme antes de ofertar.",
+            "kind": "fee",
         })
     registration_rate = _registration_rate(p.get("uf"))
     if registration_rate is not None:
@@ -358,36 +581,6 @@ _CATALOG_DETAIL_COLUMNS = _CATALOG_COLUMNS + """,
 """
 
 
-def _parse_ends_at(value) -> Optional[datetime]:
-    """Parse endsAt (ISO string or epoch ms) into a timezone-aware datetime."""
-    if value is None or value == "":
-        return None
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
-    try:
-        s = str(value).strip()
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except (ValueError, TypeError):
-        return None
-
-
-def _is_active(ends_at, now) -> bool:
-    dt = _parse_ends_at(ends_at)
-    return dt is None or dt > now
-
-
-def _closing_within_24h(ends_at, now) -> bool:
-    dt = _parse_ends_at(ends_at)
-    if dt is None:
-        return False
-    return now < dt <= now + timedelta(hours=24)
-
-
 @app.get("/properties")
 def get_properties() -> list[dict]:
     """Compatibility alias backed by the production catalog."""
@@ -418,17 +611,48 @@ def get_catalog_item(property_id: int) -> dict:
             row = connection.execute(text(query), {"id": property_id}).mappings().one_or_none()
             if row is None:
                 raise HTTPException(status_code=404, detail="Property not found")
-            enrichment = connection.execute(
-                text("SELECT result_json FROM enrichments WHERE property_id = :id"),
+            enrichment_row = connection.execute(
+                text("SELECT result_json, pipeline_version FROM enrichments WHERE property_id = :id"),
                 {"id": property_id},
-            ).scalar_one_or_none()
+            ).mappings().one_or_none()
+            enrichment = enrichment_row["result_json"] if enrichment_row else None
+            parsed_enrichment = _safe_enrichment(enrichment, row["property_type"])
+            market_detail = (
+                parsed_enrichment.get("marketDetail")
+                if isinstance(parsed_enrichment, dict) else None
+            )
+            stale_confidence = bool(
+                enrichment_row and enrichment_row["pipeline_version"] != PIPELINE_VERSION
+            )
+            if isinstance(market_detail, dict) and (
+                stale_confidence or not market_detail.get("confidenceLevel")
+            ):
+                comparable_rows = connection.execute(text("""
+                    SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url,
+                           to_jsonb(c)->>'property_type' AS property_type,
+                           NULLIF(to_jsonb(c)->>'beds', '')::INTEGER AS beds,
+                           NULLIF(to_jsonb(c)->>'lat', '')::DOUBLE PRECISION AS lat,
+                           NULLIF(to_jsonb(c)->>'lng', '')::DOUBLE PRECISION AS lng,
+                           r.id AS reference_id,
+                           r.neighborhood AS reference_neighborhood,
+                           r.property_type AS reference_property_type
+                    FROM regional_market_comparables c
+                    JOIN regional_market_prices r ON r.id = c.reference_id
+                    WHERE r.uf = :uf AND r.city = :city
+                    ORDER BY c.price_per_m2
+                """), {
+                    "uf": row["uf"] or "", "city": row["city"] or "",
+                }).mappings().all()
+                parsed_enrichment = _refresh_confidence_level(
+                    parsed_enrichment, row, comparable_rows, force=stale_confidence,
+                )
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
     card = _catalog_card(row, include_edital_data=True)
-    card["enrichment"] = _safe_enrichment(enrichment, row["property_type"])
+    card["enrichment"] = parsed_enrichment
     return card
 
 
@@ -503,14 +727,22 @@ def analyze_catalog_item(property_id: int) -> dict:
             if reference is not None:
                 if reference["scope"] == "neighborhood":
                     comparable_query = """
-                        SELECT address, price, area_m2, price_per_m2, source, url
+                        SELECT address, price, area_m2, price_per_m2, source, url,
+                               to_jsonb(regional_market_comparables)->>'property_type' AS property_type,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'beds', '')::INTEGER AS beds,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'lat', '')::DOUBLE PRECISION AS lat,
+                               NULLIF(to_jsonb(regional_market_comparables)->>'lng', '')::DOUBLE PRECISION AS lng
                         FROM regional_market_comparables
                         WHERE reference_id = :reference_id ORDER BY price_per_m2
                     """
                     comparable_params = {"reference_id": reference["id"]}
                 else:
                     comparable_query = """
-                        SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url
+                        SELECT c.address, c.price, c.area_m2, c.price_per_m2, c.source, c.url,
+                               to_jsonb(c)->>'property_type' AS property_type,
+                               NULLIF(to_jsonb(c)->>'beds', '')::INTEGER AS beds,
+                               NULLIF(to_jsonb(c)->>'lat', '')::DOUBLE PRECISION AS lat,
+                               NULLIF(to_jsonb(c)->>'lng', '')::DOUBLE PRECISION AS lng
                         FROM regional_market_comparables c
                         JOIN regional_market_prices r ON r.id = c.reference_id
                         WHERE r.uf = :uf AND r.city = :city AND r.property_type = :property_type
@@ -559,24 +791,3 @@ def analyze_catalog_item(property_id: int) -> dict:
         raise HTTPException(status_code=503, detail="Catalog database unavailable") from exc
 
     return _safe_enrichment(result_json, row["property_type"])
-
-
-@app.get("/dashboard")
-def get_dashboard() -> dict:
-    properties = get_catalog()
-    now = datetime.now(timezone.utc)
-    active = [p for p in properties if _is_active(p.get("endsAt"), now)]
-    active_count = len(active)
-    closing_soon = sum(1 for p in active if _closing_within_24h(p.get("endsAt"), now))
-    avg_discount = round(sum(p.get("discount", 0) for p in properties) / max(len(properties), 1))
-    avg_auction_discount = round(sum(p.get("auctionDiscount", 0) for p in properties) / max(len(properties), 1))
-
-    return {
-        "kpis": [
-            {"lbl": "Leilões ativos", "val": str(active_count), "delta": "no catálogo", "pos": True},
-            {"lbl": "Encerrando em 24h", "val": str(closing_soon) if closing_soon > 0 else "—", "delta": "em breve"},
-            {"lbl": "Desconto IA médio", "val": f"{avg_discount}%", "delta": "vs. mercado IA", "pos": avg_discount >= 15},
-            {"lbl": "Desconto oficial médio", "val": f"{avg_auction_discount}%", "delta": "vs. avaliação do edital", "pos": False},
-        ],
-        "activity": [],
-    }

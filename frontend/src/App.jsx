@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import Home from './components/Home';
 import Feed from './components/Feed';
 import PropertyDetail from './components/PropertyDetail';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
-import { fetchCatalog, fetchDashboard } from './api';
+import { fetchCatalog } from './api';
 
 function App() {
   const [screen, setScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedScreen = params.get('screen');
-    if (['home', 'feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
-    return 'home';
+    if (['feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
+    return 'feed';
   });
   const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
@@ -21,7 +20,6 @@ function App() {
     } catch { return []; }
   });
   const [properties, setProperties] = useState([]);
-  const [dashboard, setDashboard] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [history, setHistory] = useState(() => {
     try {
@@ -29,19 +27,14 @@ function App() {
       return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
-  const [feedSearch, setFeedSearch] = useState({ address: '', filters: null });
-  const [feedKey, setFeedKey] = useState(0);
-
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([fetchCatalog(), fetchDashboard()])
-      .then(([catalogResult, dashboardResult]) => {
+    fetchCatalog()
+      .then(catalogData => {
         if (cancelled) return;
-        const catalogData = catalogResult.status === 'fulfilled' ? catalogResult.value : [];
-        const dashboardData = dashboardResult.status === 'fulfilled' ? dashboardResult.value : null;
         if (Array.isArray(catalogData)) setProperties(catalogData);
-        if (dashboardData) setDashboard(dashboardData);
       })
+      .catch(() => {})
       .finally(() => { if (!cancelled) setInitialLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -121,18 +114,11 @@ function App() {
 
   const clearHistory = useCallback(() => setHistory([]), []);
 
-  const handleSearch = useCallback((address, filters) => {
-    setFeedSearch({ address, filters });
-    setFeedKey(k => k + 1);
-    setScreen('feed');
-  }, []);
-
   const screenLabel =
-    screen === 'home' ? '01 Dashboard' :
-    screen === 'feed' ? '02 Feed' :
-    screen === 'watchlist' ? '03 Watchlist' :
-    screen === 'history' ? '04 Histórico' :
-    '05 Detalhe do Imóvel';
+    screen === 'feed' ? '01 Feed' :
+    screen === 'watchlist' ? '02 Watchlist' :
+    screen === 'history' ? '03 Histórico' :
+    '04 Detalhe do Imóvel';
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
@@ -140,8 +126,7 @@ function App() {
       {initialLoading ? (
         <InitialLoading />
       ) : (<>
-        {screen === 'home' && <Home go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} dashboard={dashboard} onSearch={handleSearch} history={history} />}
-        {screen === 'feed' && <Feed key={feedKey} initialAddress={feedSearch.address} initialFilters={feedSearch.filters} go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
+        {screen === 'feed' && <Feed go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
         {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
         {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
         {screen === 'detail' && <PropertyDetail key={selected?.id} property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
@@ -171,12 +156,11 @@ function TopBar({ screen, go, watchCount }) {
         width: 0, background: 'var(--accent)', transition: 'width .1s linear',
       }} />
       <div className="row gap-6" style={{ alignItems: 'center' }}>
-        <button className="brand" onClick={() => go('home')}>
+        <button className="brand" onClick={() => go('feed')}>
           <span className="logo"></span>
           Argos
         </button>
         <nav className="nav">
-          <a className={screen === 'home' ? 'active' : ''} onClick={() => go('home')}>Dashboard</a>
           <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
           <a className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
             Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}

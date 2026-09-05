@@ -56,6 +56,13 @@ def test_edital_data_is_selected_only_for_catalog_detail():
     assert "edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS
 
 
+def test_vercel_area_similarity_is_continuous_and_symmetric():
+    similarity = vercel_api._area_similarity(171.19, 212)
+
+    assert round(similarity * 100, 2) == 80.75
+    assert vercel_api._area_similarity(212, 171.19) == similarity
+
+
 def test_stale_land_enrichment_is_suppressed():
     stale = json.dumps({
         "market": 185_533_656, "discount": 99, "roi": 1000,
@@ -85,6 +92,68 @@ def test_persisted_city_reference_is_identified_in_market_detail():
 
     assert result["market"] == 250_000
     assert result["marketDetail"]["indicators"][0]["lbl"] == "Preço/m² · cidade"
+    assert result["marketDetail"]["confidenceLevel"] == "low"
+    assert "confidenceDebug" not in result["marketDetail"]
+
+
+def test_persisted_enrichment_exposes_only_high_confidence_level():
+    row = {
+        "id": 9, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Apartamento", "area_m2": 70,
+        "beds": 2, "lat": -25.4284, "lng": -49.2733,
+        "preco": 150_000, "avaliacao": 250_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/9",
+        "photo_url": None,
+    }
+    comparables = [{
+        "address": f"Rua {index}", "property_type": "Apartamento",
+        "price": 350_000, "area_m2": 70, "beds": 2,
+        "price_per_m2": 5_000, "source": "Portal",
+        "url": f"https://portal/{index}", "lat": -25.4284, "lng": -49.2733,
+    } for index in range(5)]
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, comparables,
+    )
+
+    assert result["marketDetail"]["confidenceLevel"] == "high"
+    assert "confidenceDebug" not in result["marketDetail"]
+
+
+def test_legacy_enrichment_refreshes_level_without_exposing_debug():
+    row = {
+        "property_type": "Apartamento", "neighborhood": "Centro", "area_m2": 70,
+        "beds": 2, "lat": -25.4284, "lng": -49.2733,
+    }
+    comparables = [{
+        "reference_id": 1, "reference_neighborhood": "",
+        "reference_property_type": "Apartamento",
+        "address": f"Rua {index}", "property_type": "Apartamento",
+        "price": 350_000, "area_m2": 70, "beds": 2,
+        "price_per_m2": 5_000, "source": "Portal",
+        "url": f"https://portal/{index}", "lat": -25.4284, "lng": -49.2733,
+    } for index in range(5)]
+    legacy = {
+        "marketDetail": {"indicators": [], "comparables": [], "confidenceLevel": "low"},
+    }
+
+    result = vercel_api._refresh_confidence_level(legacy, row, comparables, force=True)
+
+    assert result["marketDetail"]["confidenceLevel"] == "high"
+    assert "confidenceDebug" not in result["marketDetail"]
+
+
+def test_safe_enrichment_removes_legacy_confidence_debug():
+    legacy = json.dumps({
+        "marketDetail": {
+            "confidenceLevel": "low",
+            "confidenceDebug": {"score": 12.5},
+        },
+    })
+
+    result = vercel_api._safe_enrichment(legacy, "Apartamento")
+
+    assert "confidenceDebug" not in result["marketDetail"]
 
 
 def test_persisted_enrichment_includes_dynamic_editable_costs():
@@ -93,7 +162,8 @@ def test_persisted_enrichment_includes_dynamic_editable_costs():
         "address": "Rua A", "property_type": "Apartamento", "area_m2": 50,
         "beds": 2, "preco": 100_000, "avaliacao": 150_000,
         "modalidade": "Leilão SFI", "detail_url": "https://example.com/7",
-        "photo_url": None, "descricao_raw": "Comissão do leiloeiro de 6% sobre o lance",
+        "photo_url": None, "descricao_raw": "Texto descritivo sem percentual confiável",
+        "edital_data": {"commissionRate": 0.06},
     }
 
     result = vercel_api._build_persisted_enrichment(
@@ -125,7 +195,7 @@ def test_persisted_enrichment_prefers_official_edital_commission():
     assert "edital" in commission["label"]
 
 
-def test_persisted_direct_sale_has_no_auctioneer_commission():
+def test_persisted_direct_sale_marks_auctioneer_commission_exempt():
     row = {
         "id": 8, "uf": "PR", "city": "Curitiba", "neighborhood": "Tingui",
         "address": "Rua B", "property_type": "Casa", "area_m2": 100,
@@ -140,7 +210,27 @@ def test_persisted_direct_sale_has_no_auctioneer_commission():
     costs = {item["id"]: item for item in result["costs"]}
 
     assert costs["auction_bid"]["label"] == "Preço de venda"
-    assert "auctioneer_commission" not in costs
+    assert costs["auctioneer_commission"]["label"] == "Comissão isenta"
+    assert costs["auctioneer_commission"]["value"] == 0
+
+
+def test_persisted_open_tender_uses_edital_commission():
+    row = {
+        "id": 9, "uf": "PR", "city": "Londrina", "neighborhood": "Centro",
+        "address": "Rua C", "property_type": "Apartamento", "area_m2": 60,
+        "beds": 2, "preco": 180_000, "avaliacao": 260_000,
+        "modalidade": "Licitação Aberta", "detail_url": "https://example.com/9",
+        "photo_url": None, "descricao_raw": "",
+        "edital_data": {"commissionRate": 0.05},
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 4_500, "scope": "city"}, [],
+    )
+    commission = next(item for item in result["costs"] if item["id"] == "auctioneer_commission")
+
+    assert "edital" in commission["label"]
+    assert commission["rate"] == 0.05
 
 
 def test_catalog_requires_database_configuration(monkeypatch):

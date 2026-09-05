@@ -29,6 +29,8 @@ class PropertyMetadata:
     city: str = ""
     neighborhood: str = ""
     state: str = ""
+    lat: float | None = None
+    lng: float | None = None
     beds: int | None = None
     baths: int | None = None
     parking: int | None = None
@@ -44,11 +46,16 @@ class PropertyMetadata:
 @dataclass
 class ComparableProperty:
     address: str = ""
+    property_type: str = ""
     price: float = 0.0
     area_m2: float = 0.0
+    beds: int | None = None
     price_per_m2: float = 0.0
     source: str = ""
     url: str = ""
+    lat: float | None = None
+    lng: float | None = None
+    distance_km: float | None = None
 
 
 @dataclass
@@ -56,6 +63,7 @@ class MarketResult:
     price_per_m2_neighborhood: float = 0.0
     comparable_properties: list[ComparableProperty] = field(default_factory=list)
     discount_percentage: float = 0.0
+    confidence_level: str = "low"
 
 
 @dataclass

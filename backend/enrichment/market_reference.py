@@ -10,11 +10,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
 from loguru import logger
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, select
 
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
@@ -23,7 +24,11 @@ from db.models import (
 from enrichment.market_coverage import canonical_property_type, is_eligible_market_property
 from enrichment.run import metadata_from_property
 from graph.market import calculate_market
+from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
+
+
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v3"
 
 
 def _now() -> datetime:
@@ -32,6 +37,50 @@ def _now() -> datetime:
 
 def _aware(value):
     return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
+
+
+async def _ensure_subject_coordinates(metadata, geocoder) -> None:
+    """Geocode the representative before a city job clears its search street."""
+    if metadata.lat is not None and metadata.lng is not None:
+        return
+    if not metadata.address.strip():
+        return
+    raw_address = metadata.address.strip()
+    first_part = raw_address.split(",", 1)[0].strip()
+    # Caixa commonly separates the number as `N. 1076` and appends apartment,
+    # block and parking details. Nominatim resolves the civic address once that
+    # unit noise is removed.
+    number_match = re.search(
+        r"(?:^|,)\s*(?:N(?:UMERO|[ºO.]*)\s*\.?\s*)?(\d{1,6})(?:\s|,|$)",
+        raw_address,
+        flags=re.IGNORECASE,
+    )
+    street = re.split(
+        r"\s+N(?:UMERO|[ºO.]*)\s*\.?\s*(?:\d+|SN)\b",
+        first_part,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0].strip()
+    civic_address = street
+    if number_match and not re.search(r"\b\d{1,6}\s*$", street):
+        civic_address = f"{street} {number_match.group(1)}"
+    queries = [
+        ", ".join(part for part in (
+            civic_address, metadata.city.strip(), metadata.state.strip(), "Brasil",
+        ) if part),
+        ", ".join(part for part in (
+            street, metadata.city.strip(), metadata.state.strip(), "Brasil",
+        ) if part),
+    ]
+    for query in dict.fromkeys(queries):
+        try:
+            coordinates = await asyncio.to_thread(geocoder.geocode, query)
+        except Exception as exc:
+            logger.warning("Market reference subject geocoding failed: {}", exc)
+            return
+        if coordinates:
+            metadata.lat, metadata.lng = coordinates
+            return
 
 
 def _closing_at(prop):
@@ -134,16 +183,20 @@ def _retry_delay(attempt_count: int, empty: bool = False) -> timedelta:
 
 async def refresh_references(
     session_factory, ufs: list[str], limit: int = 10, max_age_days: int = 90,
-    property_id: int | None = None,
+    property_id: int | None = None, geocoder=None,
 ) -> dict[str, int]:
     coverage = reconcile_coverage(session_factory, ufs)
+    owns_geocoder = geocoder is None
+    geocoder = geocoder or NominatimClient()
     now = _now()
     cutoff = now - timedelta(days=max_age_days)
     with session_factory() as session:
-        stmt = select(MarketReferenceJob).where(
-            MarketReferenceJob.uf.in_(ufs),
-            or_(MarketReferenceJob.next_attempt_at.is_(None), MarketReferenceJob.next_attempt_at <= now),
-        )
+        # Load every job in scope so successful legacy snapshots can bypass a
+        # future next_attempt_at once. Their comparables predate the confidence
+        # inputs (type, bedrooms and coordinates), so treating them as fresh
+        # would leave every rematerialized analysis artificially low until the
+        # normal 90-day expiry.
+        stmt = select(MarketReferenceJob).where(MarketReferenceJob.uf.in_(ufs))
         if property_id is not None:
             stmt = stmt.where(MarketReferenceJob.representative_property_id == property_id)
         jobs = session.execute(stmt.order_by(
@@ -157,8 +210,21 @@ async def refresh_references(
                 RegionalMarketPrice.neighborhood == job.neighborhood,
                 RegionalMarketPrice.property_type == job.property_type,
             )).scalar_one_or_none()
+            legacy_snapshot = bool(
+                reference
+                and job.status == "successful"
+                and reference.source != MARKET_REFERENCE_SOURCE
+            )
+            attempt_due = job.next_attempt_at is None or _aware(job.next_attempt_at) <= now
+            if not attempt_due and not legacy_snapshot:
+                continue
             fresh = reference and _aware(reference.computed_at) >= cutoff
-            if property_id is None and job.status == "successful" and fresh:
+            if (
+                property_id is None
+                and job.status == "successful"
+                and fresh
+                and not legacy_snapshot
+            ):
                 continue
             candidates.append(job.id)
             if limit and len(candidates) >= limit:
@@ -175,9 +241,13 @@ async def refresh_references(
                 metadata = metadata_from_property(prop)
                 metadata.property_type = job.property_type
                 metadata.neighborhood = job.neighborhood
+                await _ensure_subject_coordinates(metadata, geocoder)
                 if not job.neighborhood:  # city baseline must not accidentally search one street
                     metadata.address = ""
-                comparables = await scrape_comparables(metadata)
+                comparables = await scrape_comparables(metadata, geocoder=geocoder)
+                if metadata.lat is not None and metadata.lng is not None:
+                    prop.lat, prop.lng = metadata.lat, metadata.lng
+                    prop.geocode_status = "ok"
                 result = calculate_market(metadata, comparables)
                 job.attempt_count += 1
                 job.last_attempted_at = now
@@ -203,7 +273,7 @@ async def refresh_references(
                     session.add(reference)
                 reference.price_per_m2 = result.price_per_m2_neighborhood
                 reference.sample_size = len(result.comparable_properties)
-                reference.source = "listing_median"
+                reference.source = MARKET_REFERENCE_SOURCE
                 reference.computed_at = now
                 session.flush()
                 session.execute(delete(RegionalMarketComparable).where(
@@ -211,9 +281,12 @@ async def refresh_references(
                 ))
                 for comp in result.comparable_properties:
                     session.add(RegionalMarketComparable(
-                        reference_id=reference.id, address=comp.address, price=comp.price,
-                        area_m2=comp.area_m2, price_per_m2=comp.price_per_m2,
+                        reference_id=reference.id, address=comp.address,
+                        property_type=comp.property_type, price=comp.price,
+                        area_m2=comp.area_m2, beds=comp.beds,
+                        price_per_m2=comp.price_per_m2,
                         source=comp.source, url=comp.url,
+                        lat=comp.lat, lng=comp.lng,
                     ))
                 job.status = "successful"
                 job.last_error = ""
@@ -233,6 +306,8 @@ async def refresh_references(
                     session.commit()
                 summary["failed"] += 1
                 logger.exception("Market reference job {} failed: {}", job_id, exc)
+    if owns_geocoder:
+        geocoder.close()
     logger.info("Market coverage refresh: {}", json.dumps(summary))
     return summary
 

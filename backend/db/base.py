@@ -50,7 +50,8 @@ def init_db(engine: Engine) -> None:
     # v1 predates migrations and create_all() does not add columns to an
     # existing table. Keep this small compatibility migration here so deployed
     # SQLite/Postgres catalogs gain ingestion fields on next startup.
-    existing = {column["name"] for column in inspect(engine).get_columns("properties")}
+    inspector = inspect(engine)
+    existing = {column["name"] for column in inspector.get_columns("properties")}
     date_columns = {
         "first_auction_at": "TIMESTAMP WITH TIME ZONE",
         "second_auction_at": "TIMESTAMP WITH TIME ZONE",
@@ -74,6 +75,28 @@ def init_db(engine: Engine) -> None:
             connection.execute(text(
                 f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
             ))
+
+        # create_all() does not widen existing columns. Pipeline v8 introduced
+        # a descriptive 24-character label, so make old Postgres deployments
+        # self-heal before a worker attempts to materialize analyses. SQLite
+        # does not enforce VARCHAR lengths and needs no ALTER TABLE rebuild.
+        if engine.dialect.name == "postgresql":
+            pipeline_column = next(
+                (
+                    column for column in inspector.get_columns("enrichments")
+                    if column["name"] == "pipeline_version"
+                ),
+                None,
+            )
+            current_length = (
+                getattr(pipeline_column["type"], "length", None)
+                if pipeline_column else None
+            )
+            if current_length is not None and current_length < 64:
+                connection.execute(text(
+                    "ALTER TABLE enrichments "
+                    "ALTER COLUMN pipeline_version TYPE VARCHAR(64)"
+                ))
         for name, postgres_type in price_columns.items():
             if name in existing:
                 continue
@@ -88,6 +111,29 @@ def init_db(engine: Engine) -> None:
                 column_type = "JSON"
             connection.execute(text(
                 f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
+            ))
+
+        comparable_existing = {
+            column["name"] for column in inspector.get_columns(
+                "regional_market_comparables"
+            )
+        }
+        comparable_columns = {
+            "property_type": "VARCHAR(64)",
+            "beds": "INTEGER",
+            "lat": "DOUBLE PRECISION",
+            "lng": "DOUBLE PRECISION",
+        }
+        for name, postgres_type in comparable_columns.items():
+            if name in comparable_existing:
+                continue
+            column_type = (
+                "FLOAT" if engine.dialect.name == "sqlite" and name in {"lat", "lng"}
+                else postgres_type
+            )
+            connection.execute(text(
+                "ALTER TABLE regional_market_comparables "
+                f"ADD COLUMN {name} {column_type}"
             ))
 
 

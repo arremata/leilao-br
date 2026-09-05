@@ -423,11 +423,31 @@ a { color: inherit; text-decoration: none; }
   color: var(--bad);
 }
 
+/* ---------- Simulator (§02.01) — refined skin ---------- */
+
+/* Simulator card shell: slightly denser, flatter, more editorial */
+.simulator-card {
+  padding: 28px 28px 24px !important;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(17,24,39,.04), 0 4px 16px rgba(17,24,39,.03);
+}
+
+/* "Resetar" button: subtle ghost, mono touch */
+.simulator-reset-btn {
+  border-radius: 6px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--fg-2);
+}
+
+/* Panel: adjustable costs — unified quiet module */
 .scenario-cost-panel {
-  margin-bottom: 24px;
-  padding: 18px;
+  margin-bottom: 26px;
+  padding: 22px;
   border: 1px solid var(--line-1);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-2);
 }
 
@@ -436,7 +456,7 @@ a { color: inherit; text-decoration: none; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .scenario-cost-panel-head .uppy {
@@ -444,7 +464,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .scenario-cost-panel-head p {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   color: var(--fg-2);
   font-size: 12px;
 }
@@ -452,44 +472,51 @@ a { color: inherit; text-decoration: none; }
 .scenario-saved-note {
   color: var(--fg-3);
   font-size: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--line-1);
+  border-radius: 4px;
+  background: var(--bg-1);
 }
 
 .scenario-cost-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .scenario-money-field {
   min-width: 0;
-  padding: 13px;
-  border: 1px solid var(--line-1);
-  border-radius: 9px;
+  padding: 14px 16px;
   background: var(--bg-1);
+  border-radius: 12px;
+  border: 1px solid var(--line-1);
+  box-shadow: 0 1px 2px rgba(17,24,39,.03);
 }
 
 .scenario-money-field > label > .uppy {
   display: block;
-  margin-bottom: 7px;
+  margin-bottom: 8px;
   color: var(--fg-2);
+  letter-spacing: .06em;
 }
 
 .scenario-money-input {
   display: flex;
   align-items: center;
-  height: 42px;
-  padding: 0 11px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--line-2);
   border-radius: 8px;
   background: var(--bg-1);
   color: var(--fg-2);
+  font-family: var(--f-mono);
   transition: border-color .15s, box-shadow .15s;
 }
 
 .scenario-money-input:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 25%, transparent);
 }
 
 .scenario-money-input input {
@@ -501,7 +528,9 @@ a { color: inherit; text-decoration: none; }
   background: transparent;
   color: var(--fg-0);
   font-family: var(--f-mono);
+  font-size: 15px;
   font-weight: 500;
+  font-feature-settings: 'tnum';
 }
 
 .scenario-money-suffix {
@@ -516,7 +545,7 @@ a { color: inherit; text-decoration: none; }
   justify-content: space-between;
   gap: 8px;
   min-height: 17px;
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--fg-3);
   font-size: 10.5px;
 }
@@ -527,19 +556,197 @@ a { color: inherit; text-decoration: none; }
   font-size: 10.5px;
 }
 
-.scenario-money-field.compact {
-  padding: 11px;
+/* City reference footnote — mono strip */
+.scenario-cost-panel > p {
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-1);
+  font-size: 11px !important;
+  line-height: 1.55;
+  color: var(--fg-2) !important;
 }
 
-.renovation-alternative {
-  margin-top: 14px;
+.scenario-cost-panel > p .mono {
+  font-feature-settings: 'tnum';
 }
 
+/* ---------- Metric tiles — differentiated but quieter ---------- */
+
+/* external + total: cooler, quieter */
+.sim-metric.muted,
+.sim-metric.cost {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+}
+
+.sim-metric.muted .num-xl,
+.sim-metric.cost .num-xl {
+  color: var(--fg-1);
+}
+
+.sim-metric.muted > p,
+.sim-metric.cost > p {
+  color: var(--fg-2);
+}
+
+/* hero (lance máximo): flatter violet, generous air */
+.sim-metric.hero {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #7C3AED 0%, #6D28D9 70%);
+  border: 1px solid #6D28D9;
+  box-shadow: 0 8px 24px rgba(124,58,237,.28);
+  overflow: hidden;
+}
+
+.sim-metric.hero::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -20%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,.12), transparent 70%);
+  pointer-events: none;
+}
+
+.sim-metric.hero .uppy {
+  color: rgba(255,255,255,.75);
+}
+
+.sim-metric.hero .num-xl {
+  color: #fff;
+  font-size: 28px;
+}
+
+.sim-metric.hero > p {
+  color: rgba(255,255,255,.8);
+}
+
+/* Financial equation: recommended bid + external costs = total. */
+.cost-equation {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.12fr) 24px
+    minmax(0, .92fr) 24px
+    minmax(0, 1fr)
+    minmax(0, 1.03fr);
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.cost-equation-card {
+  min-width: 0;
+}
+
+.cost-equation-card .sim-metric,
+.cost-equation-card .sale-value-metric {
+  height: 100%;
+}
+
+.cost-equation-operator {
+  align-self: center;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: 50%;
+  background: var(--bg-1);
+  color: var(--fg-3);
+  font-family: var(--f-mono);
+  font-size: 14px;
+}
+
+.bid-room {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255,255,255,.22);
+}
+
+.bid-room > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(255,255,255,.72);
+  font-size: 10.5px;
+}
+
+.bid-room strong {
+  color: #fff;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bid-room .bid-room-delta {
+  justify-content: flex-start;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(255,255,255,.12);
+}
+
+.bid-room-delta span:last-child {
+  font-size: 10px;
+}
+
+.automatic-cost-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.automatic-cost-tags span {
+  padding: 3px 6px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
+  background: var(--bg-1);
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.total-equation-copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-1);
+  color: var(--fg-3);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+}
+
+.total-equation-copy span:nth-child(2) {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.sale-scenario-context {
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+}
+
+/* Sale value is important context, but secondary to the three cost totals. */
 .sale-value-metric {
-  padding: 16px 18px;
-  border: 1px solid var(--good);
-  border-radius: 10px;
-  background: var(--good-soft);
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--line-1);
+  border-radius: 12px;
+  background: var(--bg-2);
+  box-shadow: none;
 }
 
 .sale-value-metric > .row > .uppy {
@@ -547,7 +754,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .sale-custom-tag {
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: var(--good);
   color: #fff;
@@ -560,18 +767,19 @@ a { color: inherit; text-decoration: none; }
 .sale-value-input {
   display: flex;
   align-items: baseline;
-  margin-top: 7px;
-  color: var(--good);
+  margin-top: 6px;
+  color: var(--fg-0);
   font-family: var(--f-mono);
-  font-size: 25px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 550;
+  letter-spacing: -0.03em;
 }
 
 .sale-value-input > button {
   max-width: 100%;
   overflow: hidden;
-  border-bottom: 1px dashed rgba(22, 163, 74, .45);
-  color: var(--good);
+  border-bottom: 1px dashed var(--line-2);
+  color: var(--fg-0);
   font: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -580,59 +788,61 @@ a { color: inherit; text-decoration: none; }
 .sale-value-input input {
   width: 100%;
   min-width: 0;
-  padding: 0 0 0 7px;
+  padding: 0 0 0 8px;
   border: 0;
   border-bottom: 1px solid transparent;
   outline: 0;
   background: transparent;
-  color: var(--good);
+  color: var(--fg-0);
   font-family: var(--f-mono);
   font-size: inherit;
   font-weight: inherit;
 }
 
 .sale-value-input:focus-within input {
-  border-color: var(--good);
+  border-color: var(--accent);
 }
 
 .sale-delta {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  color: #fff;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--good);
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
+  box-shadow: none;
 }
 
-.sale-delta.positive { background: var(--good); }
-.sale-delta.negative { background: var(--bad); }
+.sale-delta.positive { background: var(--good-soft); }
+.sale-delta.negative { background: var(--bad-soft); color: var(--bad); }
 
 .sale-basis-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 5px;
-  margin-top: 10px;
+  margin-top: 9px;
   padding: 3px;
-  border: 1px solid rgba(22, 163, 74, .25);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .55);
+  border: 1px solid var(--line-1);
+  border-radius: 9px;
+  background: var(--bg-1);
 }
 
 .sale-basis-toggle button {
   min-width: 0;
   padding: 6px 7px;
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--fg-2);
   text-align: left;
+  transition: background .15s;
 }
 
 .sale-basis-toggle button.active {
   background: var(--bg-1);
-  box-shadow: 0 1px 4px rgba(17, 24, 39, .12);
+  box-shadow: 0 1px 4px rgba(17,24,39,.1);
   color: var(--fg-0);
 }
 
@@ -655,30 +865,291 @@ a { color: inherit; text-decoration: none; }
 }
 
 .sale-basis-toggle button small {
-  margin-top: 1px;
+  margin-top: 2px;
   font-family: var(--f-mono);
   font-size: 8.5px;
 }
 
 .sale-value-metric > p {
   margin: 7px 0 0;
-  color: var(--fg-2);
+  color: var(--fg-3);
   font-size: 10.5px;
-  line-height: 1.35;
+  line-height: 1.4;
+}
+
+/* ---------- Slider fields (SimSliders row) ---------- */
+
+/* SliderField label/value row — accent value pops */
+.sim-sliders .uppy {
+  letter-spacing: .1em;
+}
+
+/* Slider track — visible fill to the left */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0/var(--fill, 0%) 100% no-repeat,
+    var(--bg-3);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  margin: 12px 0 0;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(17,24,39,.18);
+  transition: transform .1s, box-shadow .15s;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 8px rgba(124,58,237,.35);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.slider::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(17,24,39,.18);
+  transition: transform .1s, box-shadow .15s;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 8px rgba(124,58,237,.35);
+}
+
+/* Slider min/max tick labels */
+.sim-sliders .mono[style*="fg-3"] {
+  font-size: 9.5px !important;
+  letter-spacing: .06em;
+}
+
+/* SliderField bottom description */
+.sim-sliders [style*="fontSize: 12"] {
+  color: var(--fg-2);
+}
+
+/* ---------- Renovation value — directly editable and synced to slider ---------- */
+.renovation-money-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--line-1);
+  border-radius: 8px;
+  background: var(--bg-1);
+  color: var(--accent-strong);
+  font-family: var(--f-mono);
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.renovation-money-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.renovation-money-editor input {
+  width: 94px;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  appearance: textfield;
+  background: transparent;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.renovation-money-editor input::-webkit-inner-spin-button,
+.renovation-money-editor input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.renovation-money-editor input:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.renovation-money-status {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* ---------- Region strip — mono, quieter, framed ---------- */
+.sim-region-strip {
+  padding: 10px 14px;
+  background: var(--bg-2);
+  border-radius: 8px;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  color: var(--fg-2);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sim-region-strip b {
+  color: var(--fg-0);
+  font-weight: 600;
+}
+
+.sim-region-strip .sep {
+  width: 3px; height: 3px;
+  background: var(--fg-3);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.scenario-extra-costs {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line-2);
+}
+
+.scenario-extra-costs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.scenario-extra-costs-head .uppy {
+  color: var(--fg-1);
+}
+
+.scenario-extra-costs-head p {
+  margin: 3px 0 0;
+  color: var(--fg-2);
+  font-size: 11.5px;
+}
+
+.scenario-extra-costs-head > .mono {
+  color: var(--fg-3);
+  font-size: 10px;
+}
+
+.scenario-extra-costs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.scenario-extra-cost-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--bg-1);
+}
+
+.scenario-extra-cost-item span,
+.scenario-extra-cost-item strong {
+  display: block;
+}
+
+.scenario-extra-cost-item span {
+  overflow-wrap: anywhere;
+  color: var(--fg-1);
+  font-size: 12px;
+}
+
+.scenario-extra-cost-item strong {
+  margin-top: 4px;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scenario-extra-cost-item > button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--fg-3);
+  font-size: 18px;
+}
+
+.scenario-extra-cost-item > button:hover,
+.scenario-extra-cost-item > button:focus-visible {
+  background: var(--bad-soft);
+  color: var(--bad);
+  outline: none;
 }
 
 .custom-cost-trigger {
   display: flex;
   width: 100%;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 20px;
-  border-top: 1px dashed var(--line-2);
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px dashed var(--accent);
+  border-radius: 10px;
+  background: var(--bg-1);
   color: var(--accent-strong);
-  font-size: 12.5px;
-  font-weight: 500;
+  text-align: left;
   transition: background .15s;
+}
+
+.custom-cost-plus {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  font-size: 18px;
+}
+
+.custom-cost-trigger strong,
+.custom-cost-trigger small {
+  display: block;
+}
+
+.custom-cost-trigger strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.custom-cost-trigger small {
+  margin-top: 3px;
+  color: var(--fg-3);
+  font-size: 10px;
 }
 
 .custom-cost-trigger:hover,
@@ -690,11 +1161,39 @@ a { color: inherit; text-decoration: none; }
 .custom-cost-form {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto;
+  grid-column: 1 / -1;
   gap: 12px;
   align-items: end;
-  padding: 16px 20px;
-  border-top: 1px dashed var(--line-2);
+  padding: 16px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--bg-1);
+}
+
+.custom-cost-suggestions {
+  grid-column: 1 / -1;
+}
+
+.custom-cost-suggestions > .uppy {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--fg-3);
+}
+
+.custom-cost-suggestions button {
+  padding: 5px 8px;
+  border: 1px solid var(--line-1);
+  border-radius: 999px;
   background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: 10.5px;
+}
+
+.custom-cost-suggestions button:hover,
+.custom-cost-suggestions button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  outline: none;
 }
 
 .custom-cost-form label > .uppy {
@@ -1007,11 +1506,6 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 1280px) {
-  .home-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .home-split-grid,
   .detail-hero-grid,
   .analysis-grid {
     grid-template-columns: 1fr !important;
@@ -1045,6 +1539,15 @@ a { color: inherit; text-decoration: none; }
 
   .feed-grid {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+  }
+
+  .cost-equation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .cost-equation-operator {
+    display: none;
   }
 }
 
@@ -1120,7 +1623,6 @@ a { color: inherit; text-decoration: none; }
     gap: 10px;
   }
 
-  .home-card-grid,
   .feed-grid,
   .property-grid {
     grid-template-columns: 1fr !important;
@@ -1149,7 +1651,6 @@ a { color: inherit; text-decoration: none; }
   }
 
   .detail-hero-grid,
-  .home-split-grid,
   .analysis-grid,
   .form-grid,
   .meta-grid,
@@ -1204,6 +1705,14 @@ a { color: inherit; text-decoration: none; }
     grid-template-columns: 1fr;
   }
 
+  .simulator-card {
+    padding: 20px 16px !important;
+  }
+
+  .scenario-cost-panel {
+    padding: 16px;
+  }
+
   .scenario-cost-panel-head {
     flex-direction: column;
     gap: 6px;
@@ -1212,6 +1721,24 @@ a { color: inherit; text-decoration: none; }
   .sim-sliders {
     grid-template-columns: 1fr !important;
     gap: 20px !important;
+  }
+
+  .cost-equation {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .cost-equation-operator {
+    justify-self: center;
+  }
+
+  .sale-scenario-context {
+    max-width: none;
+  }
+
+  .scenario-extra-costs-head {
+    flex-direction: column;
+    gap: 5px;
   }
 
   .history-row {
