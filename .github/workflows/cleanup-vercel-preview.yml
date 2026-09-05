@@ -1,0 +1,134 @@
+name: Cleanup closed PR Vercel previews
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleanup-vercel-preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      # These IDs deliberately constrain deletion to Gustavo's ARGOS project.
+      VERCEL_PROJECT_ID: prj_Yv7ESf4HceaydQospT2uvuc93bPh
+      VERCEL_TEAM_ID: team_c92CNIbFMgeyXFnMzG98LzwG
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - name: Delete previews belonging to the closed PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = process.env.VERCEL_TOKEN;
+            const projectId = process.env.VERCEL_PROJECT_ID;
+            const teamId = process.env.VERCEL_TEAM_ID;
+            const pullRequest = context.payload.pull_request;
+            const expectedPrId = String(pullRequest.number);
+            const expectedBranch = pullRequest.head.ref;
+
+            if (!token) {
+              core.setFailed(
+                'Missing VERCEL_TOKEN. Add a dedicated ARGOS Vercel token as a GitHub Actions repository secret.'
+              );
+              return;
+            }
+            core.setSecret(token);
+
+            const headers = {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            };
+            const candidates = new Map();
+            const seenCursors = new Set();
+            let until;
+
+            // Resolve all deployments first, using Vercel's timestamp cursor.
+            // Nothing is deleted unless every candidate passes the safeguards below.
+            for (let page = 1; page <= 100; page += 1) {
+              const query = new URLSearchParams({
+                projectId,
+                teamId,
+                target: 'preview',
+                branch: expectedBranch,
+                limit: '100',
+              });
+              if (until !== undefined) query.set('until', String(until));
+
+              const response = await fetch(
+                `https://api.vercel.com/v7/deployments?${query}`,
+                { headers }
+              );
+              if (!response.ok) {
+                throw new Error(
+                  `Unable to list Vercel previews (${response.status} ${response.statusText})`
+                );
+              }
+
+              const body = await response.json();
+              for (const deployment of body.deployments ?? []) {
+                const isExpectedProject = deployment.projectId === projectId;
+                const isPreview = deployment.target == null;
+                const isExpectedBranch = deployment.meta?.githubCommitRef === expectedBranch;
+                const isExpectedPr = String(deployment.meta?.githubPrId ?? '') === expectedPrId;
+
+                if (isExpectedProject && isPreview && isExpectedBranch && isExpectedPr) {
+                  candidates.set(deployment.uid, deployment);
+                } else {
+                  core.warning(
+                    `Skipped ${deployment.uid}: deployment did not pass every project/preview/branch/PR safeguard.`
+                  );
+                }
+              }
+
+              const next = body.pagination?.next;
+              if (next == null) break;
+              if (seenCursors.has(next)) {
+                throw new Error('Vercel returned a repeated pagination cursor; no deployments were deleted.');
+              }
+              seenCursors.add(next);
+              until = next;
+
+              if (page === 100) {
+                throw new Error('Vercel preview listing exceeded 100 pages; no deployments were deleted.');
+              }
+            }
+
+            core.info(
+              `Resolved ${candidates.size} ARGOS preview deployment(s) for PR #${expectedPrId} (${expectedBranch}).`
+            );
+
+            for (const deployment of candidates.values()) {
+              const query = new URLSearchParams({ teamId });
+              const response = await fetch(
+                `https://api.vercel.com/v13/deployments/${encodeURIComponent(deployment.uid)}?${query}`,
+                { method: 'DELETE', headers }
+              );
+
+              if (response.status === 404) {
+                core.info(`${deployment.uid} was already deleted.`);
+                continue;
+              }
+              if (!response.ok) {
+                throw new Error(
+                  `Unable to delete ${deployment.uid} (${response.status} ${response.statusText})`
+                );
+              }
+              core.info(`Deleted ${deployment.uid} (${deployment.url}).`);
+            }
+
+            await core.summary
+              .addHeading('Vercel preview cleanup')
+              .addRaw(
+                candidates.size === 0
+                  ? `No ARGOS Preview deployments matched PR #${expectedPrId}.`
+                  : `Deleted ${candidates.size} ARGOS Preview deployment(s) for PR #${expectedPrId}.`
+              )
+              .write();

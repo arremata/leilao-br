@@ -33,7 +33,9 @@ clica em Merge no GitHub. Esse clique manual é a aprovação e o comando de
 publicação quando o próprio Gustavo abriu o PR. Quando outra pessoa abriu o PR,
 ela precisa aguardar a aprovação de Gustavo no commit atual; qualquer novo push
 exige uma nova aprovação. O agente nunca faz o merge nem habilita merge
-automático.
+automático. Quando um PR é fechado ou publicado, uma automação apaga os previews
+daquele PR no projeto ARGOS; o endereço deixa de funcionar, mas a implantação de
+produção permanece intacta.
 
 ## Limites de segurança
 
@@ -42,7 +44,8 @@ Quando a escrita estiver habilitada, ações persistentes no preview também alt
 produção. Por isso, use apenas os fluxos necessários para validar a mudança e não
 execute testes destrutivos. Ingestão, migrações de banco, credenciais, permissões,
 automações e infraestrutura sempre precisam ser destacadas para revisão especial
-do responsável técnico.
+do responsável técnico. O link do preview é público e pode ser aberto sem conta
+na Vercel; trate tudo o que ele expõe como uma interface pública de produção.
 
 Cada pessoa usa sua própria conta do GitHub. Ninguém compartilha senha, token ou
 credencial de produção com outra pessoa ou com o chat.
