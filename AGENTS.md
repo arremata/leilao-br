@@ -44,8 +44,11 @@ answers would materially change product behavior or risk.
 - Never run ingestion, migrations, destructive commands, or broad data repair
   from a preview without an explicit user request. Never expose database
   credentials to the browser or PR logs.
-- Keep previews protected to authorized team members. The preview UI must visibly
-  state that it uses production data and that actions may alter production.
+- Preview URLs are intentionally public so nontechnical validators can open them
+  without a Vercel account. Treat every preview endpoint as internet-accessible;
+  do not add a new production write path without explicit review and bounded,
+  non-destructive behavior. The preview UI must visibly state that it uses
+  production data and that actions may alter production.
 
 ### Review ownership
 
@@ -207,6 +210,8 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-05** — Made ARGOS Production and Preview deployment URLs public by disabling Vercel Authentication. Public previews still use the production catalog with explicitly enabled writes, currently limited to upserting deterministic property enrichments and prioritizing missing market-reference jobs; future write paths must be reviewed as public production operations.
 
 - **2026-09-05** — Added a conditional production-owner status gate. Gustavo-authored PRs retain the established manual self-merge flow, while every PR from another author requires Gustavo's approving review on the current head commit; any later push resets the status to pending.
 
