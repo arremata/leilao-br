@@ -1,4 +1,5 @@
-# The product owner is the production release approver for every change.
+# The product owner is documented here as the release owner. Production approval
+# is Gustavo's manual merge after required checks, including for his own PRs.
 * @GustavoAdamee
 
 # Security-sensitive surfaces are listed explicitly so their ownership remains

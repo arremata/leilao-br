@@ -17,7 +17,8 @@ Exemplos:
 3. Testar a mudança e corrigir problemas encontrados.
 4. Publicar um preview da Vercel usando os dados reais de produção.
 5. Entregar o link com instruções curtas sobre o que validar.
-6. Depois da sua confirmação, abrir o PR para `main` e habilitar o merge automático.
+6. Depois da sua confirmação, abrir o PR para `main` e deixá-lo aguardando o
+   responsável pela publicação.
 
 ## O que você precisa fazer
 
@@ -27,9 +28,9 @@ Abra o preview e use o produto normalmente. Responda no chat com o que percebeu:
 - “No celular ainda ficou apertado.”
 - “A regra deveria ser X, não Y.”
 
-Quando o PR estiver pronto, `GustavoAdamee` revisa e aprova no GitHub. A aprovação
-é o comando de publicação: o merge só acontece quando a aprovação, os testes e o
-preview estiverem todos válidos.
+Quando o PR estiver pronto e todos os testes estiverem válidos, `GustavoAdamee`
+clica em Merge no GitHub. Esse clique manual é a aprovação e o comando de
+publicação. O agente nunca faz o merge nem habilita merge automático.
 
 ## Limites de segurança
 

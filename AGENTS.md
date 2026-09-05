@@ -24,11 +24,11 @@ answers would materially change product behavior or risk.
    summary, the preview link, and a short click-by-click validation checklist.
 7. Do not open the production PR until the requester confirms the preview is
    correct. After confirmation, open a PR to `main`, complete every section of
-   the PR template, and enable squash auto-merge when repository protections
-   allow it.
-8. Never merge directly, bypass a rule, dismiss a failed check, or deploy around
-   the PR. `GustavoAdamee` approval plus all required checks is the production
-   release gate.
+   the PR template, and leave it unmerged for the production owner.
+8. Never press Merge, enable auto-merge, bypass a rule, dismiss a failed check,
+   or deploy around the PR. All required checks must pass, then
+   `GustavoAdamee` manually merges the PR; that explicit merge action is the
+   production approval.
 9. After deployment, smoke-test production and report the result. If it fails,
    stop and recommend reverting the PR to the last healthy deployment.
 
@@ -49,10 +49,13 @@ answers would materially change product behavior or risk.
 
 ### Review ownership
 
-Every production PR requires the repository code owner. Changes to database
-models or migrations, ingestion, enrichment or financial rules, authentication,
-secrets, permissions, GitHub Actions, or Vercel configuration must be called out
-as sensitive in the PR even when the requested behavior is otherwise simple.
+`GustavoAdamee` is the production release owner. Because GitHub does not count a
+PR author's review of their own PR, the protected workflow uses Gustavo's manual
+merge after every required check rather than a required review approval. Changes
+to database models or migrations, ingestion, enrichment or financial rules,
+authentication, secrets, permissions, GitHub Actions, or Vercel configuration
+must be called out as sensitive in the PR even when the requested behavior is
+otherwise simple.
 
 The human playbook is in `docs/SHIP_WITH_AGENT.md`.
 
@@ -202,6 +205,8 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-05** — Restored Gustavo's established self-merge release flow while retaining mandatory PRs and backend, frontend, and Vercel checks. Agents must leave merge disabled; Gustavo's manual merge after validation is the explicit production approval because GitHub cannot count an author's review of their own PR.
 
 - **2026-09-05** — Normalized standard Supabase `postgresql://` and legacy `postgres://` connection strings to SQLAlchemy's installed Psycopg 3 dialect, preventing new Vercel services from attempting to import the absent Psycopg 2 driver.
 
