@@ -1498,10 +1498,21 @@ function CostBreakdown({ p, sim }) {
             onCommit={(value) => setExpenseEstimate('iptu', value)}
             onReset={() => setExpenseEstimate('iptu', '')}
           />
+          {/* Sem referência, o total NÃO é zero: é desconhecido. Mostrar
+              "R$ 0,00" afirmaria que morar aqui não custa nada por mês. */}
           <div className="monthly-total">
             <span className="uppy">Por mês, somando</span>
-            <strong>R$ {fmtBRL(monthlyToLive)}</strong>
-            <span>condomínio + IPTU</span>
+            {monthlyToLive > 0 ? (
+              <>
+                <strong>R$ {fmtBRL(monthlyToLive)}</strong>
+                <span>condomínio + IPTU</span>
+              </>
+            ) : (
+              <>
+                <strong className="unknown">Ainda não sabemos</strong>
+                <span>digite os valores que descobrir</span>
+              </>
+            )}
           </div>
         </div>
         <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>
@@ -1546,7 +1557,11 @@ function ScenarioMoneyField({
   label, value, adjusted, defaultLabel, suffix, onCommit, onReset,
 }) {
   const [draft, setDraft] = useState(null);
-  const displayedValue = draft == null ? (Number.isFinite(Number(value)) ? String(value) : '') : draft;
+  // Zero sem referência é "não sabemos", não "custa zero": o campo fica vazio
+  // com o placeholder, e o rótulo abaixo explica que não temos o dado.
+  const displayedValue = draft == null
+    ? (Number.isFinite(Number(value)) && Number(value) > 0 ? String(value) : '')
+    : draft;
   const commit = () => {
     if (draft == null) return;
     if (draft.trim() === '') onReset?.();
