@@ -377,16 +377,24 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const uf = propertyUf(p);
   const registrationRate = BRAZILIAN_UFS.has(uf) ? (REGISTRATION_RATES[uf] || 0.0075) : null;
 
-  // Normalize legacy cached cost rows and backfill the new platform estimates
-  // so the feature works before every persisted enrichment has been refreshed.
+  // O enriquecimento fica PERSISTIDO no banco: enquanto as análises antigas não
+  // forem recalculadas, elas continuam trazendo as linhas de dívida com valor
+  // zero ("IPTU em dia."), a linha de ganho de capital e os rótulos da era do
+  // investidor. Corrigir só o backend não basta — o que já está gravado precisa
+  // ser normalizado na leitura.
   let sourceRows = (p.costs || [])
     .filter(r => {
       const label = normalizedCostLabel(r.label);
+      // Dívida sem valor apurado não vira linha: ausência de evidência não é
+      // afirmação de que a dívida não existe.
       if (r.kind === 'debt' && (label.includes('condomínio') || label.includes('condominio'))) return false;
       if (r.kind === 'debt' && label.includes('iptu')) return false;
+      // Ganho de capital só existe para quem revende.
+      if (label.includes('ganho de capital')) return false;
       return true;
     })
     .map((r, index) => ({ ...r, id: costRowId(r, index), value: Number(r.value) || 0 }))
+    .filter(r => r.id !== 'capital_gains')
     // Commission is rebuilt from the current structured edital below. This
     // prevents a stale materialized 5% estimate from overriding official data.
     .filter(r => r.id !== 'auctioneer_commission');
@@ -405,7 +413,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   const officialCommissionRate = Number(editalData.commissionRate);
   if (commissionExempt) {
     ensureCost({
-      id: 'auctioneer_commission', label: 'Comissão isenta', value: 0, rate: 0,
+      id: 'auctioneer_commission', label: 'Sem comissão de leiloeiro', value: 0, rate: 0,
       hint: `Nesta modalidade você não paga comissão de leiloeiro.`,
       kind: 'fee',
     });
@@ -454,18 +462,28 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             : (r.hint || 'Menor valor aceito nesta rodada do leilão.'),
         };
       }
-      if (r.id === 'property_registration' && registrationRate != null && !Number.isFinite(Number(r.rate))) {
+      if (r.id === 'property_registration') {
+        const rate = Number.isFinite(Number(r.rate)) && Number(r.rate) > 0
+          ? Number(r.rate)
+          : registrationRate;
+        if (rate == null) return r;
         return {
           ...r,
-          label: `Registro em cartório (${(registrationRate * 100).toLocaleString('pt-BR')}%)`,
-          value: Math.round(minBidFloor * registrationRate),
-          rate: registrationRate,
+          label: `Registro em cartório (${(rate * 100).toLocaleString('pt-BR')}%)`,
+          value: Number.isFinite(Number(r.rate)) && Number(r.rate) > 0
+            ? r.value
+            : Math.round(minBidFloor * rate),
+          rate,
           hint: 'Estimativa da taxa do cartório para passar o imóvel para o seu nome, com base nas tabelas estaduais de 2025. O valor exato varia; confirme com o cartório.',
         };
       }
+      // O rótulo é reescrito, e não só o valor: análises já gravadas trazem
+      // "Desocupação do imóvel · estimativa" e "Reforma estimada", da era do
+      // investidor, e não serão recalculadas tão cedo.
       if (r.id === 'occupant_removal') {
         return {
           ...r,
+          label: 'Tirar quem está morando',
           value: evictionCost,
           hint: evictionAdjusted
             ? 'Valor informado por você.'
@@ -476,11 +494,15 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         return {
           ...r,
           id: 'renovation',
+          label: 'Reforma',
           value: renoCost,
           hint: renovationAdjusted
             ? `Valor informado por você. A estimativa para pintura e ajustes neste imóvel é de R$ ${fmtBRL(suggestedRenoCost)}.`
             : `${renovationLevelLabel(renoPct)} — estimativa para ${Math.round(p.area || 0)} m².`,
         };
+      }
+      if (r.id === 'auctioneer_commission') {
+        return { ...r, label: commissionExempt ? 'Sem comissão de leiloeiro' : r.label };
       }
       return r;
     });
