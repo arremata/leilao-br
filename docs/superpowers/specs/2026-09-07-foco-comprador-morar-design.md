@@ -97,7 +97,6 @@ Aplicando as cinco perguntas como critério: sai o que não responde a nenhuma d
 | Vocabulário de spread: "spread", "deságio", "ágio", "% do mercado", "100% (referência)" | aba Mercado |
 | Faixa "R$/m² da região" e "taxa de reforma aplicada" | `PropertyDetail.jsx:1535-1541` |
 | Botões desabilitados "Exportar CSV", "Exportar análise", "↓ PDF" | `Feed.jsx:166`, `PropertyDetail.jsx:699`, `:1568` |
-| A aba 04 inteira — ver B2 | `PropertyDetail.jsx:841`, `LegalComingSoon` em `:2034-2046` |
 | Código morto: `LiveCard.jsx`, CSS do score circular (`styles.css:233-255`) e da barra de risco (`:301-314`) | — |
 
 Estas remoções não constituem a reescrita da página de detalhe nos cinco blocos do
@@ -116,20 +115,21 @@ e ajustável pela pessoa, como já é hoje.
 pergunta de quem vai morar é "dá para eu me mudar já ou preciso mexer antes?". O valor
 segue ajustável; muda o enquadramento e some o vocabulário de R$/m².
 
-### B2. A aba 04 é removida, não renomeada
+### B2. A aba 04 permanece, com outro nome
 
 A aba 04 é hoje um "em breve" sem conteúdo, intitulado "Análise jurídica"
-(`PropertyDetail.jsx:2039`). Ela tem dois problemas ao mesmo tempo: não responde a
-nenhuma das cinco perguntas, e seu título é palavra proibida por risco de OAB (§1.4).
+(`PropertyDetail.jsx:2039`) — vocabulário proibido por risco de OAB (§1.4).
 
-Renomeá-la criaria um problema novo — a aba 03 já se chama "Edital" ou "Documentos", e
-duas abas de documento confundem exatamente quem é leigo. A aba é removida. O conteúdo
-jurídico futuro está na seção 8, com sua dependência nomeada.
+Uma versão anterior deste desenho mandava removê-la. Isso foi revisto: o PR #11
+(`feat/juridico-ingestao-motor-guardrails`, aberto e não mesclado) declara que "o campo
+`legal` no `AuctionPropertyResult` e o render na aba Jurídica vêm em PRs seguintes".
+Remover a aba apagaria o destino de um trabalho em voo.
 
-Isso **substitui a decisão PD-007**, que mantinha a área como "Em breve". O motivo
-original de PD-007 (não oferecer parecer antes de o produto estar pronto) permanece
-válido e é melhor servido pela ausência da aba do que por uma promessa vazia com um nome
-que não podemos usar.
+A aba permanece como "em breve" e passa a se chamar **"Pendências do imóvel"** — nome que
+descreve leitura e organização de documento, não parecer, e que não colide com a aba 03
+("Edital" / "Documentos"). O corpo é reescrito no mesmo registro.
+
+A decisão **PD-007 permanece ativa**, sem substituição.
 
 ## 5. Parte C — A linguagem
 
@@ -219,7 +219,7 @@ Cada item abaixo veio do documento de comunicação e está bloqueado por um fat
 | **Custo total no card** e filtro por custo total | O total só é somado no frontend (`PropertyDetail.jsx:614`); várias linhas são percentuais que recalculam contra um lance ajustável; não há total canônico no servidor; e a análise por imóvel não cobre o catálogo inteiro | Definir cenário padrão canônico no servidor e cobrir o catálogo. Alto |
 | **"Baseado em N imóveis parecidos"** | `comparable_count` é calculado (`market_confidence.py:266`) e descartado — só o nível é preservado (`market.py:147`). O teto é 5 comparáveis, então a frase nunca dirá 14 como no exemplo do documento | Encanamento. Baixo |
 | **"A avaliação foi feita em [data]"** | A data da avaliação não é capturada de nenhuma fonte | Coleta nova |
-| **Procedência com número de página** | As páginas do PDF são unidas com `\n` antes de qualquer parse (`caixa_edital.py:38-41`); a fronteira de página é destruída na extração | Refatorar a extração |
+| **Procedência com número de página** | As páginas do PDF são unidas com `\n` antes de qualquer parse (`caixa_edital.py:38-41`); a fronteira de página é destruída na extração. **Em resolução:** o PR #11 introduz `backend/tools/doc_ingest.py`, que preserva paginação e offsets e expõe `locate()` para validar em que página um trecho literal está | Depende do PR #11 |
 | **Dívidas com valor** | Não há valor de dívida estruturado em lugar nenhum | Fonte nova, e decisão sobre risco de OAB |
 | **URLs indexáveis** | Não há roteador (dependências do front são só `react` e `react-dom`), a URL nunca é escrita, não há renderização no servidor, e `vercel.json` manda todo caminho para o mesmo `index.html` vazio | Projeto próprio de arquitetura |
 | **Filtros Banheiros e Vaga** | `baths`, `parking` e `floor` são campos declarados no contrato e nunca preenchidos por nada. Sempre `null` | Extração nova |
@@ -277,11 +277,16 @@ Ao final da implementação, registrar em `docs/PRODUCT_DECISIONS.md`:
   evidência não é emitida; menção sem valor é exibida como menção.
 - **PD-010 — Leilão e compra direta são separados na descoberta.** Consequência: abas
   próprias no feed e guias de próximos passos distintos.
-- **PD-007 passa a Substituída por PD-011.** PD-011 — a área jurídica sai da interface em
-  vez de permanecer como "Em breve". Motivo: uma aba vazia não responde a nenhuma das
-  cinco perguntas, e seu título é vocabulário proibido por risco de OAB. Consequência:
-  reativação futura exige escopo, fontes, responsabilidade e um nome que descreva leitura
-  de documento, não parecer.
+
+PD-007 permanece ativa e sem alteração: a área jurídica segue como "Em breve". Muda
+apenas o nome exibido, por vocabulário — ver B2.
+
+### Coordenação com o PR #11
+
+O PR #11 (`feat/juridico-ingestao-motor-guardrails`) é puramente aditivo — nove arquivos
+novos, nenhuma linha removida — e não toca nenhum arquivo desta entrega. Os dois trabalhos
+compartilham o mesmo princípio, enunciado lá como "lacuna ≠ conformidade" e aqui como a
+Parte A. Quando o render da aba chegar, ele encontra a aba preservada e renomeada.
 
 Atualizar `docs/PRODUCT_CONTEXT.md` com a marca Argos, o novo público e as capacidades
 resultantes.
