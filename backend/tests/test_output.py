@@ -183,6 +183,42 @@ class TestBuildResultDetails:
         assert costs["property_registration"].rate == 0.009
         assert costs["occupant_removal"].value == 5000
 
+    def test_no_debt_line_when_there_is_no_evidence_of_debt(self):
+        """Ausência de evidência não pode virar afirmação.
+
+        O comportamento antigo emitia overdue_iptu e overdue_condo com valor 0 e
+        os textos "IPTU em dia." e "Sem débito condominial." — uma afirmação
+        categórica de ausência de dívida sem nenhuma evidência por trás.
+        """
+        state = _make_full_state()
+        state.legal_result = LegalResult()
+
+        costs = {item.id: item for item in build_result(state).costs}
+
+        assert "overdue_iptu" not in costs
+        assert "overdue_condo" not in costs
+
+    def test_debt_lines_appear_only_with_a_parsed_amount(self):
+        state = _make_full_state()
+        state.legal_result = LegalResult(
+            tax_debts_iptu="IPTU em aberto de R$ 2.300,00 conforme o edital.",
+            condominium_debts="O documento cita débito de condomínio, sem informar o valor.",
+        )
+
+        costs = {item.id: item for item in build_result(state).costs}
+
+        assert costs["overdue_iptu"].value == 2300
+        # Dívida citada sem valor não vira linha de custo: ela é uma menção,
+        # não um número que a pessoa possa somar.
+        assert "overdue_condo" not in costs
+
+    def test_capital_gains_is_not_offered_to_a_buyer_who_will_live_there(self):
+        state = _make_full_state()
+
+        costs = {item.id: item for item in build_result(state).costs}
+
+        assert "capital_gains" not in costs
+
     def test_direct_sale_uses_sale_price_and_marks_commission_exempt(self):
         state = _make_full_state()
         state.property_metadata.auction_type = "Venda Direta Online"

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Arremate** — a Brazilian real estate auction intelligence platform. Unified project with:
+**Argos** — helps people buying a home to live in navigate Caixa auction and direct-sale listings. Unified project with:
 - **Backend** (`../backend/`): Python LangGraph AI agents + FastAPI API on port 8000
 - **Frontend** (`./`): React 19 SPA (Vite) on port 5173, responsive PWA
 - **Vercel** (`../vercel-backend/`): Serverless deployment with synced seed.json
@@ -36,12 +36,21 @@ npm run preview      # preview production build
 - Components in `src/components/` with named exports
 - Entry point: `src/main.jsx` → `src/App.jsx`
 - React 19 + StrictMode
-- Four-screen SPA: `feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`
-- Screen and watchlist persist to `localStorage` (keys: `arremate_screen`, `arremate_watched`)
+- Four-screen SPA: `feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`.
+  The visible labels are Imóveis / Salvos / Vistos; the internal screen names and the
+  `arremate_*` storage keys are deliberately unchanged, because renaming the keys would
+  silently erase saved properties and history for existing users.
+- Watchlist and history persist to `localStorage` (keys: `arremate_watched`, `arremate_history`)
 
 ### Data model
 
-Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them. Each property: `id`, auction metadata (`auctionType` = Judicial/Extrajudicial, `praca` = 1ª praça/2ª praça or null, `modalidade` = Licitação aberta/Venda direta, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`, `baths`, `parking`, `floor`), `endsAt` (ISO 8601 string), `occupancy`, `risk` flags (`j`/`f`/`l`/`o`), `photoUrl`, `auctionUrl`. The `market` field reflects real comparable sales, not just the auction appraisal. `discount` can be negative (bid above market).
+Properties come from `GET /api/properties` (backend). On load, App.jsx fetches them. Each property: `id`, auction metadata (`auctionType` = Judicial/Extrajudicial, `praca` = 1ª praça/2ª praça or null, `modalidade` = Licitação aberta/Venda direta, `auctioneer`, `court`), pricing (`minBid`, `market` as raw BRL numbers, `discount`, `roi`), specs (`area`, `beds`), `endsAt` (ISO 8601 string), `photoUrl`, `auctionUrl`. The `market` field reflects real comparable sales, not just the auction appraisal. `discount` can be negative (bid above market).
+
+Fields the backend does NOT provide, despite older documentation: there is no top-level
+`occupancy` (it exists only as free text inside `editalData`, on the detail endpoint), and
+no `risk` flags — `l`/`o` never existed in the contract, and `j`/`f` are no longer published
+because they were a constant, not a computed verdict. `baths`, `parking` and `floor` are
+declared in the contract but never populated, so they cannot back a filter.
 
 ### API integration
 

@@ -10,11 +10,7 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
 
       <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 28 }}>
         <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            <span className="ix">§ watchlist</span>
-            <span>imóveis monitorados</span>
-          </div>
-          <h1 className="h1">Watchlist</h1>
+          <h1 className="h1">Salvos</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
             {watchedItems.length === 0
               ? 'Nenhum imóvel salvo ainda.'
@@ -31,11 +27,11 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
       {watchedItems.length === 0 ? (
         <div className="card" style={{ padding: 64, textAlign: 'center' }}>
           <div style={{ fontSize: 40, color: 'var(--fg-3)', marginBottom: 16 }}>☆</div>
-          <h3 className="h3" style={{ marginBottom: 8 }}>Watchlist vazia</h3>
+          <h3 className="h3" style={{ marginBottom: 8 }}>Você ainda não salvou nenhum imóvel</h3>
           <p style={{ margin: '0 0 20px', color: 'var(--fg-2)', fontSize: 14, maxWidth: 420, marginInline: 'auto' }}>
-            Salve imóveis com a estrela (★) para acompanhar mudanças de preço, novos riscos detectados e proximidade do leilão.
+            Toque na estrela (★) de um imóvel para guardá-lo aqui e acompanhar o preço e a data.
           </p>
-          <button className="btn primary" onClick={() => go('feed')}>Explorar feed</button>
+          <button className="btn primary" onClick={() => go('feed')}>Ver imóveis</button>
         </div>
       ) : view === 'grid' ? (
         <div className="property-grid" style={{
@@ -58,15 +54,15 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 0.9fr 0.9fr 0.7fr 1fr 32px',
+            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
             gap: 14, padding: '10px 18px',
             background: 'var(--bg-2)', fontSize: 10.5,
             textTransform: 'uppercase', letterSpacing: '0.08em',
             fontFamily: 'var(--f-mono)', color: 'var(--fg-3)',
           }}>
             <span>foto</span><span>imóvel</span>
-            <span>preço</span><span>desconto</span><span>roi</span>
-            <span>risco</span><span>encerra em</span><span></span>
+            <span>valor inicial</span><span>avaliação</span><span>imóveis parecidos</span>
+            <span>leilão em</span><span></span>
           </div>
           {watchedItems.map(p => (
             <PropertyRow

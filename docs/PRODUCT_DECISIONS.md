@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 5 de setembro de 2026.
+Última atualização: 7 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -90,6 +90,11 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** custos automáticos são identificados, despesas personalizadas
   podem ser adicionadas, reforma e preço de saída são ajustáveis, e comissão só
   entra quando aplicável à modalidade.
+- **Emendada em 7 de setembro de 2026 por PD-008:** o princípio permanece, mas a
+  equação passa a ser "quanto você pretende oferecer + custos = total até a
+  chave". Preço de saída, prazo de revenda e meta de retorno saem, porque não
+  existem para quem vai morar. Condomínio e IPTU deixam a equação e formam o
+  bloco de custo mensal de morar.
 
 ### PD-007 — Não oferecer parecer jurídico antes do produto estar pronto
 
@@ -102,6 +107,51 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** documentos e fatos oficiais podem ser exibidos, mas não como
   parecer jurídico. A ativação futura exigirá escopo, fontes e responsabilidade
   claramente definidos.
+
+### PD-008 — Atender quem compra para morar
+
+- **Data:** 7 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o usuário principal passa a ser a pessoa que vai morar no imóvel.
+  A superfície de investidor sai da interface; o cálculo permanece desligado no
+  backend, para eventual reativação.
+- **Motivo:** o produto foi construído em torno de meta de retorno, prazo de
+  revenda e preço de saída. Quem vai morar não tem nenhuma dessas coisas, e o
+  vocabulário sinalizava "isto não é para você".
+- **Consequências:** todo elemento de tela precisa responder a uma destas cinco
+  perguntas — quanto vou pagar no total, tem alguém morando, que dívidas vêm
+  junto, dá para financiar, o que faço agora. "Seu limite" é derivado de um fato
+  (o valor a partir do qual o custo total passa a avaliação oficial), nunca de
+  uma meta de retorno. Condomínio e IPTU passam a ser a conta mensal de morar, e
+  reforma responde "dá para eu me mudar já?".
+
+### PD-009 — Ausência de evidência nunca vira afirmação
+
+- **Data:** 7 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** um dado que não temos é declarado como desconhecido; nunca é
+  convertido em uma afirmação sobre o mundo.
+- **Motivo:** as linhas de IPTU e condomínio saíam com valor zero e os textos
+  "IPTU em dia." e "Sem débito condominial." para todo imóvel, porque o nó
+  jurídico está desligado. Era uma afirmação categórica sem nenhuma evidência, e
+  justamente sobre a informação que mais pesa na decisão.
+- **Consequências:** linha de custo sem valor apurado não é emitida. Dívida
+  citada no documento sem valor aparece como menção, não como número. Veredito
+  de risco não calculado não é publicado. Rótulo de coluna sem dado embaixo é
+  defeito, não decoração.
+
+### PD-010 — Leilão e compra direta são separados na descoberta
+
+- **Data:** 7 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o feed separa Leilões e Compra direta em abas próprias, e cada
+  modalidade tem seu próprio guia de próximos passos.
+- **Motivo:** são produtos com lógicas opostas — um tem disputa e data, o outro
+  é primeiro a chegar. Misturá-los confunde exatamente quem é leigo, e reaproveitar
+  os passos do leilão na compra direta inventaria um processo que não existe.
+- **Consequências:** a ordenação padrão passa a ser relevância (proximidade da
+  data mais completude dos dados); desconto continua disponível como opção, mas
+  deixa de ser o padrão, porque premiava terreno sistematicamente.
 
 ## Decisões ativas de operação do produto
 

@@ -118,10 +118,10 @@ function App() {
   const clearHistory = useCallback(() => setHistory([]), []);
 
   const screenLabel =
-    screen === 'feed' ? '01 Feed' :
-    screen === 'watchlist' ? '02 Watchlist' :
-    screen === 'history' ? '03 Histórico' :
-    '04 Detalhe do Imóvel';
+    screen === 'feed' ? '01 Imóveis' :
+    screen === 'watchlist' ? '02 Salvos' :
+    screen === 'history' ? '03 Vistos' :
+    '04 Imóvel';
 
   return (
     <div className="app-shell" data-screen-label={screenLabel}>
@@ -150,7 +150,7 @@ function InitialLoading() {
       <div style={{ textAlign: 'center' }}>
         <span className="countdown" style={{ justifyContent: 'center', color: 'var(--fg-2)' }}>
           <span className="dot" style={{ background: 'var(--accent)' }}></span>
-          <span className="mono">Carregando oportunidades…</span>
+          <span className="mono">Carregando imóveis…</span>
         </span>
       </div>
     </main>
@@ -170,11 +170,11 @@ function TopBar({ screen, go, watchCount }) {
           Argos
         </button>
         <nav className="nav">
-          <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
+          <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Imóveis</a>
           <a className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
-            Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
+            Salvos {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
           </a>
-          <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</a>
+          <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Vistos</a>
         </nav>
       </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fmtBRL, getEndsAtMs } from '../utils';
+import { fmtBRL, getEndsAtMs, pracaLabel } from '../utils';
 
 // ============================================================
 // Countdown timer
@@ -146,7 +146,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
             backdropFilter: 'blur(8px)',
             fontSize: 14,
           }}
-          title={watched ? 'Remover da watchlist' : 'Adicionar à watchlist'}
+          title={watched ? 'Remover dos salvos' : 'Salvar este imóvel'}
         >
           {watched ? '★' : '☆'}
         </button>
@@ -156,7 +156,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
       <div style={{ padding: 18 }}>
         {/* Tags */}
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="tag">{p.praca || p.modalidade || p.auctionType}</span>
+          <span className="tag">{pracaLabel(p.praca) || p.modalidade || p.auctionType}</span>
           <span className="tag">{p.type}</span>
         </div>
 
@@ -173,59 +173,50 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
 
         <div className="divider" style={{ margin: '16px 0' }}></div>
 
-        {/* Lance mínimo — compact header */}
+        {/* Preço de partida */}
         <div className="row between baseline" style={{ marginBottom: 16 }}>
           <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-            {isDirectSale ? 'preço de venda' : 'lance mínimo'}
+            {isDirectSale ? 'preço de venda' : 'valor inicial'}
           </span>
           <span className="num-md" style={{ color: 'var(--fg-0)' }}>
             R$ {fmtBRL(p.minBid)}
           </span>
         </div>
 
-        {/* Avaliação do leilão + mercado estimado */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        {/* Economia em reais, nunca em porcentagem: "38% de deságio" não diz
+            nada para quem nunca comprou um imóvel. */}
+        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-              {isDirectSale ? 'Avaliação oficial' : 'Avaliação leilão'}
-            </span>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--fg-1)', marginTop: 4 }}>
-              {(p.auctionDiscount ?? 0) >= 0
-                ? `${p.auctionDiscount ?? 0}% desconto oficial`
-                : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
-            </div>
+            {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
+              <div style={{ fontSize: 11.5, color: 'var(--good)', marginTop: 4, fontWeight: 500 }}>
+                R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+              </div>
+            )}
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div className="property-card-metric-end" style={{ textAlign: 'right' }}>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-              Mercado estimado
+              Imóveis parecidos
             </span>
             {hasMarketAnalysis ? <>
               <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
                 R$ {fmtBRL(p.market)}
               </div>
-              <div className="mono" style={{
-                fontSize: 11, marginTop: 4,
-                color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
-                fontWeight: 500,
+              <div style={{
+                fontSize: 11.5, marginTop: 4, fontWeight: 500,
+                color: p.market > p.minBid ? 'var(--good)' : 'var(--bad)',
               }}>
-                {p.discount >= 0 ? `+${p.discount}% desconto estimado` : `${p.discount}% acima da estimativa`}
+                {p.market > p.minBid
+                  ? `R$ ${fmtBRL(p.market - p.minBid)} mais barato`
+                  : `R$ ${fmtBRL(p.minBid - p.market)} mais caro`}
               </div>
             </> : (
-              <div style={{ marginTop: 5, fontSize: 12, color: 'var(--fg-2)' }}>Análise pendente</div>
+              <div style={{ marginTop: 5, fontSize: 12, color: 'var(--fg-2)' }}>ainda não calculado</div>
             )}
           </div>
-        </div>
-
-        <div className="divider" style={{ margin: '16px 0' }}></div>
-
-        {/* Bottom row: risk summary + leiloeiro */}
-        <div className="row between" style={{ alignItems: 'center' }}>
-          <span className="mono" style={{ fontSize: 10.5, color: 'var(--fg-2)' }}>
-            {p.auctioneer}
-          </span>
         </div>
       </div>
     </article>
@@ -244,7 +235,7 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
+        gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
         gap: 14,
         padding: '16px 20px',
         alignItems: 'center',
@@ -267,32 +258,35 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
           {p.title}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {p.praca || p.modalidade || p.auctionType}
+          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {pracaLabel(p.praca) || p.modalidade || p.auctionType}
         </div>
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.minBid)}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
-          {isDirectSale ? 'preço de venda' : 'lance mínimo'}
+        <div style={{ fontSize: 11, color: 'var(--fg-2)' }}>
+          {isDirectSale ? 'preço de venda' : 'valor inicial'}
         </div>
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
-        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)' }}>
-          {(p.auctionDiscount ?? 0) >= 0 ? `−${p.auctionDiscount ?? 0}% oficial` : `+${Math.abs(p.auctionDiscount ?? 0).toFixed(1)}% ágio`}
-        </div>
+        {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
+          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>
+            R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+          </div>
+        )}
       </div>
       <div>
         {hasMarketAnalysis ? <>
           <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.market)}</div>
-          <div className="mono" style={{
-            fontSize: 11,
-            color: p.discount > 0 ? 'var(--good)' : p.discount < 0 ? 'var(--bad)' : 'var(--fg-2)',
-            fontWeight: 500,
+          <div style={{
+            fontSize: 11, fontWeight: 500,
+            color: p.market > p.minBid ? 'var(--good)' : 'var(--bad)',
           }}>
-            {p.discount >= 0 ? `+${p.discount}% estimado` : `${p.discount}% acima da estimativa`}
+            {p.market > p.minBid
+              ? `R$ ${fmtBRL(p.market - p.minBid)} mais barato`
+              : `R$ ${fmtBRL(p.minBid - p.market)} mais caro`}
           </div>
-        </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>Análise pendente</div>}
+        </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>ainda não calculado</div>}
       </div>
       <Countdown until={p.endsAt} compact />
       <button

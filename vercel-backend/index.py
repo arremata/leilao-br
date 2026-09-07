@@ -470,14 +470,15 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             ),
             "kind": "fee", "rate": registration_rate,
         })
+    # Sem "capital_gains": imposto sobre ganho de capital só existe para quem
+    # revende. Quem compra para morar não tem preço de saída.
     costs.extend([
         {
-            "id": "occupant_removal", "label": "Desocupação do imóvel · estimativa", "value": 5000,
-            "hint": "Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.",
+            "id": "occupant_removal", "label": "Tirar quem está morando", "value": 5000,
+            "hint": "Reserva inicial, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.",
             "kind": "fee",
         },
-        {"id": "renovation", "label": "Reforma estimada", "value": 0, "hint": "Calculada no simulador por área e faixa regional.", "kind": "reno"},
-        {"id": "capital_gains", "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Calculado conforme o cenário de venda.", "kind": "tax"},
+        {"id": "renovation", "label": "Reforma", "value": 0, "hint": "Quanto você pretende gastar para deixar o imóvel pronto para morar.", "kind": "reno"},
     ])
     property_type = p.get("property_type") or ""
     neighborhood = p.get("neighborhood") or ""
@@ -502,7 +503,10 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         "discount": discount, "minBid": min_bid, "market": market, "roi": roi,
         "appraisal": appraisal,
         "auctionDiscount": round((appraisal - min_bid) / appraisal * 100, 2) if appraisal else 0,
-        "area": area, "beds": p.get("beds"), "endsAt": "", "risk": {"j": "bad", "f": "good"},
+        # Sem "risk": o valor era fixo no código ({"j": "bad", "f": "good"}) para
+        # todo imóvel, porque o nó jurídico está desligado. Um veredito constante
+        # não é um veredito. Nada de risco é publicado enquanto não houver cálculo.
+        "area": area, "beds": p.get("beds"), "endsAt": "",
         "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
         "marketDetail": market_detail, "costs": costs, "edital": None,
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
