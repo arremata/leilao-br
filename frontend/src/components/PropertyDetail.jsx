@@ -71,6 +71,23 @@ function propertyUf(property) {
 // de fora do país veria um horário diferente do que a Caixa publica.
 const SAO_PAULO = 'America/Sao_Paulo';
 
+/**
+ * Mescla a análise gravada sobre o card do catálogo, sem deixar que um campo
+ * vazio da análise apague um valor que o catálogo tem.
+ *
+ * A análise fica persistida e envelhece; o catálogo é reingerido. Um simples
+ * spread deixava a análise vencer sempre — e ela grava `praca: null`, o que
+ * fazia a rodada do leilão sumir da tela em todo imóvel analisado.
+ */
+function mergeEnrichment(card, enrichment) {
+  const merged = { ...card };
+  for (const [key, value] of Object.entries(enrichment)) {
+    if (value === null || value === undefined || value === '') continue;
+    merged[key] = value;
+  }
+  return merged;
+}
+
 /** Formato curto usado dentro do card do imóvel: "14 de set. · 10:00". */
 function formatAuctionDayTime(value) {
   if (!value) return '';
@@ -137,16 +154,18 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const catalogProperty = property;
   // Effective property: an already-enriched result as-is, a thin catalog card
   // merged with its fetched enrichment, or the thin card alone (hero-only view).
+  //
+  // A análise fica gravada no banco e envelhece; o card do catálogo é o dado
+  // fresco. Espalhar a análise por cima apaga campos que ela não conhece — foi
+  // assim que `praca` sumiu da tela, porque a análise a grava como null.
+  // `mergeEnrichment` só deixa a análise sobrescrever quando ela tem valor.
   const enriched = alreadyEnriched
     ? catalogProperty
     : (enrichment ? {
-        ...catalogProperty,
-        ...enrichment,
-        // Persisted enrichment may predate auction-date ingestion and contain
-        // an empty endsAt. Never let it erase the fresher catalog countdown.
-        endsAt: enrichment.endsAt || catalogProperty.endsAt,
-        firstAuctionAt: enrichment.firstAuctionAt || catalogProperty.firstAuctionAt,
-        secondAuctionAt: enrichment.secondAuctionAt || catalogProperty.secondAuctionAt,
+        ...mergeEnrichment(catalogProperty, enrichment),
+        // Estes são a exceção à regra acima: o catálogo manda mesmo quando a
+        // análise TAMBÉM tem valor, porque a análise pode ser de antes de a
+        // Caixa republicar preço, modalidade ou documento.
         firstAuctionPrice: catalogProperty.firstAuctionPrice ?? enrichment.firstAuctionPrice,
         secondAuctionPrice: catalogProperty.secondAuctionPrice ?? enrichment.secondAuctionPrice,
         modalidade: catalogProperty.modalidade || enrichment.modalidade,
