@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Navigate, NavLink, Link } from 'react-router-dom';
+import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import Feed from './components/Feed';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
+import NotFound from './components/NotFound';
 import { fetchCatalog } from './api';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
@@ -137,7 +138,7 @@ function App() {
         <Route path="/vistos" element={
           <History history={history} clearHistory={clearHistory} properties={properties} />
         } />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );

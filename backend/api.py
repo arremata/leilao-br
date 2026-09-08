@@ -26,6 +26,7 @@ from enrichment.market_coverage import queue_city_reference, resolve_market_refe
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
 from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
+from graph.output import _extract_street
 from graph.state import ComparableProperty
 
 class IngestRequest(BaseModel):
@@ -90,14 +91,17 @@ def _refresh_confidence_level(
 def _card_title(p: Property) -> str:
     """Human-readable card title from ingested fields.
 
-    Mirrors build_result's title shape ("{type} {area} m²") but keyed on the
-    neighborhood we have at ingestion time; falls back to the raw address when
-    the source gave us no property type.
+    Keyed on the street, exactly like ``build_result``. The two used to disagree
+    — the card said the neighborhood and the analysis said the street — so the
+    same property showed two different names depending on where you looked. With
+    a URL per property that inconsistency became visible in the browser tab.
+    Falls back to the raw address when the source gave us no property type.
     """
     if p.property_type:
         title = f"{p.property_type} {p.area_m2 or 0:.0f} m²"
-        if p.neighborhood:
-            title += f", {p.neighborhood}"
+        street = _extract_street(p.address or "")
+        if street:
+            title += f", {street}"
         return title
     return p.address or ""
 

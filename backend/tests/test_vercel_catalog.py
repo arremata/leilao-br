@@ -36,7 +36,8 @@ def test_catalog_card_matches_frontend_contract():
 
     assert card["id"] == 7
     assert card["sourceId"] == "123"
-    assert card["title"] == "Apartamento 80 m², Centro"
+    # Nome pela rua, não pelo bairro: o card e a análise precisam concordar.
+    assert card["title"] == "Apartamento 80 m², Rua A"
     assert card["auctionDiscount"] == 50.0
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"

@@ -70,7 +70,9 @@ def test_catalog_card_has_title_and_auction_discount():
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["auctionDiscount"] == 50.0
-    assert card["title"] == "Apartamento 72 m², Batel"
+    # O nome do imóvel é a rua, não o bairro — a mesma regra de build_result,
+    # para que o card e a análise não mostrem dois nomes para o mesmo imóvel.
+    assert card["title"] == "Apartamento 72 m², Rua X"
     assert card["auctionUrl"] == "https://example.com/leilao/9"
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"

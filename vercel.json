@@ -32,15 +32,7 @@
       "destination": { "service": "backend" }
     },
     {
-      "source": "/imovel/:id",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/salvos",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/vistos",
+      "source": "/((?!api/)[^.]+)",
       "destination": "/index.html"
     },
     {

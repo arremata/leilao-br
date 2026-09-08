@@ -127,6 +127,19 @@ def _registration_rate(uf: str | None) -> float | None:
     return _REGISTRATION_RATES.get(normalized_uf, _DEFAULT_REGISTRATION_RATE)
 
 
+def _extract_street(address: str | None) -> str:
+    """Rua, sem o número. Mesma regra de `graph.output._extract_street`.
+
+    Duplicada porque este handler é um arquivo isolado no serviço da Vercel e
+    não importa de `backend/`. Se uma mudar, a outra precisa mudar junto.
+    """
+    if not address:
+        return ""
+    street = address.split(",")[0].strip()
+    street = re.sub(r"\s*n[ºo.]?\s*\d+$", "", street, flags=re.IGNORECASE).strip()
+    return re.sub(r"\s+\d+$", "", street).strip()
+
+
 def _canonical_property_type(value: str | None) -> str:
     normalized = _normalize_text(value)
     for pattern, canonical in (
@@ -496,7 +509,8 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     } if expense_reference else None)
     return {
         "id": str(p["id"]), "photoLabel": f"{property_type.upper()} · {neighborhood.upper()} · {p.get('uf') or ''}",
-        "title": f"{property_type} {area:.0f} m², {neighborhood}", "address": p.get("address") or "",
+        "title": f"{property_type} {area:.0f} m², {_extract_street(p.get('address')) or neighborhood}",
+        "address": p.get("address") or "",
         "type": property_type, "neighborhood": neighborhood,
         "city": f"{p.get('city') or ''}, {p.get('uf') or ''}", "auctionType": "Extrajudicial",
         "praca": None, "modalidade": p.get("modalidade"), "auctioneer": "—", "court": "—",
@@ -579,8 +593,9 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     property_type = p.get("property_type")
     if property_type:
         title = f"{property_type} {p.get('area_m2') or 0:.0f} m²"
-        if p.get("neighborhood"):
-            title += f", {p['neighborhood']}"
+        street = _extract_street(p.get("address"))
+        if street:
+            title += f", {street}"
     else:
         title = p.get("address") or ""
 

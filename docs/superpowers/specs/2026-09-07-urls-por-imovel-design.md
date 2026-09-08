@@ -37,24 +37,16 @@ tags `og:` para pré-visualização de link é a **entrega seguinte** — ver se
 | `/imovel/{id}` | Um imóvel |
 | `/salvos` | Imóveis salvos |
 | `/vistos` | Imóveis abertos recentemente |
-| caminho desconhecido | 404 da Vercel |
+| caminho desconhecido | "Esta página não existe", dentro do app |
 
-Um **caminho** desconhecido recebe um 404 de verdade do servidor. Uma versão
-anterior deste desenho previa redirecionar para a lista; isso foi revisto ao
-verificar no preview. Como as rotas do app são enumeradas (seção 5), o que não
-está na lista não chega ao React — e um 404 honesto para um endereço que não
-existe é melhor do que fingir que ele existe.
+Um endereço errado não pode ser um beco sem saída. Duas mensagens distintas, para
+duas situações distintas:
 
-**Limitação conhecida:** esse 404 é a página crua da Vercel, sem a marca e sem
-caminho de volta. Uma `404.html` própria foi tentada e não é servida: o rewrite
-catch-all para o serviço do frontend intercepta antes de a convenção de página
-404 estática valer. Forçar isso exigiria mexer no roteamento de plataforma, com
-risco de quebrar o serviço de `/assets/*` — troca ruim por um ganho cosmético num
-caminho que só é alcançado por erro de digitação. Fica registrado como melhoria
-separada.
+- **Caminho desconhecido:** a rota não existe. "Esta página não existe."
+- **Id desconhecido numa rota válida:** a rota existe, o imóvel é que não.
+  "Não encontramos este imóvel." Ver 8.3.
 
-O caso que de fato importa — um link compartilhado para um imóvel que não existe
-mais — não passa por aqui: a rota existe, e a mensagem é a de 8.3.
+Ambas oferecem o caminho de volta para a lista.
 
 Um **id** desconhecido numa rota válida é outra coisa: a rota existe, o imóvel é
 que não. Mostra a própria mensagem, descrita em 8.3.
@@ -89,18 +81,24 @@ troca de tela, o que faria a lista perder a posição ao voltar.
 
 ## 5. A hospedagem
 
-`vercel.json` passa a **enumerar as rotas do app**, apontando cada uma para
-`/index.html` no serviço do frontend:
+`vercel.json` manda para `/index.html` tudo o que **não é arquivo e não é API**:
 
 ```
-/imovel/(.*)   ·   /salvos   ·   /vistos   →   /index.html
+/((?!api/)[^.]+)   →   /index.html
 ```
 
-Um catch-all seria mais curto, mas engoliria `/assets/*`, `/sw.js`,
-`/manifest.webmanifest`, `/offline.html` e os ícones caso a ordem de verificação de
-arquivo mude. Enumerar elimina esse risco pelo custo de uma linha por rota nova.
+A regra é "sem ponto no caminho". Todo arquivo servido tem extensão — `/sw.js`,
+`/assets/index-abc.js`, `/manifest.webmanifest`, `/offline.html`, os ícones — e
+por isso cai na regra seguinte, que continua entregando ao serviço do frontend.
+Um catch-all cru para `/index.html` transformaria `/sw.js` em HTML e quebraria o
+service worker.
 
-A rota `/api/(.*)` continua tendo precedência, como hoje.
+A raiz `/` não casa (o grupo exige ao menos um caractere) e segue pelo serviço do
+frontend, como antes. `/api/(.*)` continua tendo precedência.
+
+Uma versão anterior deste desenho enumerava rota por rota. Isso funcionava, mas
+deixava todo caminho desconhecido no 404 cru da Vercel, sem marca e sem caminho de
+volta — e obrigava a mexer no `vercel.json` a cada rota nova.
 
 ## 6. Carregar um imóvel sem carregar o catálogo
 
