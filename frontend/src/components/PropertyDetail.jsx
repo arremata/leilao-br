@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Countdown, Photo, Specs } from './shared';
-import { fmtBRL, pracaLabel } from '../utils';
+import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 
@@ -1009,9 +1009,9 @@ function Market({ p }) {
         : 'Baseada em imóveis parecidos na região.',
     },
   }[md.confidenceLevel];
-  const mapsQuery = encodeURIComponent([p.address, p.city].filter(Boolean).join(', '));
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
-  const mapsEmbedUrl = `https://www.google.com/maps?q=${mapsQuery}&output=embed`;
+  const mapsSearch = encodeURIComponent(mapsQuery(p));
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsSearch}`;
+  const mapsEmbedUrl = `https://www.google.com/maps?q=${mapsSearch}&output=embed`;
 
   return (
     <div>
