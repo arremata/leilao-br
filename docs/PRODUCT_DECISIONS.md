@@ -153,6 +153,22 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   data mais completude dos dados); desconto continua disponível como opção, mas
   deixa de ser o padrão, porque premiava terreno sistematicamente.
 
+### PD-011 — Cada imóvel tem um endereço próprio
+
+- **Data:** 7 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o produto deixa de ser uma tela só. Cada imóvel passa a ter uma
+  URL — `/imovel/{id}` — que abre direto, sobrevive ao recarregar, responde ao
+  botão voltar e pode ser copiada e enviada.
+- **Motivo:** sem endereço não dá para mandar um imóvel para alguém, guardar nos
+  favoritos do navegador, nem comparar dois lado a lado. O botão voltar saía do
+  produto em vez de retornar à lista.
+- **Consequências:** `/imovel/{id}` é um contrato público. O id é estável — a
+  ingestão é upsert e nada é apagado — e links antigos devem continuar
+  funcionando, inclusive para imóveis que saíram do catálogo, que passam a dizer
+  isso em vez de sumir ou de aparecer como se ainda estivessem à venda. No
+  computador o clique num imóvel abre nova guia; no celular, a mesma.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

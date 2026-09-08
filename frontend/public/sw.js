@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arremate-v1';
+const CACHE_NAME = 'argos-v2';
 const APP_SHELL = [
   '/',
   '/offline.html',
@@ -48,11 +48,22 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
+          // Grava sob a própria URL. Gravar tudo sob '/' era inofensivo quando
+          // todo caminho servia o mesmo HTML; com /imovel/{id} passaria a
+          // devolver a página de um imóvel para quem abrisse a home offline.
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => caches.match('/') || caches.match('/offline.html'))
+        // `caches.match` devolve uma Promise, que é sempre verdadeira: o `||`
+        // que existia aqui nunca alcançava a página offline.
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          const shell = await caches.match('/');
+          if (shell) return shell;
+          return caches.match('/offline.html');
+        })
     );
     return;
   }

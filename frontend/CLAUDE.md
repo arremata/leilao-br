@@ -36,11 +36,18 @@ npm run preview      # preview production build
 - Components in `src/components/` with named exports
 - Entry point: `src/main.jsx` → `src/App.jsx`
 - React 19 + StrictMode
-- Four-screen SPA: `feed`/`detail`/`watchlist`/`history`, driven by `go(screen, prop)` in `App.jsx`.
-  The visible labels are Imóveis / Salvos / Vistos; the internal screen names and the
-  `arremate_*` storage keys are deliberately unchanged, because renaming the keys would
-  silently erase saved properties and history for existing users.
-- Watchlist and history persist to `localStorage` (keys: `arremate_watched`, `arremate_history`)
+- Routed with `react-router-dom`: `/`, `/imovel/:id`, `/salvos`, `/vistos`; unknown paths
+  redirect to `/`. The visible labels are Imóveis / Salvos / Vistos.
+- Feed state (tab, search, filters, sort, view, page) lives in the query string, so back
+  from a property restores the same search. Defaults are omitted from the URL.
+- Property cards are real `<a>` elements (`usePropertyLink`): new tab on desktop, same tab
+  on touch, decided by `matchMedia('(pointer: coarse)')`. Middle-click and cmd-click work
+  for free — do not replace them with `onClick` handlers.
+- `vercel.json` must list every app route explicitly. A catch-all rewrite would risk
+  swallowing `/assets/*`, `/sw.js` and `/manifest.webmanifest`.
+- Watchlist and history persist to `localStorage` (keys: `arremate_watched`,
+  `arremate_history`). Those keys are deliberately unchanged despite the Argos rename:
+  renaming them would silently erase saved properties for existing users.
 
 ### Data model
 

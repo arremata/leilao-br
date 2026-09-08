@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
@@ -14,24 +15,66 @@ const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
 // leigo, então são abas e não um filtro escondido.
 const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA DIRETA');
 
-export default function Feed({ go, watched, toggleWatch, properties, initialAddress = '', initialFilters = null }) {
-  const [addressQuery, setAddressQuery] = useState(initialAddress);
-  const [kind, setKind] = useState('auction');
-  const [filters, setFilters] = useState({
-    praca: initialFilters?.praca || 'Todos',
-    modalidade: initialFilters?.modalidade || 'Todos',
-    propertyType: initialFilters?.propertyType || 'Todos',
-    discountMin: initialFilters?.discountMin || 0,
-    state: initialFilters?.state || initialFilters?.uf || 'Todos',
-    city: initialFilters?.city || 'Todas',
-  });
-  // Relevância é o padrão: ordenar por desconto premia terreno, que tem
-  // sistematicamente o maior desconto e quase nunca é o que a pessoa procura.
-  const [sort, setSort] = useState('relevance');
+// A busca mora na URL, e não em estado local: é isso que faz voltar de um
+// imóvel devolver a mesma lista, e faz uma busca ser compartilhável. Só o que
+// difere do padrão aparece no endereço, para não virar uma parede de
+// parâmetros.
+const DEFAULTS = {
+  aba: 'leiloes', q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+  rodada: 'Todos', modalidade: 'Todos', desconto: '0',
+  ordem: 'relevance', vis: 'grid', pagina: '1',
+};
+
+function readParams(searchParams) {
+  const get = (key) => searchParams.get(key) ?? DEFAULTS[key];
+  return {
+    kind: get('aba') === 'direta' ? 'direct' : 'auction',
+    addressQuery: get('q'),
+    filters: {
+      state: get('estado'),
+      city: get('cidade'),
+      propertyType: get('tipo'),
+      praca: get('rodada'),
+      modalidade: get('modalidade'),
+      discountMin: Number(get('desconto')) || 0,
+    },
+    sort: get('ordem'),
+    view: get('vis') === 'lista' ? 'list' : 'grid',
+    page: Math.max(1, Number(get('pagina')) || 1),
+  };
+}
+
+export default function Feed({ watched, toggleWatch, properties, loading = false }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
-  const [view, setView] = useState('grid');
-  const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
+
+  // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
+  // tecla não deve virar uma entrada no histórico.
+  const setParams = useCallback((patch, { replace = false } = {}) => {
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      Object.entries(patch).forEach(([key, value]) => {
+        const asText = value == null ? '' : String(value);
+        if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
+        else next.set(key, asText);
+      });
+      // Qualquer mudança de busca recomeça da primeira página.
+      if (!('pagina' in patch)) next.delete('pagina');
+      return next;
+    }, { replace });
+  }, [setSearchParams]);
+
+  const setKind = (value) => setParams({ aba: value === 'direct' ? 'direta' : 'leiloes' });
+  const setAddressQuery = (value) => setParams({ q: value }, { replace: true });
+  const setSort = (value) => setParams({ ordem: value });
+  const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
+  const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
+  const setFilters = (next) => setParams({
+    estado: next.state, cidade: next.city, tipo: next.propertyType,
+    rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
+  });
 
   const byKind = useMemo(
     () => properties.filter(p => isDirectSaleModality(p.modalidade) === (kind === 'direct')),
@@ -147,11 +190,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     return () => window.clearInterval(interval);
   }, [sort]);
 
-  // Pagination is UI-derived state; resetting here is intentional whenever
-  // search/sort inputs change.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPage(1); }, [addressQuery, filters, sort, kind]);
-
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
   const activeFilterCount =
@@ -163,14 +201,10 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     (filters.praca !== 'Todos' ? 1 : 0) +
     (filters.modalidade !== 'Todos' ? 1 : 0);
 
-  const clearAll = () => {
-    setAddressQuery('');
-    setFilters({
-      praca: 'Todos', modalidade: 'Todos',
-      propertyType: 'Todos',
-      discountMin: 0, state: 'Todos', city: 'Todas',
-    });
-  };
+  const clearAll = () => setParams({
+    q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+    rodada: 'Todos', modalidade: 'Todos', desconto: '0',
+  });
 
   return (
     <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
@@ -307,7 +341,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       </div>
 
       {/* Content */}
-      {filtered.length === 0 ? (
+      {loading && properties.length === 0 ? (
+        <Loading />
+      ) : filtered.length === 0 ? (
         <Empty />
       ) : view === 'grid' ? (
         <div className="property-grid feed-grid" style={{
@@ -319,7 +355,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             <PropertyCard
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched={watched.includes(p.id)}
               onToggleWatch={toggleWatch}
               staggerIndex={i}
@@ -355,7 +390,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             <PropertyRow
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched={watched.includes(p.id)}
               onToggleWatch={toggleWatch}
             />
@@ -365,7 +399,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
       {paginated.length < filtered.length && (
         <div style={{ textAlign: 'center', marginTop: 48 }}>
-          <button className="btn lg" onClick={() => setPage(p => p + 1)}>
+          <button className="btn lg" onClick={() => setPage(page + 1)}>
             Carregar mais
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginLeft: 6 }}>
               {(filtered.length - paginated.length).toLocaleString('pt-BR')} restantes
@@ -526,6 +560,17 @@ function ViewToggle({ value, onChange }) {
       >
         <span className="mono">≡</span> lista
       </button>
+    </div>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="card" style={{ padding: 60, textAlign: 'center' }}>
+      <span className="countdown" style={{ justifyContent: 'center', color: 'var(--fg-2)' }}>
+        <span className="dot" style={{ background: 'var(--accent)' }}></span>
+        <span className="mono">Carregando imóveis…</span>
+      </span>
     </div>
   );
 }

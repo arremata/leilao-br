@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Countdown, Photo, Specs } from './shared';
 import { fmtBRL, pracaLabel } from '../utils';
-import { fetchCatalogItem, analyzeCatalogItem } from '../api';
+import { analyzeCatalogItem } from '../api';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 
 const REGISTRATION_RATES = {
@@ -86,7 +87,8 @@ function formatAuctionEvent(date, price) {
   return parts.join(' · ');
 }
 
-export default function PropertyDetail({ property, go, watched, toggleWatch }) {
+export default function PropertyDetail({ property, watched, toggleWatch }) {
+  const isRemoved = property?.status === 'removed';
   // Abre na primeira pergunta que a pessoa faz: quanto vou pagar no total.
   const [tab, setTab] = useState('cost');
 
@@ -108,47 +110,16 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     property?.id ? readStoredObject(`arremate_property_costs_${property.id}`, { overrides: {}, customCosts: [] }) : {}
   ));
 
-  // On-demand enrichment for ingested catalog items. Seed / URL-analyzed
-  // properties already carry marketDetail and skip the fetch entirely.
-  const [catalogDetail, setCatalogDetail] = useState(null);
-  const [enrichment, setEnrichment] = useState(null);
-  // Thin catalog items start in the loading state (fetch fires on mount);
-  // already-enriched or absent properties never fetch.
-  const [enrichLoading, setEnrichLoading] = useState(() => !!property && !property.marketDetail);
+  // A busca do imóvel é responsabilidade de PropertyRoute. Aqui já chega ou o
+  // card completo com `enrichment`, ou o card magro da lista enquanto a busca
+  // não voltou. `analyzeCatalogItem` continua sendo disparado daqui.
+  const [analyzedResult, setAnalyzedResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState(null);
 
   const alreadyEnriched = !!property?.marketDetail;
-
-  // Fetch enrichment for a thin catalog item once. App remounts this component
-  // per property (key={id}), so state resets naturally on navigation — no need
-  // to clear it synchronously here.
-  useEffect(() => {
-    if (!property || alreadyEnriched) return undefined;
-    let cancelled = false;
-    fetchCatalogItem(property.id)
-      .then(item => {
-        if (!cancelled && item) {
-          setCatalogDetail(item);
-          if (item.enrichment) setEnrichment(item.enrichment);
-        }
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setEnrichLoading(false); });
-    return () => { cancelled = true; };
-  }, [property, alreadyEnriched]);
-
-  if (!property) {
-    return (
-      <div style={{ maxWidth: 1480, margin: '0 auto', padding: '60px 24px', textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Nenhum imóvel selecionado.</p>
-        <button className="btn" onClick={() => go('feed')} style={{ marginTop: 16 }}>Voltar ao feed</button>
-      </div>
-    );
-  }
-  const catalogProperty = catalogDetail
-    ? { ...property, ...catalogDetail }
-    : property;
+  const enrichment = analyzedResult || property?.enrichment || null;
+  const catalogProperty = property;
   // Effective property: an already-enriched result as-is, a thin catalog card
   // merged with its fetched enrichment, or the thin card alone (hero-only view).
   const enriched = alreadyEnriched
@@ -187,7 +158,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
     setAnalyzeError(null);
     try {
       const result = await analyzeCatalogItem(property.id);
-      setEnrichment(result);
+      setAnalyzedResult(result);
     } catch (err) {
       setAnalyzeError(err.message || 'Falha ao analisar o imóvel.');
     } finally {
@@ -594,8 +565,8 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
 
       {/* ===== Breadcrumb + actions ===== */}
       <div className="row between detail-top" style={{ marginBottom: 18 }}>
-        <button
-          onClick={() => go('feed')}
+        <Link
+          to="/"
           className="row gap-2"
           style={{ color: 'var(--fg-2)', fontSize: 12.5 }}
         >
@@ -603,16 +574,22 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
           <span>Imóveis</span>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>/</span>
           <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
-        </button>
+        </Link>
         <div className="row gap-2 detail-actions">
           {auctionUrl && (
             <a
-              className="btn sm primary"
+              /* Num imóvel que saiu do catálogo, esta deixa de ser a ação
+                 principal: seria convidar a pessoa a dar lance no que não
+                 existe mais. O link fica, para ela poder conferir. */
+              className={`btn sm${isRemoved ? '' : ' primary'}`}
               href={auctionUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              {isDirectSale ? 'Ver na Caixa' : 'Ver o leilão na Caixa'} <span aria-hidden="true">↗</span>
+              {isRemoved
+                ? 'Conferir na Caixa'
+                : isDirectSale ? 'Ver na Caixa' : 'Ver o leilão na Caixa'}
+              {' '}<span aria-hidden="true">↗</span>
             </a>
           )}
           {editalUrl && (
@@ -657,9 +634,9 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
             <button
               className="btn sm primary"
               onClick={handleAnalyze}
-              disabled={analyzing || enrichLoading}
+              disabled={analyzing}
             >
-              {analyzing ? 'Analisando…' : enrichLoading ? 'Carregando…' : 'Analisar imóvel'}
+              {analyzing ? 'Calculando…' : 'Calcular os custos'}
             </button>
           )}
         </div>
@@ -826,7 +803,6 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
         <AnalyzeCTA
           onAnalyze={handleAnalyze}
           analyzing={analyzing}
-          loading={enrichLoading}
           error={analyzeError}
           canAnalyze={p.canAnalyze === true}
         />
@@ -835,7 +811,7 @@ export default function PropertyDetail({ property, go, watched, toggleWatch }) {
   );
 }
 
-function AnalyzeCTA({ onAnalyze, analyzing, loading, error, canAnalyze }) {
+function AnalyzeCTA({ onAnalyze, analyzing, error, canAnalyze }) {
   const collectionQueued = error?.toLowerCase().includes('priorizada');
   return (
     <div className="card fade-in" style={{ padding: 40, textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
@@ -846,8 +822,8 @@ function AnalyzeCTA({ onAnalyze, analyzing, loading, error, canAnalyze }) {
           : 'O cálculo ainda não está disponível aqui. Os dados oficiais da Caixa continuam acima.'}
       </p>
       {canAnalyze && (
-        <button className="btn primary" onClick={onAnalyze} disabled={analyzing || loading} style={{ minWidth: 180 }}>
-          {analyzing ? 'Calculando…' : loading ? 'Carregando…' : 'Calcular os custos'}
+        <button className="btn primary" onClick={onAnalyze} disabled={analyzing} style={{ minWidth: 180 }}>
+          {analyzing ? 'Calculando…' : 'Calcular os custos'}
         </button>
       )}
       {error && <p style={{ marginTop: 16, fontSize: 12.5, color: collectionQueued ? 'var(--fg-2)' : 'var(--bad)' }}>{error}</p>}

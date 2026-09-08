@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { fmtBRL, getEndsAtMs, pracaLabel } from '../utils';
+import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
 
 // ============================================================
 // Countdown timer
@@ -112,14 +114,15 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 // ============================================================
 // Property card — DENSE, lots of information
 // ============================================================
-export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex = 0 }) {
+export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   const isDirectSale = /venda direta/i.test(p.modalidade || '');
+  const link = usePropertyLink(p.id);
   return (
-    <article
+    <Link
+      {...link}
       className="card hov fade-in property-card"
-      onClick={onClick}
-      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}
+      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms`, display: 'block' }}
     >
       {/* Photo with overlays */}
       <div style={{ position: 'relative' }}>
@@ -136,7 +139,7 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
         </div>
         {/* Watch button bottom-right */}
         <button
-          onClick={(e) => { e.stopPropagation(); onToggleWatch?.(p.id); }}
+          onClick={(e) => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
           style={{
             position: 'absolute', bottom: 12, right: 12,
             width: 32, height: 32, borderRadius: 8,
@@ -219,20 +222,21 @@ export function PropertyCard({ p, onClick, watched, onToggleWatch, staggerIndex 
           </div>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
 // ============================================================
 // Property row (table-like dense)
 // ============================================================
-export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
+export function PropertyRow({ p, watched, onToggleWatch }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   const isDirectSale = /venda direta/i.test(p.modalidade || '');
+  const link = usePropertyLink(p.id);
   return (
-    <div
+    <Link
+      {...link}
       className="property-row"
-      onClick={onClick}
       style={{
         display: 'grid',
         gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
@@ -290,7 +294,7 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       </div>
       <Countdown until={p.endsAt} compact />
       <button
-        onClick={(e) => { e.stopPropagation(); onToggleWatch?.(p.id); }}
+        onClick={(e) => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
         style={{
           width: 28, height: 28, borderRadius: 6,
           color: watched ? 'var(--accent)' : 'var(--fg-3)',
@@ -299,6 +303,6 @@ export function PropertyRow({ p, onClick, watched, onToggleWatch }) {
       >
         {watched ? '★' : '☆'}
       </button>
-    </div>
+    </Link>
   );
 }

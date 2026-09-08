@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
 
-export default function Watchlist({ go, watched, toggleWatch, properties }) {
+export default function Watchlist({ watched, toggleWatch, properties }) {
   const watchedItems = properties.filter(p => watched.includes(p.id));
   const [view, setView] = useState('grid');
 
@@ -31,7 +32,7 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
           <p style={{ margin: '0 0 20px', color: 'var(--fg-2)', fontSize: 14, maxWidth: 420, marginInline: 'auto' }}>
             Toque na estrela (★) de um imóvel para guardá-lo aqui e acompanhar o preço e a data.
           </p>
-          <button className="btn primary" onClick={() => go('feed')}>Ver imóveis</button>
+          <Link className="btn primary" to="/">Ver imóveis</Link>
         </div>
       ) : view === 'grid' ? (
         <div className="property-grid" style={{
@@ -43,7 +44,6 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
             <PropertyCard
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched
               onToggleWatch={toggleWatch}
               staggerIndex={i}
@@ -68,7 +68,6 @@ export default function Watchlist({ go, watched, toggleWatch, properties }) {
             <PropertyRow
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched
               onToggleWatch={toggleWatch}
             />

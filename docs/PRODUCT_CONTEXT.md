@@ -52,6 +52,20 @@ permanece desligado no backend, para eventual reativação.
 
 ## Produto disponível hoje
 
+### Endereços
+
+Cada imóvel tem uma URL própria — `/imovel/{id}` — que abre direto, sobrevive ao
+recarregar e pode ser copiada e enviada. A lista guarda a busca no endereço, então
+voltar de um imóvel devolve os mesmos filtros. No computador, clicar num imóvel
+abre nova guia, para comparar sem perder a busca; no celular, a mesma guia.
+
+Um imóvel que saiu do catálogo da Caixa continua acessível pelo link antigo e diz
+que saiu, em vez de sumir ou de aparecer como se ainda estivesse à venda.
+
+A pré-visualização do link em aplicativos de mensagem ainda é genérica: mostra a
+marca do site, não o imóvel. Isso depende de entregar as tags de compartilhamento
+no HTML do servidor, o que ainda não é feito.
+
 ### Lista de imóveis
 
 - É a entrada principal do produto; não existe um Dashboard separado.

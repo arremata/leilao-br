@@ -32,6 +32,18 @@
       "destination": { "service": "backend" }
     },
     {
+      "source": "/imovel/:id",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/salvos",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/vistos",
+      "destination": "/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": { "service": "frontend" }
     }
