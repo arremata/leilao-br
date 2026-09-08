@@ -37,15 +37,24 @@ tags `og:` para pré-visualização de link é a **entrega seguinte** — ver se
 | `/imovel/{id}` | Um imóvel |
 | `/salvos` | Imóveis salvos |
 | `/vistos` | Imóveis abertos recentemente |
-| caminho desconhecido | `404.html`, com link para a lista |
+| caminho desconhecido | 404 da Vercel |
 
-Um **caminho** desconhecido recebe um 404 de verdade do servidor, com uma página
-própria que oferece o caminho de volta. Uma versão anterior deste desenho previa
-redirecionar para a lista; isso foi revisto ao verificar no preview. Como as
-rotas do app são enumeradas (seção 5), o que não está na lista não chega ao
-React — e um 404 honesto para um endereço que não existe é melhor do que fingir
-que ele existe. O que não pode acontecer é ser um beco sem saída, e é isso que a
-página resolve.
+Um **caminho** desconhecido recebe um 404 de verdade do servidor. Uma versão
+anterior deste desenho previa redirecionar para a lista; isso foi revisto ao
+verificar no preview. Como as rotas do app são enumeradas (seção 5), o que não
+está na lista não chega ao React — e um 404 honesto para um endereço que não
+existe é melhor do que fingir que ele existe.
+
+**Limitação conhecida:** esse 404 é a página crua da Vercel, sem a marca e sem
+caminho de volta. Uma `404.html` própria foi tentada e não é servida: o rewrite
+catch-all para o serviço do frontend intercepta antes de a convenção de página
+404 estática valer. Forçar isso exigiria mexer no roteamento de plataforma, com
+risco de quebrar o serviço de `/assets/*` — troca ruim por um ganho cosmético num
+caminho que só é alcançado por erro de digitação. Fica registrado como melhoria
+separada.
+
+O caso que de fato importa — um link compartilhado para um imóvel que não existe
+mais — não passa por aqui: a rota existe, e a mensagem é a de 8.3.
 
 Um **id** desconhecido numa rota válida é outra coisa: a rota existe, o imóvel é
 que não. Mostra a própria mensagem, descrita em 8.3.
