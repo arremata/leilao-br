@@ -19,6 +19,29 @@ export const getEndsAtMs = (endsAt) => {
 };
 
 /**
+ * Corta o que vem depois do nome real da rua.
+ *
+ * Às vezes o ruído está dentro do próprio logradouro, e não depois da vírgula:
+ * "RUA AMADEU BARILLI FILHO ANTIGA RUA PROJETADA A" ou "RUA PODARGOS NUMERO SN
+ * QUADRA 010 LOTE 003". O Google não resolve nenhum dos dois e abre no centro
+ * da cidade.
+ *
+ * "ANTIGA" só corta quando não é a primeira palavra depois do tipo de
+ * logradouro, para não mutilar uma rua legitimamente chamada "Rua Antiga ...".
+ */
+const cleanStreet = (value) => {
+  let street = String(value || '').trim();
+  street = street.split(/[(/]/)[0].trim();
+  street = street.replace(/\s+(?:ANTIGA|ANTIGO)\s+\S.*$/i, (match, offset) => (
+    // Preserva "RUA ANTIGA ..." — o corte exige ao menos duas palavras antes.
+    street.slice(0, offset).trim().split(/\s+/).length >= 2 ? '' : match
+  ));
+  street = street.replace(/\s+(?:NUMERO|N[ºo.]?)\s+SN\b.*$/i, '');
+  street = street.replace(/\s+(?:QUADRA|QD|LOTE|LT)\b.*$/i, '');
+  return street.trim();
+};
+
+/**
  * Consulta para o Google Maps a partir de um imóvel.
  *
  * O endereço da Caixa vem no formato `{LOGRADOURO}, N. {NÚMERO}, {unidade}`, e a
@@ -43,7 +66,7 @@ export const mapsQuery = (p) => {
   }
 
   const parts = String(p.address || '').split(',').map(s => s.trim());
-  const street = parts[0] || '';
+  const street = cleanStreet(parts[0] || '');
 
   let number = '';
   const rawNumber = (parts[1] || '').match(/^(?:n[ºo.]?\s*)?(\d+[A-Za-z]?)$/i);
