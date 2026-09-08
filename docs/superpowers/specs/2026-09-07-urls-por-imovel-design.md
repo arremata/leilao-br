@@ -37,10 +37,18 @@ tags `og:` para pré-visualização de link é a **entrega seguinte** — ver se
 | `/imovel/{id}` | Um imóvel |
 | `/salvos` | Imóveis salvos |
 | `/vistos` | Imóveis abertos recentemente |
-| caminho desconhecido | Redireciona para `/` |
+| caminho desconhecido | `404.html`, com link para a lista |
 
-Um **caminho** desconhecido redireciona para a lista. Um **id** desconhecido numa
-rota válida é outra coisa: mostra a própria mensagem, descrita em 8.3.
+Um **caminho** desconhecido recebe um 404 de verdade do servidor, com uma página
+própria que oferece o caminho de volta. Uma versão anterior deste desenho previa
+redirecionar para a lista; isso foi revisto ao verificar no preview. Como as
+rotas do app são enumeradas (seção 5), o que não está na lista não chega ao
+React — e um 404 honesto para um endereço que não existe é melhor do que fingir
+que ele existe. O que não pode acontecer é ser um beco sem saída, e é isso que a
+página resolve.
+
+Um **id** desconhecido numa rota válida é outra coisa: a rota existe, o imóvel é
+que não. Mostra a própria mensagem, descrita em 8.3.
 
 Na lista, o que hoje é estado local vira query: aba (`leiloes` ou `direta`), busca
 por endereço, estado, cidade, tipo, rodada, modalidade, desconto mínimo e ordenação.
@@ -189,7 +197,8 @@ Duas coisas a resolver quando essa entrega chegar, registradas para não se perd
   7. Um id inexistente mostra a mensagem própria, não uma tela quebrada.
   8. Um imóvel com `status = "removed"` avisa que saiu do catálogo.
   9. `/assets/*`, `/sw.js` e `/manifest.webmanifest` continuam sendo servidos como
-     arquivo, e não capturados pela reescrita.
+     arquivo, e não capturados pela reescrita. Esta é a razão de enumerar as
+     rotas: um catch-all para `index.html` transformaria `/sw.js` em HTML.
   10. Console sem erro novo; sem transbordo horizontal no celular.
 
 ## 11. Decisão de produto a registrar
