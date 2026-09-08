@@ -67,6 +67,21 @@ function propertyUf(property) {
   return cityMatch && BRAZILIAN_UFS.has(cityMatch[1]) ? cityMatch[1] : '';
 }
 
+// A hora de um leilão é hora civil brasileira. Sem fixar o fuso, quem abrisse
+// de fora do país veria um horário diferente do que a Caixa publica.
+const SAO_PAULO = 'America/Sao_Paulo';
+
+/** Formato curto usado dentro do card do imóvel: "14 de set. · 10:00". */
+function formatAuctionDayTime(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  const dia = parsed.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', timeZone: SAO_PAULO });
+  const hora = parsed.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: SAO_PAULO });
+  return `${dia} · ${hora}`;
+}
+
+/** Formato longo, com ano, para o registro oficial na aba de documentos. */
 function formatAuctionDate(value) {
   if (!value) return '';
   const parsed = new Date(value);
@@ -74,7 +89,7 @@ function formatAuctionDate(value) {
   return parsed.toLocaleString('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
-    timeZone: 'America/Sao_Paulo',
+    timeZone: SAO_PAULO,
   });
 }
 
@@ -723,7 +738,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               </div>
               <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
                 {p.endsAt
-                  ? new Date(p.endsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }) + ' · ' + new Date(p.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                  ? formatAuctionDayTime(p.endsAt)
                   : isDirectSale ? 'Sujeito à disponibilidade na Caixa' : '—'}
               </div>
             </div>
@@ -852,12 +867,12 @@ function PricingGrid({ p }) {
   const secondBidPrice = p.secondAuctionPrice || p.edital?.secondBidPrice || 0;
   const appraisal = p.appraisal || 0;
   const has2nd = secondBidPrice > 0;
-  const firstBidDate = p.edital?.firstBidDate || (p.firstAuctionAt
-    ? new Date(p.firstAuctionAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : null);
-  const secondBidDate = p.edital?.secondBidDate || (p.secondAuctionAt
-    ? new Date(p.secondAuctionAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-    : null);
+  // O edital guarda a data como ISO, não como texto pronto — renderizá-la
+  // direto colocava "2026-09-14T13:00:00+00:00" na tela. formatAuctionDate
+  // converte para o fuso de São Paulo e devolve a própria string quando a fonte
+  // já vem formatada.
+  const firstBidDate = formatAuctionDayTime(p.edital?.firstBidDate || p.firstAuctionAt);
+  const secondBidDate = formatAuctionDayTime(p.edital?.secondBidDate || p.secondAuctionAt);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
       <div>
@@ -895,12 +910,12 @@ function PricingGrid({ p }) {
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>Se não vender · 2ª rodada</span>
           {has2nd ? (
             <>
-              <div className="row gap-2 baseline" style={{ marginTop: 4 }}>
-                <div className="num-md">R$ {fmtBRL(secondBidPrice)}</div>
-                <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>
+              <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(secondBidPrice)}</div>
+              {firstBidPrice > secondBidPrice && (
+                <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
                   R$ {fmtBRL(firstBidPrice - secondBidPrice)} a menos
-                </span>
-              </div>
+                </div>
+              )}
               {secondBidDate && (
                 <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
               )}
