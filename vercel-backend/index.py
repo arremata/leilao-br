@@ -127,6 +127,19 @@ def _registration_rate(uf: str | None) -> float | None:
     return _REGISTRATION_RATES.get(normalized_uf, _DEFAULT_REGISTRATION_RATE)
 
 
+def _extract_street(address: str | None) -> str:
+    """Rua, sem o número. Mesma regra de `graph.output._extract_street`.
+
+    Duplicada porque este handler é um arquivo isolado no serviço da Vercel e
+    não importa de `backend/`. Se uma mudar, a outra precisa mudar junto.
+    """
+    if not address:
+        return ""
+    street = address.split(",")[0].strip()
+    street = re.sub(r"\s*n[ºo.]?\s*\d+$", "", street, flags=re.IGNORECASE).strip()
+    return re.sub(r"\s+\d+$", "", street).strip()
+
+
 def _canonical_property_type(value: str | None) -> str:
     normalized = _normalize_text(value)
     for pattern, canonical in (
@@ -470,14 +483,15 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             ),
             "kind": "fee", "rate": registration_rate,
         })
+    # Sem "capital_gains": imposto sobre ganho de capital só existe para quem
+    # revende. Quem compra para morar não tem preço de saída.
     costs.extend([
         {
-            "id": "occupant_removal", "label": "Desocupação do imóvel · estimativa", "value": 5000,
-            "hint": "Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.",
+            "id": "occupant_removal", "label": "Tirar quem está morando", "value": 5000,
+            "hint": "Reserva inicial, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.",
             "kind": "fee",
         },
-        {"id": "renovation", "label": "Reforma estimada", "value": 0, "hint": "Calculada no simulador por área e faixa regional.", "kind": "reno"},
-        {"id": "capital_gains", "label": "Imposto sobre ganho de capital", "value": 0, "hint": "Calculado conforme o cenário de venda.", "kind": "tax"},
+        {"id": "renovation", "label": "Reforma", "value": 0, "hint": "Quanto você pretende gastar para deixar o imóvel pronto para morar.", "kind": "reno"},
     ])
     property_type = p.get("property_type") or ""
     neighborhood = p.get("neighborhood") or ""
@@ -495,14 +509,18 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     } if expense_reference else None)
     return {
         "id": str(p["id"]), "photoLabel": f"{property_type.upper()} · {neighborhood.upper()} · {p.get('uf') or ''}",
-        "title": f"{property_type} {area:.0f} m², {neighborhood}", "address": p.get("address") or "",
+        "title": f"{property_type} {area:.0f} m², {_extract_street(p.get('address')) or neighborhood}",
+        "address": p.get("address") or "",
         "type": property_type, "neighborhood": neighborhood,
         "city": f"{p.get('city') or ''}, {p.get('uf') or ''}", "auctionType": "Extrajudicial",
         "praca": None, "modalidade": p.get("modalidade"), "auctioneer": "—", "court": "—",
         "discount": discount, "minBid": min_bid, "market": market, "roi": roi,
         "appraisal": appraisal,
         "auctionDiscount": round((appraisal - min_bid) / appraisal * 100, 2) if appraisal else 0,
-        "area": area, "beds": p.get("beds"), "endsAt": "", "risk": {"j": "bad", "f": "good"},
+        # Sem "risk": o valor era fixo no código ({"j": "bad", "f": "good"}) para
+        # todo imóvel, porque o nó jurídico está desligado. Um veredito constante
+        # não é um veredito. Nada de risco é publicado enquanto não houver cálculo.
+        "area": area, "beds": p.get("beds"), "endsAt": "",
         "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
         "marketDetail": market_detail, "costs": costs, "edital": None,
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
@@ -575,8 +593,9 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     property_type = p.get("property_type")
     if property_type:
         title = f"{property_type} {p.get('area_m2') or 0:.0f} m²"
-        if p.get("neighborhood"):
-            title += f", {p['neighborhood']}"
+        street = _extract_street(p.get("address"))
+        if street:
+            title += f", {street}"
     else:
         title = p.get("address") or ""
 

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
 
@@ -9,70 +10,122 @@ const normalizeLocation = (value) => String(value || '')
 const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
   .replace(/(^|\s)\S/g, letter => letter.toLocaleUpperCase('pt-BR'));
 
-export default function Feed({ go, watched, toggleWatch, properties, initialAddress = '', initialFilters = null }) {
-  const [addressQuery, setAddressQuery] = useState(initialAddress);
-  const [filters, setFilters] = useState({
-    judicial: initialFilters?.judicial || 'Todos',
-    praca: initialFilters?.praca || 'Todos',
-    modalidade: initialFilters?.modalidade || 'Todos',
-    propertyType: initialFilters?.propertyType || 'Todos',
-    discountMin: initialFilters?.discountMin || 0,
-    state: initialFilters?.state || initialFilters?.uf || 'Todos',
-    city: initialFilters?.city || 'Todas',
-  });
-  const [sort, setSort] = useState('discount');
+// Leilão e compra direta são produtos com lógicas opostas: um tem disputa e
+// data, o outro é primeiro a chegar. Misturá-los confunde exatamente quem é
+// leigo, então são abas e não um filtro escondido.
+const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA DIRETA');
+
+// A busca mora na URL, e não em estado local: é isso que faz voltar de um
+// imóvel devolver a mesma lista, e faz uma busca ser compartilhável. Só o que
+// difere do padrão aparece no endereço, para não virar uma parede de
+// parâmetros.
+const DEFAULTS = {
+  aba: 'leiloes', q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+  rodada: 'Todos', modalidade: 'Todos', desconto: '0',
+  ordem: 'relevance', vis: 'grid', pagina: '1',
+};
+
+function readParams(searchParams) {
+  const get = (key) => searchParams.get(key) ?? DEFAULTS[key];
+  return {
+    kind: get('aba') === 'direta' ? 'direct' : 'auction',
+    addressQuery: get('q'),
+    filters: {
+      state: get('estado'),
+      city: get('cidade'),
+      propertyType: get('tipo'),
+      praca: get('rodada'),
+      modalidade: get('modalidade'),
+      discountMin: Number(get('desconto')) || 0,
+    },
+    sort: get('ordem'),
+    view: get('vis') === 'lista' ? 'list' : 'grid',
+    page: Math.max(1, Number(get('pagina')) || 1),
+  };
+}
+
+export default function Feed({ watched, toggleWatch, properties, loading = false }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
-  const [view, setView] = useState('grid');
-  const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
+
+  // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
+  // tecla não deve virar uma entrada no histórico.
+  const setParams = useCallback((patch, { replace = false } = {}) => {
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      Object.entries(patch).forEach(([key, value]) => {
+        const asText = value == null ? '' : String(value);
+        if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
+        else next.set(key, asText);
+      });
+      // Qualquer mudança de busca recomeça da primeira página.
+      if (!('pagina' in patch)) next.delete('pagina');
+      return next;
+    }, { replace });
+  }, [setSearchParams]);
+
+  const setKind = (value) => setParams({ aba: value === 'direct' ? 'direta' : 'leiloes' });
+  const setAddressQuery = (value) => setParams({ q: value }, { replace: true });
+  const setSort = (value) => setParams({ ordem: value });
+  const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
+  const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
+  const setFilters = (next) => setParams({
+    estado: next.state, cidade: next.city, tipo: next.propertyType,
+    rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
+  });
+
+  const byKind = useMemo(
+    () => properties.filter(p => isDirectSaleModality(p.modalidade) === (kind === 'direct')),
+    [properties, kind],
+  );
+  const directCount = useMemo(
+    () => properties.filter(p => isDirectSaleModality(p.modalidade)).length,
+    [properties],
+  );
 
   const stateOptions = useMemo(() => [
     'Todos',
-    ...[...new Set(properties.map(p => p.uf).filter(Boolean))]
+    ...[...new Set(byKind.map(p => p.uf).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [properties]);
+  ], [byKind]);
 
   const cityOptions = useMemo(() => {
     const selectedState = normalizeLocation(filters.state);
-    const cities = properties
+    const cities = byKind
       .filter(p => filters.state === 'Todos' || normalizeLocation(p.uf) === selectedState)
       .map(p => p.city)
       .filter(Boolean);
     const uniqueByNormalizedName = new Map();
     cities.forEach(city => uniqueByNormalizedName.set(normalizeLocation(city), formatCity(city)));
     return ['Todas', ...[...uniqueByNormalizedName.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))];
-  }, [properties, filters.state]);
+  }, [byKind, filters.state]);
 
   const propertyTypeOptions = useMemo(() => [
     'Todos',
-    ...[...new Set(properties.map(p => p.type).filter(Boolean))]
+    ...[...new Set(byKind.map(p => p.type).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [properties]);
+  ], [byKind]);
 
   const modalityOptions = useMemo(() => [
     'Todos',
-    ...[...new Set(properties.map(p => p.modalidade).filter(Boolean))]
+    ...[...new Set(byKind.map(p => p.modalidade).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [properties]);
-
-  const auctionTypeOptions = useMemo(() => [
-    'Todos',
-    ...[...new Set(properties.map(p => p.auctionType).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [properties]);
+  ], [byKind]);
 
   const pracaOptions = useMemo(() => {
-    const eligible = properties.filter(p =>
+    const eligible = byKind.filter(p =>
       filters.modalidade === 'Todos' || p.modalidade === filters.modalidade);
     return [
       'Todos',
       ...[...new Set(eligible.map(p => p.praca).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, 'pt-BR')),
     ];
-  }, [properties, filters.modalidade]);
+  }, [byKind, filters.modalidade]);
 
   const filtered = useMemo(() => {
-    let list = [...properties];
+    let list = [...byKind];
 
     if (addressQuery.trim()) {
       const q = addressQuery.toLowerCase();
@@ -87,11 +140,27 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     if (filters.discountMin > 0) list = list.filter(p => (p.discount ?? p.auctionDiscount ?? 0) >= filters.discountMin);
     if (filters.state !== 'Todos') list = list.filter(p => normalizeLocation(p.uf) === normalizeLocation(filters.state));
     if (filters.city !== 'Todas') list = list.filter(p => normalizeLocation(p.city) === normalizeLocation(filters.city));
-    if (filters.judicial !== 'Todos') list = list.filter(p => p.auctionType === filters.judicial);
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
 
-    if (sort === 'discount') list.sort((a, b) =>
+    if (sort === 'relevance') {
+      // Relevância = data próxima primeiro, depois quanto do imóvel a gente
+      // realmente conhece. Um imóvel sem foto, sem área e sem quartos é ruído
+      // para quem está escolhendo onde morar, mesmo com desconto alto.
+      const completeness = (p) => (
+        (p.photoUrl ? 2 : 0) + (p.area > 0 ? 1 : 0) + (p.beds > 0 ? 1 : 0)
+        + (p.neighborhood ? 1 : 0) + (Number.isFinite(p.appraisal) && p.appraisal > 0 ? 1 : 0)
+      );
+      list.sort((a, b) => {
+        const aDate = getEndsAtMs(a.endsAt);
+        const bDate = getEndsAtMs(b.endsAt);
+        const aUpcoming = Number.isFinite(aDate) && aDate > sortNow ? aDate : Number.POSITIVE_INFINITY;
+        const bUpcoming = Number.isFinite(bDate) && bDate > sortNow ? bDate : Number.POSITIVE_INFINITY;
+        if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
+        return completeness(b) - completeness(a);
+      });
+    }
+    else if (sort === 'discount') list.sort((a, b) =>
       (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0));
     else if (sort === 'soonest') {
       // This mode is about upcoming opportunities, not chronological history:
@@ -113,18 +182,13 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [addressQuery, filters, sort, sortNow, properties]);
+  }, [addressQuery, filters, sort, sortNow, byKind]);
 
   useEffect(() => {
-    if (sort !== 'soonest') return undefined;
+    if (sort !== 'soonest' && sort !== 'relevance') return undefined;
     const interval = window.setInterval(() => setSortNow(Date.now()), 60_000);
     return () => window.clearInterval(interval);
   }, [sort]);
-
-  // Pagination is UI-derived state; resetting here is intentional whenever
-  // search/sort inputs change.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setPage(1); }, [addressQuery, filters, sort]);
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
@@ -134,18 +198,13 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
     (filters.discountMin > 0 ? 1 : 0) +
     (filters.state !== 'Todos' ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
-    (filters.judicial !== 'Todos' ? 1 : 0) +
     (filters.praca !== 'Todos' ? 1 : 0) +
     (filters.modalidade !== 'Todos' ? 1 : 0);
 
-  const clearAll = () => {
-    setAddressQuery('');
-    setFilters({
-      judicial: 'Todos', praca: 'Todos', modalidade: 'Todos',
-      propertyType: 'Todos',
-      discountMin: 0, state: 'Todos', city: 'Todas',
-    });
-  };
+  const clearAll = () => setParams({
+    q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+    rodada: 'Todos', modalidade: 'Todos', desconto: '0',
+  });
 
   return (
     <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
@@ -153,22 +212,34 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       {/* Header */}
       <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
         <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>
-            <span className="ix">§ feed</span>
-            <span>todas as oportunidades ativas</span>
-          </div>
-          <h1 className="h1">Feed de oportunidades</h1>
+          <h1 className="h1">Imóveis</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--fg-2)', fontSize: 14 }}>
-            {properties.length} imóveis no portfólio
+            Imóveis da Caixa, com a conta de quanto você pagaria até receber a chave.
           </p>
         </div>
-        <div className="row gap-2 page-actions">
-          <button className="btn" disabled title="Disponível em breve.">
-            <span className="mono" style={{ color: 'var(--fg-2)' }}>↗</span>
-            Exportar CSV
-            <span className="tag accent" style={{ padding: '1px 5px', fontSize: 8.5 }}>Em breve</span>
-          </button>
-        </div>
+      </div>
+
+      {/* Leilão e compra direta são produtos diferentes. */}
+      <div className="kind-tabs" role="tablist" aria-label="Tipo de venda">
+        <button
+          role="tab"
+          aria-selected={kind === 'auction'}
+          className={kind === 'auction' ? 'active' : ''}
+          onClick={() => setKind('auction')}
+        >
+          Leilões
+          <small>tem disputa e data</small>
+        </button>
+        <button
+          role="tab"
+          aria-selected={kind === 'direct'}
+          className={kind === 'direct' ? 'active' : ''}
+          onClick={() => setKind('direct')}
+          disabled={directCount === 0}
+        >
+          Compra direta
+          <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
+        </button>
       </div>
 
       {/* Filter bar */}
@@ -212,26 +283,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             )}
           </div>
 
-          {auctionTypeOptions.length > 2 && (
-            <Filter label="Tipo de leilão" value={filters.judicial}
-              options={auctionTypeOptions}
-              onChange={(v) => setFilters({ ...filters, judicial: v })} />
-          )}
-          {pracaOptions.length > 1 && (
-            <Filter label="Praça" value={filters.praca}
-              options={pracaOptions}
-              onChange={(v) => setFilters({ ...filters, praca: v })} />
-          )}
-          {propertyTypeOptions.length > 2 && (
-            <Filter label="Imóvel" value={filters.propertyType}
-              options={propertyTypeOptions}
-              onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-          )}
-          {modalityOptions.length > 2 && (
-            <Filter label="Modalidade" value={filters.modalidade}
-              options={modalityOptions}
-              onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
-          )}
           {stateOptions.length > 2 && (
             <Filter label="Estado" value={filters.state}
               options={stateOptions}
@@ -240,7 +291,22 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           <Filter label="Cidade" value={filters.city}
             options={cityOptions}
             onChange={(v) => setFilters({ ...filters, city: v })} />
-          <RangeChip label="Desconto disponível" suffix="%" max={60} value={filters.discountMin}
+          {propertyTypeOptions.length > 2 && (
+            <Filter label="Tipo" value={filters.propertyType}
+              options={propertyTypeOptions}
+              onChange={(v) => setFilters({ ...filters, propertyType: v })} />
+          )}
+          {pracaOptions.length > 1 && (
+            <Filter label="Rodada" value={filters.praca}
+              options={pracaOptions}
+              onChange={(v) => setFilters({ ...filters, praca: v })} />
+          )}
+          {modalityOptions.length > 2 && (
+            <Filter label="Modalidade" value={filters.modalidade}
+              options={modalityOptions}
+              onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
+          )}
+          <RangeChip label="Abaixo da avaliação" suffix="%" max={60} value={filters.discountMin}
             onChange={(v) => setFilters({ ...filters, discountMin: v })} />
 
           {activeFilterCount > 0 && (
@@ -265,10 +331,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
       {/* Result count */}
       <div className="row between" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <span className="mono" style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-          <b style={{ color: 'var(--fg-0)' }}>{filtered.length.toString().padStart(3, '0')}</b> resultados
-          <span style={{ margin: '0 8px' }}>·</span>
-          desconto oficial médio {Math.round(filtered.reduce((a, b) => a + (b.auctionDiscount || 0), 0) / Math.max(filtered.length, 1))}%
+        <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>
+          <b style={{ color: 'var(--fg-0)' }}>{filtered.length}</b>
+          {filtered.length === 1 ? ' imóvel' : ' imóveis'}
         </span>
         <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
           1–{paginated.length} de {filtered.length}
@@ -276,7 +341,9 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
       </div>
 
       {/* Content */}
-      {filtered.length === 0 ? (
+      {loading && properties.length === 0 ? (
+        <Loading />
+      ) : filtered.length === 0 ? (
         <Empty />
       ) : view === 'grid' ? (
         <div className="property-grid feed-grid" style={{
@@ -288,7 +355,6 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
             <PropertyCard
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched={watched.includes(p.id)}
               onToggleWatch={toggleWatch}
               staggerIndex={i}
@@ -297,9 +363,12 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
         </div>
       ) : (
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
+          {/* Sete colunas de cabeçalho para as sete células que PropertyRow
+              renderiza. Antes havia uma coluna "risco" sem dado embaixo, o que
+              deslocava todas as colunas seguintes. */}
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 0.7fr 1fr 32px',
+            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
             gap: 14,
             padding: '10px 18px',
             background: 'var(--bg-2)',
@@ -311,18 +380,16 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
           }}>
             <span>foto</span>
             <span>imóvel</span>
-            <span>lance</span>
+            <span>valor inicial</span>
             <span>avaliação</span>
-            <span>mercado estimado</span>
-            <span>risco</span>
-            <span>encerra em</span>
+            <span>imóveis parecidos</span>
+            <span>{kind === 'direct' ? 'disponível' : 'leilão em'}</span>
             <span></span>
           </div>
           {paginated.map(p => (
             <PropertyRow
               key={p.id}
               p={p}
-              onClick={() => go('detail', p)}
               watched={watched.includes(p.id)}
               onToggleWatch={toggleWatch}
             />
@@ -332,7 +399,7 @@ export default function Feed({ go, watched, toggleWatch, properties, initialAddr
 
       {paginated.length < filtered.length && (
         <div style={{ textAlign: 'center', marginTop: 48 }}>
-          <button className="btn lg" onClick={() => setPage(p => p + 1)}>
+          <button className="btn lg" onClick={() => setPage(page + 1)}>
             Carregar mais
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginLeft: 6 }}>
               {(filtered.length - paginated.length).toLocaleString('pt-BR')} restantes
@@ -493,6 +560,17 @@ function ViewToggle({ value, onChange }) {
       >
         <span className="mono">≡</span> lista
       </button>
+    </div>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="card" style={{ padding: 60, textAlign: 'center' }}>
+      <span className="countdown" style={{ justifyContent: 'center', color: 'var(--fg-2)' }}>
+        <span className="dot" style={{ background: 'var(--accent)' }}></span>
+        <span className="mono">Carregando imóveis…</span>
+      </span>
     </div>
   );
 }

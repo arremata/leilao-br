@@ -15,6 +15,9 @@ answers would materially change product behavior or risk.
    `main`.
 2. Restate the desired outcome and infer concise acceptance criteria.
 3. Implement the complete change, including relevant tests and this changelog.
+   Keep `docs/PRODUCT_CONTEXT.md` aligned when current user-facing capabilities
+   or constraints change. Record accepted durable product choices in
+   `docs/PRODUCT_DECISIONS.md`, but keep implementation details out of it.
 4. Run proportionate verification. Backend changes require relevant pytest
    coverage; frontend changes require lint, a production build, and browser
    validation at relevant desktop/mobile sizes. Check the browser console.
@@ -211,6 +214,10 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-07** — Gave every property its own address. The app was a single screen with no routes: the URL was never written, `/imovel/923` returned 404, and the browser back button left the product. Added `react-router-dom` with `/`, `/imovel/:id`, `/salvos` and `/vistos`; list filters now live in the query string, so going back from a property restores the same search. Property cards became real anchors — middle-click, cmd-click and "open in new tab" work for free — opening a new tab on desktop and the same tab on touch. Opening a property link no longer waits for the whole catalog; it fetches that one property. Fixed along the way: the service worker cached every navigation under `/`, which would have served a property page to anyone opening the home offline once paths diverged, and its offline fallback was unreachable because `caches.match` returns an always-truthy Promise. A property that left the Caixa catalog now says so instead of showing price and countdown for something no longer for sale.
+- **2026-09-07** — Repositioned the product from auction investors to people buying a home to live in. Removed the investor surface (target return, months-to-sale, exit price, capital-gains scenario) and derived "Seu limite" from a fact instead: the offer at which total cost passes the official appraisal. Reframed monthly condo and IPTU as the recurring cost of living there, and renovation as "can I move in already?". Added a next-steps guide whose per-step copy lives in an isolated content file for editorial review. Split the feed into Leilões and Compra direta tabs and made relevance the default order. Applied the plain-language dictionary across the interface and adopted Argos as the visible brand while leaving storage keys and env vars untouched.
+- **2026-09-07** — Stopped publishing claims without evidence. The `overdue_iptu` and `overdue_condo` cost lines were emitted with value `0` and the texts "IPTU em dia." and "Sem débito condominial." for every property, because the legal node is disabled — a categorical claim of no debt on no evidence, contradicting PD-001. Those lines are now emitted only when an amount is actually parsed. The hardcoded `{"j": "bad", "f": "good"}` risk verdict no longer ships in the analysis payload, the phantom "risco" table column was removed, and the Feed and Watchlist headers now describe the seven cells their rows actually render.
+- **2026-09-05** — Added concise Portuguese product memory for ordinary Claude conversations and a durable product-decision log. Agent instructions now require user-facing changes to keep the current context aligned and accepted long-term choices to be recorded without leaking implementation detail into the product documents.
 - **2026-09-05** — Added automatic Vercel cleanup when a PR closes or merges. The workflow paginates ARGOS Preview deployments for the exact branch, verifies the ARGOS project and matching GitHub PR metadata before deletion, and cannot target Production or Luigi's separate Vercel project.
 - **2026-09-05** — Made ARGOS Production and Preview deployment URLs public by disabling Vercel Authentication. Public previews still use the production catalog with explicitly enabled writes, currently limited to upserting deterministic property enrichments and prioritizing missing market-reference jobs; future write paths must be reviewed as public production operations.
 
