@@ -32,7 +32,6 @@ export const BEFORE_AUCTION_STEPS = [
   { id: 'check_occupancy', label: 'Descobrir se tem alguém morando no imóvel', body: '' },
   { id: 'credit', label: 'Conseguir o crédito aprovado, se for financiar', body: '' },
   { id: 'register', label: 'Fazer seu cadastro para poder dar lance', body: '', hasDeadline: true },
-  { id: 'deposit', label: 'Depositar o valor exigido para participar', body: '', hasDeadline: true },
   { id: 'bid', label: 'Dar o lance', body: '', hasDeadline: true },
 ];
 

@@ -83,8 +83,9 @@ Cinco áreas:
 1. **Quanto você vai pagar:** o valor que a pessoa pretende oferecer, os gastos
    que ela pode ajustar, a conta aberta item por item, o total até a chave e o
    custo mensal de morar em bloco separado.
-2. **O que fazer agora:** os passos antes da compra e depois dela, com estado
-   salvo no navegador e ancorados nas datas reais quando existirem.
+2. **O que fazer agora:** um painel lateral que acompanha a página sem ocupar uma
+   aba principal. Organiza as etapas antes e depois da compra, mostra o percentual
+   concluído e usa datas reais quando existirem.
 3. **Preço na região:** comparação com a avaliação oficial e com imóveis
    parecidos, os anúncios usados, e quanta evidência sustenta a estimativa.
 4. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,

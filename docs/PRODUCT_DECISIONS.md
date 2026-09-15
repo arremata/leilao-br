@@ -183,6 +183,19 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   interface evita textos técnicos de persistência e detalhes automáticos de
   metragem junto ao controle de reforma.
 
+### PD-013 — Manter os próximos passos disponíveis na lateral
+
+- **Data:** 15 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** “O que fazer agora” deixa a navegação principal e vira um painel
+  lateral recolhível. O avanço é apresentado como percentual e quantidade de
+  etapas concluídas, nunca como tarefas.
+- **Motivo:** o guia precisa acompanhar a consulta às contas, preços e documentos
+  sem obrigar a pessoa a sair da área que está lendo.
+- **Consequências:** a abertura fica disponível na lateral direita em telas
+  grandes e como ação flutuante no celular. O painel preserva o avanço por imóvel,
+  mantém os prazos documentados e não inclui uma etapa genérica de depósito.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

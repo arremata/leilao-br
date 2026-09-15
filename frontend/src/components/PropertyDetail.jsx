@@ -1948,6 +1948,7 @@ function NextStepsDrawer({ p }) {
         aria-controls="next-steps-drawer"
         aria-expanded={open}
         aria-label={`Abrir O que fazer agora, ${completionPercentage}% concluído`}
+        title="O que fazer agora"
       >
         <span className="mono">02</span>
         <span>O que fazer agora</span>
