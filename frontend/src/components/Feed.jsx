@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
 import { getEndsAtMs } from '../utils';
@@ -48,6 +48,8 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const pageRef = useRef(null);
   const PAGE_SIZE = 12;
 
   // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
@@ -192,8 +194,10 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
+  // Chip count no botão ⚙: apenas filtros não-search que desviam do padrão.
+  // A query de busca tem seu próprio campo sempre visível; contá-la aqui
+  // faria o chip piscar "1" sempre que alguém digita, o que confunde.
   const activeFilterCount =
-    (addressQuery.trim() ? 1 : 0) +
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
     (filters.state !== 'Todos' ? 1 : 0) +
@@ -206,8 +210,28 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     rodada: 'Todos', modalidade: 'Todos', desconto: '0',
   });
 
+  // Esc e click-fora fecham o painel de filtros sem alterar a URL; o painel é
+  // transitório por design — sua abertura não deve empurrar histórico.
+  useEffect(() => {
+    if (!filtersOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setFiltersOpen(false);
+    };
+    const onPointerDown = (event) => {
+      if (pageRef.current && !pageRef.current.contains(event.target)) {
+        setFiltersOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [filtersOpen]);
+
   return (
-    <div className="page feed-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
+    <div className="page feed-page" ref={pageRef} style={{ maxWidth: 1480, margin: '0 auto', padding: '28px 28px 80px' }}>
 
       {/* Header */}
       <div className="row between page-header fade-in" style={{ alignItems: 'flex-end', marginBottom: 18 }}>
@@ -219,113 +243,144 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         </div>
       </div>
 
-      {/* Leilão e compra direta são produtos diferentes. */}
-      <div className="kind-tabs" role="tablist" aria-label="Tipo de venda">
+      {/* Toolbar — sempre visível, sticky. Contém o que precisa de atenção
+          imediata (kind, search) e os botões para revelar o restante. */}
+      <div className="feed-toolbar" role="region" aria-label="Barra de ferramentas do feed">
+        {/* Kind tabs — em formato segmented compacto para caber no toolbar */}
+        <div className="kind-tabs kind-tabs--compact" role="tablist" aria-label="Tipo de venda">
+          <button
+            role="tab"
+            aria-selected={kind === 'auction'}
+            className={kind === 'auction' ? 'active' : ''}
+            onClick={() => setKind('auction')}
+          >
+            Leilões
+          </button>
+          <button
+            role="tab"
+            aria-selected={kind === 'direct'}
+            className={kind === 'direct' ? 'active' : ''}
+            onClick={() => setKind('direct')}
+            disabled={directCount === 0}
+          >
+            Compra direta
+            {directCount === 0 && <span className="kind-tabs-empty-hint">· 0</span>}
+          </button>
+        </div>
+
+        {/* Search — flexível, ocupa o centro */}
+        <div className="feed-search">
+          <span className="mono feed-search-icon">⌕</span>
+          <input
+            placeholder="Endereço, bairro, cidade..."
+            value={addressQuery}
+            onChange={(e) => setAddressQuery(e.target.value)}
+            aria-label="Buscar por endereço, bairro ou cidade"
+          />
+          {addressQuery && (
+            <button
+              onClick={() => setAddressQuery('')}
+              aria-label="Limpar busca"
+              className="feed-search-clear"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Botão Filtros — abre o painel inline */}
         <button
-          role="tab"
-          aria-selected={kind === 'auction'}
-          className={kind === 'auction' ? 'active' : ''}
-          onClick={() => setKind('auction')}
+          type="button"
+          onClick={() => setFiltersOpen(current => !current)}
+          aria-expanded={filtersOpen}
+          aria-controls="feed-filter-panel"
+          className={`feed-filter-toggle${filtersOpen ? ' open' : ''}`}
         >
-          Leilões
-          <small>tem disputa e data</small>
+          <span className="mono" aria-hidden="true">⚙</span>
+          Filtros
+          {activeFilterCount > 0 && (
+            <span className="feed-filter-count">{activeFilterCount}</span>
+          )}
         </button>
-        <button
-          role="tab"
-          aria-selected={kind === 'direct'}
-          className={kind === 'direct' ? 'active' : ''}
-          onClick={() => setKind('direct')}
-          disabled={directCount === 0}
-        >
-          Compra direta
-          <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
-        </button>
+
+        {/* Sort + View — trailing, sem mudanças */}
+        <Sort value={sort} onChange={(value) => {
+          if (value === 'soonest') setSortNow(Date.now());
+          setSort(value);
+        }} />
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
-      {/* Filter bar */}
-      <div className="filter-bar" style={{
-        position: 'sticky', top: 60, zIndex: 20,
-        background: 'rgba(255,255,255,0.6)',
-        backdropFilter: 'blur(16px) saturate(1.3)',
-        WebkitBackdropFilter: 'blur(16px) saturate(1.3)',
-        padding: '14px 0',
-        borderBottom: '1px solid var(--line-1)',
-        marginBottom: 20,
-      }}>
-        <div className="row gap-2 wrap filter-controls" style={{ alignItems: 'center' }}>
-
-          {/* Address text search */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            height: 32, padding: '0 10px',
-            borderRadius: 8,
-            border: '1px solid ' + (addressQuery ? 'var(--line-3)' : 'var(--line-1)'),
-            background: 'var(--bg-1)',
-            minWidth: 180,
-          }}>
-            <span className="mono" style={{ color: 'var(--fg-3)', fontSize: 11 }}>⌕</span>
-            <input
-              placeholder="Endereço, bairro..."
-              value={addressQuery}
-              onChange={(e) => setAddressQuery(e.target.value)}
-              style={{
-                border: 0, outline: 'none', background: 'transparent',
-                fontSize: 12.5, width: 130,
-              }}
-            />
-            {addressQuery && (
-              <button
-                onClick={() => setAddressQuery('')}
-                style={{ color: 'var(--fg-3)', fontSize: 14, lineHeight: 1 }}
-              >
-                ×
-              </button>
+      {/* Painel de filtros — abre/fecha com grid-template-rows, sem JS animation.
+          Fica acima dos resultados para manter o contexto visual. */}
+      <div
+        id="feed-filter-panel"
+        className={`feed-filter-panel${filtersOpen ? ' open' : ''}`}
+        aria-hidden={!filtersOpen}
+      >
+        <div className="feed-filter-panel-inner">
+          {/* Row 1: dropdowns */}
+          <div className="feed-filter-row">
+            {stateOptions.length > 2 && (
+              <Filter label="Estado" value={filters.state}
+                options={stateOptions}
+                onChange={(v) => setFilters({ ...filters, state: v, city: 'Todas' })} />
+            )}
+            <Filter label="Cidade" value={filters.city}
+              options={cityOptions}
+              onChange={(v) => setFilters({ ...filters, city: v })} />
+            {propertyTypeOptions.length > 2 && (
+              <Filter label="Tipo" value={filters.propertyType}
+                options={propertyTypeOptions}
+                onChange={(v) => setFilters({ ...filters, propertyType: v })} />
+            )}
+            {pracaOptions.length > 1 && (
+              <Filter label="Rodada" value={filters.praca}
+                options={pracaOptions}
+                onChange={(v) => setFilters({ ...filters, praca: v })} />
+            )}
+            {modalityOptions.length > 2 && (
+              <Filter label="Modalidade" value={filters.modalidade}
+                options={modalityOptions}
+                onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
             )}
           </div>
 
-          {stateOptions.length > 2 && (
-            <Filter label="Estado" value={filters.state}
-              options={stateOptions}
-              onChange={(v) => setFilters({ ...filters, state: v, city: 'Todas' })} />
-          )}
-          <Filter label="Cidade" value={filters.city}
-            options={cityOptions}
-            onChange={(v) => setFilters({ ...filters, city: v })} />
-          {propertyTypeOptions.length > 2 && (
-            <Filter label="Tipo" value={filters.propertyType}
-              options={propertyTypeOptions}
-              onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-          )}
-          {pracaOptions.length > 1 && (
-            <Filter label="Rodada" value={filters.praca}
-              options={pracaOptions}
-              onChange={(v) => setFilters({ ...filters, praca: v })} />
-          )}
-          {modalityOptions.length > 2 && (
-            <Filter label="Modalidade" value={filters.modalidade}
-              options={modalityOptions}
-              onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
-          )}
-          <RangeChip label="Abaixo da avaliação" suffix="%" max={60} value={filters.discountMin}
-            onChange={(v) => setFilters({ ...filters, discountMin: v })} />
+          {/* Row 2: slider — amplo, com label à esquerda e valor grande */}
+          <div className="feed-slider-row">
+            <label className="feed-slider-label">
+              <span>Abaixo da avaliação</span>
+              <strong className="mono">{filters.discountMin}%</strong>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="60"
+              step="1"
+              value={filters.discountMin}
+              onChange={(e) => setFilters({ ...filters, discountMin: +e.target.value })}
+              className="slider"
+              style={{
+                '--fill': `${(filters.discountMin / 60) * 100}%`,
+                flex: 1,
+              }}
+              aria-label="Desconto mínimo abaixo da avaliação (em porcento)"
+            />
+          </div>
 
+          {/* Row 3: Limpar — só aparece quando há filtros ativos */}
           {activeFilterCount > 0 && (
-            <button
-              className="btn ghost sm"
-              onClick={clearAll}
-              style={{ color: 'var(--accent)' }}
-            >
-              Limpar {activeFilterCount}
-            </button>
+            <div className="feed-clear-row">
+              <button
+                type="button"
+                className="btn ghost sm"
+                onClick={clearAll}
+                style={{ color: 'var(--accent)' }}
+              >
+                Limpar filtros ({activeFilterCount})
+              </button>
+            </div>
           )}
-
-          <span style={{ flex: 1 }}></span>
-
-          <Sort value={sort} onChange={(value) => {
-            if (value === 'soonest') setSortNow(Date.now());
-            setSort(value);
-          }} />
-          <ViewToggle value={view} onChange={setView} />
         </div>
       </div>
 
@@ -461,37 +516,6 @@ function Filter({ label, value, options, onChange }) {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function RangeChip({ label, suffix, value, onChange, max = 100 }) {
-  const active = value > 0;
-  return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 10,
-      height: 32, padding: '0 12px',
-      borderRadius: 8,
-      border: '1px solid ' + (active ? 'var(--line-3)' : 'var(--line-1)'),
-      background: active ? 'var(--bg-2)' : 'var(--bg-1)',
-      fontSize: 12.5,
-      minWidth: 200,
-    }}>
-      <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{label} ≥</span>
-      <span className="mono" style={{
-        fontSize: 12, fontWeight: 500,
-        color: active ? 'var(--accent)' : 'var(--fg-1)',
-        minWidth: 28,
-      }}>
-        {value}{suffix}
-      </span>
-      <input
-        type="range" min="0" max={max} step="1"
-        value={value}
-        onChange={(e) => onChange(+e.target.value)}
-        className="slider"
-        style={{ flex: 1, marginLeft: 4 }}
-      />
     </div>
   );
 }
