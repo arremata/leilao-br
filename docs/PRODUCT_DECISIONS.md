@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 7 de setembro de 2026.
+Última atualização: 15 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -193,8 +193,10 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Motivo:** o guia precisa acompanhar a consulta às contas, preços e documentos
   sem obrigar a pessoa a sair da área que está lendo.
 - **Consequências:** a abertura fica disponível na lateral direita em telas
-  grandes e como ação flutuante no celular. O painel preserva o avanço por imóvel,
-  mantém os prazos documentados e não inclui uma etapa genérica de depósito.
+  grandes e como ação flutuante no celular. Ele não recebe número de seção e se
+  apresenta uma vez quando a pessoa chega ao fim da página. O painel preserva o
+  avanço por imóvel, mantém os prazos documentados, registra a leitura das regras
+  ao chegar ao fim dessa área e não inclui uma etapa genérica de depósito.
 
 ## Decisões ativas de operação do produto
 

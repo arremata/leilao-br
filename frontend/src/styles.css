@@ -455,7 +455,7 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* Lado a lado: "Tirar quem está morando" + reforma dividem a mesma linha em
+/* Lado a lado: desocupação + reforma dividem a mesma linha em
    desktop, eliminando o espaço em branco que aparecia quando o grid só tinha
    um único campo ocupando 1/3 do painel. Colapsa para 1 coluna no mobile. */
 .scenario-cost-pair {
@@ -1713,12 +1713,7 @@ a { color: inherit; text-decoration: none; }
   outline-offset: 2px;
 }
 
-.next-steps-drawer-trigger > .mono {
-  color: var(--fg-3);
-  font-size: 10px;
-}
-
-.next-steps-drawer-trigger > span:nth-child(2) {
+.next-steps-drawer-trigger-label {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   white-space: nowrap;
@@ -1962,7 +1957,7 @@ a { color: inherit; text-decoration: none; }
     right: 12px;
     bottom: 16px;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     width: min(230px, calc(100vw - 24px));
     padding: 11px 12px;
     border-right: 1px solid var(--line-2);
@@ -1971,7 +1966,7 @@ a { color: inherit; text-decoration: none; }
     text-align: left;
   }
 
-  .next-steps-drawer-trigger > span:nth-child(2) {
+  .next-steps-drawer-trigger-label {
     writing-mode: horizontal-tb;
     transform: none;
   }
@@ -2001,6 +1996,147 @@ a { color: inherit; text-decoration: none; }
 
   .next-steps-drawer-body {
     padding: 0 18px calc(28px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- Preço na região ---------- */
+.market-overview-grid {
+  align-items: start;
+}
+
+.market-region-card {
+  align-self: start;
+  padding: 22px;
+}
+
+.market-region-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.market-region-header .uppy {
+  color: var(--fg-3);
+}
+
+.market-region-header h3 {
+  margin: 5px 0 0;
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.market-region-header .tag {
+  flex: 0 0 auto;
+}
+
+.market-confidence-note {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  margin-top: 18px;
+  padding: 12px 13px;
+  border: 1px solid var(--line-1);
+  border-radius: 9px;
+  background: var(--bg-2);
+}
+
+.market-confidence-note > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--fg-3);
+  color: var(--bg-1);
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.market-confidence-note.bad > span { background: var(--bad); }
+.market-confidence-note.warn > span { background: var(--warn); color: var(--fg-0); }
+.market-confidence-note.good > span { background: var(--good); }
+
+.market-confidence-note p {
+  margin: 1px 0 0;
+  color: var(--fg-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.market-region-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.market-region-metric {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 9px;
+  background: var(--bg-1);
+}
+
+.market-region-metric .uppy {
+  display: block;
+  min-height: 26px;
+  color: var(--fg-3);
+  line-height: 1.35;
+}
+
+.market-region-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: clamp(20px, 2vw, 27px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  white-space: nowrap;
+}
+
+.market-region-metric > span:last-child:not(.uppy) {
+  display: block;
+  margin-top: 4px;
+  color: var(--fg-2);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.market-region-metric > .positive { color: var(--good) !important; }
+.market-region-metric > .negative { color: var(--bad) !important; }
+
+.market-region-disclaimer {
+  margin: 12px 0 0;
+  color: var(--fg-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rules-read-marker {
+  width: 100%;
+  height: 1px;
+}
+
+@media (max-width: 600px) {
+  .market-region-card {
+    padding: 18px;
+  }
+
+  .market-region-header {
+    flex-direction: column;
+  }
+
+  .market-region-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .market-region-metric .uppy {
+    min-height: 0;
   }
 }
 

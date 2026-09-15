@@ -78,20 +78,22 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Página do imóvel
 
-Cinco áreas:
+Quatro áreas numeradas e um guia lateral:
 
 1. **Quanto você vai pagar:** o valor que a pessoa pretende oferecer, os gastos
    que ela pode ajustar, a conta aberta item por item, o total até a chave e o
    custo mensal de morar em bloco separado.
-2. **O que fazer agora:** um painel lateral que acompanha a página sem ocupar uma
-   aba principal. Organiza as etapas antes e depois da compra, mostra o percentual
-   concluído e usa datas reais quando existirem.
-3. **Preço na região:** comparação com a avaliação oficial e com imóveis
+2. **Preço na região:** comparação com a avaliação oficial e com imóveis
    parecidos, os anúncios usados, e quanta evidência sustenta a estimativa.
-4. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,
+3. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,
    preços, pagamento e responsabilidades quando publicados.
-5. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega
+4. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega
    parecer jurídico nem classificação automática de risco legal.
+
+**O que fazer agora** acompanha a página como painel lateral sem numeração.
+Organiza as etapas antes e depois da compra, mostra o percentual concluído e usa
+datas reais quando existirem. O painel se apresenta ao chegar ao fim da página;
+chegar ao fim das regras oficiais registra essa leitura como concluída.
 
 O produto não chama nenhum valor de “seu limite”: a comparação com a avaliação
 oficial continua disponível na área de preços, sem parecer uma recomendação de
