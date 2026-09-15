@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Countdown, Photo, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
@@ -771,6 +772,8 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       </div>
 
       {isEnriched ? (<>
+      <NextStepsDrawer p={p} />
+
       {/* ===== TABS ===== */}
       <div className="detail-tabs" style={{
         display: 'flex', gap: 0,
@@ -779,7 +782,6 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       }}>
         {[
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
-          { v: 'guide', l: 'O que fazer agora', ix: '02' },
           { v: 'market', l: 'Preço na região', ix: '03' },
           { v: 'edital', l: isDirectSale ? 'Documentos' : 'Regras deste leilão', ix: '04' },
           { v: 'legal', l: 'Pendências do imóvel', ix: '05', comingSoon: true },
@@ -808,7 +810,6 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       {/* ===== TAB CONTENT ===== */}
       <div className="fade-in" key={tab}>
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
-        {tab === 'guide' && <NextSteps p={p} />}
         {tab === 'market' && <Market p={p} />}
         {tab === 'legal' && <LegalComingSoon />}
         {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} />}
@@ -1334,7 +1335,13 @@ function CostBreakdown({ p, sim }) {
               <p>Mude o que quiser. A conta abaixo acompanha.</p>
             </div>
           </div>
-          <div className="scenario-cost-grid">
+          {/* ── Par lado a lado: desocupação + reforma ──
+              Antes, os dois blocos ficavam empilhados em coluna única e o grid
+              de 3 colunas deixava o restante da linha vazio. Agora eles dividem
+              uma linha em desktop (cada um ocupa metade do painel), eliminando
+              o espaço em branco. Em telas menores o par colapsa para coluna
+              única, com a ordem preservada. */}
+          <div className="scenario-cost-pair">
             <ScenarioMoneyField
               label="Tirar quem está morando"
               value={evictionCost}
@@ -1343,40 +1350,40 @@ function CostBreakdown({ p, sim }) {
               onCommit={setEvictionCost}
               onReset={resetEvictionCost}
             />
-          </div>
 
-          {/* Reforma — a pergunta é "dá para me mudar já?" */}
-          <div style={{ marginTop: 18 }}>
-            <div className="row between baseline">
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-                Precisa de reforma para você se mudar?
-              </span>
-              <RenovationMoneyEditor
-                value={renoCost}
-                adjusted={renovationAdjusted}
+            {/* Reforma — a pergunta é "dá para me mudar já?" */}
+            <div className="scenario-money-field scenario-money-field--reno">
+              <div className="row between baseline">
+                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+                  Precisa de reforma para você se mudar?
+                </span>
+                <RenovationMoneyEditor
+                  value={renoCost}
+                  adjusted={renovationAdjusted}
+                  disabled={isLand}
+                  onCommit={setRenovationCost}
+                />
+              </div>
+              <input
+                type="range" min={0} max={100} value={renoPct}
+                onChange={(e) => setRenoPct(+e.target.value)}
                 disabled={isLand}
-                onCommit={setRenovationCost}
+                className="slider"
+                style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
+                aria-label="Precisa de reforma para você se mudar?"
               />
+              <div className="row between" style={{ marginTop: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>dá para morar já</span>
+                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>precisa refazer tudo</span>
+              </div>
+              {(isLand || renovationAdjusted) && (
+                <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
+                  {isLand
+                    ? 'Terreno não recebe estimativa de reforma.'
+                    : 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'}
+                </p>
+              )}
             </div>
-            <input
-              type="range" min={0} max={100} value={renoPct}
-              onChange={(e) => setRenoPct(+e.target.value)}
-              disabled={isLand}
-              className="slider"
-              style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
-              aria-label="Precisa de reforma para você se mudar?"
-            />
-            <div className="row between" style={{ marginTop: 8 }}>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>dá para morar já</span>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>precisa refazer tudo</span>
-            </div>
-            {(isLand || renovationAdjusted) && (
-              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
-                {isLand
-                  ? 'Terreno não recebe estimativa de reforma.'
-                  : 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'}
-              </p>
-            )}
           </div>
 
           <CustomCostsEditor
@@ -1480,30 +1487,139 @@ function CostBreakdown({ p, sim }) {
   );
 }
 
-function OfferInput({ value, onCommit }) {
-  const [draft, setDraft] = useState(null);
-  const displayed = draft == null ? String(Math.round(Number(value) || 0)) : draft;
-  const commit = () => {
-    if (draft == null) return;
-    const amount = Number(draft);
-    if (Number.isFinite(amount) && amount >= 0) onCommit(amount);
+// ====== pt-BR money mask helpers ======
+// Converte um número em BRL em uma string parcialmente digitável "1.234,56".
+// Regras: dígitos são obrigatórios; ',' introduz a parte decimal (até 2 dígitos);
+// '.' em pontos de milhar é ignorado na digitação mas reaplica ao renderizar.
+const BRL_MASK_DECIMAL_SEPARATOR = ',';
+
+// Converte um número (ex.: 352752.11) para a exibição "352.752,11".
+// Zeros e valores não finitos viram '' para que o placeholder apareça.
+function numericToDisplay(value) {
+  if (value == null) return '';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  const fixed = num.toFixed(2);
+  const [intPart, decPart] = fixed.split('.');
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return decPart === '00' ? grouped : `${grouped},${decPart}`;
+}
+
+function normaliseMoneyInput(raw) {
+  // Strip tudo que não é dígito. Preservamos ',' como separador decimal.
+  const cleaned = String(raw || '').replace(/[^\d,]/g, '');
+  // Mantém apenas a primeira ',' como separador decimal
+  const firstComma = cleaned.indexOf(BRL_MASK_DECIMAL_SEPARATOR);
+  const allowDecimal = firstComma !== -1;
+  const intOnly = allowDecimal ? cleaned.slice(0, firstComma).replace(/[^\d]/g, '') : cleaned;
+  const decPart = allowDecimal ? cleaned.slice(firstComma + 1).replace(/[^\d]/g, '') : '';
+  // Limpa zeros à esquerda do inteiro, mas preserva um '0' sozinho ou quando há decimal
+  let intPart = intOnly.replace(/^0+(?=\d)/, '');
+  if (intPart === '') intPart = decPart !== '' ? '0' : '';
+  // Se o inteiro ficou maior que 3 dígitos e contém '.', o usuário colou um
+  // valor pronto já formatado (ex.: "1.234.567") — removemos os pontos antes
+  // de reaplicar a máscara, porque eles são sempre separador de milhar.
+  if (intPart !== '' && intPart.length > 3) intPart = intPart.replace(/\./g, '');
+  return { intPart, decPart, hasDecimal: allowDecimal };
+}
+
+function applyMoneyMask(raw) {
+  const { intPart, decPart, hasDecimal } = normaliseMoneyInput(raw);
+  if (!intPart && !decPart) return '';
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (!hasDecimal || decPart === '') return grouped;
+  return `${grouped},${decPart.slice(0, 2)}`;
+}
+
+function maskToNumber(masked) {
+  const { intPart, decPart } = normaliseMoneyInput(masked);
+  if (!intPart && !decPart) return null;
+  const numericString = `${intPart || '0'}${decPart ? '.' + decPart.padEnd(2, '0').slice(0, 2) : ''}`;
+  const value = Number(numericString);
+  return Number.isFinite(value) ? value : null;
+}
+
+// ====== Shared MoneyMaskInput ======
+//
+// Uma única implementação de input de dinheiro para o painel inteiro.
+// Recebe o valor numérico atual (number) e o chama de volta com um número
+// sempre que o formato for válido. A exibição é sempre formatada com
+// separador de milhares "." e opcionalmente "," para centavos, atualizando
+// enquanto o usuário digita. O `R$` prefix fica fora do input (decisão de
+// layout atual) — o campo por si só mostra apenas os dígitos formatados.
+function MoneyMaskInput({ value, onCommit, onReset, disabled, ariaLabel, placeholder = '0' }) {
+  const [draft, setDraft] = useState(null); // string de exibição "1.234,56" enquanto digita
+  const displayed = draft == null ? numericToDisplay(value) : draft;
+
+  const commit = (displayStr) => {
+    if (displayStr == null) return;
+    const trimmed = displayStr.trim();
+    if (trimmed === '') {
+      onReset?.();
+    } else {
+      const parsed = maskToNumber(trimmed);
+      if (parsed != null && parsed >= 0) onCommit?.(parsed);
+    }
     setDraft(null);
   };
+
+  const handleChange = (event) => {
+    const raw = event.target.value;
+    // Se o campo ficar vazio, entendemos isso como "limpar" (o usuário verá o placeholder "0").
+    if (raw === '') {
+      setDraft('');
+      return;
+    }
+    setDraft(applyMoneyMask(raw));
+  };
+
+  const handleFocus = () => {
+    // Quando ganha foco, já mostramos a versão formatada atual para que o
+    // usuário não veja um salto visual. Se o valor for zero/empty, mantemos
+    // o campo vazio para mostrar o placeholder "0".
+    const num = Number(value);
+    setDraft(Number.isFinite(num) && num > 0 ? numericToDisplay(num) : '');
+  };
+
+  const handleBlur = (event) => {
+    commit(event.target.value);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') {
+      setDraft(null);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={displayed}
+      onFocus={handleFocus}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      disabled={disabled}
+    />
+  );
+}
+
+// ====== Individual call-site wrappers ======
+// Antes: cada campo usava <input type="number"> com o valor cru como string.
+// Agora: cada campo usa MoneyMaskInput por dentro, mantendo as mesmas
+// promessas de commit/reset/adjusted e os mesmos rótulos abaixo.
+
+function OfferInput({ value, onCommit }) {
   return (
     <label className="buyer-offer-input">
       <span>R$</span>
-      <input
-        type="number" min="0" step="100" inputMode="decimal"
-        value={displayed}
-        onFocus={() => setDraft(String(Math.round(Number(value) || 0)))}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
-          if (event.key === 'Escape') setDraft(null);
-        }}
-        aria-label="Quanto você pretende oferecer"
-      />
+      <MoneyMaskInput value={value} onCommit={onCommit} ariaLabel="Quanto você pretende oferecer" />
     </label>
   );
 }
@@ -1511,42 +1627,21 @@ function OfferInput({ value, onCommit }) {
 function ScenarioMoneyField({
   label, value, adjusted, defaultLabel, suffix, onCommit, onReset,
 }) {
-  const [draft, setDraft] = useState(null);
-  // Zero sem referência é "não sabemos", não "custa zero": o campo fica vazio
-  // com o placeholder, e o rótulo abaixo explica que não temos o dado.
-  const displayedValue = draft == null
-    ? (Number.isFinite(Number(value)) && Number(value) > 0 ? String(value) : '')
-    : draft;
-  const commit = () => {
-    if (draft == null) return;
-    if (draft.trim() === '') onReset?.();
-    else {
-      const amount = Number(draft);
-      if (Number.isFinite(amount) && amount >= 0) onCommit?.(amount);
-    }
-    setDraft(null);
-  };
-
   return (
     <div className="scenario-money-field">
       <label>
         <span className="uppy">{label}</span>
-      <div className="scenario-money-input">
-        <span>R$</span>
-        <input
-          type="number" min="0" step="0.01" inputMode="decimal"
-          value={displayedValue}
-          onFocus={() => setDraft(String(value ?? ''))}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
-            if (event.key === 'Escape') setDraft(null);
-          }}
-          placeholder="0,00" aria-label={label}
-        />
-        {suffix && <span className="scenario-money-suffix">{suffix}</span>}
-      </div>
+        <div className="scenario-money-input">
+          <span>R$</span>
+          <MoneyMaskInput
+            value={value}
+            onCommit={onCommit}
+            onReset={onReset}
+            ariaLabel={label}
+            placeholder="0"
+          />
+          {suffix && <span className="scenario-money-suffix">{suffix}</span>}
+        </div>
       </label>
       <div className="scenario-money-meta">
         <span>{adjusted ? 'Valor informado por você' : defaultLabel}</span>
@@ -1557,36 +1652,15 @@ function ScenarioMoneyField({
 }
 
 function RenovationMoneyEditor({ value, adjusted, disabled, onCommit }) {
-  const [draft, setDraft] = useState(null);
-  const displayedValue = draft == null ? String(Math.round(Number(value) || 0)) : draft;
-  const commit = () => {
-    if (draft == null) return;
-    const amount = Number(draft);
-    if (Number.isFinite(amount) && amount >= 0) onCommit(amount);
-    setDraft(null);
-  };
-
   return (
     <label className={`renovation-money-editor${adjusted ? ' adjusted' : ''}`}>
       <span>R$</span>
-      <input
-        type="number"
-        min="0"
-        step="100"
-        inputMode="decimal"
-        value={displayedValue}
+      <MoneyMaskInput
+        value={value}
+        onCommit={onCommit}
         disabled={disabled}
-        onFocus={event => {
-          setDraft(String(Math.round(Number(value) || 0)));
-          event.currentTarget.select();
-        }}
-        onChange={event => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={event => {
-          if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
-          if (event.key === 'Escape') setDraft(null);
-        }}
-        aria-label="Valor da reforma"
+        ariaLabel="Valor da reforma"
+        placeholder="0"
       />
       {adjusted && <span className="renovation-money-status">digitado</span>}
     </label>
@@ -1779,19 +1853,23 @@ function LegalComingSoon() {
 }
 
 // ============================================================
-// TAB 2 — O QUE FAZER AGORA
+// PAINEL LATERAL 02 — O QUE FAZER AGORA
 // ============================================================
 // Estrutura, estados e datas moram aqui. O texto explicativo de cada passo vive
 // em `nextStepsContent.js` e é de responsabilidade da revisão editorial: até que
 // um passo tenha texto revisado, ele mostra só o rótulo e o prazo. Nunca um
 // texto provisório inventado — descrever o que dá errado ao atrasar um prazo é
 // afirmação de processo com consequência jurídica.
-function NextSteps({ p }) {
+function NextStepsDrawer({ p }) {
   const isDirectSale = isDirectSaleProperty(p);
   const storageKey = p?.id ? `arremate_property_steps_${p.id}` : null;
   const [done, setDone] = useState(() => (
     p?.id ? readStoredObject(`arremate_property_steps_${p.id}`) : {}
   ));
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const drawerRef = useRef(null);
+  const closeRef = useRef(null);
 
   const toggle = (id) => {
     const next = { ...done };
@@ -1806,6 +1884,11 @@ function NextSteps({ p }) {
   const d = p.editalData || p.edital?.editalData || {};
   const steps = buildNextSteps({ property: p, editalData: d, isDirectSale });
   const afterSteps = isDirectSale ? AFTER_PURCHASE_STEPS.direct : AFTER_PURCHASE_STEPS.auction;
+  const allSteps = [...steps, ...afterSteps];
+  const completedSteps = allSteps.reduce((total, step) => total + (done[step.id] ? 1 : 0), 0);
+  const completionPercentage = allSteps.length > 0
+    ? Math.round((completedSteps / allSteps.length) * 100)
+    : 0;
 
   // Fixado na montagem: a contagem de dias não precisa se mover durante a
   // leitura, e ler o relógio durante o render torna o componente impuro.
@@ -1815,39 +1898,137 @@ function NextSteps({ p }) {
     ? Math.ceil((deadline.getTime() - now) / 86400000)
     : null;
 
-  return (
-    <div>
-      <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-        <h3 className="h2">
-          {isDirectSale ? 'O que fazer para comprar este imóvel' : 'O que fazer antes do leilão'}
-        </h3>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 620 }}>
-          {daysLeft != null && daysLeft > 0
-            ? `Faltam ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} para o leilão.`
-            : isDirectSale
-              ? 'Não há disputa nem data: quem fecha primeiro, leva.'
-              : 'A data deste leilão não foi divulgada.'}
-          {' '}Marque o que já fez. Fica salvo neste navegador.
-        </p>
-        <ol className="next-steps">
-          {steps.map(step => (
-            <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
-          ))}
-        </ol>
-      </div>
+  const closeDrawer = useCallback(() => {
+    setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
 
-      <div className="card" style={{ padding: 24 }}>
-        <h3 className="h2">Depois que o imóvel for seu</h3>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 620 }}>
-          A compra não termina no pagamento. Estes são os passos até a chave na mão.
-        </p>
-        <ol className="next-steps">
-          {afterSteps.map(step => (
-            <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
-          ))}
-        </ol>
-      </div>
-    </div>
+  useEffect(() => {
+    if (!open) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeDrawer();
+        return;
+      }
+      if (event.key !== 'Tab' || !drawerRef.current) return;
+      const focusable = [...drawerRef.current.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeDrawer, open]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="next-steps-drawer-trigger"
+        onClick={() => setOpen(true)}
+        aria-controls="next-steps-drawer"
+        aria-expanded={open}
+        aria-label={`Abrir O que fazer agora, ${completionPercentage}% concluído`}
+      >
+        <span className="mono">02</span>
+        <span>O que fazer agora</span>
+        <strong>{completionPercentage}%</strong>
+      </button>
+
+      {open && createPortal(
+        <div className="next-steps-drawer-layer">
+          <div className="next-steps-drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />
+          <aside
+            ref={drawerRef}
+            id="next-steps-drawer"
+            className="next-steps-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="next-steps-title"
+            aria-describedby="next-steps-summary"
+          >
+            <header className="next-steps-drawer-head">
+              <div className="row between" style={{ alignItems: 'flex-start', gap: 20 }}>
+                <div>
+                  <span className="uppy">Etapa 02</span>
+                  <h2 id="next-steps-title">O que fazer agora</h2>
+                </div>
+                <button
+                  ref={closeRef}
+                  type="button"
+                  className="next-steps-drawer-close"
+                  onClick={closeDrawer}
+                  aria-label="Fechar O que fazer agora"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="next-steps-progress" aria-live="polite">
+                <div className="row between baseline">
+                  <strong>{completionPercentage}% concluído</strong>
+                  <span>{completedSteps} de {allSteps.length} etapas concluídas</span>
+                </div>
+                <progress value={completionPercentage} max="100">
+                  {completionPercentage}% concluído
+                </progress>
+              </div>
+            </header>
+
+            <div className="next-steps-drawer-body">
+              <section className="next-steps-section" aria-labelledby="next-steps-before-title">
+                <h3 id="next-steps-before-title">
+                  {isDirectSale ? 'Para comprar este imóvel' : 'Antes do leilão'}
+                </h3>
+                <p id="next-steps-summary">
+                  {daysLeft != null && daysLeft > 0
+                    ? `Faltam ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} para o leilão.`
+                    : isDirectSale
+                      ? 'Não há disputa nem data: quem fecha primeiro, leva.'
+                      : 'A data deste leilão não foi divulgada.'}
+                  {' '}Marque cada etapa conforme avançar.
+                </p>
+                <ol className="next-steps">
+                  {steps.map(step => (
+                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
+                  ))}
+                </ol>
+              </section>
+
+              <section className="next-steps-section" aria-labelledby="next-steps-after-title">
+                <h3 id="next-steps-after-title">Depois que o imóvel for seu</h3>
+                <p>A compra não termina no pagamento. Estas são as etapas até a chave na mão.</p>
+                <ol className="next-steps">
+                  {afterSteps.map(step => (
+                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
+                  ))}
+                </ol>
+              </section>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

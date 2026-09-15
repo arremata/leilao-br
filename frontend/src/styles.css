@@ -455,6 +455,25 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Lado a lado: "Tirar quem está morando" + reforma dividem a mesma linha em
+   desktop, eliminando o espaço em branco que aparecia quando o grid só tinha
+   um único campo ocupando 1/3 do painel. Colapsa para 1 coluna no mobile. */
+.scenario-cost-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* O bloco de reforma herda o mesmo "card" dos outros ScenarioMoneyField para
+   que o par desça como uma única unidade visual. Sobrescrevemos apenas o
+   padding interno que o conteúdo do slider exige. */
+.scenario-money-field--reno {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .scenario-money-field {
   min-width: 0;
   padding: 14px 16px;
@@ -1331,7 +1350,8 @@ a { color: inherit; text-decoration: none; }
   }
 
   .scenario-cost-grid,
-  .scenario-cost-grid.without-condominium {
+  .scenario-cost-grid.without-condominium,
+  .scenario-cost-pair {
     grid-template-columns: 1fr;
   }
 
@@ -1656,6 +1676,197 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ---------- O que fazer agora ---------- */
+.next-steps-drawer-trigger {
+  position: fixed;
+  top: 52%;
+  right: -1px;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 196px;
+  padding: 11px 12px;
+  border: 1px solid var(--line-2);
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  background: var(--bg-1);
+  box-shadow: 0 8px 28px rgba(17,24,39,.14);
+  color: var(--fg-0);
+  font-size: 12px;
+  text-align: left;
+  transform: translateY(-50%);
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+
+.next-steps-drawer-trigger:hover {
+  border-color: var(--accent);
+  box-shadow: 0 10px 32px rgba(17,24,39,.18);
+  transform: translateY(-50%) translateX(-3px);
+}
+
+.next-steps-drawer-trigger:focus-visible,
+.next-steps-drawer-close:focus-visible,
+.next-step-check:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+.next-steps-drawer-trigger > .mono {
+  color: var(--fg-3);
+  font-size: 10px;
+}
+
+.next-steps-drawer-trigger > strong {
+  color: var(--accent-strong);
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+.next-steps-drawer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.next-steps-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17,24,39,.34);
+  backdrop-filter: blur(2px);
+  animation: next-steps-backdrop-in .2s ease-out;
+}
+
+.next-steps-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(480px, 100vw);
+  height: 100dvh;
+  border-left: 1px solid var(--line-2);
+  background: var(--bg-1);
+  box-shadow: -18px 0 48px rgba(17,24,39,.18);
+  animation: next-steps-drawer-in .24s cubic-bezier(.16,1,.3,1);
+}
+
+.next-steps-drawer-head {
+  position: relative;
+  z-index: 1;
+  padding: 22px 24px 20px;
+  border-bottom: 1px solid var(--line-1);
+  background: var(--bg-1);
+}
+
+.next-steps-drawer-head .uppy {
+  color: var(--fg-3);
+}
+
+.next-steps-drawer-head h2 {
+  margin: 5px 0 0;
+  color: var(--fg-0);
+  font-size: 24px;
+  letter-spacing: -0.035em;
+}
+
+.next-steps-drawer-close {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-size: 25px;
+  line-height: 1;
+  transition: border-color .15s, background .15s;
+}
+
+.next-steps-drawer-close:hover {
+  border-color: var(--line-3);
+  background: var(--bg-2);
+}
+
+.next-steps-progress {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--bg-2);
+}
+
+.next-steps-progress strong {
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: 15px;
+}
+
+.next-steps-progress span {
+  color: var(--fg-2);
+  font-size: 11.5px;
+}
+
+.next-steps-progress progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin-top: 11px;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  overflow: hidden;
+  background: var(--bg-3);
+}
+
+.next-steps-progress progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--bg-3);
+}
+
+.next-steps-progress progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width .2s ease;
+}
+
+.next-steps-progress progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.next-steps-drawer-body {
+  min-height: 0;
+  padding: 0 24px 32px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.next-steps-section {
+  padding: 24px 0 6px;
+}
+
+.next-steps-section + .next-steps-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--line-2);
+}
+
+.next-steps-section h3 {
+  margin: 0;
+  color: var(--fg-0);
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.next-steps-section > p {
+  margin: 6px 0 0;
+  color: var(--fg-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 .next-steps {
   margin: 18px 0 0;
   padding: 0;
@@ -1666,10 +1877,10 @@ a { color: inherit; text-decoration: none; }
 
 .next-step {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 14px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px 12px;
   align-items: start;
-  padding: 14px 4px;
+  padding: 13px 2px;
   border-top: 1px solid var(--line-1);
 }
 
@@ -1713,11 +1924,12 @@ a { color: inherit; text-decoration: none; }
 }
 
 .next-step-when {
+  grid-column: 2;
   color: var(--fg-2);
   font-family: var(--f-mono);
   font-size: 11px;
-  text-align: right;
-  white-space: nowrap;
+  text-align: left;
+  white-space: normal;
 }
 
 .next-step-when em {
@@ -1727,15 +1939,59 @@ a { color: inherit; text-decoration: none; }
   white-space: normal;
 }
 
-@media (max-width: 860px) {
-  .next-step {
-    grid-template-columns: 24px 1fr;
-    row-gap: 6px;
+@keyframes next-steps-drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes next-steps-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .next-steps-drawer-trigger {
+    top: auto;
+    right: 12px;
+    bottom: 16px;
+    width: min(230px, calc(100vw - 24px));
+    border-right: 1px solid var(--line-2);
+    border-radius: 999px;
+    transform: none;
   }
-  .next-step-when {
-    grid-column: 2;
-    text-align: left;
-    white-space: normal;
+
+  .next-steps-drawer-trigger:hover {
+    transform: translateY(-2px);
+  }
+
+  .next-steps-drawer {
+    width: 100vw;
+    border-left: 0;
+  }
+
+  .next-steps-drawer-head {
+    padding: max(18px, env(safe-area-inset-top)) 18px 16px;
+  }
+
+  .next-steps-drawer-head h2 {
+    font-size: 22px;
+  }
+
+  .next-steps-progress .row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .next-steps-drawer-body {
+    padding: 0 18px calc(28px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .next-steps-drawer,
+  .next-steps-drawer-backdrop {
+    animation: none;
   }
 }
 
