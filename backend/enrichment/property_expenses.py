@@ -10,18 +10,22 @@ def _normalized(value: str | None) -> str:
     return unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode().casefold()
 
 
+def has_condominium_cost(prop) -> bool:
+    """Return whether condominium is a relevant monthly cost for a property."""
+    property_type = _normalized(getattr(prop, "property_type", ""))
+    description = _normalized(getattr(prop, "descricao_raw", ""))
+    is_apartment = bool(re.search(r"\b(apartamento|apto|flat|kitnet|studio)\b", property_type))
+    return is_apartment or "condomin" in description
+
+
 def estimate_property_expenses(prop, reference) -> dict:
     """Calculate monthly estimates without presenting them as billed values."""
     appraisal = float(getattr(prop, "avaliacao", None) or getattr(prop, "preco", 0) or 0)
     area = float(getattr(prop, "area_m2", None) or 0)
-    property_type = _normalized(getattr(prop, "property_type", ""))
-    description = _normalized(getattr(prop, "descricao_raw", ""))
     annual_iptu = round(appraisal * float(reference.annual_iptu_rate), 2)
 
-    is_apartment = bool(re.search(r"\b(apartamento|apto|flat|kitnet|studio)\b", property_type))
-    explicitly_condo = "condomin" in description
     monthly_condo = round(area * float(reference.condo_per_m2_monthly), 2) if (
-        area > 0 and (is_apartment or explicitly_condo)
+        area > 0 and has_condominium_cost(prop)
     ) else 0.0
 
     return {

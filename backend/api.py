@@ -21,7 +21,7 @@ from db.base import get_engine, init_db, make_session_factory
 from db.models import (
     Property, Enrichment, RegionalMarketComparable, CityExpenseReference,
 )
-from enrichment.property_expenses import apply_property_expenses
+from enrichment.property_expenses import apply_property_expenses, has_condominium_cost
 from enrichment.market_coverage import queue_city_reference, resolve_market_reference
 from enrichment.run import metadata_from_property, run_structured_enrichment, PIPELINE_VERSION
 from ingestion.adapters.caixa_detail import fetch_detail
@@ -159,6 +159,7 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         "address": p.address,
         "title": _card_title(p),
         "type": p.property_type,
+        "hasCondominium": has_condominium_cost(p),
         "area": p.area_m2,
         "beds": p.beds,
         "minBid": p.preco,

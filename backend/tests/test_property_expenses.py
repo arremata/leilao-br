@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from enrichment.property_expenses import estimate_property_expenses
+from enrichment.property_expenses import estimate_property_expenses, has_condominium_cost
 
 
 def _reference():
@@ -27,6 +27,7 @@ def test_ordinary_house_has_no_condo_estimate():
         avaliacao=200_000, preco=100_000, area_m2=90,
         property_type="Casa", descricao_raw="Casa desocupada",
     )
+    assert has_condominium_cost(prop) is False
     assert estimate_property_expenses(prop, _reference())["monthlyCondo"] == 0
 
 
@@ -36,5 +37,6 @@ def test_house_explicitly_in_condominium_gets_estimate():
         property_type="Casa", descricao_raw="Imóvel em condomínio fechado",
     )
     result = estimate_property_expenses(prop, _reference())
+    assert has_condominium_cost(prop) is True
     assert result["annualIptu"] == 600
     assert result["monthlyCondo"] == 600

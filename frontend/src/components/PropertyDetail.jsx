@@ -35,15 +35,6 @@ function isDirectSaleProperty(property) {
   return normalizedCostLabel(property?.modalidade).includes('venda direta');
 }
 
-// Nível de reforma escrito como a pergunta de quem vai morar: dá para me mudar
-// já, ou preciso mexer antes?
-function renovationLevelLabel(pct) {
-  if (pct <= 0) return 'pronto para morar, sem obra';
-  if (pct <= 15) return 'pintura e pequenos ajustes';
-  if (pct < 100) return 'cozinha, banheiros e piso';
-  return 'obra completa, imóvel refeito por dentro';
-}
-
 function costRowId(row, index = 0) {
   if (row.id) return String(row.id);
   const label = normalizedCostLabel(row.label);
@@ -248,9 +239,16 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const suggestedRenoCost = Math.round(rawRenoRate * (p.area || 0));
   // Condomínio e IPTU não são custo de carregamento até uma revenda: são a
   // conta que chega todo mês depois que a pessoa se muda.
-  const monthlyCondo = expenseEstimates.condo != null
-    ? Number(expenseEstimates.condo) || 0
-    : Number(p.monthlyCondo) || 0;
+  // A API informa quando condomínio faz parte deste tipo de imóvel. O fallback
+  // mantém análises antigas corretas para apartamentos e referências positivas.
+  const hasCondominium = p.hasCondominium ?? (
+    /apartamento|apto|flat|kitnet|studio/i.test(p.type || '') || Number(p.monthlyCondo) > 0
+  );
+  const monthlyCondo = hasCondominium
+    ? (expenseEstimates.condo != null
+        ? Number(expenseEstimates.condo) || 0
+        : Number(p.monthlyCondo) || 0)
+    : 0;
   const monthlyIptu = expenseEstimates.iptu != null
     ? Number(expenseEstimates.iptu) || 0
     : Number(p.monthlyIptu) || 0;
@@ -502,8 +500,8 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           label: 'Reforma',
           value: renoCost,
           hint: renovationAdjusted
-            ? `Valor informado por você. A estimativa para pintura e ajustes neste imóvel é de R$ ${fmtBRL(suggestedRenoCost)}.`
-            : `${renovationLevelLabel(renoPct)} — estimativa para ${Math.round(p.area || 0)} m².`,
+            ? 'Valor informado por você.'
+            : 'Quanto você pretende gastar para deixar o imóvel pronto para morar.',
         };
       }
       if (r.id === 'auctioneer_commission') {
@@ -533,22 +531,6 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const rateForRow = (r) => Number(r.rate) > 0
     ? Number(r.rate)
     : (minBidFloor > 0 ? (Number(r.value) || 0) / minBidFloor : 0);
-  const scalableRows = sourceRows.filter(_isScalingFee);
-  const feeRate = scalableRows.reduce((total, row) => total + rateForRow(row), 0);
-  const flatCosts = sourceRows.reduce((total, row) => {
-    if (row.kind === 'price' || _isScalingFee(row)) return total;
-    return total + (Number(row.value) || 0);
-  }, 0) + customCosts.reduce((total, row) => total + Math.max(0, Number(row.value) || 0), 0);
-  // "Seu limite" é um fato, não um conselho: é o valor de oferta a partir do
-  // qual o custo total até a chave ultrapassa o valor de avaliação oficial do
-  // imóvel. Não depende de preço de saída, prazo de revenda nem meta de
-  // retorno — nada disso existe para quem vai morar.
-  const appraisalValue = Math.max(0, Number(p.appraisal) || 0);
-  const bidLimitRaw = appraisalValue > 0 && (1 + feeRate) > 0
-    ? Math.round((appraisalValue - flatCosts) / (1 + feeRate))
-    : 0;
-  const hasBidLimit = bidLimitRaw > 0;
-  const bidLimit = hasBidLimit ? bidLimitRaw : 0;
 
   // A pessoa informa quanto pretende oferecer. O padrão é o valor inicial
   // publicado — o que ela pagaria se arrematasse pelo mínimo.
@@ -556,7 +538,6 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const consideredBid = offerAdjusted
     ? Math.max(0, Number(scenarioPreferences.offer))
     : minBidFloor;
-  const offerOverLimit = hasBidLimit && consideredBid > bidLimit;
 
   const dynamicRows = sourceRows.map(r => {
     if (r.kind === 'price') {
@@ -571,7 +552,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     return r;
   }).concat(customCosts.map(row => ({
     ...row, value: Math.max(0, Number(row.value) || 0), kind: 'custom', custom: true,
-    hint: 'Gasto que você adicionou. Fica salvo neste navegador.',
+    hint: 'Gasto que você adicionou.',
   })));
   const dynamicTotal = dynamicRows.reduce((total, row) => total + (Number(row.value) || 0), 0);
   const externalCosts = Math.max(0, dynamicTotal - consideredBid);
@@ -579,13 +560,12 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const sim = {
     renoPct, setRenoPct: setRenoLevel,
     renoCost, renovationAdjusted, renoRate: appliedRenoRate, regionPricePerM2, isLand,
-    monthlyCondo, monthlyIptu, monthlyToLive,
+    hasCondominium, monthlyCondo, monthlyIptu, monthlyToLive,
     expenseEstimates, setExpenseEstimate, expenseReference: p.expenseEstimate,
     evictionCost, evictionAdjusted,
     setEvictionCost: (value) => setScenarioPreference('evictionCost', value),
     resetEvictionCost: () => setScenarioPreference('evictionCost', null),
     setRenovationCost: setRenovationBudget,
-    appraisalValue, bidLimit, hasBidLimit, offerOverLimit,
     offer: consideredBid, offerAdjusted, minBidFloor,
     setOffer: (value) => setScenarioPreference('offer', value),
     resetOffer: () => setScenarioPreference('offer', null),
@@ -1284,11 +1264,10 @@ function CostBreakdown({ p, sim }) {
   const {
     renoPct, setRenoPct,
     renoCost, renovationAdjusted, isLand,
-    monthlyCondo, monthlyIptu, monthlyToLive,
+    hasCondominium, monthlyCondo, monthlyIptu, monthlyToLive,
     expenseEstimates, setExpenseEstimate, expenseReference,
     evictionCost, evictionAdjusted, setEvictionCost, resetEvictionCost,
     setRenovationCost,
-    appraisalValue, bidLimit, hasBidLimit, offerOverLimit,
     offer, offerAdjusted, minBidFloor, setOffer, resetOffer,
     dynamicRows, dynamicTotal, externalCosts, customCosts,
     addCustomCost, removeCustomCost, resetScenarioPreferences, resetExpenseEstimates,
@@ -1307,12 +1286,6 @@ function CostBreakdown({ p, sim }) {
     commissionExempt ? 'Sem comissão de leiloeiro' : 'Comissão do leiloeiro',
     'Registro em cartório',
   ];
-  // Posição da oferta na barra: o limite fica a 75% da largura, para que ficar
-  // acima dele seja visível sem estourar o desenho.
-  const barPct = hasBidLimit
-    ? Math.min(100, (offer / bidLimit) * 75)
-    : 0;
-
   return (
     <div>
       {/* ── Simulator ── */}
@@ -1333,7 +1306,7 @@ function CostBreakdown({ p, sim }) {
           </button>
         </div>
 
-        {/* Quanto você pretende oferecer + o limite factual */}
+        {/* Quanto você pretende oferecer */}
         <div className="buyer-offer">
           <div className="buyer-offer-field">
             <span className="uppy">
@@ -1351,35 +1324,66 @@ function CostBreakdown({ p, sim }) {
               )}
             </div>
           </div>
+        </div>
 
-          {hasBidLimit ? (
-            <div className={`buyer-limit${offerOverLimit ? ' over' : ''}`}>
-              <span className="uppy">Seu limite</span>
-              <div className="buyer-limit-bar" role="img" aria-label={
-                offerOverLimit
-                  ? `Sua oferta passa o limite de R$ ${fmtBRL(bidLimit)}`
-                  : `Sua oferta está dentro do limite de R$ ${fmtBRL(bidLimit)}`
-              }>
-                <i style={{ width: `${barPct}%` }} />
-                <span className="buyer-limit-mark" style={{ left: '75%' }} />
-              </div>
-              <strong>até R$ {fmtBRL(bidLimit)}</strong>
-              <p>
-                {offerOverLimit
-                  ? `Com o valor que você digitou, o custo total passa os R$ ${fmtBRL(appraisalValue)} do valor de avaliação do imóvel.`
-                  : `Acima de R$ ${fmtBRL(bidLimit)}, o custo total passa os R$ ${fmtBRL(appraisalValue)} do valor de avaliação do imóvel.`}
-              </p>
+        {/* ── Valores que dependem de você ── */}
+        <div className="scenario-cost-panel" style={{ marginTop: 24 }}>
+          <div className="scenario-cost-panel-head">
+            <div>
+              <span className="uppy">Valores que dependem de você</span>
+              <p>Mude o que quiser. A conta abaixo acompanha.</p>
             </div>
-          ) : (
-            <div className="buyer-limit">
-              <span className="uppy">Seu limite</span>
-              <p>
-                A Caixa não informou o valor de avaliação deste imóvel, então não
-                dá para dizer a partir de quanto você passaria a pagar mais do que
-                ele vale.
-              </p>
+          </div>
+          <div className="scenario-cost-grid">
+            <ScenarioMoneyField
+              label="Tirar quem está morando"
+              value={evictionCost}
+              adjusted={evictionAdjusted}
+              defaultLabel="Reserva sugerida por nós"
+              onCommit={setEvictionCost}
+              onReset={resetEvictionCost}
+            />
+          </div>
+
+          {/* Reforma — a pergunta é "dá para me mudar já?" */}
+          <div style={{ marginTop: 18 }}>
+            <div className="row between baseline">
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+                Precisa de reforma para você se mudar?
+              </span>
+              <RenovationMoneyEditor
+                value={renoCost}
+                adjusted={renovationAdjusted}
+                disabled={isLand}
+                onCommit={setRenovationCost}
+              />
             </div>
-          )}
+            <input
+              type="range" min={0} max={100} value={renoPct}
+              onChange={(e) => setRenoPct(+e.target.value)}
+              disabled={isLand}
+              className="slider"
+              style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
+              aria-label="Precisa de reforma para você se mudar?"
+            />
+            <div className="row between" style={{ marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>dá para morar já</span>
+              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>precisa refazer tudo</span>
+            </div>
+            {(isLand || renovationAdjusted) && (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
+                {isLand
+                  ? 'Terreno não recebe estimativa de reforma.'
+                  : 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'}
+              </p>
+            )}
+          </div>
+
+          <CustomCostsEditor
+            costs={customCosts}
+            onAdd={addCustomCost}
+            onRemove={removeCustomCost}
+          />
         </div>
 
         {/* ── A conta aberta, item por item ── */}
@@ -1420,67 +1424,6 @@ function CostBreakdown({ p, sim }) {
           {externalCostTags.map(tag => <span key={tag}>{tag}</span>)}
           <span>Fora da compra: R$ {fmtBRL(externalCosts)}</span>
         </div>
-
-        {/* ── Valores que dependem de você ── */}
-        <div className="scenario-cost-panel" style={{ marginTop: 24 }}>
-          <div className="scenario-cost-panel-head">
-            <div>
-              <span className="uppy">Valores que dependem de você</span>
-              <p>Mude o que quiser. A conta acima acompanha.</p>
-            </div>
-            <span className="mono scenario-saved-note">salvos neste navegador</span>
-          </div>
-          <div className="scenario-cost-grid">
-            <ScenarioMoneyField
-              label="Tirar quem está morando"
-              value={evictionCost}
-              adjusted={evictionAdjusted}
-              defaultLabel="Reserva sugerida por nós"
-              onCommit={setEvictionCost}
-              onReset={resetEvictionCost}
-            />
-          </div>
-
-          {/* Reforma — a pergunta é "dá para me mudar já?" */}
-          <div style={{ marginTop: 18 }}>
-            <div className="row between baseline">
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-                Precisa de reforma para você se mudar?
-              </span>
-              <RenovationMoneyEditor
-                value={renoCost}
-                adjusted={renovationAdjusted}
-                disabled={isLand}
-                onCommit={setRenovationCost}
-              />
-            </div>
-            <input
-              type="range" min={0} max={100} value={renoPct}
-              onChange={(e) => setRenoPct(+e.target.value)}
-              disabled={isLand}
-              className="slider"
-              style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
-              aria-label="Precisa de reforma para você se mudar?"
-            />
-            <div className="row between" style={{ marginTop: 8 }}>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>dá para morar já</span>
-              <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>precisa refazer tudo</span>
-            </div>
-            <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
-              {isLand
-                ? 'Terreno não recebe estimativa de reforma.'
-                : renovationAdjusted
-                  ? 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'
-                  : `${renovationLevelLabel(renoPct).charAt(0).toUpperCase()}${renovationLevelLabel(renoPct).slice(1)} — estimativa para ${Math.round(p.area || 0)} m².`}
-            </p>
-          </div>
-
-          <CustomCostsEditor
-            costs={customCosts}
-            onAdd={addCustomCost}
-            onRemove={removeCustomCost}
-          />
-        </div>
       </div>
 
       {/* ── Quanto custa por mês morar aqui ── */}
@@ -1489,16 +1432,18 @@ function CostBreakdown({ p, sim }) {
         <p style={{ margin: '6px 0 18px', fontSize: 13, color: 'var(--fg-2)', maxWidth: 620 }}>
           Isso não entra no total acima. É a conta que chega todo mês depois que você se muda.
         </p>
-        <div className="scenario-cost-grid">
-          <ScenarioMoneyField
-            label="Condomínio por mês"
-            value={monthlyCondo}
-            adjusted={expenseEstimates.condo != null}
-            defaultLabel={p.monthlyCondo ? 'Estimativa para a cidade' : 'Não sabemos o valor deste condomínio'}
-            suffix="/mês"
-            onCommit={(value) => setExpenseEstimate('condo', value)}
-            onReset={() => setExpenseEstimate('condo', '')}
-          />
+        <div className={`scenario-cost-grid${hasCondominium ? '' : ' without-condominium'}`}>
+          {hasCondominium && (
+            <ScenarioMoneyField
+              label="Condomínio por mês"
+              value={monthlyCondo}
+              adjusted={expenseEstimates.condo != null}
+              defaultLabel={p.monthlyCondo ? 'Estimativa para a cidade' : 'Não sabemos o valor deste condomínio'}
+              suffix="/mês"
+              onCommit={(value) => setExpenseEstimate('condo', value)}
+              onReset={() => setExpenseEstimate('condo', '')}
+            />
+          )}
           <ScenarioMoneyField
             label="IPTU por mês"
             value={monthlyIptu}
@@ -1515,7 +1460,7 @@ function CostBreakdown({ p, sim }) {
             {monthlyToLive > 0 ? (
               <>
                 <strong>R$ {fmtBRL(monthlyToLive)}</strong>
-                <span>condomínio + IPTU</span>
+                <span>{hasCondominium ? 'condomínio + IPTU' : 'IPTU'}</span>
               </>
             ) : (
               <>
@@ -1527,7 +1472,7 @@ function CostBreakdown({ p, sim }) {
         </div>
         <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>
           {expenseReference
-            ? `Estimativa para ${expenseReference.city}/${expenseReference.uf}, com base em ${expenseReference.referenceYear}. Fonte: ${expenseReference.source}. Confirme o condomínio com o síndico antes de decidir.`
+            ? `Estimativa para ${expenseReference.city}/${expenseReference.uf}, com base em ${expenseReference.referenceYear}. Fonte: ${expenseReference.source}.${hasCondominium ? ' Confirme o condomínio com o síndico antes de decidir.' : ''}`
             : 'Ainda não temos referência de custo mensal para esta cidade. Você pode digitar os valores que descobrir; eles ficam salvos neste navegador.'}
         </p>
       </div>

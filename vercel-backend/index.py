@@ -120,6 +120,13 @@ def _normalize_text(value: str | None) -> str:
     return " ".join(value.casefold().split())
 
 
+def _has_condominium_cost(property_type: str | None, description: str | None) -> bool:
+    normalized_type = _normalize_text(property_type)
+    return bool(re.search(r"\b(apartamento|apto|flat|kitnet|studio)\b", normalized_type)) or (
+        "condomin" in _normalize_text(description)
+    )
+
+
 def _registration_rate(uf: str | None) -> float | None:
     normalized_uf = (uf or "").upper().strip()
     if normalized_uf not in _BRAZILIAN_UFS:
@@ -497,8 +504,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     neighborhood = p.get("neighborhood") or ""
     expense_reference = dict(expense_reference) if expense_reference else None
     annual_iptu = round(appraisal * float(expense_reference["annual_iptu_rate"]), 2) if expense_reference else None
-    normalized_type = _normalize_text(property_type)
-    in_condo = bool(re.search(r"\b(apartamento|apto|flat|kitnet|studio)\b", normalized_type)) or "condomin" in _normalize_text(p.get("descricao_raw"))
+    in_condo = _has_condominium_cost(property_type, p.get("descricao_raw"))
     monthly_condo = round(area * float(expense_reference["condo_per_m2_monthly"]), 2) if expense_reference and in_condo else None
     expense_estimate = ({
         "kind": "city_reference", "uf": expense_reference["uf"],
@@ -511,7 +517,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         "id": str(p["id"]), "photoLabel": f"{property_type.upper()} · {neighborhood.upper()} · {p.get('uf') or ''}",
         "title": f"{property_type} {area:.0f} m², {_extract_street(p.get('address')) or neighborhood}",
         "address": p.get("address") or "",
-        "type": property_type, "neighborhood": neighborhood,
+        "type": property_type, "hasCondominium": in_condo, "neighborhood": neighborhood,
         "city": f"{p.get('city') or ''}, {p.get('uf') or ''}", "auctionType": "Extrajudicial",
         "praca": None, "modalidade": p.get("modalidade"), "auctioneer": "—", "court": "—",
         "discount": discount, "minBid": min_bid, "market": market, "roi": roi,
@@ -609,6 +615,7 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "address": p.get("address"),
         "title": title,
         "type": property_type,
+        "hasCondominium": _has_condominium_cost(property_type, p.get("descricao_raw")),
         "area": p.get("area_m2"),
         "beds": p.get("beds"),
         "minBid": p.get("preco"),

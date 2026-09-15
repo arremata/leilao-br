@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 7 de setembro de 2026.
+Última atualização: 15 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -80,9 +80,9 @@ no HTML do servidor, o que ainda não é feito.
 
 Cinco áreas:
 
-1. **Quanto você vai pagar:** o valor que a pessoa pretende oferecer, "Seu
-   limite", a conta aberta item por item, o total até a chave, e o custo mensal
-   de morar (condomínio e IPTU) em bloco separado.
+1. **Quanto você vai pagar:** o valor que a pessoa pretende oferecer, os gastos
+   que ela pode ajustar, a conta aberta item por item, o total até a chave e o
+   custo mensal de morar em bloco separado.
 2. **O que fazer agora:** os passos antes da compra e depois dela, com estado
    salvo no navegador e ancorados nas datas reais quando existirem.
 3. **Preço na região:** comparação com a avaliação oficial e com imóveis
@@ -92,9 +92,11 @@ Cinco áreas:
 5. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega
    parecer jurídico nem classificação automática de risco legal.
 
-**"Seu limite" é um fato, não um conselho:** é o valor de oferta a partir do qual
-o custo total ultrapassa o valor de avaliação oficial. Não depende de preço de
-saída nem de meta de retorno.
+O produto não chama nenhum valor de “seu limite”: a comparação com a avaliação
+oficial continua disponível na área de preços, sem parecer uma recomendação de
+oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
+explicitamente descritos como parte de um condomínio; nos demais casos, a conta
+mensal mostra apenas IPTU.
 
 O acesso ao anúncio oficial permanece destacado como “Ver o leilão na Caixa” ou
 ação equivalente à modalidade.
@@ -203,4 +205,3 @@ limitado e não destrutivo.
 - `AGENTS.md`: arquitetura, regras técnicas e changelog completo.
 - `frontend/src/components/`: comportamento atual das telas.
 - `backend/graph/contracts.py`: contrato detalhado dos dados de uma análise.
-

@@ -120,10 +120,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   vocabulário sinalizava "isto não é para você".
 - **Consequências:** todo elemento de tela precisa responder a uma destas cinco
   perguntas — quanto vou pagar no total, tem alguém morando, que dívidas vêm
-  junto, dá para financiar, o que faço agora. "Seu limite" é derivado de um fato
-  (o valor a partir do qual o custo total passa a avaliação oficial), nunca de
-  uma meta de retorno. Condomínio e IPTU passam a ser a conta mensal de morar, e
-  reforma responde "dá para eu me mudar já?".
+  junto, dá para financiar, o que faço agora. Condomínio e IPTU passam a ser a
+  conta mensal de morar, e reforma responde "dá para eu me mudar já?". A antiga
+  apresentação de “Seu limite” foi posteriormente removida pela PD-012.
 
 ### PD-009 — Ausência de evidência nunca vira afirmação
 
@@ -169,6 +168,21 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   isso em vez de sumir ou de aparecer como se ainda estivessem à venda. No
   computador o clique num imóvel abre nova guia; no celular, a mesma.
 
+### PD-012 — Mostrar somente custos pertinentes ao imóvel
+
+- **Data:** 15 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** a conta começa pelos valores que a pessoa pode ajustar e depois
+  mostra o resumo do que será pago. O campo “Seu limite” deixa de existir.
+  Condomínio só aparece quando o tipo do imóvel ou sua descrição oficial indica
+  que esse custo faz sentido.
+- **Motivo:** “Seu limite” parecia uma recomendação pessoal, e mostrar condomínio
+  para uma casa comum introduzia um custo que não pertence àquele imóvel.
+- **Consequências:** casas fora de condomínio exibem somente IPTU na conta mensal;
+  apartamentos e casas explicitamente em condomínio mantêm os dois campos. A
+  interface evita textos técnicos de persistência e detalhes automáticos de
+  metragem junto ao controle de reforma.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR
@@ -208,4 +222,3 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** o que passa a ser verdadeiro no produto e quais limites se
   aplicam.
 ```
-
