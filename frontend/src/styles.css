@@ -2187,74 +2187,160 @@ a { color: inherit; text-decoration: none; }
 
 .kind-tabs button:disabled { cursor: not-allowed; opacity: .5; }
 
-/* Versão compacta usada dentro da toolbar do feed: mesma pegada visual, mas
-   em altura menor para não explodir a linha. Mantém ícone/atividade. */
-.kind-tabs--compact {
-  gap: 4px;
-  margin-bottom: 0;
-  border: 1px solid var(--line-1);
-  border-radius: 8px;
-  padding: 3px;
-  background: var(--bg-1);
-}
-
-.kind-tabs--compact button {
-  display: inline-flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 4px;
-  padding: 5px 12px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--fg-2);
-}
-
-.kind-tabs--compact button:hover:not(:disabled) {
-  background: var(--bg-2);
-  color: var(--fg-0);
-}
-
-.kind-tabs--compact button.active {
-  background: var(--fg-0);
-  color: var(--bg-1);
-  border-color: transparent;
-}
-
-.kind-tabs--compact button small {
-  display: none; /* hide the long caption in compact mode */
-}
-
-.kind-tabs--compact .kind-tabs-empty-hint {
-  margin-left: 4px;
-  color: var(--fg-3);
-  font-size: 11px;
-}
-
-.kind-tabs--compact button.active .kind-tabs-empty-hint {
-  color: rgba(255, 255, 255, 0.6);
-}
-
 @media (max-width: 560px) {
   .kind-tabs { flex-direction: column; }
 }
 
-/* ---------- Feed toolbar — sticky, com kind tabs + search + filtros + sort/view ---------- */
-.feed-toolbar {
+/* ---------- Feed layout: rail esquerdo com kind tabs + filtros ---------- */
+.feed-page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px 28px 80px;
+}
+
+.feed-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.feed-rail {
   position: sticky;
-  top: 60;
-  z-index: 20;
+  top: 76px;
+  align-self: start;
+}
+
+.feed-rail-inner {
+  display: grid;
+  gap: 18px;
+}
+
+/* Kind tabs dentro do rail — botões empilhados, full-width, com legenda */
+.kind-tabs--rail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-bottom: 0;
+}
+
+.kind-tabs--rail button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--bg-1);
+  color: var(--fg-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.kind-tabs--rail button small {
+  display: block;
+  margin-top: 2px;
+  color: var(--fg-3);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.kind-tabs--rail button:hover:not(:disabled) {
+  border-color: var(--line-3);
+}
+
+.kind-tabs--rail button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.kind-tabs--rail button.active small {
+  color: var(--accent-strong);
+  opacity: 0.8;
+}
+
+.kind-tabs--rail button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Seções do rail com títulos em small caps */
+.feed-rail-section {
+  padding: 12px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 10px;
+  background: var(--bg-2);
+}
+
+.feed-rail-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.feed-rail-stack > div {
+  width: 100%;
+}
+
+.feed-rail-stack > div > button {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Slider row dentro do rail — full width */
+.feed-rail-slider {
+  display: grid;
+  gap: 6px;
+}
+
+.feed-rail-slider-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.feed-rail-slider-row strong {
+  font-size: 14px;
+  color: var(--fg-0);
+  font-weight: 600;
+}
+
+.feed-rail-slider input.slider {
+  width: 100%;
+  margin: 0;
+}
+
+.feed-rail-slider-row .mono {
+  font-feature-settings: 'tnum';
+}
+
+.feed-rail-clear {
+  justify-self: start;
+}
+
+/* ---------- Main column: toolbar sticky em cima, resultados embaixo ---------- */
+.feed-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.feed-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 0;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(16px) saturate(1.3);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border-bottom: 1px solid var(--line-1);
-  margin-bottom: 16px;
+  padding: 0;
+}
+
+.feed-filter-toggle {
+  display: none; /* rail is always open on desktop */
 }
 
 .feed-search {
@@ -2263,9 +2349,8 @@ a { color: inherit; text-decoration: none; }
   gap: 6px;
   flex: 1;
   min-width: 200px;
-  max-width: 480px;
-  height: 34px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   border-radius: 8px;
   border: 1px solid var(--line-1);
   background: var(--bg-1);
@@ -2287,7 +2372,7 @@ a { color: inherit; text-decoration: none; }
   border: 0;
   outline: none;
   background: transparent;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--fg-0);
 }
 
@@ -2306,33 +2391,6 @@ a { color: inherit; text-decoration: none; }
   color: var(--fg-0);
 }
 
-.feed-filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid var(--line-1);
-  background: var(--bg-1);
-  color: var(--fg-1);
-  font-size: 12.5px;
-  font-weight: 500;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.feed-filter-toggle:hover {
-  border-color: var(--line-2);
-  background: var(--bg-2);
-}
-
-.feed-filter-toggle.open,
-.feed-filter-toggle[aria-expanded="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
-
 .feed-filter-count {
   display: inline-flex;
   align-items: center;
@@ -2348,80 +2406,50 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600;
 }
 
-/* ---------- Painel de filtros (colapsável) ---------- */
-.feed-filter-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  overflow: hidden;
-  transition: grid-template-rows 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  margin-bottom: 16px;
-}
-
-.feed-filter-panel.open {
-  grid-template-rows: 1fr;
-}
-
-.feed-filter-panel-inner {
-  min-height: 0;
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--line-1);
-  border-radius: 10px;
-  background: var(--bg-2);
-}
-
-.feed-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.feed-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--line-2);
-}
-
-.feed-slider-label {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 10.5px;
-  color: var(--fg-3);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-family: var(--f-mono);
-  white-space: nowrap;
-}
-
-.feed-slider-label strong {
-  font-size: 14px;
-  color: var(--fg-0);
-  font-family: var(--f-mono);
-  font-weight: 600;
-}
-
-.feed-clear-row {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
-  border-top: 1px dashed var(--line-2);
-}
-
-/* Mobile: toolbar empilha; painel continua full-width */
-@media (max-width: 860px) {
+/* Mobile e telas estreitas: rail sai do fluxo, vira drawer topo-a-topo */
+@media (max-width: 1100px) {
+  .feed-layout {
+    grid-template-columns: 1fr;
+  }
+  .feed-rail {
+    position: static;
+    display: none;
+  }
+  .feed-rail.open {
+    display: block;
+  }
+  .feed-filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line-1);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    font-size: 12.5px;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .feed-filter-toggle:hover {
+    border-color: var(--line-2);
+    background: var(--bg-2);
+  }
+  .feed-filter-toggle.open {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
   .feed-toolbar {
     flex-wrap: wrap;
   }
   .feed-search {
     order: 3;
     flex-basis: 100%;
-    max-width: 100%;
   }
 }
+
 
 
 .monthly-total strong.unknown {

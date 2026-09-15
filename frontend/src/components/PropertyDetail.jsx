@@ -1003,7 +1003,6 @@ function Collapsible({ title, children, last }) {
 // ============================================================
 function Market({ p }) {
   const md = p.marketDetail;
-  const isDirectSale = isDirectSaleProperty(p);
 
   if (!md) {
     return (
@@ -1018,32 +1017,12 @@ function Market({ p }) {
   const appraisal = p.appraisal || 0;
   const market = p.market || 0;
 
-  // Anchor for bar percentages: the larger of appraisal / market, so the bar
-  // can visualize all three values on the same scale even when the market
-  // estimate is smaller than the edital appraisal (or vice versa).
-  const barMax = Math.max(market, appraisal, bid, 1);
-  const bidPct = (bid / barMax) * 100;
-  const appraisalPct = (appraisal / barMax) * 100;
-  const marketPct = (market / barMax) * 100;
-
   // Gaps relative to each reference
   const gapVsMarket = market - bid;
   const gapVsAppraisal = appraisal - bid;
 
-  // Horizon para a banda: o menor e maior valor de venda entre os anúncios
-  // comparáveis que embasaram a estimativa `market`. Quando só tem um anúncio
-  // a banda colapsa para um único tick — melhor omitir do que dar um intervalo
-  // artificialmente estreito.
-  const comparablePrices = Array.isArray(md.comparables)
-    ? md.comparables.map(c => Number(c?.salePrice)).filter(v => Number.isFinite(v) && v > 0)
-    : [];
-  const comparableLow = comparablePrices.length > 1 ? Math.min(...comparablePrices) : null;
-  const comparableHigh = comparablePrices.length > 1 ? Math.max(...comparablePrices) : null;
-  const hasComparableBand = comparableLow != null && comparableHigh != null && comparableHigh > comparableLow;
-  const comparableLowPct = hasComparableBand ? (comparableLow / barMax) * 100 : 0;
-  const comparableHighPct = hasComparableBand ? (comparableHigh / barMax) * 100 : 0;
-  const filteredIndicators = md.indicators;
   const comparableCount = Array.isArray(md.comparables) ? md.comparables.length : 0;
+  const filteredIndicators = md.indicators;
   // A confiança é comunicada em três estados e em linguagem comum: o que a
   // pessoa precisa saber é se a estimativa se apoia em pouca ou muita evidência.
   const confidence = {
@@ -1076,159 +1055,131 @@ function Market({ p }) {
   return (
     <div>
       <div className="analysis-grid market-overview-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Comparação: preço pedido, avaliação oficial e imóveis parecidos */}
+        {/* Comparação: preço pedido, avaliação oficial e imóveis parecidos.
+            Barras verticais com headline no topo: o leitor absorve o punchline
+            em uma frase, e as barras confirmam visualmente a escala. */}
         <div className="card" style={{ padding: 22 }}>
-          <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
-            <div>
-              <h3 className="h2" style={{ marginTop: 4 }}>
-                Como este preço se compara
-              </h3>
-              <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-                Você compara três referências: o valor inicial do leilão,
-                quanto um avaliador oficial disse que o imóvel vale,
-                e quanto imóveis parecidos na região têm sido vendidos.
-              </p>
-            </div>
-          </div>
+          <span className="uppy" style={{ color: 'var(--fg-2)', display: 'block', marginBottom: 8 }}>
+            Como este preço se compara
+          </span>
+          <h3 className="h2" style={{ margin: 0, marginBottom: 6, lineHeight: 1.2 }}>
+            {gapVsMarket > 0 && comparableCount > 1
+              ? `Valor inicial cerca de R$ ${fmtBRL(gapVsMarket)} abaixo de imóveis parecidos`
+              : gapVsAppraisal > 0
+                ? `Valor inicial cerca de R$ ${fmtBRL(gapVsAppraisal)} abaixo do valor de avaliação`
+                : 'Preço em linha com as referências que temos'
+            }
+          </h3>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-2)', marginBottom: 24 }}>
+            {gapVsMarket > 0 && gapVsAppraisal > 0
+              ? 'E abaixo do valor de avaliação também.'
+              : gapVsMarket > 0 && gapVsAppraisal <= 0
+                ? 'Mas acima do valor que um avaliador oficial marcou.'
+                : gapVsAppraisal > 0
+                  ? 'E abaixo do valor que um avaliador oficial marcou.'
+                  : 'Três números diferentes, lado a lado.'
+            }
+          </p>
 
-          {/* Bullet bar: barra principal é o valor inicial do leilão (roxo),
-              sobre uma faixa cinza que mostra o intervalo observado entre
-              imóveis parecidos; o valor de avaliação é apenas um tick. A banda
-              só aparece quando há pelo menos 2 imóveis parecidos — com um só,
-              o tick é suficiente. */}
-          <div style={{ position: 'relative', marginTop: 30, marginBottom: 8 }}>
-            <div style={{ height: 22, background: 'var(--bg-3)', borderRadius: 11, position: 'relative', overflow: 'visible' }}>
-              {/* Comparable-sales band */}
-              {hasComparableBand && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${comparableLowPct}%`,
-                  width: `${Math.max(comparableHighPct - comparableLowPct, 0.5)}%`,
-                  top: 0, bottom: 0,
-                  background: 'var(--bg-2)',
-                  border: '1px solid var(--line-2)',
-                  borderRadius: 11,
-                }} aria-hidden="true"></div>
-              )}
-              {/* Bid fill — the actionable number */}
+          {/* Bar chart vertical — altura proporcional a cada valor */}
+          {(() => {
+            const chartMax = Math.max(bid, market, appraisal, 1);
+            const bidPct = (bid / chartMax) * 100;
+            const marketPct = (market / chartMax) * 100;
+            const appraisalPct = (appraisal / chartMax) * 100;
+            return (
               <div style={{
-                position: 'absolute', left: 0, top: 0, bottom: 0,
-                width: `${Math.min(bidPct, 100)}%`,
-                background: 'var(--accent)', borderRadius: 11,
-                display: 'flex', alignItems: 'center', paddingLeft: 12, paddingRight: 12,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: 18,
+                alignItems: 'end',
+                marginBottom: 18,
               }}>
-                {bidPct >= 24 && (
-                  <span className="mono" style={{ color: 'var(--accent-ink)', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    R$ {fmtBRL(bid)}
-                    {gapVsMarket > 0 && comparableCount > 1 && (
-                      <> · ~R$ {fmtBRL(gapVsMarket)} mais barato</>
-                    )}
-                  </span>
-                )}
+                {/* Valor inicial do leilão — destaque principal */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ marginBottom: 6, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+                      R$ {fmtBRL(bid)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>este imóvel</div>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    maxWidth: 110,
+                    height: `${Math.max(bidPct / 100 * 180, 8)}px`,
+                    background: 'var(--accent)',
+                    borderRadius: '6px 6px 0 0',
+                  }} aria-label={`Valor inicial do leilão: R$ ${fmtBRL(bid)}`}></div>
+                  <div style={{ marginTop: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
+                      Valor inicial do leilão
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>Caixa pede</div>
+                  </div>
+                </div>
+
+                {/* Imóveis parecidos — cinza neutro */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ marginBottom: 6, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
+                      R$ {fmtBRL(market)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>estimativa</div>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    maxWidth: 110,
+                    height: `${Math.max(marketPct / 100 * 180, 8)}px`,
+                    background: 'var(--line-3)',
+                    borderRadius: '6px 6px 0 0',
+                  }} aria-label={`Imóveis parecidos na região: R$ ${fmtBRL(market)}`}></div>
+                  <div style={{ marginTop: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
+                      Imóveis parecidos na região
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>mercado</div>
+                  </div>
+                </div>
+
+                {/* Valor de avaliação — escuro, sem destaque */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ marginBottom: 6, textAlign: 'center' }}>
+                    <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
+                      R$ {fmtBRL(appraisal)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>avaliação</div>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    maxWidth: 110,
+                    height: `${Math.max(appraisalPct / 100 * 180, 8)}px`,
+                    background: 'var(--fg-1)',
+                    borderRadius: '6px 6px 0 0',
+                  }} aria-label={`Valor de avaliação: R$ ${fmtBRL(appraisal)}`}></div>
+                  <div style={{ marginTop: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
+                      Valor de avaliação
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>avaliador oficial</div>
+                  </div>
+                </div>
               </div>
-              {/* Appraisal marker — informational tick, not a comparison anchor */}
-              {appraisal > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${Math.min(appraisalPct, 100)}%`,
-                  top: -8, bottom: -8, width: 2,
-                  background: 'var(--fg-1)', transform: 'translateX(-1px)',
-                }} aria-hidden="true"></div>
-              )}
-              {/* Market point estimate tick (only shown when no band) */}
-              {market > 0 && !hasComparableBand && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${Math.min(marketPct, 100)}%`,
-                  top: -8, bottom: -8, width: 2,
-                  background: 'var(--good)', transform: 'translateX(-1px)',
-                }} aria-hidden="true"></div>
-              )}
-            </div>
-            {/* Tick labels under bar — omitted deliberately; legend below has the values */}
+            );
+          })()}
+
+          {/* Footnote — sempre no mesmo lugar, citação da fonte */}
+          <div style={{
+            paddingTop: 14,
+            borderTop: '1px solid var(--line-1)',
+            fontSize: 11.5,
+            color: 'var(--fg-2)',
+            lineHeight: 1.5,
+          }}>
+            <span className="mono" style={{ color: 'var(--fg-3)' }}>ⓘ</span>{' '}
+            {comparableCount === 0
+              ? 'Ainda não temos anúncios comparáveis nesta região. Mostramos apenas valor inicial e avaliação.'
+              : `Preço dos parecidos estimado pelo Argos com base em ${comparableCount === 1 ? '1 anúncio' : `${comparableCount} anúncios`}.`}
           </div>
-
-          {/* Legend — three rows: auction bid / appraisal / comparable-market range */}
-          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-            <div className="row between" style={{ alignItems: 'center' }}>
-              <div className="row gap-2" style={{ alignItems: 'center' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', display: 'inline-block' }}></span>
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                  {isDirectSale ? 'Preço de venda' : `Valor inicial do leilão ${has2nd ? '· 2ª rodada' : ''}`}
-                </span>
-              </div>
-              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
-                <span className="num-md" style={{ color: 'var(--accent)' }}>R$ {fmtBRL(bid)}</span>
-              </div>
-            </div>
-            <div className="row between" style={{ alignItems: 'center' }}>
-              <div className="row gap-2" style={{ alignItems: 'center' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--fg-1)', display: 'inline-block' }}></span>
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                  Valor de avaliação
-                </span>
-              </div>
-              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
-                <span className="num-md" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(appraisal)}</span>
-              </div>
-            </div>
-            <div className="row between" style={{ alignItems: 'center' }}>
-              <div className="row gap-2" style={{ alignItems: 'center' }}>
-                <span style={{
-                  width: 10, height: 10, borderRadius: 2, background: 'var(--bg-2)',
-                  border: '1px solid var(--line-2)', display: 'inline-block',
-                }}></span>
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                  Imóveis parecidos na região
-                </span>
-              </div>
-              <div className="row gap-2" style={{ alignItems: 'baseline' }}>
-                <span className="num-md" style={{ color: 'var(--fg-1)' }}>
-                  R$ {fmtBRL(market)}
-                </span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                  {comparableCount === 1
-                    ? '· estimativa Argos com 1 anúncio'
-                    : `· estimativa Argos com ${comparableCount} anúncios`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Footnote under legend — explains what changed when not enough data */}
-          {!hasComparableBand && (
-            <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-              {comparableCount === 0
-                ? 'Ainda não temos imóveis parecidos suficientes nesta região para estimar uma faixa. Mostramos apenas o valor de avaliação.'
-                : 'Temos apenas um anúncio nesta região. Mostramos o valor como referência, mas não é um mercado robusto.'}
-            </p>
-          )}
-
-          {/* Gap summary — single callout: what you save vs appraisal */}
-          {gapVsAppraisal !== 0 && (
-            <div style={{
-              marginTop: 16,
-              padding: '11px 13px',
-              borderRadius: 6,
-              fontSize: 12.5,
-              background: 'var(--bg-2)',
-              borderLeft: '3px solid var(--fg-3)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              gap: 8,
-            }}>
-              <span className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5 }}>
-                comparado ao valor de avaliação
-              </span>
-              <span>
-                <b className="mono" style={{ color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
-                  R$ {fmtBRL(Math.abs(gapVsAppraisal))}
-                </b>
-                <span style={{ marginLeft: 6, fontSize: 11.5, color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)' }}>
-                  {gapVsAppraisal >= 0 ? 'abaixo' : 'acima'}
-                </span>
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Resumo da referência regional: compacto para não herdar a altura do
