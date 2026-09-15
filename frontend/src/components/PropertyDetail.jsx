@@ -123,6 +123,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   ));
   const expenseStorageKey = property?.id ? `arremate_property_expenses_${property.id}` : null;
   const costStorageKey = property?.id ? `arremate_property_costs_${property.id}` : null;
+  const stepsStorageKey = property?.id ? `arremate_property_steps_${property.id}` : null;
   const [expenseEstimates, setExpenseEstimates] = useState(() => {
     if (!property?.id) return {};
     return readStoredObject(
@@ -133,6 +134,37 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const [costPreferences, setCostPreferences] = useState(() => (
     property?.id ? readStoredObject(`arremate_property_costs_${property.id}`, { overrides: {}, customCosts: [] }) : {}
   ));
+  const [stepsDone, setStepsDone] = useState(() => (
+    property?.id ? readStoredObject(`arremate_property_steps_${property.id}`) : {}
+  ));
+
+  const persistStepProgress = useCallback((next) => {
+    if (!stepsStorageKey) return;
+    try { localStorage.setItem(stepsStorageKey, JSON.stringify(next)); } catch { /* segue utilizável */ }
+  }, [stepsStorageKey]);
+
+  const toggleStep = useCallback((id) => {
+    setStepsDone(current => {
+      const next = { ...current };
+      if (next[id]) delete next[id];
+      else next[id] = true;
+      persistStepProgress(next);
+      return next;
+    });
+  }, [persistStepProgress]);
+
+  const markStepDone = useCallback((id) => {
+    setStepsDone(current => {
+      if (current[id]) return current;
+      const next = { ...current, [id]: true };
+      persistStepProgress(next);
+      return next;
+    });
+  }, [persistStepProgress]);
+
+  const markRulesRead = useCallback(() => {
+    markStepDone('read_rules');
+  }, [markStepDone]);
 
   // A busca do imóvel é responsabilidade de PropertyRoute. Aqui já chega ou o
   // card completo com `enrichment`, ou o card magro da lista enquanto a busca
@@ -446,7 +478,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     });
   }
   ensureCost({
-    id: 'occupant_removal', label: 'Tirar quem está morando', value: 5000,
+    id: 'occupant_removal', label: 'Desocupação', value: 5000,
     hint: 'Reserva inicial, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.',
     kind: 'fee',
   });
@@ -487,7 +519,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       if (r.id === 'occupant_removal') {
         return {
           ...r,
-          label: 'Tirar quem está morando',
+          label: 'Desocupação',
           value: evictionCost,
           hint: evictionAdjusted
             ? 'Valor informado por você.'
@@ -772,7 +804,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       </div>
 
       {isEnriched ? (<>
-      <NextStepsDrawer p={p} />
+      <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />
 
       {/* ===== TABS ===== */}
       <div className="detail-tabs" style={{
@@ -782,9 +814,9 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       }}>
         {[
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
-          { v: 'market', l: 'Preço na região', ix: '03' },
-          { v: 'edital', l: isDirectSale ? 'Documentos' : 'Regras deste leilão', ix: '04' },
-          { v: 'legal', l: 'Pendências do imóvel', ix: '05', comingSoon: true },
+          { v: 'market', l: 'Preço na região', ix: '02' },
+          { v: 'edital', l: isDirectSale ? 'Documentos' : 'Regras deste leilão', ix: '03' },
+          { v: 'legal', l: 'Pendências do imóvel', ix: '04', comingSoon: true },
         ].map(t => (
           <button
             key={t.v}
@@ -812,7 +844,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
         {tab === 'market' && <Market p={p} />}
         {tab === 'legal' && <LegalComingSoon />}
-        {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} />}
+        {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} onReadToEnd={markRulesRead} />}
       </div>
       </>) : (
         <AnalyzeCTA
@@ -967,7 +999,7 @@ function Collapsible({ title, children, last }) {
 }
 
 // ============================================================
-// TAB 1 — MARKET
+// TAB 2 — MARKET
 // ============================================================
 function Market({ p }) {
   const md = p.marketDetail;
@@ -997,6 +1029,19 @@ function Market({ p }) {
   // Gaps relative to each reference
   const gapVsMarket = market - bid;
   const gapVsAppraisal = appraisal - bid;
+
+  // Horizon para a banda: o menor e maior valor de venda entre os anúncios
+  // comparáveis que embasaram a estimativa `market`. Quando só tem um anúncio
+  // a banda colapsa para um único tick — melhor omitir do que dar um intervalo
+  // artificialmente estreito.
+  const comparablePrices = Array.isArray(md.comparables)
+    ? md.comparables.map(c => Number(c?.salePrice)).filter(v => Number.isFinite(v) && v > 0)
+    : [];
+  const comparableLow = comparablePrices.length > 1 ? Math.min(...comparablePrices) : null;
+  const comparableHigh = comparablePrices.length > 1 ? Math.max(...comparablePrices) : null;
+  const hasComparableBand = comparableLow != null && comparableHigh != null && comparableHigh > comparableLow;
+  const comparableLowPct = hasComparableBand ? (comparableLow / barMax) * 100 : 0;
+  const comparableHighPct = hasComparableBand ? (comparableHigh / barMax) * 100 : 0;
   const filteredIndicators = md.indicators;
   const comparableCount = Array.isArray(md.comparables) ? md.comparables.length : 0;
   // A confiança é comunicada em três estados e em linguagem comum: o que a
@@ -1030,7 +1075,7 @@ function Market({ p }) {
 
   return (
     <div>
-      <div className="analysis-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="analysis-grid market-overview-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Comparação: preço pedido, avaliação oficial e imóveis parecidos */}
         <div className="card" style={{ padding: 22 }}>
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 18 }}>
@@ -1039,51 +1084,77 @@ function Market({ p }) {
                 Como este preço se compara
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-                Três números diferentes: o que a Caixa pede, quanto um avaliador
-                oficial disse que o imóvel vale, e quanto imóveis parecidos na
-                região têm sido vendidos.
+                Você compara três referências: o valor inicial do leilão,
+                quanto um avaliador oficial disse que o imóvel vale,
+                e quanto imóveis parecidos na região têm sido vendidos.
               </p>
             </div>
           </div>
 
-          {/* 3-way stacked bar — bar fills with bid, markers for appraisal & market */}
+          {/* Bullet bar: barra principal é o valor inicial do leilão (roxo),
+              sobre uma faixa cinza que mostra o intervalo observado entre
+              imóveis parecidos; o valor de avaliação é apenas um tick. A banda
+              só aparece quando há pelo menos 2 imóveis parecidos — com um só,
+              o tick é suficiente. */}
           <div style={{ position: 'relative', marginTop: 30, marginBottom: 8 }}>
-            <div style={{ height: 14, background: 'var(--bg-3)', borderRadius: 7, position: 'relative', overflow: 'visible' }}>
-              {/* Bid fill */}
+            <div style={{ height: 22, background: 'var(--bg-3)', borderRadius: 11, position: 'relative', overflow: 'visible' }}>
+              {/* Comparable-sales band */}
+              {hasComparableBand && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${comparableLowPct}%`,
+                  width: `${Math.max(comparableHighPct - comparableLowPct, 0.5)}%`,
+                  top: 0, bottom: 0,
+                  background: 'var(--bg-2)',
+                  border: '1px solid var(--line-2)',
+                  borderRadius: 11,
+                }} aria-hidden="true"></div>
+              )}
+              {/* Bid fill — the actionable number */}
               <div style={{
                 position: 'absolute', left: 0, top: 0, bottom: 0,
                 width: `${Math.min(bidPct, 100)}%`,
-                background: 'var(--accent)', borderRadius: 7,
-              }}></div>
-              {/* Appraisal marker — vertical line + dot above */}
+                background: 'var(--accent)', borderRadius: 11,
+                display: 'flex', alignItems: 'center', paddingLeft: 12, paddingRight: 12,
+              }}>
+                {bidPct >= 24 && (
+                  <span className="mono" style={{ color: 'var(--accent-ink)', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    R$ {fmtBRL(bid)}
+                    {gapVsMarket > 0 && comparableCount > 1 && (
+                      <> · ~R$ {fmtBRL(gapVsMarket)} mais barato</>
+                    )}
+                  </span>
+                )}
+              </div>
+              {/* Appraisal marker — informational tick, not a comparison anchor */}
               {appraisal > 0 && (
                 <div style={{
                   position: 'absolute',
                   left: `${Math.min(appraisalPct, 100)}%`,
                   top: -8, bottom: -8, width: 2,
                   background: 'var(--fg-1)', transform: 'translateX(-1px)',
-                }}></div>
+                }} aria-hidden="true"></div>
               )}
-              {/* Estimated-market marker — vertical line + dot above */}
-              {market > 0 && (
+              {/* Market point estimate tick (only shown when no band) */}
+              {market > 0 && !hasComparableBand && (
                 <div style={{
                   position: 'absolute',
                   left: `${Math.min(marketPct, 100)}%`,
                   top: -8, bottom: -8, width: 2,
                   background: 'var(--good)', transform: 'translateX(-1px)',
-                }}></div>
+                }} aria-hidden="true"></div>
               )}
             </div>
-            {/* Tick labels under bar — only show if they fit; otherwise rely on legend below */}
+            {/* Tick labels under bar — omitted deliberately; legend below has the values */}
           </div>
 
-          {/* Legend — three rows: bid / appraisal / estimated market */}
+          {/* Legend — three rows: auction bid / appraisal / comparable-market range */}
           <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
             <div className="row between" style={{ alignItems: 'center' }}>
               <div className="row gap-2" style={{ alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent)', display: 'inline-block' }}></span>
                 <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                  {isDirectSale ? 'Preço de venda' : `Valor inicial ${has2nd ? '· 2ª rodada' : ''}`}
+                  {isDirectSale ? 'Preço de venda' : `Valor inicial do leilão ${has2nd ? '· 2ª rodada' : ''}`}
                 </span>
               </div>
               <div className="row gap-2" style={{ alignItems: 'baseline' }}>
@@ -1103,62 +1174,70 @@ function Market({ p }) {
             </div>
             <div className="row between" style={{ alignItems: 'center' }}>
               <div className="row gap-2" style={{ alignItems: 'center' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--good)', display: 'inline-block' }}></span>
+                <span style={{
+                  width: 10, height: 10, borderRadius: 2, background: 'var(--bg-2)',
+                  border: '1px solid var(--line-2)', display: 'inline-block',
+                }}></span>
                 <span className="uppy" style={{ color: 'var(--fg-2)' }}>
                   Imóveis parecidos na região
                 </span>
               </div>
               <div className="row gap-2" style={{ alignItems: 'baseline' }}>
-                <span className="num-md" style={{ color: 'var(--good)' }}>R$ {fmtBRL(market)}</span>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>estimativa nossa</span>
+                <span className="num-md" style={{ color: 'var(--fg-1)' }}>
+                  R$ {fmtBRL(market)}
+                </span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                  {comparableCount === 1
+                    ? '· estimativa Argos com 1 anúncio'
+                    : `· estimativa Argos com ${comparableCount} anúncios`}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Gap summary — estimated market and official appraisal */}
-          <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {/* Footnote under legend — explains what changed when not enough data */}
+          {!hasComparableBand && (
+            <p style={{ margin: '12px 0 0', fontSize: 11.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
+              {comparableCount === 0
+                ? 'Ainda não temos imóveis parecidos suficientes nesta região para estimar uma faixa. Mostramos apenas o valor de avaliação.'
+                : 'Temos apenas um anúncio nesta região. Mostramos o valor como referência, mas não é um mercado robusto.'}
+            </p>
+          )}
+
+          {/* Gap summary — single callout: what you save vs appraisal */}
+          {gapVsAppraisal !== 0 && (
             <div style={{
-              padding: '11px 13px', borderRadius: 6, fontSize: 12.5,
-              background: gapVsMarket >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)',
-              borderLeft: `3px solid ${gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)'}`,
+              marginTop: 16,
+              padding: '11px 13px',
+              borderRadius: 6,
+              fontSize: 12.5,
+              background: 'var(--bg-2)',
+              borderLeft: '3px solid var(--fg-3)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              gap: 8,
             }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>
-                comparado a imóveis parecidos
-              </div>
-              <div style={{ color: 'var(--fg-0)' }}>
-                <b style={{ color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
-                  R$ {fmtBRL(Math.abs(gapVsMarket))}
-                </b>
-              </div>
-              <div style={{ fontSize: 11.5, marginTop: 2, color: gapVsMarket >= 0 ? 'var(--good)' : 'var(--bad)' }}>
-                {gapVsMarket >= 0 ? 'mais barato' : 'mais caro'}
-              </div>
-            </div>
-            <div style={{
-              padding: '11px 13px', borderRadius: 6, fontSize: 12.5,
-              background: gapVsAppraisal >= 0 ? 'var(--good-soft)' : 'var(--bad-soft)',
-              borderLeft: `3px solid ${gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)'}`,
-            }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5, marginBottom: 3 }}>
+              <span className="uppy" style={{ color: 'var(--fg-3)', fontSize: 10.5 }}>
                 comparado ao valor de avaliação
-              </div>
-              <div style={{ color: 'var(--fg-0)' }}>
-                <b style={{ color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
+              </span>
+              <span>
+                <b className="mono" style={{ color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)', fontFamily: 'var(--f-mono)' }}>
                   R$ {fmtBRL(Math.abs(gapVsAppraisal))}
                 </b>
-              </div>
-              <div style={{ fontSize: 11.5, marginTop: 2, color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)' }}>
-                {gapVsAppraisal >= 0 ? 'abaixo da avaliação' : 'acima da avaliação'}
-              </div>
+                <span style={{ marginLeft: 6, fontSize: 11.5, color: gapVsAppraisal >= 0 ? 'var(--good)' : 'var(--bad)' }}>
+                  {gapVsAppraisal >= 0 ? 'abaixo' : 'acima'}
+                </span>
+              </span>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* § 01.02 — indicadores + valorização */}
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row between" style={{ alignItems: 'flex-start', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        {/* Resumo da referência regional: compacto para não herdar a altura do
+            comparativo maior ao lado. */}
+        <div className="card market-region-card">
+          <div className="market-region-header">
             <div>
-              <h3 className="h2" style={{ marginTop: 4 }}>A região: {p.neighborhood}</h3>
+              <span className="uppy">Referência de preço</span>
+              <h3 className="h2">{p.neighborhood || p.city}</h3>
             </div>
             {confidence && (
               <span className={`tag dot ${confidence.tone}`}>
@@ -1167,36 +1246,23 @@ function Market({ p }) {
             )}
           </div>
           {confidence && (
-            <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--fg-2)', lineHeight: 1.5 }}>
-              {confidence.note} Estimativa nossa, não é valor oficial.
-            </p>
+            <div className={`market-confidence-note ${confidence.tone}`}>
+              <span aria-hidden="true">i</span>
+              <p>{confidence.note}</p>
+            </div>
           )}
 
-          <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+          <div className="market-region-metrics">
             {filteredIndicators.map(ind => (
-              <Stat2 key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
+              <RegionMetric key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
             ))}
           </div>
+          <p className="market-region-disclaimer">Estimativa calculada com anúncios; não é um valor oficial.</p>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16, padding: 22 }}>
-        <div className="row between" style={{ alignItems: 'center', marginBottom: 14 }}>
-          <div>
-            <h3 className="h2" style={{ marginTop: 4 }}>Onde fica</h3>
-          </div>
-          <a className="btn sm" href={mapsUrl} target="_blank" rel="noopener noreferrer">Abrir no Google Maps ↗</a>
-        </div>
-        <iframe
-          title={`Mapa de ${p.address}`}
-          src={mapsEmbedUrl}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          style={{ width: '100%', height: 320, border: 0, borderRadius: 8 }}
-        />
-      </div>
-
-      {/* § 01.04 — comparáveis (trend removida) */}
+      {/* Os anúncios vêm antes do mapa: primeiro a pessoa confere a evidência
+          usada no preço; depois localiza o imóvel. */}
       {md.comparables.length > 0 && (
         <div className="card" style={{ marginTop: 16, padding: 22 }}>
           <h3 className="h2" style={{ marginTop: 4, marginBottom: 4 }}>Os imóveis que usamos para comparar</h3>
@@ -1237,27 +1303,47 @@ function Market({ p }) {
           </div>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 16, padding: 22 }}>
+        <div className="row between" style={{ alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <h3 className="h2" style={{ marginTop: 4 }}>Onde fica</h3>
+          </div>
+          <a className="btn sm" href={mapsUrl} target="_blank" rel="noopener noreferrer">Abrir no Google Maps ↗</a>
+        </div>
+        <iframe
+          title={`Mapa de ${p.address}`}
+          src={mapsEmbedUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          style={{ width: '100%', height: 320, border: 0, borderRadius: 8 }}
+        />
+      </div>
     </div>
   );
 }
 
-function Stat2({ lbl, val, delta, pos, neg }) {
+function RegionMetric({ lbl, val, delta, pos, neg }) {
+  const normalizedLabel = normalizedCostLabel(lbl);
+  const displayLabel = normalizedLabel.includes('imovel')
+    ? 'Preço por m² deste imóvel'
+    : normalizedLabel.includes('bairro')
+      ? 'Preço por m² dos anúncios no bairro'
+      : normalizedLabel.includes('cidade')
+        ? 'Preço por m² dos anúncios na cidade'
+        : lbl;
+
   return (
-    <div>
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>{lbl}</span>
-      <div className="num-md" style={{ marginTop: 4 }}>{val}</div>
-      <span className="mono" style={{
-        fontSize: 11.5, marginTop: 2, display: 'inline-block',
-        color: pos ? 'var(--good)' : neg ? 'var(--bad)' : 'var(--fg-2)',
-      }}>
-        {delta}
-      </span>
+    <div className="market-region-metric">
+      <span className="uppy">{displayLabel}</span>
+      <strong>{val}</strong>
+      {delta && <span className={pos ? 'positive' : neg ? 'negative' : ''}>{delta}</span>}
     </div>
   );
 }
 
 // ============================================================
-// TAB 2 — COSTS (with simulator at top)
+// TAB 1 — COSTS (with simulator at top)
 // ============================================================
 function CostBreakdown({ p, sim }) {
   const isDirectSale = isDirectSaleProperty(p);
@@ -1343,7 +1429,7 @@ function CostBreakdown({ p, sim }) {
               única, com a ordem preservada. */}
           <div className="scenario-cost-pair">
             <ScenarioMoneyField
-              label="Tirar quem está morando"
+              label="Desocupação"
               value={evictionCost}
               adjusted={evictionAdjusted}
               defaultLabel="Reserva sugerida por nós"
@@ -1830,7 +1916,7 @@ function CustomCostForm({ onAdd }) {
 }
 
 // ============================================================
-// TAB 5 — PENDÊNCIAS DO IMÓVEL (em breve)
+// TAB 4 — PENDÊNCIAS DO IMÓVEL (em breve)
 // ============================================================
 // O nome evita "análise jurídica" e "parecer": o que o produto faz é leitura de
 // documento e organização de informação. Esta aba é o destino do trabalho de
@@ -1853,33 +1939,20 @@ function LegalComingSoon() {
 }
 
 // ============================================================
-// PAINEL LATERAL 02 — O QUE FAZER AGORA
+// PAINEL LATERAL — O QUE FAZER AGORA
 // ============================================================
 // Estrutura, estados e datas moram aqui. O texto explicativo de cada passo vive
 // em `nextStepsContent.js` e é de responsabilidade da revisão editorial: até que
 // um passo tenha texto revisado, ele mostra só o rótulo e o prazo. Nunca um
 // texto provisório inventado — descrever o que dá errado ao atrasar um prazo é
 // afirmação de processo com consequência jurídica.
-function NextStepsDrawer({ p }) {
+function NextStepsDrawer({ p, done, onToggle }) {
   const isDirectSale = isDirectSaleProperty(p);
-  const storageKey = p?.id ? `arremate_property_steps_${p.id}` : null;
-  const [done, setDone] = useState(() => (
-    p?.id ? readStoredObject(`arremate_property_steps_${p.id}`) : {}
-  ));
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
   const drawerRef = useRef(null);
   const closeRef = useRef(null);
-
-  const toggle = (id) => {
-    const next = { ...done };
-    if (next[id]) delete next[id];
-    else next[id] = true;
-    setDone(next);
-    if (storageKey) {
-      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* segue utilizável */ }
-    }
-  };
+  const autoOpenedRef = useRef(false);
 
   const d = p.editalData || p.edital?.editalData || {};
   const steps = buildNextSteps({ property: p, editalData: d, isDirectSale });
@@ -1901,6 +1974,25 @@ function NextStepsDrawer({ p }) {
   const closeDrawer = useCallback(() => {
     setOpen(false);
     requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const page = document.documentElement;
+      const reachedEnd = window.scrollY > 0
+        && window.scrollY + window.innerHeight >= page.scrollHeight - 48;
+      if (!reachedEnd) return;
+
+      // A sugestão aparece uma vez por visita. Depois de fechada, não insiste
+      // enquanto a pessoa permanece no fim da página.
+      if (!autoOpenedRef.current) {
+        autoOpenedRef.current = true;
+        setOpen(true);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
@@ -1950,8 +2042,7 @@ function NextStepsDrawer({ p }) {
         aria-label={`Abrir O que fazer agora, ${completionPercentage}% concluído`}
         title="O que fazer agora"
       >
-        <span className="mono">02</span>
-        <span>O que fazer agora</span>
+        <span className="next-steps-drawer-trigger-label">O que fazer agora</span>
         <strong>{completionPercentage}%</strong>
       </button>
 
@@ -1970,7 +2061,6 @@ function NextStepsDrawer({ p }) {
             <header className="next-steps-drawer-head">
               <div className="row between" style={{ alignItems: 'flex-start', gap: 20 }}>
                 <div>
-                  <span className="uppy">Etapa 02</span>
                   <h2 id="next-steps-title">O que fazer agora</h2>
                 </div>
                 <button
@@ -2010,7 +2100,7 @@ function NextStepsDrawer({ p }) {
                 </p>
                 <ol className="next-steps">
                   {steps.map(step => (
-                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
+                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => onToggle(step.id)} />
                   ))}
                 </ol>
               </section>
@@ -2020,7 +2110,7 @@ function NextStepsDrawer({ p }) {
                 <p>A compra não termina no pagamento. Estas são as etapas até a chave na mão.</p>
                 <ol className="next-steps">
                   {afterSteps.map(step => (
-                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => toggle(step.id)} />
+                    <StepRow key={step.id} step={step} done={!!done[step.id]} onToggle={() => onToggle(step.id)} />
                   ))}
                 </ol>
               </section>
@@ -2059,7 +2149,7 @@ function StepRow({ step, done, onToggle }) {
 // ============================================================
 // TAB 3 — EDITAL
 // ============================================================
-function Edital({ p, auctionUrl }) {
+function Edital({ p, auctionUrl, onReadToEnd }) {
   const e = p.edital;
   const d = p.editalData || e?.editalData || {};
   const editalUrl = p.editalUrl || e?.editalUrl;
@@ -2234,8 +2324,29 @@ function Edital({ p, auctionUrl }) {
           <b style={{ color: 'var(--fg-1)' }}>↳</b> {e.summaryNote}
         </div>
       )}
+      <RulesReadMarker onReached={onReadToEnd} />
     </div>
   );
+}
+
+function RulesReadMarker({ onReached }) {
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker || !onReached) return undefined;
+
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting) || window.scrollY <= 0) return;
+      onReached();
+      observer.disconnect();
+    }, { threshold: 0.8 });
+
+    observer.observe(marker);
+    return () => observer.disconnect();
+  }, [onReached]);
+
+  return <div ref={markerRef} className="rules-read-marker" aria-hidden="true" />;
 }
 
 function EditalFacts({ title, items }) {
