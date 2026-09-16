@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 15 de setembro de 2026.
+Última atualização: 16 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -35,7 +35,7 @@ um MVP em evolução, concentrado no catálogo imobiliário da Caixa.
 
 O usuário principal é uma pessoa comprando um imóvel **para morar**. Ela não
 conhece o vocabulário de leilão, não quer aprendê-lo e não vai perguntar: vai
-fechar a aba. Ela tem quatro perguntas, nesta ordem:
+fechar a aba. Ela tem cinco perguntas, nesta ordem:
 
 1. Quanto vou pagar no total, até a chave estar na minha mão?
 2. Tem alguém morando? Quando eu consigo entrar?

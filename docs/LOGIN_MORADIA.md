@@ -7,7 +7,7 @@ e a sessão ficam neste navegador. A senha em texto é descartada.
 ## Rotas e comportamento
 
 - `/entrar`: modos Criar conta e Entrar, com validação local das credenciais.
-- `/perfil`: questionário de região, imóvel, orçamento e rotina.
+- `/perfil`: questionário em cinco etapas: região, imóvel, orçamento, pagamento e rotina.
 - `/`: lista personalizada quando existe conta e perfil locais; o primeiro
   acesso abre Criar conta. `/?busca=todos` mantém a exploração livre.
 - `/imovel/{id}`, `/salvos` e `/vistos`: continuam públicos.
