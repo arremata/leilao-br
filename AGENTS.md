@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-16** — Corrigido o estado após sair da conta: quando o perfil local permanece salvo, a tela de login na rota inicial agora continua sem o cabeçalho da plataforma.
+
 - **2026-09-16** — Retirou o aviso extenso das telas de login e questionário. O preview mantém apenas uma identificação curta nas telas de catálogo, informando o uso de dados reais e o comportamento das ações.
 
 - **2026-09-16** — Added a complete local account prototype with create-account and sign-in modes, required name/e-mail/password/confirmation/terms fields, password visibility control, local session and salted password verifier, followed by a five-step housing questionnaire. Account and questionnaire screens occupy the viewport without application navigation or page scrolling; the questionnaire splits budget from payment and uses persistent previous/next arrows. The preview production-data notice moved from the top layout to a compact floating label. No server authentication or database was added; the adapter boundary is documented for that future integration.

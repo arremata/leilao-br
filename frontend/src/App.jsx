@@ -60,7 +60,7 @@ function App() {
   });
   const accountScreen = location.pathname === '/entrar'
     || location.pathname === '/perfil'
-    || (location.pathname === '/' && !account && !housingProfile && !location.search);
+    || (location.pathname === '/' && !account && !location.search);
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
