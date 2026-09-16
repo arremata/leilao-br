@@ -1,7 +1,7 @@
 {
-  "name": "Arremate",
-  "short_name": "Arremate",
-  "description": "Inteligencia de leiloes imobiliarios com analise de risco, mercado e retorno projetado.",
+  "name": "Argos",
+  "short_name": "Argos",
+  "description": "Imoveis da Caixa em leilao e compra direta, com a conta de quanto voce paga ate receber a chave.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

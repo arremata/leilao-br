@@ -1,21 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import Feed from './components/Feed';
-import PropertyDetail from './components/PropertyDetail';
+import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
+import NotFound from './components/NotFound';
 import { fetchCatalog } from './api';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
 const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
-  const [screen, setScreen] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedScreen = params.get('screen');
-    if (['feed', 'detail', 'watchlist', 'history'].includes(requestedScreen)) return requestedScreen;
-    return 'feed';
-  });
-  const [selected, setSelected] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
@@ -23,13 +18,17 @@ function App() {
     } catch { return []; }
   });
   const [properties, setProperties] = useState([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [history, setHistory] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
       return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
+
+  // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
+  // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
+  // aquele imóvel e não espera os outros 500.
   useEffect(() => {
     let cancelled = false;
     fetchCatalog()
@@ -38,13 +37,9 @@ function App() {
         if (Array.isArray(catalogData)) setProperties(catalogData);
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setInitialLoading(false); });
+      .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [screen]);
 
   useEffect(() => {
     localStorage.setItem('arremate_watched', JSON.stringify(watched));
@@ -68,7 +63,6 @@ function App() {
       document.querySelectorAll('.fade-in:not(.is-visible)').forEach(el => observer.observe(el));
     };
     observe();
-    // Re-observe on screen changes
     const mo = new MutationObserver(observe);
     mo.observe(document.getElementById('root'), { childList: true, subtree: true });
     return () => { observer.disconnect(); mo.disconnect(); };
@@ -91,73 +85,66 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const go = (s, prop) => {
-    if (prop) {
-      setSelected(prop);
-      if (s === 'detail') {
-        const entry = {
-          id: prop.id, ts: Date.now(),
-          title: prop.title, address: prop.address,
-          city: prop.city, neighborhood: prop.neighborhood,
-          risk: prop.risk, minBid: prop.minBid,
-          appraisal: prop.appraisal, auctionDiscount: prop.auctionDiscount,
-          market: prop.market, discount: prop.discount, roi: prop.roi,
-          type: prop.type, auctionType: prop.auctionType,
-          modalidade: prop.modalidade, endsAt: prop.endsAt,
-        };
-        setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
-      }
-    }
-    setScreen(s);
-  };
-
-  const toggleWatch = (id) => {
+  const toggleWatch = useCallback((id) => {
     setWatched(w => w.includes(id) ? w.filter(x => x !== id) : [...w, id]);
-  };
+  }, []);
 
   const clearHistory = useCallback(() => setHistory([]), []);
 
-  const screenLabel =
-    screen === 'feed' ? '01 Feed' :
-    screen === 'watchlist' ? '02 Watchlist' :
-    screen === 'history' ? '03 Histórico' :
-    '04 Detalhe do Imóvel';
+  const recordVisit = useCallback((prop) => {
+    if (!prop?.id) return;
+    const entry = {
+      id: prop.id, ts: Date.now(),
+      title: prop.title, address: prop.address,
+      city: prop.city, neighborhood: prop.neighborhood,
+      minBid: prop.minBid, appraisal: prop.appraisal,
+      auctionDiscount: prop.auctionDiscount,
+      market: prop.market, discount: prop.discount,
+      type: prop.type, auctionType: prop.auctionType,
+      modalidade: prop.modalidade, endsAt: prop.endsAt,
+    };
+    setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
+  }, []);
 
   return (
-    <div className="app-shell" data-screen-label={screenLabel}>
+    <div className="app-shell">
       {isPreview && (
         <div className="preview-banner" role="status">
           Ambiente de validação · dados reais de produção
           {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
-      <TopBar screen={screen} go={go} watchCount={watched.length} />
-      {initialLoading ? (
-        <InitialLoading />
-      ) : (<>
-        {screen === 'feed' && <Feed go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
-        {screen === 'watchlist' && <Watchlist go={go} watched={watched} toggleWatch={toggleWatch} properties={properties} />}
-        {screen === 'history' && <History go={go} history={history} clearHistory={clearHistory} properties={properties} />}
-        {screen === 'detail' && <PropertyDetail key={selected?.id} property={selected} go={go} watched={watched} toggleWatch={toggleWatch} />}
-      </>)}
+      <TopBar watchCount={watched.length} />
+      <Routes>
+        <Route path="/" element={
+          <Feed
+            watched={watched}
+            toggleWatch={toggleWatch}
+            properties={properties}
+            loading={catalogLoading}
+          />
+        } />
+        <Route path="/imovel/:id" element={
+          <PropertyRoute
+            properties={properties}
+            watched={watched}
+            toggleWatch={toggleWatch}
+            onVisit={recordVisit}
+          />
+        } />
+        <Route path="/salvos" element={
+          <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
+        } />
+        <Route path="/vistos" element={
+          <History history={history} clearHistory={clearHistory} properties={properties} />
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </div>
   );
 }
 
-function InitialLoading() {
-  return (
-    <main className="page" style={{ maxWidth: 1480, margin: '0 auto', padding: '72px 28px', minHeight: '65vh', display: 'grid', placeItems: 'center' }}>
-      <div style={{ textAlign: 'center' }}>
-        <span className="countdown" style={{ justifyContent: 'center', color: 'var(--fg-2)' }}>
-          <span className="dot" style={{ background: 'var(--accent)' }}></span>
-          <span className="mono">Carregando oportunidades…</span>
-        </span>
-      </div>
-    </main>
-  );
-}
-
-function TopBar({ screen, go, watchCount }) {
+function TopBar({ watchCount }) {
   return (
     <header className="topbar">
       <div id="argos-progress" style={{
@@ -165,19 +152,18 @@ function TopBar({ screen, go, watchCount }) {
         width: 0, background: 'var(--accent)', transition: 'width .1s linear',
       }} />
       <div className="row gap-6" style={{ alignItems: 'center' }}>
-        <button className="brand" onClick={() => go('feed')}>
+        <Link className="brand" to="/">
           <span className="logo"></span>
           Argos
-        </button>
+        </Link>
         <nav className="nav">
-          <a className={screen === 'feed' ? 'active' : ''} onClick={() => go('feed')}>Feed</a>
-          <a className={screen === 'watchlist' ? 'active' : ''} onClick={() => go('watchlist')}>
-            Watchlist {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
-          </a>
-          <a className={screen === 'history' ? 'active' : ''} onClick={() => go('history')}>Histórico</a>
+          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>Imóveis</NavLink>
+          <NavLink to="/salvos" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Salvos {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
+          </NavLink>
+          <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
         </nav>
       </div>
-
     </header>
   );
 }

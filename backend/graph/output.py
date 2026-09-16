@@ -314,48 +314,42 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
 
     costs.append(CostLineItem(
         id="occupant_removal",
-        label="Desocupação do imóvel · estimativa",
+        label="Tirar quem está morando",
         value=5000,
-        hint="Reserva inicial para medidas de desocupação. Ajuste conforme a situação do imóvel e a orientação profissional.",
+        hint="Reserva inicial, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.",
         kind="fee",
     ))
 
-    iptu_debt = 0
-    if legal and legal.tax_debts_iptu:
-        iptu_debt = _parse_brl(legal.tax_debts_iptu)
-    costs.append(CostLineItem(
-        id="overdue_iptu",
-        label="IPTU em atraso assumido",
-        value=iptu_debt,
-        hint="IPTU vencido até a data do arremate." if iptu_debt else "IPTU em dia.",
-        kind="debt",
-    ))
+    # Ausência de evidência nunca vira afirmação. Quando não há valor de dívida
+    # apurado, a linha não é emitida — em vez de sair com R$ 0 e um texto que
+    # afirma que a dívida não existe. Uma dívida citada sem valor no documento
+    # oficial aparece como menção, não como custo.
+    iptu_debt = _parse_brl(legal.tax_debts_iptu) if legal and legal.tax_debts_iptu else 0
+    if iptu_debt:
+        costs.append(CostLineItem(
+            id="overdue_iptu",
+            label="IPTU atrasado",
+            value=iptu_debt,
+            hint="Valor de IPTU em atraso informado no documento oficial.",
+            kind="debt",
+        ))
 
-    condo_debt = 0
-    if legal and legal.condominium_debts:
-        condo_debt = _parse_brl(legal.condominium_debts)
-    costs.append(CostLineItem(
-        id="overdue_condo",
-        label="Condomínio em atraso",
-        value=condo_debt,
-        hint="Débito condominial cobrado pelo síndico." if condo_debt else "Sem débito condominial.",
-        kind="debt",
-    ))
+    condo_debt = _parse_brl(legal.condominium_debts) if legal and legal.condominium_debts else 0
+    if condo_debt:
+        costs.append(CostLineItem(
+            id="overdue_condo",
+            label="Condomínio atrasado",
+            value=condo_debt,
+            hint="Valor de condomínio em atraso informado no documento oficial.",
+            kind="debt",
+        ))
 
     costs.append(CostLineItem(
         id="renovation",
-        label="Reforma estimada",
+        label="Reforma",
         value=0,
-        hint="Calculada no simulador por área e faixa regional.",
+        hint="Quanto você pretende gastar para deixar o imóvel pronto para morar.",
         kind="reno",
-    ))
-
-    costs.append(CostLineItem(
-        id="capital_gains",
-        label="Imposto sobre ganho de capital",
-        value=0,
-        hint="Isento · primeiro imóvel · até R$ 35k.",
-        kind="tax",
     ))
 
     return costs

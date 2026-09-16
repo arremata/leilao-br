@@ -36,7 +36,9 @@ def test_catalog_card_matches_frontend_contract():
 
     assert card["id"] == 7
     assert card["sourceId"] == "123"
-    assert card["title"] == "Apartamento 80 m², Centro"
+    # Nome pela rua, não pelo bairro: o card e a análise precisam concordar.
+    assert card["title"] == "Apartamento 80 m², Rua A"
+    assert card["hasCondominium"] is True
     assert card["auctionDiscount"] == 50.0
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
@@ -54,6 +56,24 @@ def test_catalog_card_matches_frontend_contract():
 def test_edital_data_is_selected_only_for_catalog_detail():
     assert "edital_data" not in vercel_api._CATALOG_COLUMNS
     assert "edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS
+
+
+def test_catalog_condominium_cost_uses_type_and_official_description():
+    base = {
+        "id": 7, "source_id": "123", "source": "caixa", "uf": "PR",
+        "city": "Curitiba", "neighborhood": "Centro", "address": "Rua A",
+        "area_m2": 80.0, "preco": 200000.0, "status": "active",
+    }
+
+    ordinary_house = vercel_api._catalog_card({
+        **base, "property_type": "Casa", "descricao_raw": "Casa desocupada",
+    })
+    condominium_house = vercel_api._catalog_card({
+        **base, "property_type": "Casa", "descricao_raw": "Casa em condomínio fechado",
+    })
+
+    assert ordinary_house["hasCondominium"] is False
+    assert condominium_house["hasCondominium"] is True
 
 
 def test_vercel_area_similarity_is_continuous_and_symmetric():

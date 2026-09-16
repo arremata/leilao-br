@@ -70,7 +70,10 @@ def test_catalog_card_has_title_and_auction_discount():
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["auctionDiscount"] == 50.0
-    assert card["title"] == "Apartamento 72 m², Batel"
+    # O nome do imóvel é a rua, não o bairro — a mesma regra de build_result,
+    # para que o card e a análise não mostrem dois nomes para o mesmo imóvel.
+    assert card["title"] == "Apartamento 72 m², Rua X"
+    assert card["hasCondominium"] is True
     assert card["auctionUrl"] == "https://example.com/leilao/9"
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"
@@ -113,6 +116,26 @@ def test_catalog_card_title_falls_back_to_address_without_type():
 
     card = client.get("/catalog?uf=PR").json()[0]
     assert card["title"] == "Rua Y, 200"
+    api.app.dependency_overrides.clear()
+
+
+def test_catalog_marks_only_relevant_properties_for_condominium_cost():
+    client, factory = _client_with_db()
+    with factory() as s:
+        s.add_all([
+            Property(source="caixa", source_id="house", uf="PR", city="Curitiba",
+                     address="Rua A", property_type="Casa", descricao_raw="Casa desocupada",
+                     preco=100000.0, status="active"),
+            Property(source="caixa", source_id="condo-house", uf="PR", city="Curitiba",
+                     address="Rua B", property_type="Casa",
+                     descricao_raw="Casa em condomínio fechado", preco=150000.0,
+                     status="active"),
+        ])
+        s.commit()
+
+    cards = {card["sourceId"]: card for card in client.get("/catalog?uf=PR").json()}
+    assert cards["house"]["hasCondominium"] is False
+    assert cards["condo-house"]["hasCondominium"] is True
     api.app.dependency_overrides.clear()
 
 
