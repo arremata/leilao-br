@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-16** — Retirou o aviso extenso das telas de login e questionário. O preview mantém apenas uma identificação curta nas telas de catálogo, informando o uso de dados reais e o comportamento das ações.
+
 - **2026-09-16** — Added a complete local account prototype with create-account and sign-in modes, required name/e-mail/password/confirmation/terms fields, password visibility control, local session and salted password verifier, followed by a five-step housing questionnaire. Account and questionnaire screens occupy the viewport without application navigation or page scrolling; the questionnaire splits budget from payment and uses persistent previous/next arrows. The preview production-data notice moved from the top layout to a compact floating label. No server authentication or database was added; the adapter boundary is documented for that future integration.
 
 - **2026-09-15** — Removed section numbering from the “O que fazer agora” side guide and closed the numbering gap across the property tabs. The guide now introduces itself once when the buyer reaches the end of the property page, and reaching the end of the official-rules tab completes the corresponding reading step. Renamed the buyer-controlled occupancy reserve to “Desocupação”, placed the comparable evidence before the map, and rebuilt the regional-price summary as a compact, responsive evidence card without the large empty area created by equal-height columns.

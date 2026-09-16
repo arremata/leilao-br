@@ -144,9 +144,9 @@ function App() {
 
   return (
     <div className={`app-shell${accountScreen ? ' account-screen' : ''}${isPreview ? ' preview-env' : ''}`}>
-      {isPreview && (
+      {isPreview && !accountScreen && (
         <div className="preview-banner" role="status">
-          Ambiente de validação · dados reais de produção
+          Preview · dados reais
           {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
