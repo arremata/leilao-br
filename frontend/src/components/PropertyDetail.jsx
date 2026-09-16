@@ -1054,14 +1054,16 @@ function Market({ p }) {
 
   return (
     <div>
-      <div className="analysis-grid market-overview-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Comparação: preço pedido, avaliação oficial e imóveis parecidos.
-            Barras verticais com headline no topo: o leitor absorve o punchline
-            em uma frase, e as barras confirmam visualmente a escala. */}
-        <div className="card" style={{ padding: 22 }}>
-          <span className="uppy" style={{ color: 'var(--fg-2)', display: 'block', marginBottom: 8 }}>
-            Como este preço se compara
-          </span>
+      {/* Comparação + referência regional em um único card: a pessoa lê o
+          punchline e já vê a origem da estimativa ao lado, sem saltar entre
+          dois cartões. */}
+      <div className="card" style={{ padding: 22, marginBottom: 16 }}>
+        <div className="market-compare-grid">
+          {/* Coluna esquerda: comparação entre as três referências de preço */}
+          <div>
+            <span className="uppy" style={{ color: 'var(--fg-2)', display: 'block', marginBottom: 8 }}>
+              Como este preço se compara
+            </span>
           <h3 className="h2" style={{ margin: 0, marginBottom: 6, lineHeight: 1.2 }}>
             {gapVsMarket > 0 && comparableCount > 1
               ? `Valor inicial cerca de R$ ${fmtBRL(gapVsMarket)} abaixo de imóveis parecidos`
@@ -1103,13 +1105,14 @@ function Market({ p }) {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>este imóvel</div>
                   </div>
-                  <div style={{
-                    width: '100%',
-                    maxWidth: 110,
-                    height: `${Math.max(bidPct / 100 * 180, 8)}px`,
-                    background: 'var(--accent)',
-                    borderRadius: '6px 6px 0 0',
-                  }} aria-label={`Valor inicial do leilão: R$ ${fmtBRL(bid)}`}></div>
+                  <div
+                    className="market-bar market-bar--accent"
+                    style={{
+                      height: `${Math.max(bidPct / 100 * 180, 8)}px`,
+                      background: 'var(--accent)',
+                    }}
+                    aria-label={`Valor inicial do leilão: R$ ${fmtBRL(bid)}`}
+                  ></div>
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
                       Valor inicial do leilão
@@ -1118,21 +1121,33 @@ function Market({ p }) {
                   </div>
                 </div>
 
-                {/* Imóveis parecidos — cinza neutro */}
+                {/* Imóveis parecidos — barra cinza. Quando a estimativa tem
+                    pouca base a barra vira listrada: sinal visual de incerteza
+                    direto no dado, não só no chip do canto. */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ marginBottom: 6, textAlign: 'center' }}>
                     <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
-                      R$ {fmtBRL(market)}
+                      {comparableCount === 0 ? '—' : `R$ ${fmtBRL(market)}`}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>estimativa</div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                      {comparableCount === 0 ? 'não temos estimativa' : 'estimativa'}
+                    </div>
                   </div>
-                  <div style={{
-                    width: '100%',
-                    maxWidth: 110,
-                    height: `${Math.max(marketPct / 100 * 180, 8)}px`,
-                    background: 'var(--line-3)',
-                    borderRadius: '6px 6px 0 0',
-                  }} aria-label={`Imóveis parecidos na região: R$ ${fmtBRL(market)}`}></div>
+                  {comparableCount > 0 && (
+                    <div
+                      className={
+                        md.confidenceLevel === 'low'
+                          ? 'market-bar market-bar--hatch'
+                          : md.confidenceLevel === 'high'
+                            ? 'market-bar market-bar--strong'
+                            : 'market-bar'
+                      }
+                      style={{
+                        height: `${Math.max(marketPct / 100 * 180, 8)}px`,
+                      }}
+                      aria-label={`Imóveis parecidos na região: R$ ${fmtBRL(market)}`}
+                    ></div>
+                  )}
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
                       Imóveis parecidos na região
@@ -1149,13 +1164,14 @@ function Market({ p }) {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>avaliação</div>
                   </div>
-                  <div style={{
-                    width: '100%',
-                    maxWidth: 110,
-                    height: `${Math.max(appraisalPct / 100 * 180, 8)}px`,
-                    background: 'var(--fg-1)',
-                    borderRadius: '6px 6px 0 0',
-                  }} aria-label={`Valor de avaliação: R$ ${fmtBRL(appraisal)}`}></div>
+                  <div
+                    className="market-bar"
+                    style={{
+                      height: `${Math.max(appraisalPct / 100 * 180, 8)}px`,
+                      background: 'var(--fg-1)',
+                    }}
+                    aria-label={`Valor de avaliação: R$ ${fmtBRL(appraisal)}`}
+                  ></div>
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
                       Valor de avaliação
@@ -1166,49 +1182,50 @@ function Market({ p }) {
               </div>
             );
           })()}
+          </div>
 
-          {/* Footnote — sempre no mesmo lugar, citação da fonte */}
-          <div style={{
-            paddingTop: 14,
-            borderTop: '1px solid var(--line-1)',
-            fontSize: 11.5,
-            color: 'var(--fg-2)',
-            lineHeight: 1.5,
-          }}>
-            <span className="mono" style={{ color: 'var(--fg-3)' }}>ⓘ</span>{' '}
-            {comparableCount === 0
-              ? 'Ainda não temos anúncios comparáveis nesta região. Mostramos apenas valor inicial e avaliação.'
-              : `Preço dos parecidos estimado pelo Argos com base em ${comparableCount === 1 ? '1 anúncio' : `${comparableCount} anúncios`}.`}
+          {/* Coluna direita: referência da região que embasa a barra cinza */}
+          <div className="market-region-col">
+            <div className="market-region-header">
+              <div>
+                <span className="uppy">Referência de preço</span>
+                <h3 className="h2">{p.neighborhood || p.city}</h3>
+              </div>
+              {confidence && (
+                <span className={`tag dot ${confidence.tone}`}>
+                  {confidence.label}
+                </span>
+              )}
+            </div>
+            {confidence && (
+              <div className={`market-confidence-note ${confidence.tone}`}>
+                <span aria-hidden="true">i</span>
+                <p>{confidence.note}</p>
+              </div>
+            )}
+
+            <div className="market-region-metrics">
+              {filteredIndicators.map(ind => (
+                <RegionMetric key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
+              ))}
+            </div>
+            <p className="market-region-disclaimer">Estimativa calculada com anúncios; não é um valor oficial.</p>
           </div>
         </div>
 
-        {/* Resumo da referência regional: compacto para não herdar a altura do
-            comparativo maior ao lado. */}
-        <div className="card market-region-card">
-          <div className="market-region-header">
-            <div>
-              <span className="uppy">Referência de preço</span>
-              <h3 className="h2">{p.neighborhood || p.city}</h3>
-            </div>
-            {confidence && (
-              <span className={`tag dot ${confidence.tone}`}>
-                {confidence.label}
-              </span>
-            )}
-          </div>
-          {confidence && (
-            <div className={`market-confidence-note ${confidence.tone}`}>
-              <span aria-hidden="true">i</span>
-              <p>{confidence.note}</p>
-            </div>
-          )}
-
-          <div className="market-region-metrics">
-            {filteredIndicators.map(ind => (
-              <RegionMetric key={ind.lbl} lbl={ind.lbl} val={ind.val} delta={ind.delta} pos={ind.pos} neg={ind.neg} />
-            ))}
-          </div>
-          <p className="market-region-disclaimer">Estimativa calculada com anúncios; não é um valor oficial.</p>
+        {/* Footnote — always at the bottom of the card, spanning both columns */}
+        <div style={{
+          marginTop: 18,
+          paddingTop: 14,
+          borderTop: '1px solid var(--line-1)',
+          fontSize: 11.5,
+          color: 'var(--fg-2)',
+          lineHeight: 1.5,
+        }}>
+          <span className="mono" style={{ color: 'var(--fg-3)' }}>ⓘ</span>{' '}
+          {comparableCount === 0
+            ? 'Ainda não temos anúncios comparáveis nesta região. Mostramos apenas valor inicial e avaliação.'
+            : `Preço dos parecidos estimado pelo Argos com base em ${comparableCount === 1 ? '1 anúncio' : `${comparableCount} anúncios`}.`}
         </div>
       </div>
 

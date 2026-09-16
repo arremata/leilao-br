@@ -148,12 +148,12 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     if (filters.city !== 'Todas') list = list.filter(p => normalizeLocation(p.city) === normalizeLocation(filters.city));
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
-    // Esconde leilões já encerrados por padrão. O toggle "Mostrar leilões
-    // encerrados" liga/desliga isso. Compra direta não tem data e sempre
-    // aparece — o toggle é um filtro de leilão, não do feed inteiro.
+    // Esconde imóveis encerrados por padrão — leilão cuja data já passou e
+    // compra direta cuja janela de compra expirou. Sem data válida o item
+    // passa (não temos como saber se expirou), e o toggle "Mostrar imóveis
+    // encerrados" liga/desliga isso para a listagem inteira.
     if (!filters.showExpired) {
       list = list.filter(p => {
-        if (isDirectSaleModality(p.modalidade)) return true;
         const endsAt = getEndsAtMs(p.endsAt);
         if (!Number.isFinite(endsAt) || endsAt <= 0) return true;
         return endsAt > sortNow;
@@ -334,8 +334,8 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
               <FilterSwitch
                 checked={filters.showExpired}
                 onChange={(v) => setFilters({ ...filters, showExpired: v })}
-                label="Mostrar leilões encerrados"
-                helper="Incluir imóveis cujo leilão já terminou"
+                label="Mostrar imóveis encerrados"
+                helper="Incluir imóveis cuja janela de compra já fechou"
               />
             </div>
 
