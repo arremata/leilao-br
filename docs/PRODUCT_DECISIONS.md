@@ -19,6 +19,19 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
+### PD-008 — Organizar a busca pelas preferências de quem vai morar
+
+- **Data:** 16 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** oferecer um questionário inicial de moradia e abrir a lista pelas
+  preferências salvas, mantendo ajustes na própria tela e exploração livre.
+- **Motivo:** encontrar um lar começa pela região, rotina e orçamento da pessoa.
+- **Consequências:** nesta etapa, conta, sessão e preferências funcionam somente
+  no navegador, sem conta no servidor ou banco. A reserva de extras é uma premissa informada,
+  e trajetos/comparações financeiras ficam explicitamente como evolução futura.
+  Esta decisão substitui a restrição da PD-002 e evolui a entrada descrita na
+  PD-003 sem criar um Dashboard separado.
+
 ### PD-001 — Separar fatos oficiais de estimativas
 
 - **Data:** 9 de agosto de 2026
@@ -35,7 +48,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 ### PD-002 — Manter a experiência sem conta enquanto não houver autenticação
 
 - **Data:** 12 de agosto de 2026
-- **Estado:** Ativa
+- **Estado:** Substituída por PD-008
 - **Decisão:** o produto atual é uma experiência de visitante, sem identidade ou
   personalização fictícia.
 - **Motivo:** simular uma conta passa uma confiança que a infraestrutura atual
