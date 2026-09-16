@@ -214,7 +214,7 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-16** — Corrigido o estado após sair da conta: quando o perfil local permanece salvo, a tela de login na rota inicial agora continua sem o cabeçalho da plataforma.
+- **2026-09-16** — Corrigido o estado após sair da conta: o logout agora leva sempre para `/entrar`, mantendo a tela de login sem o cabeçalho da plataforma mesmo quando havia uma busca ou perfil salvo.
 
 - **2026-09-16** — Retirou o aviso extenso das telas de login e questionário. O preview mantém apenas uma identificação curta nas telas de catálogo, informando o uso de dados reais e o comportamento das ações.
 

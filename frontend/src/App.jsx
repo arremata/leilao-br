@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, NavLink, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Routes, Route, NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
@@ -16,6 +16,7 @@ const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [account, setAccount] = useState(() => {
     try { return readLocalSession(); } catch { return null; }
   });
@@ -51,7 +52,8 @@ function App() {
     signOutLocal();
     setAccount(null);
     setHousingSearch(null);
-  }, []);
+    navigate('/entrar');
+  }, [navigate]);
   const [history, setHistory] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
