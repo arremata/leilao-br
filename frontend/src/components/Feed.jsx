@@ -22,7 +22,7 @@ const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA
 const DEFAULTS = {
   aba: 'leiloes', q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
   rodada: 'Todos', modalidade: 'Todos', desconto: '0',
-  ordem: 'relevance', vis: 'grid', pagina: '1',
+  ordem: 'relevance', vis: 'grid', pagina: '1', encerrados: '0',
 };
 
 function readParams(searchParams) {
@@ -37,6 +37,7 @@ function readParams(searchParams) {
       praca: get('rodada'),
       modalidade: get('modalidade'),
       discountMin: Number(get('desconto')) || 0,
+      showExpired: get('encerrados') === '1',
     },
     sort: get('ordem'),
     view: get('vis') === 'lista' ? 'list' : 'grid',
@@ -48,7 +49,10 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Mobile: railOpen controla se o rail aparece ou não E ("drawer" aberto/fechado).
+  // Desktop: rail também começa aberto. O clique no « fecha, e o botão ⚙ na
+  // toolbar volta a abrir.
+  const [railOpen, setRailOpen] = useState(true);
   const PAGE_SIZE = 12;
 
   // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
@@ -75,6 +79,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const setFilters = (next) => setParams({
     estado: next.state, cidade: next.city, tipo: next.propertyType,
     rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
+    encerrados: next.showExpired ? '1' : '0',
   });
 
   const byKind = useMemo(
@@ -143,6 +148,17 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     if (filters.city !== 'Todas') list = list.filter(p => normalizeLocation(p.city) === normalizeLocation(filters.city));
     if (filters.praca !== 'Todos') list = list.filter(p => p.praca === filters.praca);
     if (filters.modalidade !== 'Todos') list = list.filter(p => p.modalidade === filters.modalidade);
+    // Esconde leilões já encerrados por padrão. O toggle "Mostrar leilões
+    // encerrados" liga/desliga isso. Compra direta não tem data e sempre
+    // aparece — o toggle é um filtro de leilão, não do feed inteiro.
+    if (!filters.showExpired) {
+      list = list.filter(p => {
+        if (isDirectSaleModality(p.modalidade)) return true;
+        const endsAt = getEndsAtMs(p.endsAt);
+        if (!Number.isFinite(endsAt) || endsAt <= 0) return true;
+        return endsAt > sortNow;
+      });
+    }
 
     if (sort === 'relevance') {
       // Relevância = data próxima primeiro, depois quanto do imóvel a gente
@@ -202,26 +218,30 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     (filters.state !== 'Todos' ? 1 : 0) +
     (filters.city !== 'Todas' ? 1 : 0) +
     (filters.praca !== 'Todos' ? 1 : 0) +
-    (filters.modalidade !== 'Todos' ? 1 : 0);
+    (filters.modalidade !== 'Todos' ? 1 : 0) +
+    (filters.showExpired ? 1 : 0);
 
   const clearAll = () => setParams({
     q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
-    rodada: 'Todos', modalidade: 'Todos', desconto: '0',
+    rodada: 'Todos', modalidade: 'Todos', desconto: '0', encerrados: '0',
   });
 
-  // Esc e click-fora fecham o painel de filtros sem alterar a URL; o painel é
-  // transitório por design — sua abertura não deve empurrar histórico.
-  // O click-fora só captura cliques fora do painel E fora do botão ⚙ (senão o
-  // próprio botão ⚙ se fecha imediatamente quando clicado).
+  // Em viewports estreitas o rail vira um "drawer" (media query o esconde por
+  // padrão). Quando ele está aberto e a tela é estreita, Esc e click-fora
+  // fecham. Em telas largas o rail nunca é um drawer — fica sempre visível
+  // até o usuário apertar o «.
   useEffect(() => {
-    if (!filtersOpen) return undefined;
+    if (!railOpen) return undefined;
+    const mq = window.matchMedia('(max-width: 1100px)');
+    const isMobileViewport = mq.matches;
+    if (!isMobileViewport) return undefined;
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setFiltersOpen(false);
+      if (event.key === 'Escape') setRailOpen(false);
     };
     const onPointerDown = (event) => {
-      if (event.target.closest('.feed-filter-panel')) return;
+      if (event.target.closest('.feed-rail')) return;
       if (event.target.closest('.feed-filter-toggle')) return;
-      setFiltersOpen(false);
+      setRailOpen(false);
     };
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('pointerdown', onPointerDown);
@@ -229,7 +249,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [filtersOpen]);
+  }, [railOpen]);
 
   return (
     <div className="page feed-page">
@@ -244,10 +264,28 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         </div>
       </div>
 
-      <div className="feed-layout">
+      <div className={`feed-layout${railOpen ? '' : ' rail-collapsed'}`}>
         {/* ─── Sidebar: kind tabs + todos os filtros ─── */}
-        <aside className={`feed-rail${filtersOpen ? ' open' : ''}`} aria-label="Filtros de busca">
+        <aside
+          id="feed-rail"
+          className={`feed-rail${railOpen ? ' open' : ''}`}
+          aria-label="Filtros de busca"
+          aria-hidden={!railOpen}
+        >
           <div className="feed-rail-inner">
+            <div className="feed-rail-head">
+              <span className="uppy" style={{ color: 'var(--fg-3)' }}>Tipo de venda</span>
+              <button
+                type="button"
+                className="feed-rail-collapse"
+                onClick={() => setRailOpen(false)}
+                aria-label="Esconder filtros"
+                title="Esconder filtros"
+              >
+                «
+              </button>
+            </div>
+
             {/* Kind tabs — botões full-width empilhados verticalmente */}
             <div className="kind-tabs kind-tabs--rail" role="tablist" aria-label="Tipo de venda">
               <button
@@ -275,7 +313,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
               </button>
             </div>
 
-            {/* Filtros — empilhados */}
+            {/* Localização */}
             <div className="feed-rail-section">
               <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Localização</span>
               <div className="feed-rail-stack">
@@ -290,6 +328,18 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
               </div>
             </div>
 
+            {/* Disponibilidade — toggle de leilões já encerrados */}
+            <div className="feed-rail-section">
+              <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Disponibilidade</span>
+              <FilterSwitch
+                checked={filters.showExpired}
+                onChange={(v) => setFilters({ ...filters, showExpired: v })}
+                label="Mostrar leilões encerrados"
+                helper="Incluir imóveis cujo leilão já terminou"
+              />
+            </div>
+
+            {/* Tipo de imóvel */}
             <div className="feed-rail-section">
               <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Tipo de imóvel</span>
               <div className="feed-rail-stack">
@@ -348,21 +398,23 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
         {/* ─── Main: toolbar horizontal + resultados ─── */}
         <div className="feed-main">
-          {/* Toolbar — busca, toggle do rail (mobile), sort, view */}
+          {/* Toolbar — busca, toggle do rail, sort, view */}
           <div className="feed-toolbar" role="region" aria-label="Barra de ferramentas do feed">
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(current => !current)}
-              aria-expanded={filtersOpen}
-              aria-controls="feed-rail"
-              className={`feed-filter-toggle${filtersOpen ? ' open' : ''}`}
-            >
-              <span className="mono" aria-hidden="true">⚙</span>
-              Filtros
-              {activeFilterCount > 0 && (
-                <span className="feed-filter-count">{activeFilterCount}</span>
-              )}
-            </button>
+            {!railOpen && (
+              <button
+                type="button"
+                onClick={() => setRailOpen(true)}
+                aria-expanded={railOpen}
+                aria-controls="feed-rail"
+                className="feed-filter-toggle open"
+              >
+                <span className="mono" aria-hidden="true">⚙</span>
+                Filtros
+                {activeFilterCount > 0 && (
+                  <span className="feed-filter-count">{activeFilterCount}</span>
+                )}
+              </button>
+            )}
 
             <div className="feed-search">
               <span className="mono feed-search-icon">⌕</span>
@@ -616,5 +668,26 @@ function Empty() {
         Afrouxe um filtro e tente novamente.
       </p>
     </div>
+  );
+}
+
+// Switch iOS-style para filtros binários no rail.
+// O knob se move horizontalmente e muda de cor quando ligado. Marcar com
+// role="switch" comunica o estado binário para leitores de tela.
+function FilterSwitch({ checked, onChange, label, helper }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`feed-switch${checked ? ' on' : ''}`}
+    >
+      <span className="feed-switch-knob" aria-hidden="true"></span>
+      <span className="feed-switch-body">
+        <span className="feed-switch-label">{label}</span>
+        {helper && <span className="feed-switch-helper">{helper}</span>}
+      </span>
+    </button>
   );
 }
