@@ -69,7 +69,7 @@ no HTML do servidor, o que ainda não é feito.
 ### Lista de imóveis
 
 - O primeiro acesso oferece Criar conta/Entrar com os campos esperados de um
-  cadastro e, em seguida, um questionário de moradia em quatro etapas. Nesta
+  cadastro e, em seguida, um questionário de moradia em cinco etapas. Nesta
   base sem backend, conta e sessão funcionam somente no navegador. É possível
   explorar o catálogo sem configurar.
 - Preferências informadas pelo visitante ficam somente neste navegador. Nos

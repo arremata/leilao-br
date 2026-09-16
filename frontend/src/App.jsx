@@ -59,6 +59,7 @@ function App() {
     } catch { return []; }
   });
   const accountScreen = location.pathname === '/entrar'
+    || location.pathname === '/perfil'
     || (location.pathname === '/' && !account && !housingProfile && !location.search);
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele

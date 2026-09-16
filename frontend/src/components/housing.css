@@ -5,8 +5,8 @@
 
 .auth-shell{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(440px,1.1fr);width:100%;height:100dvh;min-height:560px;overflow:hidden;background:#fff}
 .app-shell.account-screen{height:100dvh;overflow:hidden}
-.app-shell.account-screen.preview-env{display:grid;grid-template-rows:auto minmax(0,1fr)}
-.app-shell.account-screen.preview-env .auth-shell{height:100%;min-height:0}
+.app-shell.account-screen.preview-env{display:block}
+.app-shell.account-screen.preview-env .auth-shell{height:100dvh;min-height:560px}
 .auth-story{display:flex;flex-direction:column;justify-content:space-between;gap:28px;padding:clamp(34px,5vh,58px) clamp(38px,5vw,72px);background:radial-gradient(circle at 16% 15%,rgba(124,58,237,.13),transparent 32%),linear-gradient(150deg,#f8f4ff 0%,#eee7ff 100%)}
 .auth-brand{display:flex;align-items:center;gap:10px;width:max-content;color:var(--fg-0);font-family:var(--f-display);font-size:20px;font-weight:700;letter-spacing:-.03em}
 .auth-story h1{max-width:470px;margin:18px 0;font-family:var(--f-display);font-size:clamp(38px,4vw,57px);line-height:1.06;letter-spacing:-.055em;color:var(--fg-0)}
@@ -37,4 +37,29 @@
 @media(max-height:700px) and (min-width:901px){.auth-story ul{gap:10px}.auth-story h1{font-size:42px}.auth-story p{margin-bottom:0}.auth-panel{padding-block:16px}.auth-tabs{margin-bottom:13px}.auth-card h2{font-size:28px}.auth-card .housing-fields{gap:7px;margin:9px 0}.auth-card .housing-field input{height:36px}.auth-submit{padding:10px}.auth-switch{margin-top:9px}}
 @media(max-width:900px){.auth-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr;height:100dvh;min-height:680px}.auth-story{gap:14px;padding:22px 38px}.auth-story>div{display:none}.auth-story ul{display:none}.auth-panel{padding:20px 38px}}
 @media(max-width:600px){.auth-shell{min-height:640px}.auth-story{padding:18px 23px}.auth-panel{padding:16px 23px 20px}.auth-card{max-width:420px}.auth-card h2{font-size:27px}.auth-tabs{margin-bottom:14px}.auth-card .housing-fields{gap:8px;margin:10px 0}.auth-card .housing-field input{height:38px}.auth-submit{padding:11px}.auth-switch{margin-top:10px}.housing-account>a:first-child{display:none}}
+
+.housing-onboarding{display:grid;grid-template-columns:minmax(340px,.82fr) minmax(480px,1.18fr);width:100%;max-width:none;height:100dvh;min-height:560px;margin:0;border:0;border-radius:0;overflow:hidden;background:#fff;box-shadow:none}
+.housing-welcome{display:flex;flex-direction:column;justify-content:space-between;gap:24px;padding:clamp(32px,5vh,58px) clamp(38px,5vw,70px)}
+.housing-welcome-copy{margin:auto 0}
+.housing-welcome-copy>p{margin-bottom:28px}
+.housing-welcome .housing-welcome-note{margin:0}
+.housing-questionnaire{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:clamp(28px,5vh,46px) clamp(42px,7vw,92px) 44px}
+.housing-questionnaire h2{margin:14px 0 5px;font-size:clamp(25px,3vh,31px)}
+.housing-questionnaire>.housing-muted{margin:0}
+.housing-questionnaire>.housing-fields{align-self:stretch;gap:12px;margin:16px 0}
+.housing-questionnaire .housing-field{gap:6px}
+.housing-questionnaire .housing-field input,.housing-questionnaire .housing-field select{height:40px}
+.housing-questionnaire .housing-step-bars{margin:13px 0 20px}
+.housing-form-footer{margin-top:auto;padding-top:15px}
+.housing-back,.housing-next{display:flex;align-items:center;gap:9px;font-size:11px}
+.housing-back span,.housing-next span{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:17px}
+.housing-back span{border:1px solid var(--line-1);color:var(--fg-1);background:#fff}
+.housing-next{margin-left:auto;color:var(--accent)}
+.housing-next span{color:#fff;background:var(--accent);box-shadow:0 7px 20px rgba(124,58,237,.24)}
+.housing-next:disabled{opacity:.55}
+.housing-skip{color:var(--fg-2);font-size:11px}
+.housing-questionnaire>.housing-help{margin:10px 0 0}
+
+@media(max-height:700px) and (min-width:761px){.housing-welcome h1{font-size:34px;margin:14px 0}.housing-welcome-copy>p{margin-bottom:15px}.housing-benefit{margin-top:12px}.housing-questionnaire{padding-top:22px;padding-bottom:38px}.housing-questionnaire>.housing-fields{gap:8px;margin:10px 0}.housing-questionnaire .housing-field input,.housing-questionnaire .housing-field select{height:36px}.housing-questionnaire h2{font-size:25px}.housing-questionnaire .housing-step-bars{margin:9px 0 14px}}
+@media(max-width:760px){.housing-onboarding{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:100dvh;min-height:640px;margin:0}.housing-welcome{padding:18px 23px}.housing-welcome-copy,.housing-welcome .housing-welcome-note{display:none}.housing-questionnaire{padding:18px 23px 42px}.housing-questionnaire h2{font-size:24px}.housing-questionnaire>.housing-fields{gap:9px;margin:12px 0}.housing-questionnaire .housing-field input,.housing-questionnaire .housing-field select{height:38px}.housing-questionnaire .housing-paired{gap:9px}.housing-questionnaire .housing-step-bars{margin:10px 0 15px}.housing-form-footer{padding-top:12px}.housing-next b,.housing-back b{display:none}.housing-next span,.housing-back span{width:42px;height:42px}.housing-questionnaire>.housing-help{margin-top:7px}}
 
