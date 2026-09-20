@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, NavLink, Link } from 'react-router-dom';
+import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
 import Feed from './components/Feed';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
@@ -202,7 +202,18 @@ function TopBar({ watchCount }) {
 
 function AuthMenu() {
   const { user, isAuthed, logout } = useAuth();
-  if (!isAuthed) return null;
+  const navigate = useNavigate();
+  if (!isAuthed) {
+    return (
+      <button
+        className="btn"
+        onClick={() => navigate('/', { state: { showLogin: true } })}
+        style={{ height: 30, padding: '0 10px', fontSize: 13, marginLeft: 'auto' }}
+      >
+        Entrar
+      </button>
+    );
+  }
   return (
     <div className="row gap-2" style={{ alignItems: 'center', marginLeft: 'auto' }}>
       {user?.avatar_url ? (
