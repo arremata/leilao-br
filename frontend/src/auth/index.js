@@ -1,3 +1,3 @@
 export {
-  authApi, getToken, getCachedUser, saveSession, clearSession, AuthError,
+  authApi, getToken, getValidToken, getCachedUser, saveSession, clearSession, AuthError,
 } from './api';

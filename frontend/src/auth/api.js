@@ -19,6 +19,17 @@ export function getCachedUser() {
   } catch { return null; }
 }
 
+export function getValidToken() {
+  const t = getToken();
+  if (!t) return null;
+  try {
+    const [, payload] = t.split('.');
+    const { exp } = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (exp && exp * 1000 < Date.now()) { clearSession(); return null; }
+    return t;
+  } catch { clearSession(); return null; }
+}
+
 export function saveSession({ token, user }) {
   try {
     localStorage.setItem(TOKEN_KEY, token);

@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  authApi, getCachedUser, getToken, saveSession, clearSession, AuthError,
+  authApi, getCachedUser, getToken, getValidToken, saveSession, clearSession, AuthError,
 } from './api';
 
 const AuthContext = createContext(null);
@@ -9,11 +9,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getCachedUser());
   const [synced, setSynced] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const syncStartedFor = useRef(null);
 
-  const token = getToken();
+  const token = getValidToken();
   const isAuthed = Boolean(token && user);
 
   const logout = useCallback(() => {
+    syncStartedFor.current = null;
     clearSession();
     setUser(null);
     setSynced(false);
@@ -42,6 +44,9 @@ export function AuthProvider({ children }) {
   // continuity: every later toggle/view writes server-side.
   useEffect(() => {
     if (!isAuthed || synced) return;
+    const t = getToken();
+    if (syncStartedFor.current === t) return;
+    syncStartedFor.current = t;
     let cancelled = false;
     const watched = _readIds('arremate_watched');
     const history = _readHistory('arremate_history');
