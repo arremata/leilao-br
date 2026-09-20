@@ -208,3 +208,14 @@ limitado e não destrutivo.
 - `AGENTS.md`: arquitetura, regras técnicas e changelog completo.
 - `frontend/src/components/`: comportamento atual das telas.
 - `backend/graph/contracts.py`: contrato detalhado dos dados de uma análise.
+
+## Variáveis de autenticação
+
+- `GOOGLE_CLIENT_ID` — client id OAuth do app web; o backend verifica os ID
+  tokens do Google contra essa audience.
+- `VITE_GOOGLE_CLIENT_ID` — o mesmo valor exposto ao Vite para o botão Google.
+- `JWT_SECRET` — string aleatória com pelo menos 32 bytes; assina os tokens de
+  sessão HS256 que expiram em 30 dias.
+
+A tela de consentimento OAuth precisa autorizar as origens de preview e de
+produção, além de `http://localhost:5173` para desenvolvimento local.
