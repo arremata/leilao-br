@@ -18,13 +18,20 @@ from statistics import median
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
+
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parent))
+import auth as auth_module
+import users_db as users_db_module
+from auth import AuthError
 
 PIPELINE_VERSION = "v13-area-similarity"
 
@@ -64,7 +71,7 @@ app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -72,6 +79,90 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str | None = None
     pdf_texts: str | None = None
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str
+
+
+class SyncRequest(BaseModel):
+    watched: list[int] = []
+    history: list[dict] = []
+
+
+class SavedToggleRequest(BaseModel):
+    saved: bool
+
+
+class ViewedRequest(BaseModel):
+    property_id: int
+    snapshot: dict
+
+
+async def _current_user(authorization: str | None = Header(default=None)) -> dict:
+    _, secret = auth_module.require_settings()
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Entre para continuar")
+    token = authorization.removeprefix("Bearer ").strip()
+    try:
+        payload = auth_module.verify_session_token(token, secret=secret)
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return {
+        "id": int(payload["sub"]),
+        "email": payload.get("email"),
+        "name": payload.get("name"),
+        "avatar_url": payload.get("avatar_url"),
+    }
+
+
+CurrentUser = Depends(_current_user)
+
+
+@app.post("/auth/google")
+def auth_google(body: GoogleLoginRequest):
+    client_id, secret = auth_module.require_settings()
+    try:
+        payload = auth_module.verify_google_credential(body.credential, client_id)
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    profile = auth_module.user_from_google_payload(payload)
+    with _get_engine().begin() as conn:
+        user = users_db_module.upsert_user(conn, profile)
+    token = auth_module.issue_session_token(user, secret=secret)
+    return {"token": token, "user": user}
+
+
+@app.get("/me")
+def me(user: dict = CurrentUser):
+    with _get_engine().connect() as conn:
+        saved = users_db_module.get_saved_ids(conn, user["id"])
+        viewed = users_db_module.get_viewed(conn, user["id"])
+    return {"user": user, "saved": saved, "viewed": viewed}
+
+
+@app.post("/me/sync")
+def sync(body: SyncRequest, user: dict = CurrentUser):
+    with _get_engine().begin() as conn:
+        users_db_module.sync_saved(conn, user["id"], body.watched)
+        users_db_module.sync_viewed(conn, user["id"], body.history)
+    return {"ok": True}
+
+
+@app.put("/me/saved/{property_id}")
+def set_saved_route(property_id: int, body: SavedToggleRequest, user: dict = CurrentUser):
+    with _get_engine().begin() as conn:
+        users_db_module.set_saved(conn, user["id"], property_id, body.saved)
+    return {"ok": True}
+
+
+@app.post("/me/viewed")
+def record_viewed(body: ViewedRequest, user: dict = CurrentUser):
+    with _get_engine().begin() as conn:
+        users_db_module.sync_viewed(
+            conn, user["id"], [{"id": body.property_id, "snapshot": body.snapshot}],
+        )
+    return {"ok": True}
 
 
 def _is_preview() -> bool:

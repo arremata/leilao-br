@@ -1,4 +1,14 @@
-"""Contract tests for the vercel-backend auth module."""
+"""Contract tests for the vercel-backend auth module.
+
+HTTP-level tests through the real FastAPI app.
+
+Auth endpoints delegate to module-level functions on `vercel_index.auth_module`
+and `vercel_index.users_db_module`. These tests stub those helpers and run the
+real FastAPI app via TestClient so we exercise routing + dependency injection
+without needing a live DB or the Google certs endpoint.
+"""
+
+from fastapi.testclient import TestClient
 
 from datetime import datetime, timedelta, timezone
 from importlib.util import module_from_spec, spec_from_file_location
@@ -172,3 +182,118 @@ def test_upsert_viewed_uses_jsonb_cast_on_postgres(monkeypatch):
 
     users_db._upsert_viewed(_FakeConn(), 1, 2, {"a": 1})
     assert "CAST(:s AS JSONB)" in captured["sql"]
+
+
+vercel_index = _load("index")
+
+
+def _fake_engine_with(conn):
+    class _Ctx:
+        def __enter__(self):
+            return conn
+        def __exit__(self, *exc):
+            return False
+    class _Engine:
+        def begin(self): return _Ctx()
+        def connect(self): return _Ctx()
+    return _Engine()
+
+
+def _capture_conn():
+    calls = []
+    class _Conn:
+        def execute(self, statement, params=None):
+            calls.append(params)
+            class _R:
+                def mappings(self):
+                    class _M:
+                        def one(self):
+                            return {
+                                "id": params["sub"] and 7 or 7,
+                                "email": params.get("email", "e@x.com"),
+                                "name": params.get("name"),
+                                "avatar_url": params.get("avatar"),
+                            }
+                        def all(self):
+                            return []
+                    return _M()
+                def all(self): return []
+            return _R()
+    _Conn.calls = calls
+    return _Conn()
+
+
+import pytest
+
+
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
+    monkeypatch.setenv("JWT_SECRET", "s" * 32)
+    yield TestClient(vercel_index.app)
+
+
+def test_auth_google_returns_session(client, monkeypatch):
+    monkeypatch.setattr(
+        vercel_index.auth_module, "verify_google_credential",
+        lambda cred, cid: {
+            "sub": "g-9", "email": "e@x.com", "name": "E", "picture": "p",
+            "email_verified": True,
+        },
+    )
+    monkeypatch.setattr(
+        vercel_index.users_db_module, "upsert_user",
+        lambda conn, profile: {
+            "id": 7, "email": profile["email"], "name": profile.get("name"),
+            "avatar_url": profile.get("avatar_url"),
+        },
+    )
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.post("/api/auth/google", json={"credential": "tok"})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["user"]["email"] == "e@x.com"
+    assert body["token"]
+    decoded = vercel_index.auth_module.verify_session_token(
+        body["token"], secret="s" * 32,
+    )
+    assert decoded["sub"] == "7"
+
+
+def test_auth_google_rejects_bad_credential(client, monkeypatch):
+    def boom(*_a, **_kw):
+        raise vercel_index.auth_module.AuthError("bad")
+    monkeypatch.setattr(vercel_index.auth_module, "verify_google_credential", boom)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.post("/api/auth/google", json={"credential": "x"})
+    assert res.status_code == 401
+
+
+def test_me_requires_session(client):
+    assert client.get("/api/me").status_code == 401
+
+
+def test_me_returns_profile_when_authed(client, monkeypatch):
+    user = {"id": 11, "email": "a@b.com", "name": "A", "avatar_url": None}
+    token = vercel_index.auth_module.issue_session_token(
+        user, secret="s" * 32, ttl_days=30,
+    )
+    monkeypatch.setattr(
+        vercel_index.users_db_module, "get_saved_ids", lambda conn, uid: [1, 2],
+    )
+    monkeypatch.setattr(
+        vercel_index.users_db_module, "get_viewed", lambda conn, uid: [
+            {"property_id": 5, "snapshot": {"title": "x"}, "viewed_at": "t"},
+        ],
+    )
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["user"]["email"] == "a@b.com"
+    assert body["saved"] == [1, 2]
+    assert body["viewed"][0]["property_id"] == 5
