@@ -1,0 +1,27 @@
+CREATE TABLE IF NOT EXISTS users (
+  id            BIGSERIAL PRIMARY KEY,
+  google_sub    TEXT NOT NULL UNIQUE,
+  email         TEXT NOT NULL,
+  name          TEXT,
+  avatar_url    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS user_saved_properties (
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id  BIGINT NOT NULL,
+  saved_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, property_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_viewed_properties (
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  property_id  BIGINT NOT NULL,
+  viewed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  snapshot     JSONB NOT NULL,
+  PRIMARY KEY (user_id, property_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_saved_user ON user_saved_properties(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_viewed_user ON user_viewed_properties(user_id);
