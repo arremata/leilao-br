@@ -34,7 +34,13 @@ def test_verify_google_credential_uses_google_verifier(monkeypatch):
     def fake_verify(id_token, request, audience):
         captured["token"] = id_token
         captured["audience"] = audience
-        return {"sub": "g-1", "email": "x@y.com", "name": "X", "picture": "p"}
+        return {
+            "sub": "g-1",
+            "email": "x@y.com",
+            "email_verified": True,
+            "name": "X",
+            "picture": "p",
+        }
 
     monkeypatch.setattr(auth.id_token, "verify_oauth2_token", fake_verify)
     payload = auth.verify_google_credential("tok", "client-id")
@@ -49,3 +55,17 @@ def test_verify_google_credential_rejects_bad_token(monkeypatch):
     monkeypatch.setattr(auth.id_token, "verify_oauth2_token", boom)
     with pytest.raises(auth.AuthError):
         auth.verify_google_credential("bad", "client-id")
+
+
+def test_verify_google_credential_rejects_unverified_email(monkeypatch):
+    def fake_verify(*_a, **_kw):
+        return {"sub": "g-1", "email": "x@y.com", "email_verified": False}
+
+    monkeypatch.setattr(auth.id_token, "verify_oauth2_token", fake_verify)
+    with pytest.raises(auth.AuthError):
+        auth.verify_google_credential("tok", "client-id")
+
+
+def test_user_from_google_payload_requires_email():
+    with pytest.raises(auth.AuthError):
+        auth.user_from_google_payload({"sub": "g-1", "email": ""})

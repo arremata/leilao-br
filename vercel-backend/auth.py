@@ -22,13 +22,16 @@ class AuthError(Exception):
 def verify_google_credential(credential: str, client_id: str) -> dict[str, Any]:
     """Call Google's public cert verifier and return the ID-token payload."""
     try:
-        return id_token.verify_oauth2_token(
+        payload = id_token.verify_oauth2_token(
             credential,
             google_requests.Request(),
             client_id,
         )
     except Exception as exc:  # google-auth raises ValueError subclasses
         raise AuthError("Não foi possível entrar com o Google. Tente de novo.") from exc
+    if not payload.get("email_verified"):
+        raise AuthError("Email do Google não verificado.")
+    return payload
 
 
 def issue_session_token(user: dict, *, secret: str, ttl_days: int = 30) -> str:
@@ -56,9 +59,12 @@ def verify_session_token(token: str, *, secret: str) -> dict[str, Any]:
 
 
 def user_from_google_payload(payload: dict) -> dict:
+    email = payload.get("email")
+    if not email:
+        raise AuthError("Email do Google não retornado.")
     return {
         "google_sub": payload["sub"],
-        "email": payload.get("email", ""),
+        "email": email,
         "name": payload.get("name"),
         "avatar_url": payload.get("picture"),
     }
