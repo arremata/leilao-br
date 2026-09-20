@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, NavLink, Link } from 'react-router-dom';
 import Feed from './components/Feed';
 import PropertyRoute from './components/PropertyRoute';
@@ -13,7 +13,7 @@ const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
 const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
-  const { isAuthed, synced } = useAuth();
+  const { isAuthed } = useAuth();
   const [watched, setWatched] = useState([]);
   const [history, setHistory] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -72,26 +72,45 @@ function App() {
 
   // Auth: adopt server-backed saved/viewed lists once /me sync lands. The
   // AuthContext effect emits `argos:synced` with `{ user, saved, viewed }`.
+  // Register unconditionally on mount — AuthContext may dispatch the event in
+  // the same tick it flips `synced`, before a gated effect would re-run.
   useEffect(() => {
-    if (!isAuthed || !synced) return undefined;
     const onSynced = (event) => {
-      const data = event.detail;
+      const data = event.detail || {};
       setWatched(Array.isArray(data.saved) ? data.saved : []);
       setHistory(
         Array.isArray(data.viewed)
-          ? data.viewed.map(entry => entry.snapshot).filter(Boolean)
+          ? data.viewed.map(e => e && e.snapshot).filter(Boolean)
           : [],
       );
     };
     window.addEventListener('argos:synced', onSynced);
     return () => window.removeEventListener('argos:synced', onSynced);
-  }, [isAuthed, synced]);
+  }, []);
+
+  // On logout, drop the previous session's local lists so they don't leak
+  // into the next (anonymous or different-user) session.
+  const wasAuthedRef = useRef(isAuthed);
+  useEffect(() => {
+    if (wasAuthedRef.current && !isAuthed) {
+      setWatched([]);
+      setHistory([]);
+    }
+    wasAuthedRef.current = isAuthed;
+  }, [isAuthed]);
 
   const toggleWatch = useCallback((id) => {
     setWatched(current => {
       const willSave = !current.includes(id);
       const next = willSave ? [...current, id] : current.filter(x => x !== id);
-      if (isAuthed) authApi.setSaved(id, willSave).catch(() => {});
+      if (isAuthed) {
+        authApi.setSaved(id, willSave).catch(() => {
+          // Roll the optimistic toggle back if the server write failed.
+          setWatched(now => (willSave
+            ? now.filter(x => x !== id)
+            : [...now, id]));
+        });
+      }
       return next;
     });
   }, [isAuthed]);
@@ -112,7 +131,9 @@ function App() {
     };
     setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
     if (isAuthed) {
-      authApi.recordViewed(prop.id, entry).catch(() => {});
+      authApi.recordViewed(prop.id, entry).catch((err) => {
+        console.warn('Falha ao registrar visita no servidor:', err);
+      });
     }
   }, [isAuthed]);
 
