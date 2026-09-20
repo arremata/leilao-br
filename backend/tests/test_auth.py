@@ -26,17 +26,15 @@ users_db = _load("users_db")
 
 
 def _fresh_conn():
-    """Return a live SQLite connection with the schema pre-created.
+    """Return an open SQLite connection with the schema pre-created.
 
-    Returns a generator that yields exactly one open connection. Callers use
-    ``next(_fresh_conn())``; the generator object is intentionally leaked so
-    the connection stays open for the duration of the test (Python reclaims
-    both when the test process moves on).
+    The caller owns the connection and never closes it — the pytest process
+    exits cleanly and the in-memory database evaporates. Schema DDL runs in
+    its own transaction and commits before any test body executes.
     """
-    def _gen():
-        engine = create_engine("sqlite://")
-        conn = engine.connect()
-        conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+    engine = create_engine("sqlite://")
+    conn = engine.connect()
+    with conn.begin():
         conn.exec_driver_sql(
             """
             CREATE TABLE users (
@@ -58,15 +56,7 @@ def _fresh_conn():
             " viewed_at TEXT DEFAULT CURRENT_TIMESTAMP, snapshot TEXT,"
             " PRIMARY KEY (user_id, property_id))"
         )
-        yield conn
-        conn.close()
-        engine.dispose()
-    gen = _gen()
-    conn = next(gen)
-    # Attach the generator to the connection so it isn't GC'd (which would
-    # close the connection mid-test via the `finally`-equivalent cleanup).
-    conn._argos_schema_gen = gen  # type: ignore[attr-defined]
-    return iter([conn])
+    return conn
 
 
 def test_issue_and_verify_session_round_trip():
@@ -128,7 +118,7 @@ def test_user_from_google_payload_requires_email():
 
 
 def test_upsert_user_is_idempotent_and_tracks_login():
-    conn = next(_fresh_conn())
+    conn = _fresh_conn()
     first = users_db.upsert_user(conn, {
         "google_sub": "g-1", "email": "x@y.com", "name": "X", "avatar_url": "p",
     })
@@ -142,7 +132,7 @@ def test_upsert_user_is_idempotent_and_tracks_login():
 
 
 def test_sync_merges_localstorage_into_server_rows():
-    conn = next(_fresh_conn())
+    conn = _fresh_conn()
     user = users_db.upsert_user(conn, {
         "google_sub": "g-2", "email": "a@b.com", "name": "A", "avatar_url": None,
     })
@@ -159,10 +149,26 @@ def test_sync_merges_localstorage_into_server_rows():
 
 
 def test_unsave_removes_row():
-    conn = next(_fresh_conn())
+    conn = _fresh_conn()
     user = users_db.upsert_user(conn, {
         "google_sub": "g-3", "email": "a@b.com", "name": "A", "avatar_url": None,
     })
     users_db.set_saved(conn, user["id"], 30, True)
+    assert users_db.get_saved_ids(conn, user["id"]) == [30]
     users_db.set_saved(conn, user["id"], 30, False)
     assert users_db.get_saved_ids(conn, user["id"]) == []
+
+
+def test_upsert_viewed_uses_jsonb_cast_on_postgres(monkeypatch):
+    captured = {}
+
+    class _FakeConn:
+        class dialect:
+            name = "postgresql"
+
+        def execute(self, statement, params):
+            captured["sql"] = str(statement)
+            captured["params"] = params
+
+    users_db._upsert_viewed(_FakeConn(), 1, 2, {"a": 1})
+    assert "CAST(:s AS JSONB)" in captured["sql"]

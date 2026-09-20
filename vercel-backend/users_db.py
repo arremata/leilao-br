@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 
 def upsert_user(conn, profile: dict) -> dict:
-    conn.execute(
+    row = conn.execute(
         text(
             """
             INSERT INTO users (google_sub, email, name, avatar_url, last_login_at)
@@ -19,6 +19,7 @@ def upsert_user(conn, profile: dict) -> dict:
               name = EXCLUDED.name,
               avatar_url = EXCLUDED.avatar_url,
               last_login_at = CURRENT_TIMESTAMP
+            RETURNING id, email, name, avatar_url
             """
         ),
         {
@@ -27,10 +28,6 @@ def upsert_user(conn, profile: dict) -> dict:
             "name": profile.get("name"),
             "avatar": profile.get("avatar_url"),
         },
-    )
-    row = conn.execute(
-        text("SELECT id, email, name, avatar_url FROM users WHERE google_sub = :sub"),
-        {"sub": profile["google_sub"]},
     ).mappings().one()
     return dict(row)
 
@@ -50,7 +47,7 @@ def get_viewed(conn, user_id: int) -> list[dict]:
     rows = conn.execute(
         text(
             "SELECT property_id, snapshot, viewed_at FROM user_viewed_properties"
-            " WHERE user_id = :u ORDER BY viewed_at DESC"
+            " WHERE user_id = :u ORDER BY viewed_at DESC, property_id DESC"
         ),
         {"u": user_id},
     ).mappings().all()
@@ -87,8 +84,16 @@ def set_saved(conn, user_id: int, property_id: int, saved: bool) -> None:
 
 
 def sync_saved(conn, user_id: int, property_ids: Iterable[int]) -> None:
-    for pid in dict.fromkeys(property_ids):  # dedupe, keep order
-        set_saved(conn, user_id, int(pid), True)
+    ids = [int(p) for p in dict.fromkeys(property_ids)]
+    if not ids:
+        return
+    conn.execute(
+        text(
+            "INSERT INTO user_saved_properties (user_id, property_id)"
+            " VALUES (:u, :p) ON CONFLICT (user_id, property_id) DO NOTHING"
+        ),
+        [{"u": user_id, "p": pid} for pid in ids],
+    )
 
 
 def sync_viewed(conn, user_id: int, entries: Iterable[dict]) -> None:
