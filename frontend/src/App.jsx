@@ -6,25 +6,18 @@ import Watchlist from './components/Watchlist';
 import History from './components/History';
 import NotFound from './components/NotFound';
 import { fetchCatalog } from './api';
+import { useAuth } from './auth/AuthContext';
+import { authApi } from './auth';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
 const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
-  const [watched, setWatched] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch { return []; }
-  });
+  const { isAuthed, synced } = useAuth();
+  const [watched, setWatched] = useState([]);
+  const [history, setHistory] = useState([]);
   const [properties, setProperties] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
-  const [history, setHistory] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch { return []; }
-  });
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
@@ -40,14 +33,6 @@ function App() {
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('arremate_watched', JSON.stringify(watched));
-  }, [watched]);
-
-  useEffect(() => {
-    localStorage.setItem('arremate_history', JSON.stringify(history));
-  }, [history]);
 
   // Fade-in: observe .fade-in elements and add .is-visible
   useEffect(() => {
@@ -85,9 +70,31 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Auth: adopt server-backed saved/viewed lists once /me sync lands. The
+  // AuthContext effect emits `argos:synced` with `{ user, saved, viewed }`.
+  useEffect(() => {
+    if (!isAuthed || !synced) return undefined;
+    const onSynced = (event) => {
+      const data = event.detail;
+      setWatched(Array.isArray(data.saved) ? data.saved : []);
+      setHistory(
+        Array.isArray(data.viewed)
+          ? data.viewed.map(entry => entry.snapshot).filter(Boolean)
+          : [],
+      );
+    };
+    window.addEventListener('argos:synced', onSynced);
+    return () => window.removeEventListener('argos:synced', onSynced);
+  }, [isAuthed, synced]);
+
   const toggleWatch = useCallback((id) => {
-    setWatched(w => w.includes(id) ? w.filter(x => x !== id) : [...w, id]);
-  }, []);
+    setWatched(current => {
+      const willSave = !current.includes(id);
+      const next = willSave ? [...current, id] : current.filter(x => x !== id);
+      if (isAuthed) authApi.setSaved(id, willSave).catch(() => {});
+      return next;
+    });
+  }, [isAuthed]);
 
   const clearHistory = useCallback(() => setHistory([]), []);
 
@@ -104,7 +111,10 @@ function App() {
       modalidade: prop.modalidade, endsAt: prop.endsAt,
     };
     setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
-  }, []);
+    if (isAuthed) {
+      authApi.recordViewed(prop.id, entry).catch(() => {});
+    }
+  }, [isAuthed]);
 
   return (
     <div className="app-shell">
@@ -163,8 +173,42 @@ function TopBar({ watchCount }) {
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
         </nav>
+        <AuthMenu />
       </div>
     </header>
+  );
+}
+
+function AuthMenu() {
+  const { user, isAuthed, logout } = useAuth();
+  if (!isAuthed) return null;
+  return (
+    <div className="row gap-2" style={{ alignItems: 'center', marginLeft: 'auto' }}>
+      {user?.avatar_url ? (
+        <img
+          src={user.avatar_url}
+          alt=""
+          referrerPolicy="no-referrer"
+          style={{ width: 28, height: 28, borderRadius: '50%' }}
+        />
+      ) : (
+        <span
+          className="logo"
+          aria-hidden
+          style={{ width: 28, height: 28, display: 'inline-block' }}
+        />
+      )}
+      <span style={{ fontSize: 14, color: 'var(--fg-1)' }}>
+        {user?.name || user?.email}
+      </span>
+      <button
+        className="btn"
+        onClick={logout}
+        style={{ height: 30, padding: '0 10px', fontSize: 13 }}
+      >
+        Sair
+      </button>
+    </div>
   );
 }
 
