@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 15 de setembro de 2026.
+Última atualização: 16 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -35,7 +35,7 @@ um MVP em evolução, concentrado no catálogo imobiliário da Caixa.
 
 O usuário principal é uma pessoa comprando um imóvel **para morar**. Ela não
 conhece o vocabulário de leilão, não quer aprendê-lo e não vai perguntar: vai
-fechar a aba. Ela tem quatro perguntas, nesta ordem:
+fechar a aba. Ela tem cinco perguntas, nesta ordem:
 
 1. Quanto vou pagar no total, até a chave estar na minha mão?
 2. Tem alguém morando? Quando eu consigo entrar?
@@ -68,7 +68,18 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Lista de imóveis
 
-- É a entrada principal do produto; não existe um Dashboard separado.
+- O primeiro acesso oferece Criar conta/Entrar com os campos esperados de um
+  cadastro e, em seguida, um questionário de moradia em cinco etapas. Nesta
+  base sem backend, conta e sessão funcionam somente no navegador. É possível
+  explorar o catálogo sem configurar.
+- Preferências informadas pelo visitante ficam somente neste navegador. Nos
+  próximos acessos, a lista abre com região, tipo, quartos/vagas e orçamento
+  configurados, com ajustes laterais e opção de explorar todos os imóveis.
+- A triagem de orçamento soma preço inicial e reserva informada para extras;
+  sem reserva, não restringe os resultados pelo orçamento. Não garante custo
+  final, financiamento, economia ou prazo de desocupação.
+- Trabalho, trajeto, aluguel e forma de pagamento são preferências registradas;
+  cálculo de trajeto e comparação aluguel × financiamento ainda não existem.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.
@@ -108,8 +119,9 @@ ação equivalente à modalidade.
 
 - Salvos e Vistos existem sem login.
 - Esses dados ficam somente no navegador da pessoa.
-- Não existe conta de usuário, sincronização entre dispositivos ou identidade
-  fictícia na interface.
+- Não existe conta no servidor, recuperação de senha, verificação de e-mail,
+  sincronização entre dispositivos ou identidade validada. A base local de
+  conta existe para validar o fluxo e ser conectada ao backend depois.
 
 ## Dados e confiança
 
@@ -168,14 +180,16 @@ venda, sem inventar um edital individual inexistente.
    A interface não usa "análise jurídica", "parecer", "assessoria jurídica" nem
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
-5. **Sem personalização fictícia:** enquanto não houver autenticação, não há
-   perfil, atividade ou recomendação atribuída a uma pessoa imaginária.
+5. **Sem personalização fictícia:** a interface usa somente nome, conta local e
+   preferências preenchidos pela própria pessoa. A sessão local não equivale a
+   autenticação de produção.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 
 ## Ainda não disponível
 
-- Autenticação, contas e sincronização entre dispositivos.
+- Autenticação e contas no servidor, recuperação de senha, verificação de e-mail
+  e sincronização entre dispositivos.
 - Mapa nacional e agregação de todos os leiloeiros do Brasil.
 - Alertas configuráveis e exportação CSV.
 - Parecer ou assistente jurídico operacional.

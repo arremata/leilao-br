@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, NavLink, Link, useNavigate } from 'react-router-dom';
-import Feed from './components/Feed';
+import { Routes, Route, NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import HousingFeed from './components/HousingFeed';
+import HousingQuestionnaire from './components/HousingQuestionnaire';
+import HousingLogin from './components/HousingLogin';
+import { readHousingProfile, saveHousingProfile } from './housingStorage';
+import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
@@ -13,11 +17,65 @@ const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
 const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
-  const { isAuthed } = useAuth();
-  const [watched, setWatched] = useState([]);
-  const [history, setHistory] = useState([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user: authUser, isAuthed, logout: authLogout } = useAuth();
+  // Local email/password account is their prototype layer; the real session is
+  // AuthContext. When a Google login lands, AuthContext's user takes over.
+  const [account, setAccount] = useState(() => {
+    try { return readLocalSession(); } catch { return null; }
+  });
+  const [housingProfile, setHousingProfile] = useState(() => {
+    try { return readHousingProfile(); } catch { return null; }
+  });
+  const [housingSearch, setHousingSearch] = useState(null);
+  const [watched, setWatched] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch { return []; }
+  });
+  const [history, setHistory] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch { return []; }
+  });
   const [properties, setProperties] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const cities = [...new Set(properties.map(p => p.city).filter(Boolean))].sort();
+
+  // Two user sources: Google (authUser) wins over local email/password (account).
+  // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
+  // hits the real backend; the email/password form stays as the local prototype.
+  const effectiveAccount = authUser || account;
+
+  const saveProfile = useCallback(async (profile) => {
+    const saved = saveHousingProfile(profile);
+    setHousingProfile(saved);
+    setHousingSearch(null);
+  }, []);
+  const signUp = useCallback(async (input) => {
+    const user = await createLocalAccount(input);
+    setAccount(user);
+    return user;
+  }, []);
+  const signIn = useCallback(async (input) => {
+    const user = await signInLocal(input);
+    setAccount(user);
+    return user;
+  }, []);
+  const signOut = useCallback(() => {
+    signOutLocal();
+    authLogout();
+    setAccount(null);
+    setHousingSearch(null);
+    navigate('/entrar');
+  }, [navigate, authLogout]);
+
+  const accountScreen = location.pathname === '/entrar'
+    || location.pathname === '/perfil'
+    || (location.pathname === '/' && !effectiveAccount && !location.search);
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
@@ -33,6 +91,15 @@ function App() {
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // Local persistence always-on; server sync layers on top when authed.
+  useEffect(() => {
+    localStorage.setItem('arremate_watched', JSON.stringify(watched));
+  }, [watched]);
+
+  useEffect(() => {
+    localStorage.setItem('arremate_history', JSON.stringify(history));
+  }, [history]);
 
   // Fade-in: observe .fade-in elements and add .is-visible
   useEffect(() => {
@@ -138,23 +205,33 @@ function App() {
   }, [isAuthed]);
 
   return (
-    <div className="app-shell">
-      {isPreview && (
+    <div className={`app-shell${accountScreen ? ' account-screen' : ''}${isPreview ? ' preview-env' : ''}`}>
+      {isPreview && !accountScreen && (
         <div className="preview-banner" role="status">
-          Ambiente de validação · dados reais de produção
+          Preview · dados reais
           {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
-      <TopBar watchCount={watched.length} />
+      {!accountScreen && <TopBar watchCount={watched.length} account={effectiveAccount} onSignOut={signOut} />}
       <Routes>
         <Route path="/" element={
-          <Feed
+          <HousingEntry
+            profile={housingProfile}
+            account={effectiveAccount}
+            onSignUp={signUp}
+            onSignIn={signIn}
+            onSave={saveProfile}
+            appliedProfile={housingSearch}
+            onApply={setHousingSearch}
+            cities={cities}
             watched={watched}
             toggleWatch={toggleWatch}
             properties={properties}
             loading={catalogLoading}
           />
         } />
+        <Route path="/entrar" element={<HousingLogin onSignUp={signUp} onSignIn={signIn} initialMode={effectiveAccount ? 'signin' : 'signup'} signedInDestination={housingProfile ? '/' : '/perfil'} />} />
+        <Route path="/perfil" element={effectiveAccount ? <HousingQuestionnaire key={JSON.stringify(housingProfile)} initialProfile={housingProfile} cities={cities} onSave={saveProfile} /> : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
         <Route path="/imovel/:id" element={
           <PropertyRoute
             properties={properties}
@@ -175,7 +252,7 @@ function App() {
   );
 }
 
-function TopBar({ watchCount }) {
+function TopBar({ watchCount, account, onSignOut }) {
   return (
     <header className="topbar">
       <div id="argos-progress" style={{
@@ -194,54 +271,32 @@ function TopBar({ watchCount }) {
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
         </nav>
-        <AuthMenu />
+        <div className="housing-account">
+          {account ? (
+            <>
+              <Link to="/perfil">{account.name?.split(' ')[0] || account.email} · Meu perfil</Link>
+              <button type="button" className="btn ghost sm" onClick={onSignOut}>Sair</button>
+            </>
+          ) : (
+            <>
+              <Link to="/entrar">Entrar</Link>
+              <Link className="btn primary sm" to="/entrar">Criar conta</Link>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
 }
 
-function AuthMenu() {
-  const { user, isAuthed, logout } = useAuth();
-  const navigate = useNavigate();
-  if (!isAuthed) {
-    return (
-      <button
-        className="btn"
-        onClick={() => navigate('/', { state: { showLogin: true } })}
-        style={{ height: 30, padding: '0 10px', fontSize: 13, marginLeft: 'auto' }}
-      >
-        Entrar
-      </button>
-    );
+function HousingEntry(props) {
+  const [params] = useSearchParams();
+  // Existing shared feed URLs and public property URLs stay accessible.
+  if ((!props.account || !props.profile) && !props.appliedProfile && params.size === 0) {
+    if (!props.account) return <HousingLogin onSignUp={props.onSignUp} onSignIn={props.onSignIn} signedInDestination={props.profile ? '/' : '/perfil'} />;
+    return <HousingQuestionnaire initialProfile={props.profile} cities={props.cities} onSave={props.onSave} />;
   }
-  return (
-    <div className="row gap-2" style={{ alignItems: 'center', marginLeft: 'auto' }}>
-      {user?.avatar_url ? (
-        <img
-          src={user.avatar_url}
-          alt=""
-          referrerPolicy="no-referrer"
-          style={{ width: 28, height: 28, borderRadius: '50%' }}
-        />
-      ) : (
-        <span
-          className="logo"
-          aria-hidden
-          style={{ width: 28, height: 28, display: 'inline-block' }}
-        />
-      )}
-      <span style={{ fontSize: 14, color: 'var(--fg-1)' }}>
-        {user?.name || user?.email}
-      </span>
-      <button
-        className="btn"
-        onClick={logout}
-        style={{ height: 30, padding: '0 10px', fontSize: 13 }}
-      >
-        Sair
-      </button>
-    </div>
-  );
+  return <HousingFeed {...props} />;
 }
 
 export default App;

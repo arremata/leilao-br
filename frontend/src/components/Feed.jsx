@@ -45,14 +45,14 @@ function readParams(searchParams) {
   };
 }
 
-export default function Feed({ watched, toggleWatch, properties, loading = false }) {
+export default function Feed({ watched, toggleWatch, properties, loading = false, embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
   // Mobile: railOpen controla se o rail aparece ou não E ("drawer" aberto/fechado).
   // Desktop: rail também começa aberto. O clique no « fecha, e o botão ⚙ na
   // toolbar volta a abrir.
-  const [railOpen, setRailOpen] = useState(true);
+  const [railOpen, setRailOpen] = useState(() => !embedded);
   const PAGE_SIZE = 12;
 
   // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
