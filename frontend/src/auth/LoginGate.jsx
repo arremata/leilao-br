@@ -9,6 +9,11 @@ export default function LoginGate({ children }) {
   const location = useLocation();
   const isPublic = PUBLIC_PATH.test(location.pathname);
 
+  // Preview builds (Vercel PR previews) render without login, so ephemeral
+  // preview URLs don't need to be in the Google OAuth whitelist. Preview data
+  // stays localStorage-only; nothing is synced to a real account.
+  if (import.meta.env.VITE_DEPLOY_ENV === 'preview') return children;
+
   if (isAuthed || isPublic) return children;
   return <LoginScreen sessionExpired={sessionExpired} />;
 }
