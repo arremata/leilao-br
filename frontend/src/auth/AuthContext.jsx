@@ -1,9 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   authApi, getCachedUser, getToken, getValidToken, saveSession, clearSession, AuthError,
 } from './api';
-
-const AuthContext = createContext(null);
+import { AuthContext } from './context';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getCachedUser());
@@ -101,10 +100,4 @@ function _readHistory(key) {
       .filter(entry => entry && Number.isFinite(Number(entry.id)))
       .map(entry => ({ id: Number(entry.id), snapshot: entry }));
   } catch { return []; }
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
 }

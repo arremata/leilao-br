@@ -10,7 +10,7 @@ import Watchlist from './components/Watchlist';
 import History from './components/History';
 import NotFound from './components/NotFound';
 import { fetchCatalog } from './api';
-import { useAuth } from './auth/AuthContext';
+import { useAuth } from './auth/useAuth';
 import { authApi } from './auth';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
