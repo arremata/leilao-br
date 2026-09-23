@@ -4,7 +4,7 @@ import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
-import { shouldShowHousingOnboarding } from './housingEntry';
+import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
@@ -74,9 +74,12 @@ function App() {
     navigate('/entrar');
   }, [navigate, authLogout]);
 
-  const accountScreen = location.pathname === '/entrar'
-    || location.pathname === '/perfil'
-    || (location.pathname === '/' && !effectiveAccount && !location.search);
+  const accountScreen = shouldUseAccountScreen({
+    pathname: location.pathname,
+    isPreview,
+    account: effectiveAccount,
+    hasSearch: Boolean(location.search),
+  });
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
