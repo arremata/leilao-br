@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyHousingProfile, filterHousingProperties, validateHousingProfile } from './housingProfile.js';
+import {
+  emptyHousingProfile,
+  filterHousingProperties,
+  housingBudgetLabel,
+  validateHousingProfile,
+} from './housingProfile.js';
 import { readHousingProfile, saveHousingProfile } from './housingStorage.js';
 
 const properties = [
@@ -13,32 +18,35 @@ const profile = patch => ({ ...emptyHousingProfile, ...patch });
 test('normalizes location and excludes land from the housing search', () => {
   assert.deepEqual(filterHousingProperties(properties, profile({ city: ' londrina ', neighborhood: 'céntro' })).map(p => p.id), [1, 4]);
 });
-test('requires known bedroom and parking counts when marked essential', () => {
-  assert.deepEqual(filterHousingProperties(properties, profile({ beds: 2, parking: 1 })).map(p => p.id), [1]);
+test('filters the selected property type', () => {
+  assert.deepEqual(filterHousingProperties(properties, profile({ propertyType: 'Casa' })).map(p => p.id), [2, 4]);
 });
-test('budget includes the reserve and never treats unknown price as zero', () => {
-  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 220000, reserve: 30000 })), []);
-  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 230000, reserve: 30000 })).map(p => p.id), [1, 2]);
+test('budget choices cap the initial property price and reject unknown prices', () => {
+  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 199999 })), []);
+  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 200000 })).map(p => p.id), [1, 2]);
 });
-test('blank reserve prevents an unsupported all-in budget classification', () => {
-  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 100000, reserve: '' })).map(p => p.id), [1, 2, 4]);
-});
-test('explicit zero reserve is distinct from unknown reserve', () => {
-  assert.deepEqual(filterHousingProperties(properties, profile({ budget: 200000, reserve: 0 })).map(p => p.id), [1, 2]);
-});
-test('routine and financing preferences do not silently filter by unavailable data', () => {
-  assert.deepEqual(filterHousingProperties(properties, profile({ payment: 'Com financiamento', work: 'Centro', commute: '15' })).map(p => p.id), [1, 2, 4]);
+test('blank budget keeps properties with an unknown price in discovery', () => {
+  assert.deepEqual(filterHousingProperties(properties, profile({ budget: '' })).map(p => p.id), [1, 2, 4]);
 });
 test('rejects malformed profiles and unsafe numeric values', () => {
-  for (const value of [[], null, { budget: -1 }, { reserve: 'abc' }, { monthly: 'Infinity' }]) assert.equal(validateHousingProfile(value), null);
+  for (const value of [[], null, { budget: -1 }, { budget: 'Infinity' }]) assert.equal(validateHousingProfile(value), null);
   assert.equal(validateHousingProfile({ city: 'Curitiba', secret: 'not kept' }).secret, undefined);
+  assert.equal(validateHousingProfile({ city: 'Curitiba', reserve: 20000, beds: 2 }).reserve, undefined);
   assert.equal(validateHousingProfile({ city: 'x'.repeat(500) }).city.length, 300);
 });
-test('browser adapter round-trips a versioned profile and ignores corrupt storage', () => {
+test('budget labels use the visible onboarding choices', () => {
+  assert.equal(housingBudgetLabel('250000'), 'Até R$ 250 mil');
+  assert.equal(housingBudgetLabel(''), 'Ainda não sei');
+});
+test('browser adapter removes retired fields while migrating a stored profile', () => {
   let stored;
   const storage = { getItem: () => stored, setItem: (_key, value) => { stored = value; } };
-  saveHousingProfile(profile({ city: 'Londrina', budget: 250000, reserve: 20000 }), storage);
+  stored = JSON.stringify({ version: 1, profile: { city: 'Londrina', budget: 250000, reserve: 20000, work: 'Centro' } });
   assert.equal(readHousingProfile(storage).city, 'Londrina');
+  assert.equal(JSON.parse(stored).version, 2);
+  assert.equal(JSON.parse(stored).profile.reserve, undefined);
+  saveHousingProfile(profile({ city: 'Londrina', budget: 250000 }), storage);
+  assert.equal(readHousingProfile(storage).budget, '250000');
   stored = '{broken';
   assert.equal(readHousingProfile(storage), null);
   stored = JSON.stringify({ version: 99, profile: profile() });

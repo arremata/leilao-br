@@ -69,19 +69,19 @@ no HTML do servidor, o que ainda não é feito.
 ### Lista de imóveis
 
 - O primeiro acesso oferece Criar conta/Entrar e, em seguida, um questionário de
-  moradia em cinco etapas. Entrar com Google cria uma sessão de 30 dias no
-  servidor; o formulário de e-mail e senha continua sendo um protótipo somente
-  deste navegador. É possível explorar o catálogo sem configurar.
+  moradia em três escolhas: cidade, tipo de imóvel e faixa de preço. Entrar com
+  Google cria uma sessão de 30 dias no servidor; o formulário de e-mail e senha
+  continua sendo um protótipo somente deste navegador. É possível explorar o
+  catálogo sem configurar.
 - Previews de branch abrem diretamente no catálogo público, sem exigir conta,
   para que a validação use os imóveis reais sem criar identidades de teste.
-- Preferências informadas pelo visitante ficam somente neste navegador. Nos
-  próximos acessos, a lista abre com região, tipo, quartos/vagas e orçamento
-  configurados, com ajustes laterais e opção de explorar todos os imóveis.
-- A triagem de orçamento soma preço inicial e reserva informada para extras;
-  sem reserva, não restringe os resultados pelo orçamento. Não garante custo
-  final, financiamento, economia ou prazo de desocupação.
-- Trabalho, trajeto, aluguel e forma de pagamento são preferências registradas;
-  cálculo de trajeto e comparação aluguel × financiamento ainda não existem.
+- Preferências de moradia ficam neste navegador. Nos próximos acessos, a lista
+  única de todos os imóveis abre com cidade, tipo e faixa de preço já aplicados.
+  Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
+  tudo sem perder o perfil salvo.
+- A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
+  eventual desocupação e outras despesas continuam explicadas em cada imóvel;
+  a faixa não garante custo final nem aprovação de financiamento.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.

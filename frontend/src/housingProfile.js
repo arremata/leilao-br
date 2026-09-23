@@ -1,9 +1,21 @@
 export const emptyHousingProfile = {
-  city: '', neighborhood: '', propertyType: 'Todos', beds: 0, parking: 0,
-  budget: '', reserve: '', cash: '', monthly: '', payment: 'Ainda estou avaliando',
-  fgts: 'Ainda não sei', credit: 'Ainda não consultei', timing: 'Ainda não defini',
-  work: '', transport: 'Carro', commute: '30', rent: '',
+  city: '', neighborhood: '', propertyType: 'Todos', budget: '',
 };
+
+export const housingBudgetOptions = [
+  { value: '150000', label: 'Até R$ 150 mil' },
+  { value: '250000', label: 'Até R$ 250 mil' },
+  { value: '400000', label: 'Até R$ 400 mil' },
+  { value: '600000', label: 'Até R$ 600 mil' },
+  { value: '1000000', label: 'Até R$ 1 milhão' },
+  { value: '', label: 'Ainda não sei' },
+];
+
+export function housingBudgetLabel(value) {
+  return housingBudgetOptions.find(option => option.value === String(value ?? ''))?.label
+    || `Até R$ ${Number(value).toLocaleString('pt-BR')}`;
+}
+
 const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
 export function validateHousingProfile(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -11,7 +23,7 @@ export function validateHousingProfile(value) {
   Object.keys(profile).forEach(key => {
     if (typeof value[key] === 'string' || typeof value[key] === 'number') profile[key] = String(value[key]).slice(0, 300);
   });
-  for (const key of ['budget', 'reserve', 'cash', 'monthly', 'rent', 'beds', 'parking']) {
+  for (const key of ['budget']) {
     if (profile[key] !== '' && (!Number.isFinite(Number(profile[key])) || Number(profile[key]) < 0)) return null;
   }
   if (!['Todos', 'Casa', 'Apartamento'].includes(profile.propertyType)) profile.propertyType = 'Todos';
@@ -24,13 +36,9 @@ export function filterHousingProperties(properties, profile) {
     if (profile.city && normalize(p.city) !== normalize(profile.city)) return false;
     if (profile.neighborhood && !normalize(p.neighborhood).includes(normalize(profile.neighborhood))) return false;
     if (profile.propertyType !== 'Todos' && normalize(p.type) !== normalize(profile.propertyType)) return false;
-    if (Number(profile.beds) > 0 && !(Number(p.beds) >= Number(profile.beds))) return false;
-    if (Number(profile.parking) > 0 && !(Number(p.parking) >= Number(profile.parking))) return false;
-    // Só filtramos o orçamento quando a pessoa informou uma reserva. Ela é
-    // uma premissa, nunca confirmação de que cobre todas as despesas.
-    if (Number(profile.budget) > 0 && profile.reserve !== '') {
+    if (Number(profile.budget) > 0) {
       if (!Number.isFinite(Number(p.minBid)) || !(Number(p.minBid) > 0)) return false;
-      if (Number(p.minBid) + Number(profile.reserve) > Number(profile.budget)) return false;
+      if (Number(p.minBid) > Number(profile.budget)) return false;
     }
     return true;
   });

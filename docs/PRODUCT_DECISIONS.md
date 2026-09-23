@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 15 de setembro de 2026.
+Última atualização: 22 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -19,18 +19,22 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
-### PD-008 — Organizar a busca pelas preferências de quem vai morar
+### PD-014 — Perguntar somente o que organiza a primeira busca
 
-- **Data:** 16 de setembro de 2026
+- **Data:** 22 de setembro de 2026
 - **Estado:** Ativa
-- **Decisão:** oferecer um questionário inicial de moradia e abrir a lista pelas
-  preferências salvas, mantendo ajustes na própria tela e exploração livre.
-- **Motivo:** encontrar um lar começa pela região, rotina e orçamento da pessoa.
-- **Consequências:** nesta etapa, conta, sessão e preferências funcionam somente
-  no navegador, sem conta no servidor ou banco. A reserva de extras é uma premissa informada,
-  e trajetos/comparações financeiras ficam explicitamente como evolução futura.
-  Esta decisão substitui a restrição da PD-002 e evolui a entrada descrita na
-  PD-003 sem criar um Dashboard separado.
+- **Decisão:** o questionário inicial pede somente cidade, tipo de imóvel e faixa
+  de preço, com escolhas grandes em vez de formulários extensos. A lista única de
+  todos os imóveis abre com essas preferências aplicadas e permite retirar cada
+  filtro ou limpar todos.
+- **Motivo:** a entrada precisa levar rapidamente a imóveis relevantes; quartos,
+  vagas, prazo de mudança, reserva para extras, pagamento e rotina exigiam dados
+  demais antes de a pessoa conhecer o catálogo.
+- **Consequências:** bairro continua como ajuste opcional na lista. A faixa de
+  preço limita apenas o valor inicial do imóvel e nunca representa o custo total;
+  taxas, reforma, eventual desocupação e condições de pagamento ficam no detalhe.
+  O perfil salvo permanece disponível para restaurar depois de explorar sem os
+  filtros.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 
