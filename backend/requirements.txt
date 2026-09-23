@@ -21,3 +21,4 @@ curl_cffi>=0.11,<0.15
 # google-auth and PyJWT. Mirrors vercel-backend/requirements.txt.
 google-auth>=2.30.0
 PyJWT>=2.8.0
+requests>=2.32.0

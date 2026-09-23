@@ -4,6 +4,7 @@ import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
+import { shouldShowHousingOnboarding } from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
@@ -292,7 +293,13 @@ function TopBar({ watchCount, account, onSignOut }) {
 function HousingEntry(props) {
   const [params] = useSearchParams();
   // Existing shared feed URLs and public property URLs stay accessible.
-  if ((!props.account || !props.profile) && !props.appliedProfile && params.size === 0) {
+  if (shouldShowHousingOnboarding({
+    isPreview,
+    account: props.account,
+    profile: props.profile,
+    appliedProfile: props.appliedProfile,
+    searchParamCount: params.size,
+  })) {
     if (!props.account) return <HousingLogin onSignUp={props.onSignUp} onSignIn={props.onSignIn} signedInDestination={props.profile ? '/' : '/perfil'} />;
     return <HousingQuestionnaire initialProfile={props.profile} cities={props.cities} onSave={props.onSave} />;
   }

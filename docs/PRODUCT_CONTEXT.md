@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 16 de setembro de 2026.
+Última atualização: 22 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -68,10 +68,12 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Lista de imóveis
 
-- O primeiro acesso oferece Criar conta/Entrar com os campos esperados de um
-  cadastro e, em seguida, um questionário de moradia em cinco etapas. Nesta
-  base sem backend, conta e sessão funcionam somente no navegador. É possível
-  explorar o catálogo sem configurar.
+- O primeiro acesso oferece Criar conta/Entrar e, em seguida, um questionário de
+  moradia em cinco etapas. Entrar com Google cria uma sessão de 30 dias no
+  servidor; o formulário de e-mail e senha continua sendo um protótipo somente
+  deste navegador. É possível explorar o catálogo sem configurar.
+- Previews de branch abrem diretamente no catálogo público, sem exigir conta,
+  para que a validação use os imóveis reais sem criar identidades de teste.
 - Preferências informadas pelo visitante ficam somente neste navegador. Nos
   próximos acessos, a lista abre com região, tipo, quartos/vagas e orçamento
   configurados, com ajustes laterais e opção de explorar todos os imóveis.
@@ -115,13 +117,13 @@ mensal mostra apenas IPTU.
 O acesso ao anúncio oficial permanece destacado como “Ver o leilão na Caixa” ou
 ação equivalente à modalidade.
 
-### Preferências locais
+### Conta, salvos e vistos
 
-- Salvos e Vistos existem sem login.
-- Esses dados ficam somente no navegador da pessoa.
-- Não existe conta no servidor, recuperação de senha, verificação de e-mail,
-  sincronização entre dispositivos ou identidade validada. A base local de
-  conta existe para validar o fluxo e ser conectada ao backend depois.
+- Salvos e Vistos continuam disponíveis sem login e ficam neste navegador.
+- Ao entrar com Google, os dados locais são unidos à conta e passam a ser
+  sincronizados pelo servidor entre dispositivos.
+- O formulário de e-mail e senha continua local: ele não cria uma conta no
+  servidor nem sincroniza dados entre dispositivos.
 
 ## Dados e confiança
 
@@ -180,16 +182,16 @@ venda, sem inventar um edital individual inexistente.
    A interface não usa "análise jurídica", "parecer", "assessoria jurídica" nem
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
-5. **Sem personalização fictícia:** a interface usa somente nome, conta local e
-   preferências preenchidos pela própria pessoa. A sessão local não equivale a
-   autenticação de produção.
+5. **Sem personalização fictícia:** a interface usa somente nome, conta e
+   preferências preenchidos pela própria pessoa. Apenas a sessão Google é
+   autenticação no servidor; a sessão de e-mail e senha continua local.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 
 ## Ainda não disponível
 
-- Autenticação e contas no servidor, recuperação de senha, verificação de e-mail
-  e sincronização entre dispositivos.
+- Conta de e-mail e senha no servidor, recuperação de senha e verificação de
+  e-mail. A sincronização entre dispositivos existe somente para a conta Google.
 - Mapa nacional e agregação de todos os leiloeiros do Brasil.
 - Alertas configuráveis e exportação CSV.
 - Parecer ou assistente jurídico operacional.
@@ -231,5 +233,6 @@ limitado e não destrutivo.
 - `JWT_SECRET` — string aleatória com pelo menos 32 bytes; assina os tokens de
   sessão HS256 que expiram em 30 dias.
 
-A tela de consentimento OAuth precisa autorizar as origens de preview e de
-produção, além de `http://localhost:5173` para desenvolvimento local.
+A tela de consentimento OAuth precisa autorizar a origem de produção e
+`http://localhost:5173` para desenvolvimento local. Previews de branch pulam a
+entrada por conta e abrem diretamente no catálogo público.
