@@ -263,7 +263,7 @@ function TopBar({ watchCount, account, onSignOut }) {
         position: 'absolute', left: 0, bottom: 0, height: 2,
         width: 0, background: 'var(--accent)', transition: 'width .1s linear',
       }} />
-      <div className="row gap-6" style={{ alignItems: 'center' }}>
+      <div className="topbar-primary">
         <Link className="brand" to="/">
           <span className="logo"></span>
           Argos

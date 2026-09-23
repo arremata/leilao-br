@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-22** — Alinhou a navegação ao padrão de cabeçalho das aplicações web: marca e seções ficam à esquerda, enquanto perfil e saída ocupam a extremidade direita; em telas estreitas, a navegação passa para uma segunda linha sem apertar as ações da conta.
+
 - **2026-09-22** — Simplificou a entrada de moradia para três escolhas que realmente organizam o catálogo: cidade, tipo de imóvel e faixa de preço inicial. O questionário agora usa cartões grandes e cabe na tela, sem pedir quartos, vagas, prazo de mudança, reserva extra, pagamento ou rotina. A lista única de todos os imóveis abre com as preferências aplicadas e permite remover um filtro, limpar todos ou restaurar o perfil salvo.
 
 - **2026-09-22** — Repaired the account PR preview before release: branch previews now open the public production-backed catalog without onboarding, and the Vercel backend explicitly installs the HTTP transport required by Google token verification so importing the API no longer takes every catalog endpoint down.
