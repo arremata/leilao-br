@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-24** — Published the canonical production domain at `www.argosleiloes.com.br`, with the apex domain redirecting permanently to `www`. Registro.br continues to host DNS, Vercel serves the site, and valid automatically renewed Let's Encrypt certificates protect both addresses.
+
 - **2026-09-15** — Removed section numbering from the “O que fazer agora” side guide and closed the numbering gap across the property tabs. The guide now introduces itself once when the buyer reaches the end of the property page, and reaching the end of the official-rules tab completes the corresponding reading step. Renamed the buyer-controlled occupancy reserve to “Desocupação”, placed the comparable evidence before the map, and rebuilt the regional-price summary as a compact, responsive evidence card without the large empty area created by equal-height columns.
 - **2026-09-15** — Turned “O que fazer agora” into an accessible collapsible guide on the right, so buyers can consult and update their progress without leaving costs, prices, or documents. Added completed-step percentage and count, retained per-property progress, adapted the panel to a full-width mobile sheet, and removed the generic deposit-to-participate step.
 - **2026-09-15** — Simplified “Quanto você vai pagar” around the buyer's own inputs. Removed the ambiguous “Seu limite” benchmark, moved adjustable values ahead of the payment summary, removed persistence and automatic renovation-area copy, and now shows condominium only for apartments or properties explicitly described as part of one; ordinary houses show IPTU alone.

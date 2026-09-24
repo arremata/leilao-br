@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 15 de setembro de 2026.
+Última atualização: 24 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -224,6 +224,18 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   habilitadas somente de forma explícita, têm efeito em produção e devem ser
   limitadas e não destrutivas. Ingestão, migração e reparos amplos não são
   executados pelo preview sem solicitação explícita.
+
+### OD-003 — Usar `www.argosleiloes.com.br` como domínio canônico
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** a produção usa `https://www.argosleiloes.com.br` como endereço
+  canônico; o domínio sem `www` redireciona permanentemente para ele.
+- **Motivo:** o produto precisa de um endereço próprio e estável, independente
+  do endereço técnico gerado pela plataforma de hospedagem.
+- **Consequências:** links públicos devem preferir o endereço com `www`.
+  Registro.br mantém a zona DNS, a Vercel entrega o produto e renova o HTTPS
+  automaticamente para os dois endereços.
 
 ## Modelo para uma nova decisão
 
