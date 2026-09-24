@@ -167,7 +167,7 @@ Frontend starts with an empty property list and populates exclusively from `GET 
 The full platform will include:
 - **Feed**: 3-column grid with real photos, score badges, countdown, filters (praca, type, occupancy, score, city)
 - **Analysis Modal**: 4 tabs (Viabilidade, Mercado, Encargos, Juridico)
-- **Fiscal Tables**: ITBI by municipality (13 cities), emolumentos by state (IRIB table)
+- **Fiscal Tables**: cobertura nacional de ITBI com referências municipais progressivas e emolumentos por estado (IRIB)
 - **Investor Profile**: Onboarding quiz, personalized feed
 - **Monetization**: Free (3/mo), Essencial R$97, Pro R$197, Expert R$490, Escritorio R$790/mo
 - **Legal Analysis**: Premium R$197 per property, lawyer review with ONR/DataJud
@@ -189,7 +189,7 @@ The full platform will include:
 ### Phase 3 - Full Platform
 - Map view with Airbnb-style filters
 - Investor profile and onboarding
-- ITBI/emolumentos calculators per city/state
+- Expand reviewed municipal ITBI references and state registry-fee tables
 - Watchlist, alerts, batch analysis
 - Subscription tiers and credit system
 
@@ -213,6 +213,8 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.
 
 - **2026-09-24** — Reuniu toda a filtragem do catálogo na barra lateral esquerda. Tipo de venda, disponibilidade, rodada, modalidade e desconto agora convivem com região, tipo de imóvel e orçamento; o segundo painel expansível sobre os resultados e seu botão foram removidos, inclusive no celular.
 

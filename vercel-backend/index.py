@@ -33,7 +33,23 @@ import auth as auth_module
 import users_db as users_db_module
 from auth import AuthError
 
-PIPELINE_VERSION = "v13-area-similarity"
+PIPELINE_VERSION = "v14-national-itbi-estimate"
+
+_MUNICIPAL_ITBI_RATES = {
+    ("PR", "curitiba"): {
+        "rate": 0.027,
+        "source": "Prefeitura de Curitiba — ITBI, alíquota geral de 2,7%",
+    },
+    ("PR", "londrina"): {
+        "rate": 0.02,
+        "source": "Prefeitura de Londrina — Código Tributário Municipal, ITBI 2%",
+    },
+}
+_DEFAULT_ITBI_RATE = 0.03
+_DEFAULT_ITBI_SOURCE = (
+    "Estimativa inicial do Argos para planejamento. A alíquota e a base de "
+    "cálculo variam por município; confirme o valor na prefeitura antes da compra."
+)
 
 _REGISTRATION_RATES = {
     "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
@@ -223,6 +239,21 @@ def _registration_rate(uf: str | None) -> float | None:
     if normalized_uf not in _BRAZILIAN_UFS:
         return None
     return _REGISTRATION_RATES.get(normalized_uf, _DEFAULT_REGISTRATION_RATE)
+
+
+def _itbi_reference(uf: str | None, city: str | None) -> dict | None:
+    normalized_uf = (uf or "").upper().strip()
+    normalized_city = _normalize_text(city)
+    if normalized_uf not in _BRAZILIAN_UFS or not normalized_city:
+        return None
+    municipal_reference = _MUNICIPAL_ITBI_RATES.get((normalized_uf, normalized_city))
+    if municipal_reference:
+        return {**municipal_reference, "estimated": False}
+    return {
+        "rate": _DEFAULT_ITBI_RATE,
+        "source": _DEFAULT_ITBI_SOURCE,
+        "estimated": True,
+    }
 
 
 def _extract_street(address: str | None) -> str:
@@ -499,9 +530,8 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
     market = round(price_per_m2 * area, 2)
     discount = round((market - min_bid) / market * 100, 2) if market > 0 else 0
-    itbi_rate = {("PR", "CURITIBA"): 0.027, ("PR", "LONDRINA"): 0.02}.get(
-        ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
-    )
+    itbi = _itbi_reference(p.get("uf"), p.get("city"))
+    itbi_rate = itbi["rate"] if itbi else None
     fee_rate = itbi_rate or 0
     normalized_modality = _normalize_text(p.get("modalidade"))
     is_direct_sale = "venda direta" in normalized_modality
@@ -533,9 +563,14 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     if itbi_rate is not None:
         costs.append({
             "id": "itbi",
-            "label": f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)",
-            "value": round(min_bid * itbi_rate), "hint": "Alíquota municipal cadastrada.", "kind": "tax",
+            "label": (
+                f"ITBI estimado · {p.get('city') or ''} ({itbi_rate * 100:g}%)"
+                if itbi["estimated"]
+                else f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)"
+            ),
+            "value": round(min_bid * itbi_rate), "hint": itbi["source"], "kind": "tax",
             "rate": itbi_rate,
+            "estimated": itbi["estimated"],
         })
     edital_data = p.get("edital_data") if isinstance(p.get("edital_data"), dict) else {}
     official_commission_rate = edital_data.get("commissionRate")
@@ -696,6 +731,7 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     else:
         title = p.get("address") or ""
 
+    itbi = _itbi_reference(p.get("uf"), p.get("city"))
     card = {
         "id": p["id"],
         "sourceId": p.get("source_id"),
@@ -730,6 +766,9 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "matriculaUrl": p.get("matricula_url"),
         "status": p.get("status"),
         "canAnalyze": True,
+        "itbiRate": itbi["rate"] if itbi else None,
+        "itbiSource": itbi["source"] if itbi else None,
+        "itbiEstimated": itbi["estimated"] if itbi else None,
     }
     if include_edital_data:
         card["editalData"] = p.get("edital_data")

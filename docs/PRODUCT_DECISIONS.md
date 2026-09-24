@@ -216,6 +216,20 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   avanço por imóvel, mantém os prazos documentados, registra a leitura das regras
   ao chegar ao fim dessa área e não inclui uma etapa genérica de depósito.
 
+### PD-014 — Reservar ITBI em todo município
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o custo total sempre reserva ITBI quando o imóvel possui município
+  e UF brasileiros. Uma referência municipal revisada prevalece; onde ela ainda
+  não existe, o Argos usa 3% do valor da compra como estimativa inicial.
+- **Motivo:** omitir o imposto subestima o dinheiro necessário para concluir a
+  compra e impede que o catálogo cresça para novas cidades e estados.
+- **Consequências:** estimativas são identificadas como estimativas e orientam a
+  confirmação na prefeitura, pois alíquota e base de cálculo podem variar. A
+  base municipal pode crescer progressivamente sem deixar imóveis novos fora da
+  conta.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

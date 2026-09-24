@@ -445,6 +445,19 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       : 'Valor mínimo informado para o leilão.',
     kind: 'price',
   });
+  const catalogItbiRate = Number(p.itbiRate);
+  if (Number.isFinite(catalogItbiRate) && catalogItbiRate > 0) {
+    const ratePct = (catalogItbiRate * 100).toLocaleString('pt-BR');
+    ensureCost({
+      id: 'itbi',
+      label: `${p.itbiEstimated ? 'ITBI estimado' : 'ITBI'} · ${p.city || 'município'} (${ratePct}%)`,
+      value: Math.round(minBidFloor * catalogItbiRate),
+      rate: catalogItbiRate,
+      estimated: Boolean(p.itbiEstimated),
+      hint: p.itbiSource || 'Confirme a alíquota e a base de cálculo na prefeitura antes da compra.',
+      kind: 'tax',
+    });
+  }
   const editalData = p.editalData || p.edital?.editalData || {};
   const officialCommissionRate = Number(editalData.commissionRate);
   if (commissionExempt) {

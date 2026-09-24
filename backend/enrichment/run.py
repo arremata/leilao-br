@@ -14,7 +14,7 @@ from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 
-PIPELINE_VERSION = "v13-area-similarity"
+PIPELINE_VERSION = "v14-national-itbi-estimate"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -72,6 +72,7 @@ def metadata_from_property(prop) -> PropertyMetadata:
         photo_url=prop.photo_url or "",
         itbi_rate=itbi["rate"] if itbi else None,
         itbi_source=itbi["source"] if itbi else "",
+        itbi_is_estimate=itbi["estimated"] if itbi else False,
         commission_rate=commission_rate,
     )
 

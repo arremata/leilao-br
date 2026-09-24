@@ -28,6 +28,7 @@ from ingestion.adapters.caixa_detail import fetch_detail
 from ingestion.run import run_cli
 from graph.output import _extract_street
 from graph.state import ComparableProperty
+from fiscal import get_itbi
 
 class IngestRequest(BaseModel):
     source: str = "caixa"
@@ -149,6 +150,7 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         elif p.first_auction_at is not None:
             praca = "1ª praça"
 
+    itbi = get_itbi(p.uf or "", p.city or "")
     card = {
         "id": p.id,
         "sourceId": p.source_id,
@@ -184,6 +186,9 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         "matriculaUrl": p.matricula_url,
         "status": p.status,
         "canAnalyze": True,
+        "itbiRate": itbi["rate"] if itbi else None,
+        "itbiSource": itbi["source"] if itbi else None,
+        "itbiEstimated": itbi["estimated"] if itbi else None,
     }
     if include_edital_data:
         card["editalData"] = p.edital_data

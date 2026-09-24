@@ -116,6 +116,12 @@ oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóvei
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
 
+O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
+alíquota municipal foi revisada, a conta usa essa referência e identifica a
+prefeitura. Enquanto ela ainda não foi cadastrada, o produto reserva 3% do valor
+informado para a compra, rotula a linha como estimativa do Argos e orienta a
+confirmação da alíquota e da base de cálculo na prefeitura.
+
 O acesso ao anúncio oficial permanece destacado como “Ver o leilão na Caixa” ou
 ação equivalente à modalidade.
 
@@ -131,6 +137,9 @@ ação equivalente à modalidade.
 
 - Dados oficiais da Caixa e estimativas do Argos são conceitos diferentes e
   devem ser rotulados separadamente.
+- Uma estimativa de planejamento pode preencher um custo necessário quando sua
+  limitação estiver explícita; ela não se torna uma alíquota oficial por aparecer
+  na conta.
 - **Ausência de evidência nunca vira afirmação.** Uma linha de custo sem valor
   apurado não é emitida; uma dívida citada no documento sem valor aparece como
   menção, não como número; um veredito de risco não calculado não é publicado.
