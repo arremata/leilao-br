@@ -120,7 +120,9 @@ O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
 alíquota municipal foi revisada, a conta usa essa referência e identifica a
 prefeitura. Enquanto ela ainda não foi cadastrada, o produto reserva 3% do valor
 informado para a compra, rotula a linha como estimativa do Argos e orienta a
-confirmação da alíquota e da base de cálculo na prefeitura.
+confirmação da alíquota e da base de cálculo na prefeitura. Preço, ITBI, registro,
+desocupação e reforma aparecem mesmo quando a comparação de mercado ainda não
+foi coletada; essa pendência não bloqueia a conta disponível.
 
 O acesso ao anúncio oficial permanece destacado como “Ver o leilão na Caixa” ou
 ação equivalente à modalidade.

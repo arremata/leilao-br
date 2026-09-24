@@ -228,7 +228,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** estimativas são identificadas como estimativas e orientam a
   confirmação na prefeitura, pois alíquota e base de cálculo podem variar. A
   base municipal pode crescer progressivamente sem deixar imóveis novos fora da
-  conta.
+  conta. A ausência de comparação de mercado não esconde os custos que já podem
+  ser calculados com os dados oficiais do catálogo.
 
 ## Decisões ativas de operação do produto
 

@@ -8,19 +8,23 @@ max_attempts=60
 
 while (( attempt < max_attempts )); do
   deployment_id="$(
-    gh api "repos/${repository}/deployments?sha=${commit_sha}&environment=Preview&per_page=10" \
-      --jq '.[0].id // empty'
+    gh api "repos/${repository}/deployments?sha=${commit_sha}&per_page=20" \
+      --jq '[.[] | select(.environment | startswith("Preview"))][0].id // empty'
   )"
 
   if [[ -n "${deployment_id}" ]]; then
-    preview_url="$(
+    preview_urls="$(
       gh api "repos/${repository}/deployments/${deployment_id}/statuses" \
-        --jq '[.[] | select(.state == "success") | .environment_url | select(length > 0)][0] // empty'
+        --jq '.[] | select(.state == "success") | .environment_url | select(length > 0)'
     )"
-    if [[ -n "${preview_url}" ]]; then
-      printf '%s\n' "${preview_url}"
-      exit 0
-    fi
+    while IFS= read -r preview_url; do
+      [[ -z "${preview_url}" ]] && continue
+      status_code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "${preview_url}")"
+      if [[ "${status_code}" =~ ^2 ]]; then
+        printf '%s\n' "${preview_url}"
+        exit 0
+      fi
+    done <<< "${preview_urls}"
   fi
 
   attempt=$((attempt + 1))

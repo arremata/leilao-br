@@ -216,6 +216,8 @@ The full platform will include:
 
 - **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.
 
+- **2026-09-24** — Corrigiu a descoberta de previews do fluxo de entrega: o helper agora reconhece o nome real do ambiente criado pela integração Vercel e escolhe somente uma URL pública, ignorando deployments paralelos protegidos por SSO.
+
 - **2026-09-24** — Reuniu toda a filtragem do catálogo na barra lateral esquerda. Tipo de venda, disponibilidade, rodada, modalidade e desconto agora convivem com região, tipo de imóvel e orçamento; o segundo painel expansível sobre os resultados e seu botão foram removidos, inclusive no celular.
 
 - **2026-09-22** — Alinhou a navegação ao padrão de cabeçalho das aplicações web: marca e seções ficam à esquerda, enquanto perfil e saída ocupam a extremidade direita; em telas estreitas, a navegação passa para uma segunda linha sem apertar as ações da conta.
