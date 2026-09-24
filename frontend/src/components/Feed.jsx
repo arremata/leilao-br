@@ -45,6 +45,204 @@ function readParams(searchParams) {
   };
 }
 
+function patchSearchParams(current, patch) {
+  const next = new URLSearchParams(current);
+  Object.entries(patch).forEach(([key, value]) => {
+    const asText = value == null ? '' : String(value);
+    if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
+    else next.set(key, asText);
+  });
+  if (!('pagina' in patch)) next.delete('pagina');
+  return next;
+}
+
+export function CatalogSidebarFilters({ properties, hideHousingDuplicates = false, onCollapse }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { kind, filters } = readParams(searchParams);
+  const setParams = useCallback((patch) => {
+    setSearchParams(current => patchSearchParams(current, patch));
+  }, [setSearchParams]);
+  const setFilters = (next) => setParams({
+    estado: next.state, cidade: next.city, tipo: next.propertyType,
+    rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
+    encerrados: next.showExpired ? '1' : '0',
+  });
+  const byKind = useMemo(
+    () => properties.filter(property => isDirectSaleModality(property.modalidade) === (kind === 'direct')),
+    [properties, kind],
+  );
+  const directCount = useMemo(
+    () => properties.filter(property => isDirectSaleModality(property.modalidade)).length,
+    [properties],
+  );
+  const stateOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(byKind.map(property => property.uf).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [byKind]);
+  const cityOptions = useMemo(() => {
+    const selectedState = normalizeLocation(filters.state);
+    const availableCities = byKind
+      .filter(property => filters.state === 'Todos' || normalizeLocation(property.uf) === selectedState)
+      .map(property => property.city)
+      .filter(Boolean);
+    const uniqueByNormalizedName = new Map();
+    availableCities.forEach(city => uniqueByNormalizedName.set(normalizeLocation(city), formatCity(city)));
+    return ['Todas', ...[...uniqueByNormalizedName.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+  }, [byKind, filters.state]);
+  const propertyTypeOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(byKind.map(property => property.type).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [byKind]);
+  const modalityOptions = useMemo(() => [
+    'Todos',
+    ...[...new Set(byKind.map(property => property.modalidade).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+  ], [byKind]);
+  const pracaOptions = useMemo(() => {
+    const eligible = byKind.filter(property =>
+      filters.modalidade === 'Todos' || property.modalidade === filters.modalidade);
+    return [
+      'Todos',
+      ...[...new Set(eligible.map(property => property.praca).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    ];
+  }, [byKind, filters.modalidade]);
+  const visibleFilterCount =
+    (filters.discountMin > 0 ? 1 : 0)
+    + (filters.state !== 'Todos' ? 1 : 0)
+    + (filters.praca !== 'Todos' ? 1 : 0)
+    + (filters.modalidade !== 'Todos' ? 1 : 0)
+    + (filters.showExpired ? 1 : 0)
+    + (!hideHousingDuplicates && filters.city !== 'Todas' ? 1 : 0)
+    + (!hideHousingDuplicates && filters.propertyType !== 'Todos' ? 1 : 0);
+
+  function setKind(value) {
+    setParams({
+      aba: value === 'direct' ? 'direta' : 'leiloes',
+      modalidade: 'Todos',
+      rodada: 'Todos',
+    });
+  }
+
+  function clearVisibleFilters() {
+    const cleared = {
+      estado: 'Todos', rodada: 'Todos', modalidade: 'Todos',
+      desconto: '0', encerrados: '0',
+    };
+    if (!hideHousingDuplicates) Object.assign(cleared, { cidade: 'Todas', tipo: 'Todos' });
+    setParams(cleared);
+  }
+
+  return <div className="feed-rail-inner">
+    <div className="feed-rail-head">
+      <span className="uppy" style={{ color: 'var(--fg-3)' }}>Tipo de venda</span>
+      {onCollapse && <button
+        type="button"
+        className="feed-rail-collapse"
+        onClick={onCollapse}
+        aria-label="Esconder filtros"
+        title="Esconder filtros"
+      >«</button>}
+    </div>
+
+    <div className="kind-tabs kind-tabs--rail" role="tablist" aria-label="Tipo de venda">
+      <button
+        role="tab"
+        aria-selected={kind === 'auction'}
+        className={kind === 'auction' ? 'active' : ''}
+        onClick={() => setKind('auction')}
+      >
+        <div><strong>Leilões</strong><small>tem disputa e data</small></div>
+      </button>
+      <button
+        role="tab"
+        aria-selected={kind === 'direct'}
+        className={kind === 'direct' ? 'active' : ''}
+        onClick={() => setKind('direct')}
+        disabled={directCount === 0}
+      >
+        <div>
+          <strong>Compra direta</strong>
+          <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
+        </div>
+      </button>
+    </div>
+
+    {stateOptions.length > 2 && <div className="feed-rail-section">
+      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Estado</span>
+      <div className="feed-rail-stack">
+        <Filter label="Estado" value={filters.state}
+          options={stateOptions}
+          onChange={(value) => setFilters({ ...filters, state: value, city: 'Todas' })} />
+      </div>
+    </div>}
+
+    {!hideHousingDuplicates && <div className="feed-rail-section">
+      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Localização</span>
+      <div className="feed-rail-stack">
+        <Filter label="Cidade" value={filters.city}
+          options={cityOptions}
+          onChange={(value) => setFilters({ ...filters, city: value })} />
+      </div>
+    </div>}
+
+    <div className="feed-rail-section">
+      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Disponibilidade</span>
+      <FilterSwitch
+        checked={filters.showExpired}
+        onChange={(value) => setFilters({ ...filters, showExpired: value })}
+        label="Mostrar imóveis encerrados"
+        helper="Incluir imóveis cuja janela de compra já fechou"
+      />
+    </div>
+
+    <div className="feed-rail-section">
+      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>
+        {hideHousingDuplicates ? 'Detalhes da venda' : 'Tipo de imóvel'}
+      </span>
+      <div className="feed-rail-stack">
+        {!hideHousingDuplicates && propertyTypeOptions.length > 2 && <Filter
+          label="Tipo" value={filters.propertyType}
+          options={propertyTypeOptions}
+          onChange={(value) => setFilters({ ...filters, propertyType: value })}
+        />}
+        {pracaOptions.length > 1 && <Filter label="Rodada" value={filters.praca}
+          options={pracaOptions}
+          onChange={(value) => setFilters({ ...filters, praca: value })} />}
+        {modalityOptions.length > 2 && <Filter label="Modalidade" value={filters.modalidade}
+          options={modalityOptions}
+          onChange={(value) => setFilters({ ...filters, modalidade: value, praca: 'Todos' })} />}
+      </div>
+    </div>
+
+    <div className="feed-rail-section">
+      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
+        Abaixo da avaliação
+      </span>
+      <div className="feed-rail-slider">
+        <div className="feed-rail-slider-row"><strong className="mono">{filters.discountMin}%</strong></div>
+        <input
+          type="range" min="0" max="60" step="1"
+          value={filters.discountMin}
+          onChange={(event) => setFilters({ ...filters, discountMin: +event.target.value })}
+          className="slider"
+          style={{ '--fill': `${(filters.discountMin / 60) * 100}%` }}
+          aria-label="Desconto mínimo abaixo da avaliação (em porcento)"
+        />
+      </div>
+    </div>
+
+    {visibleFilterCount > 0 && <button
+      type="button"
+      className="btn ghost sm feed-rail-clear"
+      onClick={clearVisibleFilters}
+      style={{ color: 'var(--accent)' }}
+    >Limpar filtros do catálogo ({visibleFilterCount})</button>}
+  </div>;
+}
+
 export default function Feed({ watched, toggleWatch, properties, loading = false, embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
@@ -58,78 +256,17 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
   // tecla não deve virar uma entrada no histórico.
   const setParams = useCallback((patch, { replace = false } = {}) => {
-    setSearchParams(current => {
-      const next = new URLSearchParams(current);
-      Object.entries(patch).forEach(([key, value]) => {
-        const asText = value == null ? '' : String(value);
-        if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
-        else next.set(key, asText);
-      });
-      // Qualquer mudança de busca recomeça da primeira página.
-      if (!('pagina' in patch)) next.delete('pagina');
-      return next;
-    }, { replace });
+    setSearchParams(current => patchSearchParams(current, patch), { replace });
   }, [setSearchParams]);
 
-  const setKind = (value) => setParams({ aba: value === 'direct' ? 'direta' : 'leiloes' });
   const setAddressQuery = (value) => setParams({ q: value }, { replace: true });
   const setSort = (value) => setParams({ ordem: value });
   const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
   const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
-  const setFilters = (next) => setParams({
-    estado: next.state, cidade: next.city, tipo: next.propertyType,
-    rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
-    encerrados: next.showExpired ? '1' : '0',
-  });
-
   const byKind = useMemo(
     () => properties.filter(p => isDirectSaleModality(p.modalidade) === (kind === 'direct')),
     [properties, kind],
   );
-  const directCount = useMemo(
-    () => properties.filter(p => isDirectSaleModality(p.modalidade)).length,
-    [properties],
-  );
-
-  const stateOptions = useMemo(() => [
-    'Todos',
-    ...[...new Set(byKind.map(p => p.uf).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [byKind]);
-
-  const cityOptions = useMemo(() => {
-    const selectedState = normalizeLocation(filters.state);
-    const cities = byKind
-      .filter(p => filters.state === 'Todos' || normalizeLocation(p.uf) === selectedState)
-      .map(p => p.city)
-      .filter(Boolean);
-    const uniqueByNormalizedName = new Map();
-    cities.forEach(city => uniqueByNormalizedName.set(normalizeLocation(city), formatCity(city)));
-    return ['Todas', ...[...uniqueByNormalizedName.values()].sort((a, b) => a.localeCompare(b, 'pt-BR'))];
-  }, [byKind, filters.state]);
-
-  const propertyTypeOptions = useMemo(() => [
-    'Todos',
-    ...[...new Set(byKind.map(p => p.type).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [byKind]);
-
-  const modalityOptions = useMemo(() => [
-    'Todos',
-    ...[...new Set(byKind.map(p => p.modalidade).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-  ], [byKind]);
-
-  const pracaOptions = useMemo(() => {
-    const eligible = byKind.filter(p =>
-      filters.modalidade === 'Todos' || p.modalidade === filters.modalidade);
-    return [
-      'Todos',
-      ...[...new Set(eligible.map(p => p.praca).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    ];
-  }, [byKind, filters.modalidade]);
-
   const filtered = useMemo(() => {
     let list = [...byKind];
 
@@ -221,11 +358,6 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     (filters.modalidade !== 'Todos' ? 1 : 0) +
     (filters.showExpired ? 1 : 0);
 
-  const clearAll = () => setParams({
-    q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
-    rodada: 'Todos', modalidade: 'Todos', desconto: '0', encerrados: '0',
-  });
-
   // Em viewports estreitas o rail vira um "drawer" (media query o esconde por
   // padrão). Quando ele está aberto e a tela é estreita, Esc e click-fora
   // fecham. Em telas largas o rail nunca é um drawer — fica sempre visível
@@ -264,143 +396,21 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         </div>
       </div>
 
-      <div className={`feed-layout${railOpen ? '' : ' rail-collapsed'}`}>
-        {/* ─── Sidebar: kind tabs + todos os filtros ─── */}
-        <aside
+      <div className={`feed-layout${railOpen && !embedded ? '' : ' rail-collapsed'}`}>
+        {!embedded && <aside
           id="feed-rail"
           className={`feed-rail${railOpen ? ' open' : ''}`}
           aria-label="Filtros de busca"
           aria-hidden={!railOpen}
         >
-          <div className="feed-rail-inner">
-            <div className="feed-rail-head">
-              <span className="uppy" style={{ color: 'var(--fg-3)' }}>Tipo de venda</span>
-              <button
-                type="button"
-                className="feed-rail-collapse"
-                onClick={() => setRailOpen(false)}
-                aria-label="Esconder filtros"
-                title="Esconder filtros"
-              >
-                «
-              </button>
-            </div>
-
-            {/* Kind tabs — botões full-width empilhados verticalmente */}
-            <div className="kind-tabs kind-tabs--rail" role="tablist" aria-label="Tipo de venda">
-              <button
-                role="tab"
-                aria-selected={kind === 'auction'}
-                className={kind === 'auction' ? 'active' : ''}
-                onClick={() => setKind('auction')}
-              >
-                <div>
-                  <strong>Leilões</strong>
-                  <small>tem disputa e data</small>
-                </div>
-              </button>
-              <button
-                role="tab"
-                aria-selected={kind === 'direct'}
-                className={kind === 'direct' ? 'active' : ''}
-                onClick={() => setKind('direct')}
-                disabled={directCount === 0}
-              >
-                <div>
-                  <strong>Compra direta</strong>
-                  <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
-                </div>
-              </button>
-            </div>
-
-            {/* Localização */}
-            <div className="feed-rail-section">
-              <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Localização</span>
-              <div className="feed-rail-stack">
-                {stateOptions.length > 2 && (
-                  <Filter label="Estado" value={filters.state}
-                    options={stateOptions}
-                    onChange={(v) => setFilters({ ...filters, state: v, city: 'Todas' })} />
-                )}
-                <Filter label="Cidade" value={filters.city}
-                  options={cityOptions}
-                  onChange={(v) => setFilters({ ...filters, city: v })} />
-              </div>
-            </div>
-
-            {/* Disponibilidade — toggle de leilões já encerrados */}
-            <div className="feed-rail-section">
-              <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Disponibilidade</span>
-              <FilterSwitch
-                checked={filters.showExpired}
-                onChange={(v) => setFilters({ ...filters, showExpired: v })}
-                label="Mostrar imóveis encerrados"
-                helper="Incluir imóveis cuja janela de compra já fechou"
-              />
-            </div>
-
-            {/* Tipo de imóvel */}
-            <div className="feed-rail-section">
-              <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Tipo de imóvel</span>
-              <div className="feed-rail-stack">
-                {propertyTypeOptions.length > 2 && (
-                  <Filter label="Tipo" value={filters.propertyType}
-                    options={propertyTypeOptions}
-                    onChange={(v) => setFilters({ ...filters, propertyType: v })} />
-                )}
-                {pracaOptions.length > 1 && (
-                  <Filter label="Rodada" value={filters.praca}
-                    options={pracaOptions}
-                    onChange={(v) => setFilters({ ...filters, praca: v })} />
-                )}
-                {modalityOptions.length > 2 && (
-                  <Filter label="Modalidade" value={filters.modalidade}
-                    options={modalityOptions}
-                    onChange={(v) => setFilters({ ...filters, modalidade: v, praca: 'Todos' })} />
-                )}
-              </div>
-            </div>
-
-            <div className="feed-rail-section">
-              <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
-                Abaixo da avaliação
-              </span>
-              <div className="feed-rail-slider">
-                <div className="feed-rail-slider-row">
-                  <strong className="mono">{filters.discountMin}%</strong>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="60"
-                  step="1"
-                  value={filters.discountMin}
-                  onChange={(e) => setFilters({ ...filters, discountMin: +e.target.value })}
-                  className="slider"
-                  style={{ '--fill': `${(filters.discountMin / 60) * 100}%` }}
-                  aria-label="Desconto mínimo abaixo da avaliação (em porcento)"
-                />
-              </div>
-            </div>
-
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                className="btn ghost sm feed-rail-clear"
-                onClick={clearAll}
-                style={{ color: 'var(--accent)' }}
-              >
-                Limpar filtros ({activeFilterCount})
-              </button>
-            )}
-          </div>
-        </aside>
+          <CatalogSidebarFilters properties={properties} onCollapse={() => setRailOpen(false)} />
+        </aside>}
 
         {/* ─── Main: toolbar horizontal + resultados ─── */}
         <div className="feed-main">
           {/* Toolbar — busca, toggle do rail, sort, view */}
           <div className="feed-toolbar" role="region" aria-label="Barra de ferramentas do feed">
-            {!railOpen && (
+            {!embedded && !railOpen && (
               <button
                 type="button"
                 onClick={() => setRailOpen(true)}

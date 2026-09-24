@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 22 de setembro de 2026.
+Última atualização: 24 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -78,7 +78,9 @@ no HTML do servidor, o que ainda não é feito.
 - Preferências de moradia ficam neste navegador. Nos próximos acessos, a lista
   única de todos os imóveis abre com cidade, tipo e faixa de preço já aplicados.
   Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
-  tudo sem perder o perfil salvo.
+  tudo sem perder o perfil salvo. Tipo de venda, disponibilidade, modalidade,
+  rodada e desconto ficam na mesma barra lateral; não existe um segundo painel
+  de filtros sobre os resultados.
 - A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
   eventual desocupação e outras despesas continuam explicadas em cada imóvel;
   a faixa não garante custo final nem aprovação de financiamento.

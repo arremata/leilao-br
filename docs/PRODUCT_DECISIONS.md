@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 22 de setembro de 2026.
+Última atualização: 24 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -34,7 +34,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   preço limita apenas o valor inicial do imóvel e nunca representa o custo total;
   taxas, reforma, eventual desocupação e condições de pagamento ficam no detalhe.
   O perfil salvo permanece disponível para restaurar depois de explorar sem os
-  filtros.
+  filtros. Preferências e filtros do catálogo compartilham uma única barra
+  lateral, sem controles duplicados sobre a lista.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 

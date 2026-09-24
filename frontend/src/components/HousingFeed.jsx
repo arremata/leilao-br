@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import Feed from './Feed';
+import Feed, { CatalogSidebarFilters } from './Feed';
 import { HousingFields } from './HousingQuestionnaire';
 import {
   emptyHousingProfile,
@@ -18,14 +18,25 @@ function FilterChip({ children, onRemove }) {
 export default function HousingFeed({ profile, onSave, cities, appliedProfile, onApply, ...feedProps }) {
   const [params, setParams] = useSearchParams();
   const exploringWithoutProfile = params.get('busca') === 'todos';
-  const baseProfile = appliedProfile || profile || emptyHousingProfile;
-  const current = exploringWithoutProfile ? emptyHousingProfile : baseProfile;
-  const [draft, setDraft] = useState(() => ({ ...emptyHousingProfile, ...baseProfile }));
+  const savedOrAppliedProfile = appliedProfile || profile || emptyHousingProfile;
+  const linkedCity = params.get('cidade');
+  const linkedPropertyType = params.get('tipo');
+  const profileWithLinkFilters = appliedProfile ? savedOrAppliedProfile : {
+    ...savedOrAppliedProfile,
+    ...(linkedCity && linkedCity !== 'Todas' ? { city: linkedCity } : {}),
+    ...(['Casa', 'Apartamento'].includes(linkedPropertyType) ? { propertyType: linkedPropertyType } : {}),
+  };
+  const current = exploringWithoutProfile ? emptyHousingProfile : profileWithLinkFilters;
+  const [draft, setDraft] = useState(() => ({ ...emptyHousingProfile, ...profileWithLinkFilters }));
   const [open, setOpen] = useState(() => window.innerWidth > 1100);
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState(0);
-  const visibleProperties = filterHousingProperties(feedProps.properties, current);
+  const selectedState = params.get('estado');
+  const stateFilteredProperties = selectedState && selectedState !== 'Todos'
+    ? feedProps.properties.filter(property => property.uf === selectedState)
+    : feedProps.properties;
+  const visibleProperties = filterHousingProperties(stateFilteredProperties, current);
   const hasFilters = Boolean(
     current.city
     || current.neighborhood
@@ -38,6 +49,8 @@ export default function HousingFeed({ profile, onSave, cities, appliedProfile, o
     setParams(currentParams => {
       const nextParams = new URLSearchParams(currentParams);
       nextParams.delete('busca');
+      nextParams.delete('cidade');
+      nextParams.delete('tipo');
       return nextParams;
     });
   }
@@ -95,7 +108,10 @@ export default function HousingFeed({ profile, onSave, cities, appliedProfile, o
     <div className="housing-dashboard-layout">
       {open && <aside className="housing-search" id="housing-search" aria-label="Filtros da busca">
         <h2>Filtros</h2>
-        <p className="housing-help">Ajuste a busca atual ou salve as escolhas no seu perfil.</p>
+        <p className="housing-help">Tudo o que muda esta busca fica reunido aqui.</p>
+        <CatalogSidebarFilters properties={feedProps.properties} hideHousingDuplicates />
+        <div className="housing-search-divider" />
+        <h3 className="housing-search-subtitle">Suas preferências</h3>
         <div className="housing-mini-tabs" role="tablist" aria-label="Preferências">
           {['Região', 'Imóvel', 'Orçamento'].map((label, index) => <button key={label} role="tab" aria-selected={step === index} onClick={() => setStep(index)}>{label}</button>)}
         </div>
