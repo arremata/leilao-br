@@ -66,6 +66,13 @@ A pré-visualização do link em aplicativos de mensagem ainda é genérica: mos
 marca do site, não o imóvel. Isso depende de entregar as tags de compartilhamento
 no HTML do servidor, o que ainda não é feito.
 
+`/morar` é a página de apresentação para quem compra o primeiro imóvel e nunca
+participou de leilão. Mostra, com um imóvel de exemplo igual à página do imóvel,
+quanto se paga até a chave, quem mora lá, que dívidas vêm junto conforme o tipo
+de leilão e se aceita FGTS. O simulador parte de quanto a pessoa tem disponível.
+Todos os botões levam à lista de imóveis. O espaço do vídeo de demonstração está
+pronto, mas o vídeo ainda não existe.
+
 ### Lista de imóveis
 
 - É a entrada principal do produto; não existe um Dashboard separado.

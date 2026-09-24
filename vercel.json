@@ -32,6 +32,14 @@
       "destination": { "service": "backend" }
     },
     {
+      "source": "/morar",
+      "destination": "/morar.html"
+    },
+    {
+      "source": "/morar/",
+      "destination": "/morar.html"
+    },
+    {
       "source": "/((?!api/)[^.]+)",
       "destination": "/index.html"
     },
