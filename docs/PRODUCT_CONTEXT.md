@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 15 de setembro de 2026.
+Última atualização: 24 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -51,6 +51,12 @@ O produto não atende mais o investidor na interface. O cálculo de revenda
 permanece desligado no backend, para eventual reativação.
 
 ## Produto disponível hoje
+
+### Acesso público
+
+O endereço oficial de produção é `https://www.argosleiloes.com.br`. Acessar
+`https://argosleiloes.com.br` leva permanentemente ao endereço com `www`. Ambos
+usam HTTPS, e a Vercel renova os certificados automaticamente.
 
 ### Endereços
 
