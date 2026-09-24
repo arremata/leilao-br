@@ -52,6 +52,12 @@ permanece desligado no backend, para eventual reativação.
 
 ## Produto disponível hoje
 
+### Acesso público
+
+O endereço oficial de produção é `https://www.argosleiloes.com.br`. Acessar
+`https://argosleiloes.com.br` leva permanentemente ao endereço com `www`. Ambos
+usam HTTPS, e a Vercel renova os certificados automaticamente.
+
 ### Endereços
 
 Cada imóvel tem uma URL própria — `/imovel/{id}` — que abre direto, sobrevive ao
