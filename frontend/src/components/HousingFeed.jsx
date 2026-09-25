@@ -5,6 +5,7 @@ import { HousingFields } from './HousingQuestionnaire';
 import {
   emptyHousingProfile,
   filterHousingProperties,
+  hasHousingBudget,
   housingBudgetLabel,
   validateHousingProfile,
 } from '../housingProfile';
@@ -41,7 +42,7 @@ export default function HousingFeed({ profile, onSave, cities, appliedProfile, o
     current.city
     || current.neighborhood
     || (current.propertyType && current.propertyType !== 'Todos')
-    || Number(current.budget) > 0,
+    || hasHousingBudget(current.budget),
   );
   const update = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
 
@@ -127,12 +128,12 @@ export default function HousingFeed({ profile, onSave, cities, appliedProfile, o
           {current.city && <FilterChip onRemove={() => removeFilter('city')}>{current.city}</FilterChip>}
           {current.neighborhood && <FilterChip onRemove={() => removeFilter('neighborhood')}>{current.neighborhood}</FilterChip>}
           {current.propertyType && current.propertyType !== 'Todos' && <FilterChip onRemove={() => removeFilter('propertyType')}>{current.propertyType}</FilterChip>}
-          {Number(current.budget) > 0 && <FilterChip onRemove={() => removeFilter('budget')}>{housingBudgetLabel(current.budget)}</FilterChip>}
+          {hasHousingBudget(current.budget) && <FilterChip onRemove={() => removeFilter('budget')}>{housingBudgetLabel(current.budget)}</FilterChip>}
           {!hasFilters && <span className="housing-summary-empty">Sem filtros pessoais</span>}
           {hasFilters && <button className="housing-clear-filters" type="button" onClick={clearFilters}>Limpar todos</button>}
           {exploringWithoutProfile && profile && <button className="housing-clear-filters" type="button" onClick={restoreProfile}>Usar meu perfil</button>}
         </div>
-        {Number(current.budget) > 0 && <div className="housing-budget-note"><b>Faixa aplicada ao valor inicial do imóvel.</b><p>Taxas, ocupação, reforma e condições de pagamento continuam detalhadas em cada imóvel.</p></div>}
+        {hasHousingBudget(current.budget) && <div className="housing-budget-note"><b>Faixa aplicada ao valor inicial do imóvel.</b><p>Taxas, ocupação, reforma e condições de pagamento continuam detalhadas em cada imóvel.</p></div>}
         <Feed {...feedProps} properties={visibleProperties} embedded />
         {!feedProps.loading && !visibleProperties.length && <div className="housing-no-results"><p>Nenhum imóvel corresponde a esses filtros no catálogo disponível.</p><button className="btn primary" onClick={clearFilters}>Limpar filtros</button></div>}
       </section>

@@ -91,6 +91,17 @@
 .housing-choice b{font-size:13px;line-height:1.25}
 .housing-choice-check{position:absolute;right:14px;display:none;width:22px;height:22px;place-items:center;border-radius:50%;background:var(--accent);color:#fff;font-size:12px}
 .housing-choice[aria-pressed=true] .housing-choice-check{display:grid}
+.housing-field>label{font:inherit;font-weight:inherit;color:inherit}
+.housing-city-autocomplete{position:relative}
+.housing-city-autocomplete input{padding-right:44px}
+.housing-city-chevron{position:absolute;top:50%;right:16px;pointer-events:none;color:var(--fg-2);font-size:19px;line-height:1;transform:translateY(-54%);transition:transform .15s ease,color .15s ease}
+.housing-city-autocomplete.open .housing-city-chevron{color:var(--accent);transform:translateY(-45%) rotate(180deg)}
+.housing-city-options{position:absolute;z-index:40;top:calc(100% + 8px);left:0;right:0;max-height:240px;padding:6px;overflow-y:auto;border:1px solid #d9cafa;border-radius:14px;background:#fff;box-shadow:0 18px 45px rgba(17,24,39,.14);scrollbar-width:thin}
+.housing-city-options button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:42px;padding:9px 11px;border-radius:9px;color:var(--fg-1);font-size:12px;text-align:left}
+.housing-city-options button:hover,.housing-city-options button.active{background:var(--accent-soft);color:var(--accent-strong)}
+.housing-city-options button[aria-selected=true]{font-weight:700}
+.housing-city-options button b{color:var(--accent);font-size:12px}
+.housing-city-options p{margin:0;padding:13px 11px;color:var(--fg-2);font-size:11px;text-align:center}
 .housing-question-body .housing-help{margin:2px 0 0;font-size:11px;line-height:1.6}
 .housing-questionnaire .housing-form-footer{margin:0;padding-top:20px}
 .housing-questionnaire .housing-back,.housing-questionnaire .housing-next{min-height:48px;border-radius:13px;font-size:13px;font-weight:700}

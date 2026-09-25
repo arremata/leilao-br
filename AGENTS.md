@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Transformou a cidade do cadastro e da edição de preferências em uma busca com sugestões, tolerante a acentos e operável por mouse, toque ou teclado. Substituiu “Ainda não sei” por uma faixa real “Acima de R$ 1 milhão”, aplicada também ao catálogo e exibida na central de conta.
+
 - **2026-09-24** — Tornou a conta obrigatória para acessar qualquer área da plataforma, inclusive catálogo, imóveis por link direto, Salvos, Vistos e previews. Visitantes são encaminhados para Criar conta/Entrar sem carregar o catálogo; depois do acesso retornam ao endereço pretendido, enquanto contas novas concluem primeiro as preferências de moradia. A antiga exploração sem conta foi removida.
 
 - **2026-09-24** — Criou a central de conta do Argos, acessível por um ícone de usuário no lado direito do cabeçalho. A área reúne nome, e-mail, transparência sobre a persistência da conta e as três preferências de moradia já informadas; permite refazer essas escolhas e inclui uma aba de assinatura marcada como “Em breve”, sem sugerir plano ou cobrança ativa.

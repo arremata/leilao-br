@@ -77,7 +77,9 @@ no HTML do servidor, o que ainda não é feito.
 - Criar conta ou Entrar é obrigatório antes de acessar o catálogo, um imóvel por
   link direto, Salvos, Vistos ou a central de conta. Após entrar, a pessoa volta
   ao endereço que tentou abrir. Uma conta nova responde primeiro ao questionário
-  de moradia em três escolhas: cidade, tipo de imóvel e faixa de preço.
+  de moradia em três escolhas: cidade, tipo de imóvel e faixa de preço. A cidade
+  pode ser digitada e escolhida em sugestões, inclusive sem informar os acentos
+  durante a busca.
 - Entrar com Google cria uma sessão de 30 dias no servidor; o formulário de
   e-mail e senha continua sendo um protótipo somente deste navegador. Previews
   seguem a mesma entrada obrigatória e podem ser validados com uma conta local
@@ -90,7 +92,8 @@ no HTML do servidor, o que ainda não é feito.
   de filtros sobre os resultados.
 - A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
   eventual desocupação e outras despesas continuam explicadas em cada imóvel;
-  a faixa não garante custo final nem aprovação de financiamento.
+  a faixa não garante custo final nem aprovação de financiamento. As opções vão
+  de “Até R$ 150 mil” a “Acima de R$ 1 milhão”.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.
