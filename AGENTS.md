@@ -214,6 +214,12 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Fechou a API automática do Supabase para todas as tabelas do
+  Argos. Catálogo, enriquecimentos, filas operacionais e dados de conta agora
+  usam RLS com bloqueio explícito para os papéis de navegador; privilégios
+  atuais e padrões também foram removidos desses papéis, enquanto backend,
+  ingestão e administração preservam seu acesso servidor a servidor.
+
 - **2026-09-24** — Tornou a conta obrigatória para acessar qualquer área da plataforma, inclusive catálogo, imóveis por link direto, Salvos, Vistos e previews. Visitantes são encaminhados para Criar conta/Entrar sem carregar o catálogo; depois do acesso retornam ao endereço pretendido, enquanto contas novas concluem primeiro as preferências de moradia. A antiga exploração sem conta foi removida.
 
 - **2026-09-24** — Criou a central de conta do Argos, acessível por um ícone de usuário no lado direito do cabeçalho. A área reúne nome, e-mail, transparência sobre a persistência da conta e as três preferências de moradia já informadas; permite refazer essas escolhas e inclui uma aba de assinatura marcada como “Em breve”, sem sugerir plano ou cobrança ativa.

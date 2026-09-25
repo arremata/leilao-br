@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 24 de setembro de 2026.
+Última atualização: 25 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -300,6 +300,21 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** links públicos devem preferir o endereço com `www`.
   Registro.br mantém a zona DNS, a Vercel entrega o produto e renova o HTTPS
   automaticamente para os dois endereços.
+
+### OD-004 — Manter o banco fechado à API pública automática
+
+- **Data:** 25 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** nenhuma tabela de catálogo, operação ou conta fica disponível
+  diretamente ao navegador pela API automática do banco. O produto acessa esses
+  dados somente pelos serviços do Argos.
+- **Motivo:** uma chave destinada ao navegador não pode permitir leitura ou
+  alteração paralela dos dados, fora das regras de conta e das validações do
+  produto.
+- **Consequências:** catálogo, contas, Salvos, Vistos e rotinas programadas
+  continuam pelo mesmo caminho atual. Qualquer acesso direto futuro precisa de
+  regras próprias, revisão de segurança e uma decisão explícita antes de ser
+  disponibilizado.
 
 ## Modelo para uma nova decisão
 
