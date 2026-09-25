@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi, AuthError } from './api';
 import { AuthContext } from './context';
 
+const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(isPreview);
   const [synced, setSynced] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const syncStartedFor = useRef(null);
@@ -22,6 +24,9 @@ export function AuthProvider({ children }) {
       ['argos_token', 'argos_user', 'argos_local_account_v1', 'argos_local_session_v1']
         .forEach(key => localStorage.removeItem(key));
     } catch { /* legacy browser data must not block the secure session check */ }
+    // Branch previews are intentionally public and cannot create a Google
+    // session, so probing /me would only produce an expected 401 in the console.
+    if (isPreview) return undefined;
     authApi.me({ notifyUnauthorized: false })
       .then((data) => {
         if (!cancelled) setUser(data.user);
