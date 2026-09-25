@@ -53,3 +53,14 @@ def test_rls_migration_removes_current_and_default_data_api_privileges():
     assert "ALTER DEFAULT PRIVILEGES FOR ROLE postgres" in sql
     assert "REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated" in sql
     assert "REVOKE ALL PRIVILEGES ON SEQUENCES FROM anon, authenticated" in sql
+
+
+def test_step_progress_table_is_closed_to_the_data_api():
+    sql = (MIGRATION.parent / "20260925_user_property_progress.sql").read_text()
+
+    assert "CREATE TABLE IF NOT EXISTS user_property_progress" in sql
+    assert "REFERENCES users(id) ON DELETE CASCADE" in sql
+    assert "PRIMARY KEY (user_id, property_id)" in sql
+    assert "user_property_progress ENABLE ROW LEVEL SECURITY" in sql
+    assert "REVOKE ALL PRIVILEGES ON TABLE public.user_property_progress FROM anon, authenticated" in sql
+    assert "AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)" in sql

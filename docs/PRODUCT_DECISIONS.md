@@ -31,8 +31,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   armazenar senha nem construir prematuramente confirmação e recuperação.
 - **Consequências:** credenciais locais antigas são descartadas; cada dispositivo
   mantém uma sessão independente em cookie HttpOnly por até 12 horas, e sair
-  revoga apenas a sessão atual. Dados de perfil, Salvos e Vistos pertencem à
-  conta Google. Uma futura entrada por e-mail exigirá autenticação completa no
+  revoga apenas a sessão atual. Dados de perfil, Salvos, Vistos e o avanço em
+  “O que fazer agora” pertencem à conta Google; o navegador não guarda cópia
+  local deles em produção. Uma futura entrada por e-mail exigirá autenticação completa no
   servidor antes de voltar ao produto.
 
 ### PD-017 — Manter perfil cadastral separado dos filtros
@@ -232,7 +233,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** a abertura fica disponível na lateral direita em telas
   grandes e como ação flutuante no celular. Ele não recebe número de seção e se
   apresenta uma vez quando a pessoa chega ao fim da página. O painel preserva o
-  avanço por imóvel, mantém os prazos documentados, registra a leitura das regras
+  avanço por imóvel na conta Google — ao voltar ao imóvel, em qualquer
+  dispositivo, o percentual reaparece —, mantém os prazos documentados, registra a leitura das regras
   ao chegar ao fim dessa área e não inclui uma etapa genérica de depósito.
 
 ### PD-014 — Reservar ITBI em todo município

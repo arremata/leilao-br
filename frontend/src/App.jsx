@@ -33,18 +33,15 @@ function App() {
     logout: authLogout,
     updateHousingProfile,
   } = useAuth();
-  const [watched, setWatched] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch { return []; }
-  });
-  const [history, setHistory] = useState(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch { return []; }
-  });
+  // Salvos e Vistos pertencem à conta Google e chegam do servidor depois do
+  // login (`argos:synced`). Só o preview, que não tem login, guarda as listas
+  // neste navegador.
+  const [watched, setWatched] = useState(() => (
+    isPreview ? readStoredList('arremate_watched') : []
+  ));
+  const [history, setHistory] = useState(() => (
+    isPreview ? readStoredList('arremate_history') : []
+  ));
   const [properties, setProperties] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const cities = [...new Set(properties.map(p => p.city).filter(Boolean))].sort();
@@ -98,13 +95,14 @@ function App() {
     return () => { cancelled = true; };
   }, [canOpenCatalog]);
 
-  // Local persistence always-on; server sync layers on top when authed.
+  // Com conta, gravar uma cópia local faria a lista de uma pessoa ser importada
+  // na conta de quem entrar depois neste navegador.
   useEffect(() => {
-    localStorage.setItem('arremate_watched', JSON.stringify(watched));
+    if (isPreview) writeStoredList('arremate_watched', watched);
   }, [watched]);
 
   useEffect(() => {
-    localStorage.setItem('arremate_history', JSON.stringify(history));
+    if (isPreview) writeStoredList('arremate_history', history);
   }, [history]);
 
   // Fade-in: observe .fade-in elements and add .is-visible
@@ -188,7 +186,16 @@ function App() {
     });
   }, [isAuthed]);
 
-  const clearHistory = useCallback(() => setHistory([]), []);
+  const clearHistory = useCallback(() => {
+    const previous = history;
+    setHistory([]);
+    if (isAuthed) {
+      authApi.clearViewed().catch((err) => {
+        console.warn('Não foi possível limpar os imóveis vistos:', err);
+        setHistory(current => (current.length ? current : previous));
+      });
+    }
+  }, [history, isAuthed]);
 
   const recordVisit = useCallback((prop) => {
     if (!prop?.id) return;
@@ -347,6 +354,17 @@ function AccountGate({ account, allowPublic = false, requireProfile = false, pro
   }
   if (account) return <Outlet />;
   return <Navigate to="/entrar" replace state={{ from }} />;
+}
+
+function readStoredList(key) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(stored) ? stored : [];
+  } catch { return []; }
+}
+
+function writeStoredList(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* segue em memória */ }
 }
 
 export default App;

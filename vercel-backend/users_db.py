@@ -203,6 +203,63 @@ def sync_viewed(conn, user_id: int, entries: Iterable[dict]) -> None:
         _upsert_viewed(conn, user_id, int(entry["id"]), entry["snapshot"])
 
 
+def clear_viewed(conn, user_id: int) -> None:
+    conn.execute(
+        text("DELETE FROM user_viewed_properties WHERE user_id = :u"),
+        {"u": user_id},
+    )
+
+
+def get_step_progress(conn, user_id: int, property_id: int) -> list[str]:
+    value = conn.execute(
+        text(
+            "SELECT completed_steps FROM user_property_progress"
+            " WHERE user_id = :u AND property_id = :p"
+        ),
+        {"u": user_id, "p": property_id},
+    ).scalar_one_or_none()
+    if isinstance(value, str):
+        value = json.loads(value)
+    return [str(step) for step in value] if isinstance(value, list) else []
+
+
+def set_step_progress(
+    conn, user_id: int, property_id: int, completed: Iterable[str],
+) -> list[str]:
+    steps = sorted(dict.fromkeys(str(step) for step in completed))
+    if not steps:
+        # No completed step is the same as never having started this guide.
+        conn.execute(
+            text(
+                "DELETE FROM user_property_progress"
+                " WHERE user_id = :u AND property_id = :p"
+            ),
+            {"u": user_id, "p": property_id},
+        )
+        return []
+    steps_json = json.dumps(steps)
+    if conn.dialect.name == "postgresql":
+        statement = text(
+            """
+            INSERT INTO user_property_progress (user_id, property_id, completed_steps)
+            VALUES (:u, :p, CAST(:s AS JSONB))
+            ON CONFLICT (user_id, property_id) DO UPDATE SET
+              completed_steps = CAST(:s AS JSONB), updated_at = CURRENT_TIMESTAMP
+            """
+        )
+    else:
+        statement = text(
+            """
+            INSERT INTO user_property_progress (user_id, property_id, completed_steps)
+            VALUES (:u, :p, :s)
+            ON CONFLICT (user_id, property_id) DO UPDATE SET
+              completed_steps = :s, updated_at = CURRENT_TIMESTAMP
+            """
+        )
+    conn.execute(statement, {"u": user_id, "p": property_id, "s": steps_json})
+    return steps
+
+
 def _upsert_viewed(conn, user_id: int, property_id: int, snapshot: dict) -> None:
     snapshot_json = json.dumps(snapshot)
     if conn.dialect.name == "postgresql":

@@ -110,7 +110,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_configured_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
@@ -157,6 +157,15 @@ class SavedToggleRequest(BaseModel):
 class ViewedRequest(BaseModel):
     property_id: int = Field(gt=0)
     snapshot: dict
+
+
+# Step ids come from frontend/src/content/nextStepsContent.js. The backend only
+# checks their shape, so editorial changes to the guide need no API release.
+_STEP_ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+class StepProgressRequest(BaseModel):
+    completed: list[str] = Field(default_factory=list, max_length=40)
 
 
 _LOGIN_WINDOW_SECONDS = 60
@@ -396,6 +405,45 @@ def record_viewed(
             conn, user["id"], [{"id": body.property_id, "snapshot": body.snapshot}],
         )
     return {"ok": True}
+
+
+@app.delete("/me/viewed")
+def clear_viewed_route(
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    with _get_engine().begin() as conn:
+        users_db_module.clear_viewed(conn, user["id"])
+    return {"ok": True}
+
+
+@app.get("/me/progress/{property_id}")
+def get_progress_route(property_id: int, user: dict = CurrentUser):
+    if property_id <= 0:
+        raise HTTPException(status_code=422, detail="Imóvel inválido")
+    with _get_engine().connect() as conn:
+        completed = users_db_module.get_step_progress(conn, user["id"], property_id)
+    return {"property_id": property_id, "completed": completed}
+
+
+@app.put("/me/progress/{property_id}")
+def set_progress_route(
+    property_id: int,
+    body: StepProgressRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if property_id <= 0:
+        raise HTTPException(status_code=422, detail="Imóvel inválido")
+    if any(not _STEP_ID_RE.fullmatch(step) for step in body.completed):
+        raise HTTPException(status_code=422, detail="Etapa inválida")
+    with _get_engine().begin() as conn:
+        completed = users_db_module.set_step_progress(
+            conn, user["id"], property_id, body.completed,
+        )
+    return {"property_id": property_id, "completed": completed}
 
 
 def _is_preview() -> bool:
