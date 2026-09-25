@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry.js';
+import { housingPreferencesFlow, shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry.js';
 
 const emptyEntry = {
   account: null,
@@ -29,4 +29,15 @@ test('account keeps the app navigation while preference editing stays focused', 
   assert.equal(shouldUseAccountScreen({ pathname: '/perfil', isPreview: false, account: { id: 1 }, hasSearch: false }), false);
   assert.equal(shouldUseAccountScreen({ pathname: '/perfil', isPreview: false, account: null, hasSearch: false }), true);
   assert.equal(shouldUseAccountScreen({ pathname: '/preferencias', isPreview: false, account: { id: 1 }, hasSearch: false }), true);
+});
+
+test('initial preferences continue to the catalog while later edits return to account', () => {
+  assert.deepEqual(housingPreferencesFlow('?origem=cadastro'), {
+    successDestination: '/',
+    finalLabel: 'Ver imóveis',
+    cancelDestination: '/?busca=todos',
+    cancelLabel: 'Agora não',
+  });
+  assert.equal(housingPreferencesFlow('').successDestination, '/perfil');
+  assert.equal(housingPreferencesFlow('').finalLabel, 'Salvar preferências');
 });

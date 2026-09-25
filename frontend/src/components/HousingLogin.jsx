@@ -36,7 +36,7 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
           setBusy(true);
           setError('');
           await loginWithGoogle(credential);
-          navigate(creating ? '/perfil' : signedInDestination, { replace: true });
+          navigate(creating ? '/preferencias?origem=cadastro' : signedInDestination, { replace: true });
         } catch (err) {
           setError(err.message || 'Não foi possível entrar com o Google. Tente de novo.');
         } finally {
@@ -62,7 +62,7 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
       if (creating) {
         if (form.password !== form.confirmPassword) throw new Error('As senhas precisam ser iguais.');
         await onSignUp(form);
-        navigate('/perfil', { replace: true });
+        navigate('/preferencias?origem=cadastro', { replace: true });
       } else {
         await onSignIn({ email: form.email, password: form.password });
         navigate(signedInDestination, { replace: true });

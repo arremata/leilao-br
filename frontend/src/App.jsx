@@ -5,7 +5,7 @@ import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import AccountPage, { UserMark } from './components/AccountPage';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
-import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
+import { housingPreferencesFlow, shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
@@ -46,6 +46,7 @@ function App() {
   const [properties, setProperties] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const cities = [...new Set(properties.map(p => p.city).filter(Boolean))].sort();
+  const preferencesFlow = housingPreferencesFlow(location.search);
 
   // Two user sources: Google (authUser) wins over local email/password (account).
   // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
@@ -245,10 +246,7 @@ function App() {
               initialProfile={housingProfile}
               cities={cities}
               onSave={saveProfile}
-              successDestination="/perfil"
-              finalLabel="Salvar preferências"
-              cancelDestination="/perfil"
-              cancelLabel="Cancelar"
+              {...preferencesFlow}
             />
           : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/preferencias" />} />
         <Route path="/imovel/:id" element={
