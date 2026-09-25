@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Autorizou na política de segurança somente a origem de estilos do Google Identity usada pelo botão oficial de acesso. O login em `app.argosleiloes.com.br` mantém as demais restrições de conteúdo e deixa de bloquear esse recurso no navegador.
+
 - **2026-09-25** — Fechou a API automática do Supabase para todas as tabelas do
   Argos. Catálogo, enriquecimentos, filas operacionais e dados de conta —
   incluindo sessões — agora usam RLS com bloqueio explícito para os papéis de
