@@ -111,15 +111,39 @@
 .housing-search .housing-choice[aria-pressed=true]{box-shadow:0 2px 0 var(--accent)}
 .housing-search .housing-choice-icon{width:28px;height:28px;flex-basis:28px;font-size:15px}
 .housing-search .housing-choice b{font-size:11px}
-.housing-search .feed-rail-inner{gap:12px;margin-top:18px}
-.housing-search .kind-tabs--rail button{padding:9px 11px}
-.housing-search .feed-rail-section{padding:10px 11px;background:var(--bg-1)}
-.housing-search .feed-switch-label{font-size:11.5px}
+.housing-search{align-self:start;padding:20px}
+.housing-search .feed-rail-inner--compact{gap:14px;margin-top:16px}
+.housing-search .feed-rail-inner--compact .feed-rail-head{margin-bottom:-5px}
+.housing-search .feed-rail-inner--compact .feed-rail-head .uppy,
+.housing-search .feed-rail-inner--compact .feed-rail-section-title,
+.housing-search .feed-filter-field-label{margin:0;color:var(--fg-1);font-family:var(--f-sans);font-size:11px;font-weight:550;letter-spacing:0;text-transform:none}
+.housing-search .kind-tabs--rail{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
+.housing-search .kind-tabs--rail button{align-items:center;justify-content:center;min-width:0;height:36px;padding:0 5px;border:0;border-radius:7px;background:transparent;font-size:11.5px;text-align:center}
+.housing-search .kind-tabs--rail button strong{white-space:nowrap}
+.housing-search .kind-tabs--rail button.active{border:0;background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}
+.housing-search .feed-rail-inner--compact .feed-rail-section{display:grid;gap:7px;padding:0;border:0;border-radius:0;background:transparent}
+.housing-search .feed-rail-section--availability .feed-switch{min-height:40px;padding:7px 10px;border:1px solid var(--line-1);border-radius:9px;background:var(--bg-1)}
+.housing-search .feed-rail-section--availability .feed-switch-body{order:1}
+.housing-search .feed-rail-section--availability .feed-switch-knob{order:2}
+.housing-search .feed-switch-label{font-size:11.5px;font-weight:550}
 .housing-search .feed-switch-helper{font-size:10px}
-.housing-search-divider{height:1px;margin:20px 0;background:var(--line-1)}
+.housing-search .feed-rail-stack{gap:10px}
+.housing-search .feed-rail-section--discount .feed-rail-slider{gap:5px}
+.housing-search .feed-rail-section--discount .feed-rail-slider-row{min-height:18px;align-items:center}
+.housing-search .feed-rail-section--discount .feed-rail-slider-row strong{margin-left:auto;font-size:12px;color:var(--accent-strong)}
+.housing-search .feed-rail-section--discount .feed-rail-slider-row span{font-size:10px}
+.housing-search .feed-rail-clear{padding:0;font-size:10.5px}
+.housing-search-divider{height:1px;margin:16px 0;background:var(--line-1)}
 .housing-search-subtitle{margin:0;font-family:var(--f-display);font-size:16px;letter-spacing:-.03em}
+.housing-search .housing-mini-tabs{gap:3px;margin:13px 0;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
+.housing-search .housing-mini-tabs button{flex:1;min-height:34px;padding:0 4px;border-radius:7px;background:transparent}
+.housing-search .housing-mini-tabs button[aria-selected=true]{background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}
+.housing-search .housing-fields{gap:12px;margin:13px 0}
+.housing-search .housing-field input,.housing-search .housing-field select{height:40px;border-radius:9px}
+.housing-search>.btn{min-height:40px;margin:4px 0}
+.housing-search .housing-text-button{padding:9px 0}
 
-@media(min-width:1101px){.housing-search{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow-y:auto;scrollbar-width:thin}}
+@media(min-width:1101px) and (min-height:850px){.housing-search{position:sticky;top:84px}}
 @media(max-width:1100px){.housing-search{max-width:none}}
 
 @media(max-height:680px) and (min-width:761px){.housing-questionnaire{padding-top:18px;padding-bottom:18px}.housing-question-body{padding:12px 2px}.housing-question-body h1{font-size:30px}.housing-question-body>.housing-fields{margin-top:14px}.housing-choice{min-height:58px;padding-block:10px}.housing-questionnaire .housing-form-footer{padding-top:12px}}

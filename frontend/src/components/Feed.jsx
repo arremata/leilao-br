@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
+import { catalogSaleDetailVisibility } from '../catalogFilters';
 import { getEndsAtMs } from '../utils';
 
 const normalizeLocation = (value) => String(value || '')
@@ -109,6 +110,10 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
         .sort((a, b) => a.localeCompare(b, 'pt-BR')),
     ];
   }, [byKind, filters.modalidade]);
+  const saleDetailVisibility = catalogSaleDetailVisibility(kind, pracaOptions, modalityOptions);
+  const showDetailSection = hideHousingDuplicates
+    ? saleDetailVisibility.showGroup
+    : propertyTypeOptions.length > 2 || saleDetailVisibility.showGroup;
   const visibleFilterCount =
     (filters.discountMin > 0 ? 1 : 0)
     + (filters.state !== 'Todos' ? 1 : 0)
@@ -135,7 +140,7 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
     setParams(cleared);
   }
 
-  return <div className="feed-rail-inner">
+  return <div className={`feed-rail-inner${hideHousingDuplicates ? ' feed-rail-inner--compact' : ''}`}>
     <div className="feed-rail-head">
       <span className="uppy" style={{ color: 'var(--fg-3)' }}>Tipo de venda</span>
       {onCollapse && <button
@@ -151,36 +156,41 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       <button
         role="tab"
         aria-selected={kind === 'auction'}
+        aria-label={hideHousingDuplicates ? 'Leilões: têm disputa e data' : undefined}
+        title="Leilões têm disputa e uma data para terminar."
         className={kind === 'auction' ? 'active' : ''}
         onClick={() => setKind('auction')}
       >
-        <div><strong>Leilões</strong><small>tem disputa e data</small></div>
+        <div><strong>Leilões</strong>{!hideHousingDuplicates && <small>tem disputa e data</small>}</div>
       </button>
       <button
         role="tab"
         aria-selected={kind === 'direct'}
+        aria-label={hideHousingDuplicates ? 'Compra direta: sem disputa, quem fechar primeiro leva' : undefined}
+        title="Compra direta não tem disputa: quem concluir primeiro fica com o imóvel."
         className={kind === 'direct' ? 'active' : ''}
         onClick={() => setKind('direct')}
         disabled={directCount === 0}
       >
         <div>
           <strong>Compra direta</strong>
-          <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
+          {!hideHousingDuplicates && <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>}
         </div>
       </button>
     </div>
 
     {stateOptions.length > 2 && <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Estado</span>
+      {!hideHousingDuplicates && <span className="uppy feed-rail-section-title">Estado</span>}
       <div className="feed-rail-stack">
         <Filter label="Estado" value={filters.state}
+          field={hideHousingDuplicates}
           options={stateOptions}
           onChange={(value) => setFilters({ ...filters, state: value, city: 'Todas' })} />
       </div>
     </div>}
 
     {!hideHousingDuplicates && <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Localização</span>
+      <span className="uppy feed-rail-section-title">Localização</span>
       <div className="feed-rail-stack">
         <Filter label="Cidade" value={filters.city}
           options={cityOptions}
@@ -188,41 +198,45 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       </div>
     </div>}
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Disponibilidade</span>
+    <div className="feed-rail-section feed-rail-section--availability">
+      <span className="uppy feed-rail-section-title">Disponibilidade</span>
       <FilterSwitch
         checked={filters.showExpired}
         onChange={(value) => setFilters({ ...filters, showExpired: value })}
-        label="Mostrar imóveis encerrados"
-        helper="Incluir imóveis cuja janela de compra já fechou"
+        label={hideHousingDuplicates ? 'Incluir encerrados' : 'Mostrar imóveis encerrados'}
+        helper={hideHousingDuplicates ? null : 'Incluir imóveis cuja janela de compra já fechou'}
+        title="Inclui imóveis cuja janela de compra já terminou."
       />
     </div>
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>
-        {hideHousingDuplicates ? 'Detalhes da venda' : 'Tipo de imóvel'}
-      </span>
+    {showDetailSection && <div className="feed-rail-section feed-rail-section--details">
+      {!hideHousingDuplicates && <span className="uppy feed-rail-section-title">Tipo de imóvel</span>}
       <div className="feed-rail-stack">
         {!hideHousingDuplicates && propertyTypeOptions.length > 2 && <Filter
           label="Tipo" value={filters.propertyType}
           options={propertyTypeOptions}
           onChange={(value) => setFilters({ ...filters, propertyType: value })}
         />}
-        {pracaOptions.length > 1 && <Filter label="Rodada" value={filters.praca}
+        {saleDetailVisibility.showPraca && <Filter label="Rodada" value={filters.praca}
+          field={hideHousingDuplicates}
           options={pracaOptions}
           onChange={(value) => setFilters({ ...filters, praca: value })} />}
-        {modalityOptions.length > 2 && <Filter label="Modalidade" value={filters.modalidade}
+        {saleDetailVisibility.showModalidade && <Filter label="Modalidade" value={filters.modalidade}
+          field={hideHousingDuplicates}
           options={modalityOptions}
           onChange={(value) => setFilters({ ...filters, modalidade: value, praca: 'Todos' })} />}
       </div>
-    </div>
+    </div>}
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
-        Abaixo da avaliação
+    <div className="feed-rail-section feed-rail-section--discount">
+      <span className="uppy feed-rail-section-title">
+        {hideHousingDuplicates ? 'Desconto mínimo' : 'Abaixo da avaliação'}
       </span>
       <div className="feed-rail-slider">
-        <div className="feed-rail-slider-row"><strong className="mono">{filters.discountMin}%</strong></div>
+        <div className="feed-rail-slider-row">
+          {hideHousingDuplicates && <span>Abaixo da avaliação</span>}
+          <strong className="mono">{filters.discountMin}%</strong>
+        </div>
         <input
           type="range" min="0" max="60" step="1"
           value={filters.discountMin}
@@ -536,14 +550,19 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   );
 }
 
-function Filter({ label, value, options, onChange }) {
+function Filter({ label, value, options, onChange, field = false }) {
   const [open, setOpen] = useState(false);
   const active = value !== options[0];
   return (
-    <div style={{ position: 'relative' }}>
+    <div className={`feed-filter${field ? ' feed-filter--field' : ''}${active ? ' active' : ''}`} style={{ position: 'relative' }}>
+      {field && <span className="feed-filter-field-label">{label}</span>}
       <button
+        type="button"
+        className="feed-filter-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
-        style={{
+        style={field ? undefined : {
           display: 'inline-flex', alignItems: 'center', gap: 8,
           height: 32, padding: '0 12px',
           borderRadius: 8,
@@ -553,9 +572,9 @@ function Filter({ label, value, options, onChange }) {
           fontSize: 12.5,
         }}
       >
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{label}:</span>
+        {!field && <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{label}:</span>}
         <span style={{ fontWeight: active ? 500 : 400 }}>{value}</span>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>▾</span>
+        <span className="mono feed-filter-caret">▾</span>
       </button>
       {open && (
         <>
@@ -684,12 +703,13 @@ function Empty() {
 // Switch iOS-style para filtros binários no rail.
 // O knob se move horizontalmente e muda de cor quando ligado. Marcar com
 // role="switch" comunica o estado binário para leitores de tela.
-function FilterSwitch({ checked, onChange, label, helper }) {
+function FilterSwitch({ checked, onChange, label, helper, title }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      title={title}
       onClick={() => onChange(!checked)}
       className={`feed-switch${checked ? ' on' : ''}`}
     >

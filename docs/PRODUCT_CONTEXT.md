@@ -86,7 +86,9 @@ no HTML do servidor, o que ainda não é feito.
   Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
   tudo sem perder o perfil salvo. Tipo de venda, disponibilidade, modalidade,
   rodada e desconto ficam na mesma barra lateral; não existe um segundo painel
-  de filtros sobre os resultados.
+  de filtros sobre os resultados. A barra usa controles compactos e a rolagem
+  normal da página, sem uma área interna rolável. Compra direta não mostra
+  opções de rodada ou modalidade próprias de leilão.
 - A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
   eventual desocupação e outras despesas continuam explicadas em cada imóvel;
   a faixa não garante custo final nem aprovação de financiamento.

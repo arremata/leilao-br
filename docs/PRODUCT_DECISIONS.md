@@ -35,7 +35,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   taxas, reforma, eventual desocupação e condições de pagamento ficam no detalhe.
   O perfil salvo permanece disponível para restaurar depois de explorar sem os
   filtros. Preferências e filtros do catálogo compartilham uma única barra
-  lateral, sem controles duplicados sobre a lista.
+  lateral, sem controles duplicados sobre a lista ou rolagem interna. Controles
+  específicos de leilão aparecem somente quando se aplicam ao tipo de venda.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 
