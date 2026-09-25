@@ -45,9 +45,11 @@ npm run preview      # preview production build
   for free — do not replace them with `onClick` handlers.
 - `vercel.json` must list every app route explicitly. A catch-all rewrite would risk
   swallowing `/assets/*`, `/sw.js` and `/manifest.webmanifest`.
-- Watchlist and history persist to `localStorage` (keys: `arremate_watched`,
-  `arremate_history`). Those keys are deliberately unchanged despite the Argos rename:
-  renaming them would silently erase saved properties for existing users.
+- Salvos, Vistos and the "O que fazer agora" progress belong to the Google account
+  (`/me`, `/me/saved/{id}`, `/me/viewed`, `/me/progress/{id}`). Only previews, which
+  have no login, keep them in `localStorage` (`arremate_watched`, `arremate_history`,
+  `arremate_property_steps_{id}`); in production those keys are only read once, to
+  import what a browser kept before accounts existed, and are never written.
 
 ### Data model
 

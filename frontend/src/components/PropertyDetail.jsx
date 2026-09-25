@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Countdown, Photo, Specs } from './shared';
+import { Countdown, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
+import { useStepProgress } from '../useStepProgress';
 
 const REGISTRATION_RATES = {
   PR: 0.008, SP: 0.009, RJ: 0.0085, MG: 0.0075, RS: 0.007,
@@ -123,7 +124,6 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   ));
   const expenseStorageKey = property?.id ? `arremate_property_expenses_${property.id}` : null;
   const costStorageKey = property?.id ? `arremate_property_costs_${property.id}` : null;
-  const stepsStorageKey = property?.id ? `arremate_property_steps_${property.id}` : null;
   const [expenseEstimates, setExpenseEstimates] = useState(() => {
     if (!property?.id) return {};
     return readStoredObject(
@@ -134,33 +134,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const [costPreferences, setCostPreferences] = useState(() => (
     property?.id ? readStoredObject(`arremate_property_costs_${property.id}`, { overrides: {}, customCosts: [] }) : {}
   ));
-  const [stepsDone, setStepsDone] = useState(() => (
-    property?.id ? readStoredObject(`arremate_property_steps_${property.id}`) : {}
-  ));
-
-  const persistStepProgress = useCallback((next) => {
-    if (!stepsStorageKey) return;
-    try { localStorage.setItem(stepsStorageKey, JSON.stringify(next)); } catch { /* segue utilizável */ }
-  }, [stepsStorageKey]);
-
-  const toggleStep = useCallback((id) => {
-    setStepsDone(current => {
-      const next = { ...current };
-      if (next[id]) delete next[id];
-      else next[id] = true;
-      persistStepProgress(next);
-      return next;
-    });
-  }, [persistStepProgress]);
-
-  const markStepDone = useCallback((id) => {
-    setStepsDone(current => {
-      if (current[id]) return current;
-      const next = { ...current, [id]: true };
-      persistStepProgress(next);
-      return next;
-    });
-  }, [persistStepProgress]);
+  const { done: stepsDone, toggleStep, markStepDone } = useStepProgress(property?.id);
 
   const markRulesRead = useCallback(() => {
     markStepDone('read_rules');
@@ -731,16 +705,14 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               border: '2px solid var(--accent)',
               position: 'relative',
               cursor: 'pointer',
+              background: '#ECEEF1',
+              backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
             }}>
-              {p.photoUrl ? (
-                <img src={p.photoUrl} alt="Fachada" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{
-                  width: '100%', height: '100%',
-                  background: '#ECEEF1',
-                  backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
-                }} />
-              )}
+              <PropertyImage
+                src={p.photoUrl}
+                alt="Fachada"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
               <span className="mono" style={{
                 position: 'absolute', bottom: 4, left: 4,
                 fontSize: 9, color: 'var(--fg-2)',

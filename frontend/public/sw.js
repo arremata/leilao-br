@@ -30,6 +30,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET') return;
+  // Recursos externos obedecem à CSP da página e devem ser carregados pelo
+  // navegador. Rebuscá-los dentro do worker transforma a imagem em uma conexão
+  // do próprio worker, bloqueada por connect-src, e produz um ícone quebrado.
+  if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
     // Never cache personalized or auth-required responses: the Cache API keys

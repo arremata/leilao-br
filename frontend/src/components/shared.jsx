@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fmtBRL, getEndsAtMs, pracaLabel } from '../utils';
 import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
+import { imageSourceForAttempt } from '../imageFallback';
 
 // ============================================================
 // Countdown timer
@@ -57,6 +58,26 @@ export function Countdown({ until, compact, dark }) {
 // ============================================================
 // Photo placeholder
 // ============================================================
+export function PropertyImage({ src, alt = '', style }) {
+  const [failure, setFailure] = useState({ src: '', attempt: 0 });
+  const attempt = failure.src === src ? failure.attempt : 0;
+  const imageSrc = imageSourceForAttempt(src, attempt);
+  if (!imageSrc) return null;
+  return (
+    <img
+      key={imageSrc}
+      src={imageSrc}
+      alt={alt}
+      referrerPolicy="no-referrer"
+      onError={() => setFailure(current => ({
+        src,
+        attempt: current.src === src ? current.attempt + 1 : 1,
+      }))}
+      style={style}
+    />
+  );
+}
+
 export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', children, style }) {
   return (
     <div
@@ -70,7 +91,7 @@ export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', child
       }}
     >
       {photoUrl ? (
-        <img
+        <PropertyImage
           src={photoUrl}
           alt={label}
           style={{
@@ -253,9 +274,9 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
       <div style={{
         width: 56, height: 42, borderRadius: 8, overflow: 'hidden',
         background: '#ECEEF1',
-        backgroundImage: p.photoUrl ? 'none' : 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
+        backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
       }}>
-        {p.photoUrl && <img src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+        <PropertyImage src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-0)', lineHeight: 1.25 }}>

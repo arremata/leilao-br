@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import StaticPool
 
 
 MODULE_PATH = Path(__file__).parents[2] / "vercel-backend" / "auth.py"
@@ -42,7 +43,10 @@ def _fresh_conn():
     exits cleanly and the in-memory database evaporates. Schema DDL runs in
     its own transaction and commits before any test body executes.
     """
-    engine = create_engine("sqlite://")
+    # HTTP tests hit sync FastAPI routes, which run in a worker thread.
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
     conn = engine.connect()
     with conn.begin():
         conn.exec_driver_sql(
@@ -70,6 +74,12 @@ def _fresh_conn():
         conn.exec_driver_sql(
             "CREATE TABLE user_sessions (id TEXT PRIMARY KEY, user_id INTEGER,"
             " created_at TEXT, expires_at TEXT, revoked_at TEXT)"
+        )
+        conn.exec_driver_sql(
+            "CREATE TABLE user_property_progress (user_id INTEGER, property_id INTEGER,"
+            " completed_steps TEXT NOT NULL DEFAULT '[]',"
+            " updated_at TEXT DEFAULT CURRENT_TIMESTAMP,"
+            " PRIMARY KEY (user_id, property_id))"
         )
     return conn
 
@@ -252,6 +262,65 @@ def test_upsert_viewed_uses_jsonb_cast_on_postgres(monkeypatch):
 
     users_db._upsert_viewed(_FakeConn(), 1, 2, {"a": 1})
     assert "CAST(:s AS JSONB)" in captured["sql"]
+
+
+def _two_users(conn):
+    return [
+        users_db.upsert_user(conn, {
+            "google_sub": f"g-{name}", "email": f"{name}@b.com", "name": name,
+            "avatar_url": None,
+        })
+        for name in ("ana", "bia")
+    ]
+
+
+def test_clear_viewed_only_touches_the_given_user():
+    conn = _fresh_conn()
+    ana, bia = _two_users(conn)
+    users_db.sync_viewed(conn, ana["id"], [{"id": 1, "snapshot": {"title": "a"}}])
+    users_db.sync_viewed(conn, bia["id"], [{"id": 1, "snapshot": {"title": "b"}}])
+
+    users_db.clear_viewed(conn, ana["id"])
+
+    assert users_db.get_viewed(conn, ana["id"]) == []
+    assert [v["property_id"] for v in users_db.get_viewed(conn, bia["id"])] == [1]
+
+
+def test_step_progress_is_per_user_and_per_property():
+    conn = _fresh_conn()
+    ana, bia = _two_users(conn)
+
+    assert users_db.get_step_progress(conn, ana["id"], 10) == []
+    saved = users_db.set_step_progress(conn, ana["id"], 10, ["visit", "read_rules", "visit"])
+    assert saved == ["read_rules", "visit"]
+    users_db.set_step_progress(conn, ana["id"], 10, ["read_rules"])
+    users_db.set_step_progress(conn, bia["id"], 10, ["credit"])
+
+    assert users_db.get_step_progress(conn, ana["id"], 10) == ["read_rules"]
+    assert users_db.get_step_progress(conn, ana["id"], 11) == []
+    assert users_db.get_step_progress(conn, bia["id"], 10) == ["credit"]
+
+    assert users_db.set_step_progress(conn, ana["id"], 10, []) == []
+    count = conn.execute(text(
+        "SELECT COUNT(*) FROM user_property_progress WHERE user_id = :u"
+    ), {"u": ana["id"]}).scalar_one()
+    assert count == 0
+
+
+def test_step_progress_uses_jsonb_cast_on_postgres():
+    captured = {}
+
+    class _FakeConn:
+        class dialect:
+            name = "postgresql"
+
+        def execute(self, statement, params):
+            captured["sql"] = str(statement)
+            captured["params"] = params
+
+    users_db.set_step_progress(_FakeConn(), 1, 2, ["visit"])
+    assert "CAST(:s AS JSONB)" in captured["sql"]
+    assert captured["params"]["s"] == '["visit"]'
 
 
 vercel_index = _load("index")
@@ -567,6 +636,79 @@ def test_all_account_writes_respect_preview_guard(client, monkeypatch):
         "/api/me/saved/123", headers=ORIGIN, json={"saved": True},
     )
     assert res.status_code == 403
+    res = client.put(
+        "/api/me/progress/123", headers=ORIGIN, json={"completed": ["visit"]},
+    )
+    assert res.status_code == 403
+    res = client.delete("/api/me/viewed", headers=ORIGIN)
+    assert res.status_code == 403
+
+
+def test_step_progress_requires_session(client):
+    assert client.get("/api/me/progress/10").status_code == 401
+    res = client.put(
+        "/api/me/progress/10", headers=ORIGIN, json={"completed": ["visit"]},
+    )
+    assert res.status_code == 401
+
+
+def test_step_progress_round_trip_is_scoped_to_the_session_user(client, monkeypatch):
+    conn = _fresh_conn()
+    ana, bia = _two_users(conn)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(conn))
+
+    _set_session_cookie(client, ana["id"])
+    res = client.put(
+        "/api/me/progress/10",
+        headers=ORIGIN,
+        json={"completed": ["visit", "read_rules"]},
+    )
+    assert res.status_code == 200
+    assert res.json() == {"property_id": 10, "completed": ["read_rules", "visit"]}
+    assert client.get("/api/me/progress/10").json()["completed"] == ["read_rules", "visit"]
+    assert client.get("/api/me/progress/11").json()["completed"] == []
+
+    _set_session_cookie(client, bia["id"], session_id="bia-session")
+    assert client.get("/api/me/progress/10").json()["completed"] == []
+
+
+@pytest.mark.parametrize("completed", [
+    ["Visit"],
+    ["read-rules"],
+    ["x" * 41],
+    [f"step_{i}" for i in range(41)],
+])
+def test_step_progress_rejects_malformed_steps(client, monkeypatch, completed):
+    _set_session_cookie(client, 12)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_fresh_conn()))
+    res = client.put("/api/me/progress/10", headers=ORIGIN, json={"completed": completed})
+    assert res.status_code == 422
+
+
+def test_step_progress_write_requires_trusted_origin(client, monkeypatch):
+    _set_session_cookie(client, 12)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_fresh_conn()))
+    res = client.put(
+        "/api/me/progress/10",
+        headers={"Origin": "https://evil.example"},
+        json={"completed": ["visit"]},
+    )
+    assert res.status_code == 403
+
+
+def test_clear_viewed_removes_only_the_session_users_history(client, monkeypatch):
+    conn = _fresh_conn()
+    ana, bia = _two_users(conn)
+    users_db.sync_viewed(conn, ana["id"], [{"id": 1, "snapshot": {"title": "a"}}])
+    users_db.sync_viewed(conn, bia["id"], [{"id": 1, "snapshot": {"title": "b"}}])
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(conn))
+
+    _set_session_cookie(client, ana["id"])
+    assert client.delete("/api/me/viewed").status_code == 403  # no Origin header
+    assert client.delete("/api/me/viewed", headers=ORIGIN).status_code == 200
+
+    assert users_db.get_viewed(conn, ana["id"]) == []
+    assert len(users_db.get_viewed(conn, bia["id"])) == 1
 
 
 def test_logout_invalidates_server_session_and_expires_cookie(client, monkeypatch):

@@ -3,19 +3,24 @@ import { authApi, AuthError } from './api';
 import { AuthContext } from './context';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
+const SYNC_RETRY_DELAYS_MS = [2000, 5000, 15000];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(isPreview);
   const [synced, setSynced] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [syncAttempt, setSyncAttempt] = useState(0);
   const syncStartedFor = useRef(null);
   const isAuthed = Boolean(authReady && user);
+  // Profile edits replace `user`; only a different account restarts the sync.
+  const userId = user?.id ?? null;
 
   const clearLocalSession = useCallback(() => {
     syncStartedFor.current = null;
     setUser(null);
     setSynced(false);
+    setSyncAttempt(0);
   }, []);
 
   useEffect(() => {
@@ -57,6 +62,7 @@ export function AuthProvider({ children }) {
     syncStartedFor.current = null;
     setSessionExpired(false);
     setSynced(false);
+    setSyncAttempt(0);
     setUser(data.user);
     setAuthReady(true);
     return data.user;
@@ -74,39 +80,62 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
-  // Merge browser-only saved/viewed data once after the server validates the
-  // HttpOnly session. Later changes are written directly through authenticated
+  // Load the account's saved/viewed lists once the server validates the
+  // HttpOnly session. Lists kept by this browser before accounts existed are
+  // imported first, once; a failed import stays local and never blocks the
+  // account lists. Later changes are written directly through authenticated
   // same-origin requests.
   useEffect(() => {
-    if (!isAuthed || synced) return;
-    const sessionOwner = user.id;
-    if (syncStartedFor.current === sessionOwner) return;
+    if (!isAuthed || synced) return undefined;
+    const sessionOwner = userId;
+    if (syncStartedFor.current === sessionOwner) return undefined;
     syncStartedFor.current = sessionOwner;
     let cancelled = false;
+    let retryTimer = null;
     const watched = _readIds('arremate_watched');
     const history = _readHistory('arremate_history');
-    authApi.sync({ watched, history })
+    const importLocal = watched.length || history.length
+      ? authApi.sync({ watched, history })
+        .then(() => {
+          try {
+            localStorage.removeItem('arremate_watched');
+            localStorage.removeItem('arremate_history');
+          } catch { /* ignore */ }
+        })
+        .catch((err) => {
+          if (err instanceof AuthError) throw err;
+          console.warn('Não foi possível importar as listas deste navegador:', err);
+        })
+      : Promise.resolve();
+    importLocal
       .then(() => authApi.me())
       .then((data) => {
         if (cancelled) return;
         setUser(data.user);
         setSynced(true);
-        try {
-          localStorage.removeItem('arremate_watched');
-          localStorage.removeItem('arremate_history');
-        } catch { /* ignore */ }
         window.dispatchEvent(new CustomEvent('argos:synced', { detail: data }));
       })
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof AuthError) {
           window.dispatchEvent(new Event('argos:session-expired'));
+          return;
+        }
+        console.warn('Não foi possível carregar seus salvos e vistos:', err);
+        if (syncAttempt < SYNC_RETRY_DELAYS_MS.length) {
+          retryTimer = setTimeout(() => {
+            syncStartedFor.current = null;
+            setSyncAttempt(attempt => attempt + 1);
+          }, SYNC_RETRY_DELAYS_MS[syncAttempt]);
         } else {
           syncStartedFor.current = null;
         }
       });
-    return () => { cancelled = true; };
-  }, [isAuthed, synced, user]);
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+    };
+  }, [isAuthed, synced, userId, syncAttempt]);
 
   const value = useMemo(() => ({
     user,
