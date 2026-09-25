@@ -137,7 +137,9 @@ Quatro áreas numeradas e um guia lateral:
 **O que fazer agora** acompanha a página como painel lateral sem numeração.
 Organiza as etapas antes e depois da compra, mostra o percentual concluído e usa
 datas reais quando existirem. O painel se apresenta ao chegar ao fim da página;
-chegar ao fim das regras oficiais registra essa leitura como concluída.
+chegar ao fim das regras oficiais registra essa leitura como concluída. O avanço
+de cada imóvel pertence à conta Google: ao voltar ao imóvel, em qualquer
+dispositivo, as etapas marcadas continuam marcadas.
 
 O produto não chama nenhum valor de “seu limite”: a comparação com a avaliação
 oficial continua disponível na área de preços, sem parecer uma recomendação de
@@ -168,8 +170,11 @@ ação equivalente à modalidade.
   cobrança ativa.
 - Em produção, Salvos e Vistos exigem uma conta Google ativa. Previews públicos
   mantêm essas áreas como apoio de validação local, sem criar uma identidade.
-- Ao entrar com Google, os dados locais são unidos à conta e passam a ser
-  sincronizados pelo servidor entre dispositivos.
+- Salvos, Vistos e o avanço em “O que fazer agora” ficam na conta Google e são
+  os mesmos em todos os dispositivos. Limpar os Vistos limpa o histórico da
+  conta. Em produção o navegador não guarda cópia local dessas listas; o que um
+  navegador tinha guardado antes das contas é importado uma única vez no
+  primeiro acesso com Google.
 
 ## Dados e confiança
 

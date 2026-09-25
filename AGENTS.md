@@ -220,6 +220,8 @@ The full platform will include:
   Caixa; elas também recebem uma nova tentativa e mostram o espaço neutro, sem
   ícone quebrado, quando a origem continua sem responder.
 
+- **2026-09-25** — Vinculou à conta Google o avanço em “O que fazer agora”: as etapas marcadas em cada imóvel ficam salvas por usuário (nova tabela `user_property_progress`, fechada à API automática do banco) e reaparecem ao voltar ao imóvel em qualquer dispositivo; o progresso guardado antes no navegador é importado uma vez. Salvos e Vistos deixaram de ser espelhados no localStorage em produção — isso evitava que as listas de uma pessoa fossem importadas na conta de outra no mesmo navegador —, “Limpar” em Vistos agora limpa o histórico da conta, e uma falha na importação local não impede mais o carregamento das listas da conta.
+
 - **2026-09-25** — Corrigiu a gravação do perfil de moradia que podia prender uma conta nova na última etapa com erro `422`. A API normaliza representações equivalentes já usadas por clientes Argos sem relaxar cidade e orçamento obrigatórios, e o questionário agora preserva as escolhas e apresenta a orientação específica devolvida pelo servidor.
 
 - **2026-09-25** — Tornou o perfil inicial realmente obrigatório depois do primeiro login: links e buscas não pulam mais cidade, tipo e orçamento, e não há saída para o catálogo antes de salvar as três escolhas. O questionário agora cabe no viewport sem rolagem própria ou da página, inclusive com o autocomplete aberto e em telas móveis; o rótulo “COMPRAR PARA MORAR” também saiu do catálogo.

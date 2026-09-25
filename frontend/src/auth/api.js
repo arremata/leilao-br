@@ -63,4 +63,8 @@ export const authApi = {
     request(`/me/saved/${propertyId}`, { method: 'PUT', body: { saved } }),
   recordViewed: (propertyId, snapshot) =>
     request('/me/viewed', { method: 'POST', body: { property_id: propertyId, snapshot } }),
+  clearViewed: () => request('/me/viewed', { method: 'DELETE' }),
+  getStepProgress: (propertyId) => request(`/me/progress/${propertyId}`),
+  setStepProgress: (propertyId, completed) =>
+    request(`/me/progress/${propertyId}`, { method: 'PUT', body: { completed } }),
 };
