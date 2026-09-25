@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Feed, { CatalogSidebarFilters } from './Feed';
 import CityAutocomplete from './CityAutocomplete';
@@ -72,6 +72,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(() => window.innerWidth > 1100);
   const [rememberedBudget, setRememberedBudget] = useState(() => readCatalogBudget());
+  const initialBudgetRestored = useRef(false);
   const hasBudgetParam = params.has(housingFilterParamKeys.budget);
   const requested = housingFiltersFromSearchParams(params);
   const current = {
@@ -86,9 +87,11 @@ export default function HousingFeed({ cities, ...feedProps }) {
     + (Number(current.budget) > 0 ? 1 : 0);
 
   useEffect(() => {
+    if (initialBudgetRestored.current) return;
+    initialBudgetRestored.current = true;
     if (hasBudgetParam || !rememberedBudget) return;
-    setParams(previous => {
-      const next = new URLSearchParams(previous);
+    setParams(() => {
+      const next = new URLSearchParams(window.location.search);
       next.set(housingFilterParamKeys.budget, rememberedBudget);
       return next;
     }, { replace: true });
