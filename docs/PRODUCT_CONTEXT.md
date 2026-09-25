@@ -79,7 +79,9 @@ no HTML do servidor, o que ainda não é feito.
   a pessoa volta ao endereço que tentou abrir. Uma conta nova conclui sem opção
   de pular o questionário de moradia em três escolhas obrigatórias: cidade, tipo
   de imóvel e faixa de preço. A cidade pode ser digitada e escolhida em
-  sugestões, inclusive sem informar os acentos durante a busca.
+  sugestões, inclusive sem informar os acentos durante a busca. Se o servidor
+  recusar algum dado, o questionário mantém as escolhas e informa qual campo
+  precisa ser revisto.
 - Google é a única forma de criar conta ou entrar. O primeiro acesso cria a
   conta Argos automaticamente e abre o questionário; acessos seguintes retomam
   a plataforma. Cada dispositivo mantém uma sessão própria por até 12 horas em

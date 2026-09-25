@@ -142,9 +142,12 @@ class SyncRequest(BaseModel):
 
 
 class HousingProfileRequest(BaseModel):
-    city: str = Field(min_length=1, max_length=300)
-    property_type: str
-    budget: str = Field(min_length=1, max_length=32)
+    # Accept equivalent JSON shapes already emitted by Argos clients. The
+    # endpoint below still owns the required-field and allowed-choice rules.
+    city: str | None = Field(default=None, max_length=300)
+    property_type: str | None = None
+    propertyType: str | None = None
+    budget: str | int | float | None = None
 
 
 class SavedToggleRequest(BaseModel):
@@ -337,8 +340,20 @@ def update_housing_profile(
     _origin: None = Depends(_require_trusted_origin),
     _writes: None = Depends(_require_persistent_writes),
 ):
-    profile = body.model_dump()
-    profile["city"] = profile["city"].strip()
+    city = (body.city or "").strip()
+    property_type = (body.property_type or body.propertyType or "Todos").strip()
+    budget_value = body.budget
+    if isinstance(budget_value, bool):
+        budget = ""
+    elif isinstance(budget_value, (int, float)) and float(budget_value).is_integer():
+        budget = str(int(budget_value))
+    else:
+        budget = str(budget_value or "").strip()
+    profile = {
+        "city": city,
+        "property_type": property_type,
+        "budget": budget,
+    }
     if not profile["city"]:
         raise HTTPException(status_code=422, detail="Cidade obrigatória")
     if profile["property_type"] not in {"Todos", "Casa", "Apartamento"}:

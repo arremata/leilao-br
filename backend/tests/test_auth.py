@@ -513,6 +513,19 @@ def test_update_housing_profile_requires_auth_and_returns_account(client, monkey
     assert res.status_code == 200
     assert captured["profile"]["budget"] == "above-1000000"
 
+    # Browser-restored clients may use the frontend field name and a JSON
+    # number. Both represent the same valid profile and are normalized at the
+    # boundary instead of stranding the user in onboarding.
+    res = client.put(
+        "/api/me/housing-profile",
+        headers=ORIGIN,
+        json={"city": " Londrina ", "propertyType": "Apartamento", "budget": 600000},
+    )
+    assert res.status_code == 200
+    assert captured["profile"] == {
+        "city": "Londrina", "property_type": "Apartamento", "budget": "600000",
+    }
+
 
 @pytest.mark.parametrize(
     "payload",
