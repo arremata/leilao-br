@@ -5,20 +5,14 @@ import CityAutocomplete from './CityAutocomplete';
 import CurrencyInput from './CurrencyInput';
 import SearchableAutocomplete from './SearchableAutocomplete';
 import {
-  emptyHousingProfile,
   filterHousingProperties,
+  housingFilterParamKeys,
   housingBudgetLabel,
   housingFiltersFromSearchParams,
+  housingSearchParamsWithFilter,
 } from '../housingProfile';
 import { normalizeSearchOption } from '../searchableOptions';
 import { readCatalogBudget, saveCatalogBudget } from '../housingFilterStorage';
-
-const housingParamKeys = {
-  city: 'cidade',
-  neighborhood: 'bairro',
-  propertyType: 'tipo',
-  budget: 'orcamento',
-};
 
 function FilterChip({ children, onRemove }) {
   return <button className="housing-filter-chip" type="button" onClick={onRemove} title={`Remover filtro: ${children}`}>
@@ -78,7 +72,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(() => window.innerWidth > 1100);
   const [rememberedBudget, setRememberedBudget] = useState(() => readCatalogBudget());
-  const hasBudgetParam = params.has(housingParamKeys.budget);
+  const hasBudgetParam = params.has(housingFilterParamKeys.budget);
   const requested = housingFiltersFromSearchParams(params);
   const current = {
     ...requested,
@@ -95,7 +89,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
     if (hasBudgetParam || !rememberedBudget) return;
     setParams(previous => {
       const next = new URLSearchParams(previous);
-      next.set(housingParamKeys.budget, rememberedBudget);
+      next.set(housingFilterParamKeys.budget, rememberedBudget);
       return next;
     }, { replace: true });
   }, [hasBudgetParam, rememberedBudget, setParams]);
@@ -103,18 +97,11 @@ export default function HousingFeed({ cities, ...feedProps }) {
   function setHousingFilter(key, value) {
     const nextValue = key === 'budget' ? saveCatalogBudget(value) : value;
     if (key === 'budget') setRememberedBudget(nextValue);
-    const paramKey = housingParamKeys[key];
-    const defaultValue = emptyHousingProfile[key];
-    setParams(previous => {
-      const next = new URLSearchParams(previous);
-      if (nextValue === '' || nextValue === defaultValue) next.delete(paramKey);
-      else next.set(paramKey, nextValue);
-      if (key === 'city') next.delete(housingParamKeys.neighborhood);
-      next.delete('busca');
-      next.delete('q');
-      next.delete('pagina');
-      return next;
-    }, { replace: key === 'neighborhood' || key === 'budget' });
+    const latestParams = new URLSearchParams(window.location.search);
+    setParams(
+      housingSearchParamsWithFilter(latestParams, key, nextValue),
+      { replace: key === 'neighborhood' || key === 'budget' },
+    );
   }
 
   function clearRememberedBudget() {
@@ -126,7 +113,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
     clearRememberedBudget();
     setParams(previous => {
       const next = new URLSearchParams(previous);
-      Object.values(housingParamKeys).forEach(key => next.delete(key));
+      Object.values(housingFilterParamKeys).forEach(key => next.delete(key));
       next.delete('busca');
       next.delete('q');
       next.delete('pagina');

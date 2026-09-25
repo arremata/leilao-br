@@ -214,7 +214,7 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-25** — Consolidou no PR de login a central de conta e a UX mais recente dos filtros. Produção mantém conta e onboarding obrigatórios, enquanto previews abrem o catálogo público; o perfil cadastral é salvo na conta sem filtrar resultados, e a busca preserva uma única lateral com autocompletes de cidade/bairro, limite monetário manual lembrado no navegador e controles coerentes com cada tipo de venda.
+- **2026-09-25** — Consolidou no PR de login a central de conta e a UX mais recente dos filtros. Produção mantém conta e onboarding obrigatórios, enquanto previews abrem o catálogo público; o perfil cadastral é salvo na conta sem filtrar resultados, e a busca preserva uma única lateral com autocompletes de cidade/bairro, limite monetário manual lembrado no navegador e controles coerentes com cada tipo de venda. Alterações rápidas de bairro e orçamento passam a compor a URL mais recente sem apagar o filtro anterior.
 
 - **2026-09-25** — Transformou a cidade do cadastro e da edição de preferências em uma busca com sugestões, tolerante a acentos e operável por mouse, toque ou teclado. Substituiu “Ainda não sei” por uma faixa cadastral real “Acima de R$ 1 milhão”, salva no perfil e exibida na central de conta sem ser aplicada automaticamente ao catálogo.
 

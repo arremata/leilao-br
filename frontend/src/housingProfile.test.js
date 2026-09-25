@@ -9,6 +9,7 @@ import {
   housingFiltersFromSearchParams,
   housingProfileForApi,
   housingProfileFromUser,
+  housingSearchParamsWithFilter,
   validateHousingProfile,
 } from './housingProfile.js';
 import { readHousingProfile, saveHousingProfile } from './housingStorage.js';
@@ -71,6 +72,15 @@ test('catalog filters come only from the URL, not from the saved account profile
     housingFiltersFromSearchParams(new URLSearchParams('cidade=Curitiba&tipo=Casa&orcamento=250000')),
     profile({ city: 'Curitiba', propertyType: 'Casa', budget: '250000' }),
   );
+});
+test('rapid catalog filter changes preserve the filters already in the URL', () => {
+  const withNeighborhood = housingSearchParamsWithFilter(
+    new URLSearchParams('cidade=CURITIBA'), 'neighborhood', 'BACACHERI',
+  );
+  const withBudget = housingSearchParamsWithFilter(withNeighborhood, 'budget', '275000');
+  assert.equal(withBudget.get('cidade'), 'CURITIBA');
+  assert.equal(withBudget.get('bairro'), 'BACACHERI');
+  assert.equal(withBudget.get('orcamento'), '275000');
 });
 test('browser adapter removes retired fields while migrating a stored profile', () => {
   let stored;

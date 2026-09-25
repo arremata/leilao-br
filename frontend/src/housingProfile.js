@@ -2,6 +2,13 @@ export const emptyHousingProfile = {
   city: '', neighborhood: '', propertyType: 'Todos', budget: '',
 };
 
+export const housingFilterParamKeys = {
+  city: 'cidade',
+  neighborhood: 'bairro',
+  propertyType: 'tipo',
+  budget: 'orcamento',
+};
+
 const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
 export const aboveOneMillionBudget = 'above-1000000';
 
@@ -66,6 +73,19 @@ export function housingFiltersFromSearchParams(searchParams) {
     propertyType: ['Casa', 'Apartamento'].includes(requestedPropertyType) ? requestedPropertyType : 'Todos',
     budget: searchParams.get('orcamento') || '',
   };
+}
+
+export function housingSearchParamsWithFilter(searchParams, key, value) {
+  const next = new URLSearchParams(searchParams);
+  const paramKey = housingFilterParamKeys[key];
+  const defaultValue = emptyHousingProfile[key];
+  if (value === '' || value === defaultValue) next.delete(paramKey);
+  else next.set(paramKey, value);
+  if (key === 'city') next.delete(housingFilterParamKeys.neighborhood);
+  next.delete('busca');
+  next.delete('q');
+  next.delete('pagina');
+  return next;
 }
 
 export function filterHousingProperties(properties, profile) {
