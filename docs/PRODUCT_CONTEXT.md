@@ -88,11 +88,14 @@ no HTML do servidor, o que ainda não é feito.
 - Todos os filtros da busca ficam numa única barra lateral e são aplicados pela
   própria pessoa. Cidade e bairro usam autocomplete com opções reais do catálogo;
   bairro fica disponível depois da escolha da cidade. O limite de valor inicial
-  aceita qualquer valor digitado e o apresenta em reais. Tipo de venda,
-  localização, tipo de imóvel, orçamento, disponibilidade, modalidade, rodada e
-  desconto não têm uma seção separada de “preferências”, botão de aplicar nem
-  ações de salvar ou restaurar perfil. A barra usa a rolagem normal da página,
-  sem área interna rolável. Compra direta não mostra opções próprias de leilão.
+  aceita qualquer valor digitado, o apresenta em reais e, depois da primeira
+  alteração, fica lembrado neste navegador até a pessoa limpar o campo ou os
+  filtros. Esse valor lembrado pertence à busca e não vem do questionário. Tipo
+  de venda, localização, tipo de imóvel, orçamento, disponibilidade, modalidade,
+  rodada e desconto não têm uma seção separada de “preferências”, botão de
+  aplicar nem ações de salvar ou restaurar perfil. A barra usa a rolagem normal
+  da página, sem área interna rolável. Compra direta não mostra opções próprias
+  de leilão.
 - A lista não oferece uma segunda busca livre por endereço, bairro e cidade. A
   localização é escolhida pelos autocompletes da lateral; acima dos resultados
   ficam apenas o total encontrado, a ordenação e o modo de visualização.

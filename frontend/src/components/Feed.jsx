@@ -59,6 +59,7 @@ export function CatalogSidebarFilters({
   properties,
   hideHousingDuplicates = false,
   onCollapse,
+  onClearAdditionalFilters,
   additionalFilters = null,
   additionalFilterCount = 0,
   additionalClearPatch = {},
@@ -138,6 +139,7 @@ export function CatalogSidebarFilters({
   }
 
   function clearVisibleFilters() {
+    onClearAdditionalFilters?.();
     const cleared = {
       estado: 'Todos', rodada: 'Todos', modalidade: 'Todos',
       desconto: '0', encerrados: '0',

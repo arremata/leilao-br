@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-24** — Passou a lembrar neste navegador o limite de valor inicial digitado manualmente no catálogo. A primeira visita continua sem limite; depois da primeira alteração, o valor é restaurado e refletido na URL, enquanto limpar o campo ou todos os filtros remove também a preferência local. O valor do questionário permanece apenas cadastral e não alimenta esse filtro.
+
 - **2026-09-24** — Trocou o limite de valor inicial do catálogo por um campo livre com formatação monetária brasileira. Bairro agora usa o mesmo autocomplete acessível de cidade, oferece somente bairros reais do catálogo na cidade escolhida e é limpo quando a cidade muda. A busca ampla e redundante por endereço, bairro ou cidade saiu do topo dos resultados, que passou a reunir total, ordenação e modo de visualização em uma única barra compacta.
 
 - **2026-09-24** — Separou perfil e busca. Cidade, tipo de imóvel e faixa de preço informados no questionário passam a ser dados cadastrais da conta Google, persistidos no banco e nunca aplicados automaticamente ao catálogo. A barra lateral virou um conjunto único de filtros instantâneos, sem a seção “Suas preferências”, ações de salvar/restaurar ou botão de aplicar; cidade agora usa um autocomplete acessível e limitado em vez do seletor nativo extenso. A conta local de e-mail e senha preserva o perfil somente neste navegador enquanto continuar como protótipo.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Feed, { CatalogSidebarFilters } from './Feed';
 import CityAutocomplete from './CityAutocomplete';
@@ -11,6 +11,7 @@ import {
   housingFiltersFromSearchParams,
 } from '../housingProfile';
 import { normalizeSearchOption } from '../searchableOptions';
+import { readCatalogBudget, saveCatalogBudget } from '../housingFilterStorage';
 
 const housingParamKeys = {
   city: 'cidade',
@@ -76,7 +77,13 @@ function HousingCatalogFilters({ cities, properties, filters, onChange }) {
 export default function HousingFeed({ cities, ...feedProps }) {
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(() => window.innerWidth > 1100);
-  const current = housingFiltersFromSearchParams(params);
+  const [rememberedBudget, setRememberedBudget] = useState(() => readCatalogBudget());
+  const hasBudgetParam = params.has(housingParamKeys.budget);
+  const requested = housingFiltersFromSearchParams(params);
+  const current = {
+    ...requested,
+    budget: hasBudgetParam ? requested.budget : rememberedBudget,
+  };
   const visibleProperties = filterHousingProperties(feedProps.properties, current);
   const activeHousingFilterCount =
     (current.city ? 1 : 0)
@@ -84,13 +91,24 @@ export default function HousingFeed({ cities, ...feedProps }) {
     + (current.propertyType !== 'Todos' ? 1 : 0)
     + (Number(current.budget) > 0 ? 1 : 0);
 
+  useEffect(() => {
+    if (hasBudgetParam || !rememberedBudget) return;
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.set(housingParamKeys.budget, rememberedBudget);
+      return next;
+    }, { replace: true });
+  }, [hasBudgetParam, rememberedBudget, setParams]);
+
   function setHousingFilter(key, value) {
+    const nextValue = key === 'budget' ? saveCatalogBudget(value) : value;
+    if (key === 'budget') setRememberedBudget(nextValue);
     const paramKey = housingParamKeys[key];
     const defaultValue = emptyHousingProfile[key];
     setParams(previous => {
       const next = new URLSearchParams(previous);
-      if (value === '' || value === defaultValue) next.delete(paramKey);
-      else next.set(paramKey, value);
+      if (nextValue === '' || nextValue === defaultValue) next.delete(paramKey);
+      else next.set(paramKey, nextValue);
       if (key === 'city') next.delete(housingParamKeys.neighborhood);
       next.delete('busca');
       next.delete('q');
@@ -99,7 +117,13 @@ export default function HousingFeed({ cities, ...feedProps }) {
     }, { replace: key === 'neighborhood' || key === 'budget' });
   }
 
+  function clearRememberedBudget() {
+    saveCatalogBudget('');
+    setRememberedBudget('');
+  }
+
   function clearHousingFilters() {
+    clearRememberedBudget();
     setParams(previous => {
       const next = new URLSearchParams(previous);
       Object.values(housingParamKeys).forEach(key => next.delete(key));
@@ -122,6 +146,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
         <CatalogSidebarFilters
           properties={feedProps.properties}
           hideHousingDuplicates
+          onClearAdditionalFilters={clearRememberedBudget}
           additionalFilters={<HousingCatalogFilters cities={cities} properties={feedProps.properties} filters={current} onChange={setHousingFilter} />}
           additionalFilterCount={activeHousingFilterCount}
           additionalClearPatch={{ cidade: 'Todas', bairro: '', tipo: 'Todos', orcamento: '' }}
