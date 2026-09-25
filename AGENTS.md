@@ -214,6 +214,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Fechou a API automática do Supabase para todas as tabelas do
+  Argos. Catálogo, enriquecimentos, filas operacionais e dados de conta —
+  incluindo sessões — agora usam RLS com bloqueio explícito para os papéis de
+  navegador; privilégios atuais e padrões também foram removidos desses papéis,
+  enquanto backend, ingestão e administração preservam seu acesso servidor a
+  servidor.
+
 - **2026-09-25** — Endureceu a autenticação antes da liberação: removeu integralmente o protótipo local de e-mail e senha e adotou Google como única entrada de produção. A sessão saiu do localStorage para um cookie HttpOnly/Secure/SameSite de 12 horas, sem dados pessoais no token; cada dispositivo mantém sua própria sessão revogável, e o logout encerra somente a sessão atual no servidor. API e frontend agora restringem origens, impedem cache de respostas privadas, aplicam limitação de tentativas e cabeçalhos CSP/anti-framing, validam emissor/audiência/identificador do token e descartam credenciais locais antigas. Previews permanecem públicos, com login Google e escritas de conta desativados.
 
 - **2026-09-25** — Consolidou no PR de login a central de conta e a UX mais recente dos filtros. Produção mantém conta, Google e onboarding obrigatórios, enquanto previews abrem o catálogo público e oferecem somente a conta local, sem tentar iniciar Google em domínios temporários não autorizados; o perfil cadastral é salvo na conta sem filtrar resultados, e a busca preserva uma única lateral com autocompletes de cidade/bairro, limite monetário manual lembrado no navegador e controles coerentes com cada tipo de venda. Alterações rápidas de bairro e orçamento passam a compor a URL mais recente sem apagar o filtro anterior.

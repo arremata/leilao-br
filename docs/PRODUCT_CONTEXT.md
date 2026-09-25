@@ -181,6 +181,8 @@ ação equivalente à modalidade.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
+- O navegador acessa catálogo e dados de conta somente pelos serviços do Argos;
+  as tabelas do banco não formam uma API pública paralela.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
