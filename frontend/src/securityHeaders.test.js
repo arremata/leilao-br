@@ -28,3 +28,10 @@ test('production CSP permits the Google Maps embed used on property pages', () =
     'frame-src https://accounts.google.com https://www.google.com https://vercel.live https://*.vercel.live',
   );
 });
+
+test('production CSP limits remote property images to the Caixa catalog origin', () => {
+  assert.equal(
+    cspDirective('img-src'),
+    "img-src 'self' data: blob: https://venda-imoveis.caixa.gov.br https://vercel.live https://*.vercel.live",
+  );
+});
