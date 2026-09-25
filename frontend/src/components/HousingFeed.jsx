@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Feed, { CatalogSidebarFilters } from './Feed';
 import CityAutocomplete from './CityAutocomplete';
+import CurrencyInput from './CurrencyInput';
+import SearchableAutocomplete from './SearchableAutocomplete';
 import {
   emptyHousingProfile,
   filterHousingProperties,
   housingBudgetLabel,
-  housingBudgetOptions,
   housingFiltersFromSearchParams,
 } from '../housingProfile';
+import { normalizeSearchOption } from '../searchableOptions';
 
 const housingParamKeys = {
   city: 'cidade',
@@ -23,21 +25,29 @@ function FilterChip({ children, onRemove }) {
   </button>;
 }
 
-function HousingCatalogFilters({ cities, filters, onChange }) {
-  return <div className="housing-catalog-filters">
-    <CityAutocomplete key={filters.city} cities={cities} value={filters.city} onChange={value => onChange('city', value)} />
+function HousingCatalogFilters({ cities, properties, filters, onChange }) {
+  const neighborhoods = useMemo(() => {
+    if (!filters.city) return [];
+    const normalizedCity = normalizeSearchOption(filters.city);
+    return properties
+      .filter(property => normalizeSearchOption(property.city) === normalizedCity)
+      .map(property => property.neighborhood)
+      .filter(Boolean);
+  }, [filters.city, properties]);
 
-    <label className="housing-field">
-      <span>Bairro <small>opcional</small></span>
-      <input
-        name="neighborhood"
-        type="text"
-        maxLength={300}
-        placeholder="Todos os bairros"
-        value={filters.neighborhood}
-        onChange={event => onChange('neighborhood', event.target.value)}
-      />
-    </label>
+  return <div className="housing-catalog-filters">
+    <CityAutocomplete cities={cities} value={filters.city} onChange={value => onChange('city', value)} />
+
+    <SearchableAutocomplete
+      label={<><span>Bairro</span> <small>opcional</small></>}
+      options={neighborhoods}
+      value={filters.neighborhood}
+      onChange={value => onChange('neighborhood', value)}
+      placeholder={filters.city ? 'Todos os bairros' : 'Escolha uma cidade primeiro'}
+      clearLabel="Limpar bairro"
+      emptyMessage="Nenhum bairro encontrado nesta cidade."
+      disabled={!filters.city}
+    />
 
     <div className="housing-field">
       <span>Tipo de imóvel</span>
@@ -55,15 +65,11 @@ function HousingCatalogFilters({ cities, filters, onChange }) {
       </div>
     </div>
 
-    <label className="housing-field">
-      <span>Valor inicial máximo</span>
-      <select value={filters.budget} onChange={event => onChange('budget', event.target.value)}>
-        <option value="">Sem limite</option>
-        {housingBudgetOptions.filter(option => option.value).map(option => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </label>
+    <CurrencyInput
+      label="Valor inicial máximo"
+      value={filters.budget}
+      onChange={value => onChange('budget', value)}
+    />
   </div>;
 }
 
@@ -85,11 +91,12 @@ export default function HousingFeed({ cities, ...feedProps }) {
       const next = new URLSearchParams(previous);
       if (value === '' || value === defaultValue) next.delete(paramKey);
       else next.set(paramKey, value);
-      if (key === 'city' && !value) next.delete(housingParamKeys.neighborhood);
+      if (key === 'city') next.delete(housingParamKeys.neighborhood);
       next.delete('busca');
+      next.delete('q');
       next.delete('pagina');
       return next;
-    }, { replace: key === 'neighborhood' });
+    }, { replace: key === 'neighborhood' || key === 'budget' });
   }
 
   function clearHousingFilters() {
@@ -97,6 +104,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
       const next = new URLSearchParams(previous);
       Object.values(housingParamKeys).forEach(key => next.delete(key));
       next.delete('busca');
+      next.delete('q');
       next.delete('pagina');
       return next;
     });
@@ -114,7 +122,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
         <CatalogSidebarFilters
           properties={feedProps.properties}
           hideHousingDuplicates
-          additionalFilters={<HousingCatalogFilters cities={cities} filters={current} onChange={setHousingFilter} />}
+          additionalFilters={<HousingCatalogFilters cities={cities} properties={feedProps.properties} filters={current} onChange={setHousingFilter} />}
           additionalFilterCount={activeHousingFilterCount}
           additionalClearPatch={{ cidade: 'Todas', bairro: '', tipo: 'Todos', orcamento: '' }}
         />

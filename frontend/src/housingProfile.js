@@ -12,8 +12,10 @@ export const housingBudgetOptions = [
 ];
 
 export function housingBudgetLabel(value) {
-  return housingBudgetOptions.find(option => option.value === String(value ?? ''))?.label
-    || `Até R$ ${Number(value).toLocaleString('pt-BR')}`;
+  const amount = Number(value);
+  return amount > 0 && Number.isFinite(amount)
+    ? `Até R$ ${amount.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+    : 'Sem limite';
 }
 
 const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
@@ -65,7 +67,7 @@ export function filterHousingProperties(properties, profile) {
   return properties.filter(p => {
     if (!['CASA', 'APARTAMENTO'].includes(normalize(p.type))) return false;
     if (profile.city && normalize(p.city) !== normalize(profile.city)) return false;
-    if (profile.neighborhood && !normalize(p.neighborhood).includes(normalize(profile.neighborhood))) return false;
+    if (profile.neighborhood && normalize(p.neighborhood) !== normalize(profile.neighborhood)) return false;
     if (profile.propertyType !== 'Todos' && normalize(p.type) !== normalize(profile.propertyType)) return false;
     if (Number(profile.budget) > 0) {
       if (!Number.isFinite(Number(p.minBid)) || !(Number(p.minBid) > 0)) return false;

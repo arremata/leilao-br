@@ -16,12 +16,10 @@ const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
 // leigo, então são abas e não um filtro escondido.
 const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA DIRETA');
 
-// A busca mora na URL, e não em estado local: é isso que faz voltar de um
-// imóvel devolver a mesma lista, e faz uma busca ser compartilhável. Só o que
-// difere do padrão aparece no endereço, para não virar uma parede de
-// parâmetros.
+// Os filtros moram na URL: é isso que faz voltar de um imóvel devolver a mesma
+// lista. Só o que difere do padrão aparece no endereço.
 const DEFAULTS = {
-  aba: 'leiloes', q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+  aba: 'leiloes', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
   rodada: 'Todos', modalidade: 'Todos', desconto: '0',
   ordem: 'relevance', vis: 'grid', pagina: '1', encerrados: '0',
 };
@@ -30,7 +28,6 @@ function readParams(searchParams) {
   const get = (key) => searchParams.get(key) ?? DEFAULTS[key];
   return {
     kind: get('aba') === 'direta' ? 'direct' : 'auction',
-    addressQuery: get('q'),
     filters: {
       state: get('estado'),
       city: get('cidade'),
@@ -48,6 +45,7 @@ function readParams(searchParams) {
 
 function patchSearchParams(current, patch) {
   const next = new URLSearchParams(current);
+  next.delete('q');
   Object.entries(patch).forEach(([key, value]) => {
     const asText = value == null ? '' : String(value);
     if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
@@ -270,7 +268,7 @@ export function CatalogSidebarFilters({
 
 export default function Feed({ watched, toggleWatch, properties, loading = false, embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
+  const { kind, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
   // Mobile: railOpen controla se o rail aparece ou não E ("drawer" aberto/fechado).
   // Desktop: rail também começa aberto. O clique no « fecha, e o botão ⚙ na
@@ -278,13 +276,11 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const [railOpen, setRailOpen] = useState(() => !embedded);
   const PAGE_SIZE = 12;
 
-  // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
-  // tecla não deve virar uma entrada no histórico.
+  // `replace` na paginação evita uma entrada de histórico para cada expansão.
   const setParams = useCallback((patch, { replace = false } = {}) => {
     setSearchParams(current => patchSearchParams(current, patch), { replace });
   }, [setSearchParams]);
 
-  const setAddressQuery = (value) => setParams({ q: value }, { replace: true });
   const setSort = (value) => setParams({ ordem: value });
   const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
   const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
@@ -295,15 +291,6 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const filtered = useMemo(() => {
     let list = [...byKind];
 
-    if (addressQuery.trim()) {
-      const q = addressQuery.toLowerCase();
-      list = list.filter(p =>
-        p.address?.toLowerCase().includes(q) ||
-        p.neighborhood?.toLowerCase().includes(q) ||
-        p.city?.toLowerCase().includes(q) ||
-        p.title?.toLowerCase().includes(q)
-      );
-    }
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
     if (filters.discountMin > 0) list = list.filter(p => (p.discount ?? p.auctionDiscount ?? 0) >= filters.discountMin);
     if (filters.state !== 'Todos') list = list.filter(p => normalizeLocation(p.uf) === normalizeLocation(filters.state));
@@ -361,7 +348,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [addressQuery, filters, sort, sortNow, byKind]);
+  }, [filters, sort, sortNow, byKind]);
 
   useEffect(() => {
     if (sort !== 'soonest' && sort !== 'relevance') return undefined;
@@ -371,9 +358,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
-  // Chip count no botão ⚙: apenas filtros não-search que desviam do padrão.
-  // A query de busca tem seu próprio campo sempre visível; contá-la aqui
-  // faria o chip piscar "1" sempre que alguém digita, o que confunde.
+  // Chip count no botão ⚙: filtros que desviam do padrão.
   const activeFilterCount =
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
@@ -433,7 +418,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
         {/* ─── Main: toolbar horizontal + resultados ─── */}
         <div className="feed-main">
-          {/* Toolbar — busca, toggle do rail, sort, view */}
+          {/* Toolbar — total, toggle do rail, ordenação e visualização */}
           <div className="feed-toolbar" role="region" aria-label="Barra de ferramentas do feed">
             {!embedded && !railOpen && (
               <button
@@ -451,23 +436,9 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
               </button>
             )}
 
-            <div className="feed-search">
-              <span className="mono feed-search-icon">⌕</span>
-              <input
-                placeholder="Endereço, bairro, cidade..."
-                value={addressQuery}
-                onChange={(e) => setAddressQuery(e.target.value)}
-                aria-label="Buscar por endereço, bairro ou cidade"
-              />
-              {addressQuery && (
-                <button
-                  onClick={() => setAddressQuery('')}
-                  aria-label="Limpar busca"
-                  className="feed-search-clear"
-                >
-                  ×
-                </button>
-              )}
+            <div className="feed-result-count" aria-live="polite">
+              <span><b>{filtered.length}</b>{filtered.length === 1 ? ' imóvel' : ' imóveis'}</span>
+              <span className="mono">{filtered.length ? `1–${paginated.length} de ${filtered.length}` : '0 de 0'}</span>
             </div>
 
             <Sort value={sort} onChange={(value) => {
@@ -476,17 +447,6 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
             }} />
             <ViewToggle value={view} onChange={setView} />
           </div>
-
-      {/* Result count */}
-      <div className="row between" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>
-          <b style={{ color: 'var(--fg-0)' }}>{filtered.length}</b>
-          {filtered.length === 1 ? ' imóvel' : ' imóveis'}
-        </span>
-        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-          1–{paginated.length} de {filtered.length}
-        </span>
-      </div>
 
       {/* Content */}
       {loading && properties.length === 0 ? (
@@ -643,6 +603,7 @@ function Sort({ value, onChange }) {
           backgroundPosition: 'right 10px center',
         }}
       >
+        <option value="relevance">mais relevantes</option>
         <option value="discount">maior desconto estimado</option>
         <option value="soonest">encerra em breve</option>
         <option value="price-asc">menor preço</option>

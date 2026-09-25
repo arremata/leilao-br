@@ -33,9 +33,11 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** o perfil da conta Google é persistido no banco; o protótipo
   local de e-mail e senha continua restrito ao navegador. Cidade, bairro, tipo e
   orçamento são filtros explícitos e instantâneos numa única barra, sem “Suas
-  preferências”, aplicar, salvar ou restaurar. A faixa limita somente o valor
-  inicial, nunca o custo total. Controles específicos de leilão aparecem apenas
-  quando se aplicam ao tipo de venda.
+  preferências”, aplicar, salvar ou restaurar. Cidade e bairro só aceitam opções
+  presentes no catálogo, e bairro depende da cidade; o limite de valor aceita
+  entrada monetária livre. A busca ampla por texto deixa de duplicar esses filtros.
+  O limite considera somente o valor inicial, nunca o custo total. Controles
+  específicos de leilão aparecem apenas quando se aplicam ao tipo de venda.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 

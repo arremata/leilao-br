@@ -24,7 +24,7 @@ test('normalizes location and excludes land from the housing search', () => {
 test('filters the selected property type', () => {
   assert.deepEqual(filterHousingProperties(properties, profile({ propertyType: 'Casa' })).map(p => p.id), [2, 4]);
 });
-test('budget choices cap the initial property price and reject unknown prices', () => {
+test('a manually entered budget caps the initial property price and rejects unknown prices', () => {
   assert.deepEqual(filterHousingProperties(properties, profile({ budget: 199999 })), []);
   assert.deepEqual(filterHousingProperties(properties, profile({ budget: 200000 })).map(p => p.id), [1, 2]);
 });
@@ -37,9 +37,9 @@ test('rejects malformed profiles and unsafe numeric values', () => {
   assert.equal(validateHousingProfile({ city: 'Curitiba', reserve: 20000, beds: 2 }).reserve, undefined);
   assert.equal(validateHousingProfile({ city: 'x'.repeat(500) }).city.length, 300);
 });
-test('budget labels use the visible onboarding choices', () => {
-  assert.equal(housingBudgetLabel('250000'), 'Até R$ 250 mil');
-  assert.equal(housingBudgetLabel(''), 'Ainda não sei');
+test('budget labels show the full manually entered amount', () => {
+  assert.equal(housingBudgetLabel('250000'), 'Até R$ 250.000');
+  assert.equal(housingBudgetLabel(''), 'Sem limite');
 });
 test('maps the account profile to and from the server contract', () => {
   const user = {
