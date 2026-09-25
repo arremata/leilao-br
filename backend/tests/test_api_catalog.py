@@ -53,6 +53,23 @@ def test_catalog_lists_active_properties_filtered_by_uf():
     api.app.dependency_overrides.clear()
 
 
+def test_local_api_proxies_only_deterministic_caixa_photos(monkeypatch):
+    class Upstream:
+        status_code = 200
+        headers = {"content-type": "image/jpeg"}
+        content = b"\xff\xd8photo"
+
+    monkeypatch.setattr(api.requests, "get", lambda *args, **kwargs: Upstream())
+    client, _ = _client_with_db()
+
+    response = client.get("/photos/caixa/F144442043173221.jpg")
+
+    assert response.status_code == 200
+    assert response.content == Upstream.content
+    assert client.get("/photos/caixa/not-a-catalog-photo.jpg").status_code == 404
+    api.app.dependency_overrides.clear()
+
+
 def test_catalog_card_has_title_and_auction_discount():
     client, factory = _client_with_db()
     with factory() as s:

@@ -22,6 +22,7 @@ from typing import Optional
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+import requests
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -71,6 +72,47 @@ SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _engine = None
 
 app = FastAPI(title="Arremate Demo API")
+
+_CAIXA_PHOTO_FILENAME = re.compile(r"^F\d{15}\.jpg$")
+_CAIXA_PHOTO_ORIGIN = "https://venda-imoveis.caixa.gov.br/fotos"
+_CAIXA_PHOTO_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    "Referer": "https://venda-imoveis.caixa.gov.br/",
+}
+_MAX_CAIXA_PHOTO_BYTES = 5_000_000
+
+
+def _fetch_caixa_photo(filename: str) -> Response:
+    if not _CAIXA_PHOTO_FILENAME.fullmatch(filename):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    try:
+        upstream = requests.get(
+            f"{_CAIXA_PHOTO_ORIGIN}/{filename}",
+            headers=_CAIXA_PHOTO_HEADERS,
+            timeout=8,
+            allow_redirects=False,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Photo source unavailable") from exc
+
+    content_type = (upstream.headers.get("content-type") or "").lower()
+    if upstream.status_code == 404:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    if upstream.status_code != 200 or not content_type.startswith("image/"):
+        raise HTTPException(status_code=502, detail="Photo source unavailable")
+    if len(upstream.content) > _MAX_CAIXA_PHOTO_BYTES:
+        raise HTTPException(status_code=502, detail="Photo source unavailable")
+    return Response(
+        content=upstream.content,
+        media_type=content_type.split(";", 1)[0],
+        headers={
+            "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+        },
+    )
 
 
 def _configured_allowed_origins() -> list[str]:
@@ -1010,6 +1052,12 @@ _CATALOG_DETAIL_COLUMNS = _CATALOG_COLUMNS + """,
 def get_properties() -> list[dict]:
     """Compatibility alias backed by the production catalog."""
     return get_catalog()
+
+
+@app.get("/photos/caixa/{filename}")
+def get_caixa_photo(filename: str):
+    """Return only deterministic public catalog photos from the Caixa origin."""
+    return _fetch_caixa_photo(filename)
 
 
 @app.get("/catalog")

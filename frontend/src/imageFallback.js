@@ -10,7 +10,7 @@ export function propertyImageUrl(src) {
     }
     const filename = url.pathname.slice(CAIXA_PHOTO_PREFIX.length);
     if (!filename || filename.includes('/')) return src;
-    return `/caixa-fotos/${filename}${url.search}${url.hash}`;
+    return `/api/photos/caixa/${filename}${url.search}${url.hash}`;
   } catch {
     return src;
   }

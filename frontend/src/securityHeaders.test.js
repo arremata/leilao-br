@@ -28,12 +28,3 @@ test('production CSP permits the Google Maps embed used on property pages', () =
     'frame-src https://accounts.google.com https://www.google.com https://vercel.live https://*.vercel.live',
   );
 });
-
-test('production proxies only the public Caixa photo directory', () => {
-  const photoRewrite = vercelConfig.rewrites.find(({ source }) => source === '/caixa-fotos/(.*)');
-
-  assert.deepEqual(photoRewrite, {
-    source: '/caixa-fotos/(.*)',
-    destination: 'https://venda-imoveis.caixa.gov.br/fotos/$1',
-  });
-});

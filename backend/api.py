@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException
+import requests
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
@@ -37,6 +39,47 @@ class IngestRequest(BaseModel):
 
 
 app = FastAPI(title="Leilao AI API")
+
+_CAIXA_PHOTO_FILENAME = re.compile(r"^F\d{15}\.jpg$")
+_CAIXA_PHOTO_ORIGIN = "https://venda-imoveis.caixa.gov.br/fotos"
+_CAIXA_PHOTO_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    ),
+    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    "Referer": "https://venda-imoveis.caixa.gov.br/",
+}
+_MAX_CAIXA_PHOTO_BYTES = 5_000_000
+
+
+def _fetch_caixa_photo(filename: str) -> Response:
+    if not _CAIXA_PHOTO_FILENAME.fullmatch(filename):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    try:
+        upstream = requests.get(
+            f"{_CAIXA_PHOTO_ORIGIN}/{filename}",
+            headers=_CAIXA_PHOTO_HEADERS,
+            timeout=8,
+            allow_redirects=False,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Photo source unavailable") from exc
+
+    content_type = (upstream.headers.get("content-type") or "").lower()
+    if upstream.status_code == 404:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    if upstream.status_code != 200 or not content_type.startswith("image/"):
+        raise HTTPException(status_code=502, detail="Photo source unavailable")
+    if len(upstream.content) > _MAX_CAIXA_PHOTO_BYTES:
+        raise HTTPException(status_code=502, detail="Photo source unavailable")
+    return Response(
+        content=upstream.content,
+        media_type=content_type.split(";", 1)[0],
+        headers={
+            "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+        },
+    )
 
 
 @app.on_event("startup")
@@ -210,6 +253,12 @@ def get_properties(session: Session = Depends(get_session)) -> list[dict]:
         select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
     ).scalars().all()
     return [_property_card(prop) for prop in props]
+
+
+@app.get("/photos/caixa/{filename}")
+def get_caixa_photo(filename: str):
+    """Return only deterministic public catalog photos from the Caixa origin."""
+    return _fetch_caixa_photo(filename)
 
 
 @app.get("/catalog")
