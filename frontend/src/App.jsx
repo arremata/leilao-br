@@ -4,7 +4,7 @@ import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import AccountPage, { UserMark } from './components/AccountPage';
-import { housingProfileForApi, housingProfileFromUser } from './housingProfile';
+import { housingProfileForApi, housingProfileFromUser, isCompleteHousingProfile } from './housingProfile';
 import {
   accountDestination,
   housingPreferencesFlow,
@@ -54,6 +54,7 @@ function App() {
 
   const effectiveAccount = authUser;
   const effectiveHousingProfile = housingProfileFromUser(authUser);
+  const profileComplete = isCompleteHousingProfile(effectiveHousingProfile);
   const canOpenCatalog = isPreview || Boolean(effectiveAccount);
 
   const saveProfile = useCallback(async (profile) => {
@@ -233,7 +234,7 @@ function App() {
               afterSetupDestination={afterSetupDestination}
               allowExplore={isPreview}
             />} />
-        <Route element={<AccountGate account={effectiveAccount} allowPublic={isPreview} />}>
+        <Route element={<AccountGate account={effectiveAccount} allowPublic={isPreview} requireProfile={!isPreview} profileComplete={profileComplete} />}>
           <Route path="/" element={
             <HousingEntry
               profile={effectiveHousingProfile}
@@ -262,10 +263,12 @@ function App() {
           } />
           <Route path="*" element={<NotFound />} />
         </Route>
-        <Route element={<AccountGate account={effectiveAccount} />}>
+        <Route element={<AccountGate account={effectiveAccount} requireProfile profileComplete={profileComplete} />}>
           <Route path="/perfil" element={
             <AccountPage account={effectiveAccount} profile={effectiveHousingProfile} serverAccount={isAuthed} onSignOut={signOut} />
           } />
+        </Route>
+        <Route element={<AccountGate account={effectiveAccount} />}>
           <Route path="/preferencias" element={
             <HousingQuestionnaire
               key={JSON.stringify(effectiveHousingProfile)}
@@ -273,6 +276,7 @@ function App() {
               cities={cities}
               onSave={saveProfile}
               {...preferencesFlow}
+              required={!profileComplete || preferencesFlow.required}
             />
           } />
         </Route>
@@ -329,15 +333,19 @@ function HousingEntry({ profile, account, onSave, ...catalogProps }) {
     profile,
     searchParamCount: params.size,
   })) {
-    return <HousingQuestionnaire initialProfile={profile} cities={catalogProps.cities} onSave={onSave} />;
+    return <HousingQuestionnaire initialProfile={profile} cities={catalogProps.cities} onSave={onSave} required />;
   }
   return <HousingFeed {...catalogProps} />;
 }
 
-function AccountGate({ account, allowPublic = false }) {
+function AccountGate({ account, allowPublic = false, requireProfile = false, profileComplete = false }) {
   const location = useLocation();
-  if (account || allowPublic) return <Outlet />;
+  if (allowPublic) return <Outlet />;
   const from = `${location.pathname}${location.search}${location.hash}`;
+  if (account && requireProfile && !profileComplete) {
+    return <Navigate to="/preferencias?origem=cadastro" replace state={{ after: from }} />;
+  }
+  if (account) return <Outlet />;
   return <Navigate to="/entrar" replace state={{ from }} />;
 }
 

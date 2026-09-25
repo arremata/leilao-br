@@ -25,9 +25,14 @@ test('production keeps onboarding for a new visitor', () => {
   assert.equal(shouldUseAccountScreen({ pathname: '/', isPreview: false, account: null, hasSearch: false }), true);
 });
 
-test('searches skip preference setup only after the account gate', () => {
-  assert.equal(shouldShowHousingOnboarding({ ...emptyEntry, isPreview: false, searchParamCount: 1 }), false);
-  assert.equal(shouldShowHousingOnboarding({ ...emptyEntry, isPreview: false, account: { id: 1 }, profile: { city: 'Londrina' } }), false);
+test('searches cannot skip required preference setup', () => {
+  assert.equal(shouldShowHousingOnboarding({ ...emptyEntry, isPreview: false, searchParamCount: 1 }), true);
+  assert.equal(shouldShowHousingOnboarding({
+    ...emptyEntry,
+    isPreview: false,
+    account: { id: 1 },
+    profile: { city: 'Londrina', propertyType: 'Todos', budget: '250000' },
+  }), false);
   assert.equal(shouldUseAccountScreen({ pathname: '/entrar', isPreview: true, account: null, hasSearch: false }), true);
 });
 
@@ -54,11 +59,13 @@ test('initial preferences continue to the catalog while later edits return to ac
   assert.deepEqual(housingPreferencesFlow('?origem=cadastro', '/imovel/923?origem=lista'), {
     successDestination: '/imovel/923?origem=lista',
     finalLabel: 'Ver imóveis',
-    cancelDestination: '/?busca=todos',
-    cancelLabel: 'Agora não',
+    cancelDestination: null,
+    cancelLabel: null,
+    required: true,
   });
   assert.equal(housingPreferencesFlow('').successDestination, '/perfil');
   assert.equal(housingPreferencesFlow('').finalLabel, 'Salvar preferências');
+  assert.equal(housingPreferencesFlow('').required, false);
 });
 
 test('account return destinations stay inside the app and avoid setup loops', () => {

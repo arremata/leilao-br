@@ -514,6 +514,24 @@ def test_update_housing_profile_requires_auth_and_returns_account(client, monkey
     assert captured["profile"]["budget"] == "above-1000000"
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"city": "", "property_type": "Casa", "budget": "250000"},
+        {"city": "   ", "property_type": "Casa", "budget": "250000"},
+        {"city": "Curitiba", "property_type": "Casa", "budget": None},
+        {"city": "Curitiba", "property_type": "Casa", "budget": ""},
+    ],
+)
+def test_update_housing_profile_rejects_incomplete_onboarding(client, monkeypatch, payload):
+    _set_session_cookie(client, 12)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.put("/api/me/housing-profile", headers=ORIGIN, json=payload)
+
+    assert res.status_code == 422
+
+
 def test_update_housing_profile_respects_preview_write_guard(client, monkeypatch):
     user = {"id": 12, "email": "a@b.com", "name": "A", "avatar_url": None}
     _set_session_cookie(client, user["id"])
@@ -523,7 +541,7 @@ def test_update_housing_profile_respects_preview_write_guard(client, monkeypatch
     res = client.put(
         "/api/me/housing-profile",
         headers=ORIGIN,
-        json={"city": "Curitiba", "property_type": "Casa", "budget": None},
+        json={"city": "Curitiba", "property_type": "Casa", "budget": "250000"},
     )
     assert res.status_code == 403
 

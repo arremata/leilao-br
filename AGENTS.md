@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Tornou o perfil inicial realmente obrigatório depois do primeiro login: links e buscas não pulam mais cidade, tipo e orçamento, e não há saída para o catálogo antes de salvar as três escolhas. O questionário agora cabe no viewport sem rolagem própria ou da página, inclusive com o autocomplete aberto e em telas móveis; o rótulo “COMPRAR PARA MORAR” também saiu do catálogo.
+
 - **2026-09-25** — Autorizou na política de segurança somente a origem de estilos do Google Identity usada pelo botão oficial de acesso. O login em `app.argosleiloes.com.br` mantém as demais restrições de conteúdo e deixa de bloquear esse recurso no navegador.
 
 - **2026-09-25** — Fechou a API automática do Supabase para todas as tabelas do

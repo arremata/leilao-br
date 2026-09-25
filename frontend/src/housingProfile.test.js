@@ -10,6 +10,8 @@ import {
   housingProfileForApi,
   housingProfileFromUser,
   housingSearchParamsWithFilter,
+  isCompleteHousingProfile,
+  requiredHousingStepError,
   validateHousingProfile,
 } from './housingProfile.js';
 import { readHousingProfile, saveHousingProfile } from './housingStorage.js';
@@ -45,6 +47,16 @@ test('rejects malformed profiles and unsafe numeric values', () => {
   assert.equal(validateHousingProfile({ city: 'Curitiba', secret: 'not kept' }).secret, undefined);
   assert.equal(validateHousingProfile({ city: 'Curitiba', reserve: 20000, beds: 2 }).reserve, undefined);
   assert.equal(validateHousingProfile({ city: 'x'.repeat(500) }).city.length, 300);
+});
+test('requires city and budget before the initial profile is complete', () => {
+  assert.equal(isCompleteHousingProfile(profile()), false);
+  assert.equal(requiredHousingStepError(profile(), 0), 'Escolha uma cidade para continuar.');
+  assert.equal(requiredHousingStepError(profile({ city: 'Curitiba' }), 0), '');
+  assert.equal(
+    requiredHousingStepError(profile({ city: 'Curitiba' }), 2),
+    'Escolha uma faixa de preço para concluir seu perfil.',
+  );
+  assert.equal(isCompleteHousingProfile(profile({ city: 'Curitiba', budget: '400000' })), true);
 });
 test('budget labels show the full manually entered amount', () => {
   assert.equal(housingBudgetLabel('250000'), 'Até R$ 250.000');

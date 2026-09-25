@@ -21,6 +21,8 @@ export const housingBudgetOptions = [
   { value: aboveOneMillionBudget, label: 'Acima de R$ 1 milhão' },
 ];
 
+const housingBudgetValues = new Set(housingBudgetOptions.map(option => option.value));
+
 export function housingBudgetLabel(value) {
   if (value === aboveOneMillionBudget) return 'Acima de R$ 1 milhão';
   const amount = Number(value);
@@ -43,6 +45,25 @@ export function validateHousingProfile(value) {
     && (!Number.isFinite(Number(profile.budget)) || Number(profile.budget) < 0)) return null;
   if (!['Todos', 'Casa', 'Apartamento'].includes(profile.propertyType)) profile.propertyType = 'Todos';
   return profile;
+}
+
+export function isCompleteHousingProfile(value) {
+  const profile = validateHousingProfile(value);
+  return Boolean(
+    profile?.city.trim()
+    && ['Todos', 'Casa', 'Apartamento'].includes(profile.propertyType)
+    && housingBudgetValues.has(profile.budget),
+  );
+}
+
+export function requiredHousingStepError(value, step) {
+  const profile = validateHousingProfile(value);
+  if (!profile) return 'Não foi possível salvar essa escolha. Tente novamente.';
+  if (step === 0 && !profile.city.trim()) return 'Escolha uma cidade para continuar.';
+  if (step === 2 && !housingBudgetValues.has(profile.budget)) {
+    return 'Escolha uma faixa de preço para concluir seu perfil.';
+  }
+  return '';
 }
 
 export function housingProfileFromUser(user) {

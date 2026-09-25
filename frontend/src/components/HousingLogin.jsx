@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { housingProfileFromUser, isCompleteHousingProfile } from '../housingProfile';
 import './housing.css';
 
 export default function HousingLogin({
@@ -35,7 +36,7 @@ export default function HousingLogin({
             setBusy(true);
             setError('');
             const signedInUser = await loginWithGoogle(credential);
-            const needsSetup = !signedInUser.housing_profile;
+            const needsSetup = !isCompleteHousingProfile(housingProfileFromUser(signedInUser));
             navigate(
               needsSetup ? '/preferencias?origem=cadastro' : signedInDestination,
               needsSetup

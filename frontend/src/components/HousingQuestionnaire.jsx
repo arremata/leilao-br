@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   emptyHousingProfile,
   housingBudgetOptions,
+  requiredHousingStepError,
   validateHousingProfile,
 } from '../housingProfile';
 import CityAutocomplete from './CityAutocomplete';
@@ -101,6 +102,7 @@ export default function HousingQuestionnaire({
   finalLabel = 'Ver imóveis',
   cancelDestination = '/?busca=todos',
   cancelLabel = 'Agora não',
+  required = false,
 }) {
   const [profile, setProfile] = useState(() => ({ ...emptyHousingProfile, ...initialProfile }));
   const [step, setStep] = useState(0);
@@ -111,6 +113,11 @@ export default function HousingQuestionnaire({
 
   async function next(event) {
     event.preventDefault();
+    const requiredError = required ? requiredHousingStepError(profile, step) : '';
+    if (requiredError) {
+      setError(requiredError);
+      return;
+    }
     const valid = validateHousingProfile(profile);
     if (!valid) {
       setError('Não foi possível salvar essa escolha. Tente novamente.');
@@ -133,9 +140,11 @@ export default function HousingQuestionnaire({
   }
 
   return <main className="housing-onboarding">
-    <form className="housing-questionnaire" onSubmit={next}>
+    <form className={`housing-questionnaire${required ? ' required' : ''}`} onSubmit={next}>
       <header className="housing-questionnaire-header">
-        <Link className="auth-brand" to="/?busca=todos"><span className="logo" />Argos</Link>
+        {required
+          ? <span className="auth-brand"><span className="logo" />Argos</span>
+          : <Link className="auth-brand" to={cancelDestination || '/perfil'}><span className="logo" />Argos</Link>}
         <div className="housing-step-top"><span>SEU PERFIL DE MORADIA</span><span>{step + 1} de {housingSteps.length}</span></div>
         <div className="housing-step-bars" aria-label={`Etapa ${step + 1} de ${housingSteps.length}`}>
           {housingSteps.map((label, index) => <span key={label} className={index <= step ? 'filled' : ''} />)}
@@ -154,10 +163,10 @@ export default function HousingQuestionnaire({
         />
         {error && <p role="alert" className="housing-error">{error}</p>}
       </section>
-      <footer className="housing-form-footer">
+      <footer className={`housing-form-footer${required && step === 0 ? ' initial-required' : ''}`}>
         {step > 0
           ? <button className="housing-back" type="button" onClick={() => { setStep(current => current - 1); setError(''); }}><span aria-hidden="true">←</span><b>Voltar</b></button>
-          : <button className="housing-skip" type="button" onClick={() => navigate(cancelDestination)}>{cancelLabel}</button>}
+          : !required && <button className="housing-skip" type="button" onClick={() => navigate(cancelDestination)}>{cancelLabel}</button>}
         <button className="housing-next" disabled={saving}>
           <b>{saving ? 'Salvando…' : step < housingSteps.length - 1 ? 'Continuar' : finalLabel}</b>
           <span aria-hidden="true">→</span>

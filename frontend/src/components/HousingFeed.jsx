@@ -126,7 +126,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
 
   return <div className="housing-dashboard">
     <section className="housing-dashboard-heading">
-      <div><span className="housing-eyebrow">COMPRAR PARA MORAR</span><h1>Todos os imóveis</h1><p>Use os filtros para encontrar imóveis que façam sentido para você.</p></div>
+      <div><h1>Todos os imóveis</h1><p>Use os filtros para encontrar imóveis que façam sentido para você.</p></div>
       <button className="btn ghost" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="housing-search">☷ {open ? 'Ocultar' : 'Ajustar'} filtros</button>
     </section>
     <div className="housing-dashboard-layout">

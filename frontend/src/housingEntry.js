@@ -1,11 +1,12 @@
+import { isCompleteHousingProfile } from './housingProfile.js';
+
 export function shouldShowHousingOnboarding({
   isPreview,
   account,
   profile,
-  searchParamCount,
 }) {
   if (isPreview) return false;
-  return (!account || !profile) && searchParamCount === 0;
+  return !account || !isCompleteHousingProfile(profile);
 }
 
 export function shouldUseAccountScreen({ pathname, isPreview, account }) {
@@ -32,12 +33,14 @@ export function housingPreferencesFlow(search = '', afterSetupDestination = '/')
   return initialSetup ? {
     successDestination: postSetupDestination(afterSetupDestination),
     finalLabel: 'Ver imóveis',
-    cancelDestination: '/?busca=todos',
-    cancelLabel: 'Agora não',
+    cancelDestination: null,
+    cancelLabel: null,
+    required: true,
   } : {
     successDestination: '/perfil',
     finalLabel: 'Salvar preferências',
     cancelDestination: '/perfil',
     cancelLabel: 'Cancelar',
+    required: false,
   };
 }
