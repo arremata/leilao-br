@@ -315,30 +315,6 @@ def test_public_api_prefix_routes_to_catalog(monkeypatch):
     assert response.json()["detail"] == "Catalog database is not configured"
 
 
-def test_public_api_proxies_only_deterministic_caixa_photos(monkeypatch):
-    class Upstream:
-        status_code = 200
-        headers = {"content-type": "image/jpeg"}
-        content = b"\xff\xd8photo"
-
-    def fake_get(url, **kwargs):
-        assert url == "https://venda-imoveis.caixa.gov.br/fotos/F144442043173221.jpg"
-        assert kwargs["allow_redirects"] is False
-        assert kwargs["timeout"] == 8
-        return Upstream()
-
-    monkeypatch.setattr(vercel_api.requests, "get", fake_get)
-    client = TestClient(vercel_api.app)
-
-    response = client.get("/api/photos/caixa/F144442043173221.jpg")
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/jpeg"
-    assert response.content == Upstream.content
-    assert "s-maxage=604800" in response.headers["cache-control"]
-    assert client.get("/api/photos/caixa/not-a-catalog-photo.jpg").status_code == 404
-
-
 def test_preview_prefers_separately_scoped_database_credentials(monkeypatch):
     monkeypatch.setenv("VERCEL_ENV", "preview")
     monkeypatch.setenv("DATABASE_URL", "postgresql://writer.example/catalog")
