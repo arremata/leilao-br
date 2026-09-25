@@ -113,7 +113,7 @@ export default function AccountPage({ account, profile, serverAccount, onSignOut
           <div>
             <span className="account-section-kicker">SEU PLANO DE MORADIA</span>
             <h2 id="account-preferences-title">O que você procura</h2>
-            <p>Essas escolhas ajudam a organizar o catálogo para você.</p>
+            <p>Essas escolhas ficam no seu perfil. Os filtros do catálogo continuam sob seu controle.</p>
           </div>
           <Link className="btn account-edit-preferences" to="/preferencias">
             {hasPreferences ? 'Alterar preferências' : 'Definir preferências'}
@@ -125,13 +125,13 @@ export default function AccountPage({ account, profile, serverAccount, onSignOut
             icon="pin"
             label="Cidade"
             value={savedProfile.city || 'Qualquer cidade'}
-            detail={savedProfile.city ? 'Sua região de interesse' : 'Mostrando todas as cidades'}
+            detail={savedProfile.city ? 'Preferência cadastrada' : 'Sem cidade cadastrada'}
           />
           <PreferenceCard
             icon="home"
             label="Tipo de imóvel"
             value={profileTypeLabels[savedProfile.propertyType] || 'Casa ou apartamento'}
-            detail="Usado para organizar os resultados"
+            detail="Informação do seu perfil"
           />
           <PreferenceCard
             icon="wallet"
