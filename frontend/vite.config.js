@@ -8,6 +8,11 @@ export default defineConfig(({ mode }) => {
   plugins: [react()],
   server: {
     proxy: {
+      '/caixa-fotos': {
+        target: 'https://venda-imoveis.caixa.gov.br',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/caixa-fotos/, '/fotos'),
+      },
       '/api': {
         target: remoteApi || 'http://localhost:8000',
         changeOrigin: Boolean(remoteApi),

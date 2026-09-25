@@ -56,6 +56,10 @@
   },
   "rewrites": [
     {
+      "source": "/caixa-fotos/(.*)",
+      "destination": "https://venda-imoveis.caixa.gov.br/fotos/$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": { "service": "backend" }
     },

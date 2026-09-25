@@ -215,9 +215,10 @@ The full platform will include:
 ## Changelog
 
 - **2026-09-25** — Restaurou o mapa na página do imóvel ao autorizar somente o
-  embed do Google Maps na política de segurança. Fotos externas indisponíveis
-  recebem uma nova tentativa de carregamento e deixam de exibir o ícone quebrado
-  na capa, miniatura e lista quando a origem continua sem responder.
+  embed do Google Maps na política de segurança. Fotos públicas da Caixa passam
+  por uma rota de imagem limitada do próprio Argos, recebem uma nova tentativa
+  de carregamento e deixam de exibir o ícone quebrado na capa, miniatura e lista
+  quando a origem continua sem responder.
 
 - **2026-09-25** — Corrigiu a gravação do perfil de moradia que podia prender uma conta nova na última etapa com erro `422`. A API normaliza representações equivalentes já usadas por clientes Argos sem relaxar cidade e orçamento obrigatórios, e o questionário agora preserva as escolhas e apresenta a orientação específica devolvida pelo servidor.
 

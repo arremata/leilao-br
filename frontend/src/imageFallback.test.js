@@ -1,14 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { imageSourceForAttempt } from './imageFallback.js';
+import { imageSourceForAttempt, propertyImageUrl } from './imageFallback.js';
+
+test('serves Caixa catalog photos through the bounded same-origin route', () => {
+  assert.equal(
+    propertyImageUrl('https://venda-imoveis.caixa.gov.br/fotos/F144442043173221.jpg'),
+    '/caixa-fotos/F144442043173221.jpg',
+  );
+  assert.equal(
+    propertyImageUrl('https://example.com/fotos/fachada.jpg'),
+    'https://example.com/fotos/fachada.jpg',
+  );
+  assert.equal(propertyImageUrl('/photos/local.jpg'), '/photos/local.jpg');
+});
 
 test('retries an unavailable image once before showing its visual placeholder', () => {
-  const src = 'https://example.com/fachada.jpg?size=large#photo';
+  const src = 'https://venda-imoveis.caixa.gov.br/fotos/fachada.jpg?size=large#photo';
 
-  assert.equal(imageSourceForAttempt(src, 0), src);
+  assert.equal(imageSourceForAttempt(src, 0), '/caixa-fotos/fachada.jpg?size=large#photo');
   assert.equal(
     imageSourceForAttempt(src, 1),
-    'https://example.com/fachada.jpg?size=large&argos_retry=1#photo',
+    '/caixa-fotos/fachada.jpg?size=large&argos_retry=1#photo',
   );
   assert.equal(imageSourceForAttempt(src, 2), '');
 });
