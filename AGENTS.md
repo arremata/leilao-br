@@ -219,7 +219,9 @@ The full platform will include:
   incluindo sessões — agora usam RLS com bloqueio explícito para os papéis de
   navegador; privilégios atuais e padrões também foram removidos desses papéis,
   enquanto backend, ingestão e administração preservam seu acesso servidor a
-  servidor.
+  servidor. Produção recebeu as migrations de hardening e de sessões; a tabela
+  de sessões nasceu vazia, sem privilégios de leitura/escrita para `anon` ou
+  `authenticated`, e o advisor de segurança ficou sem alertas.
 
 - **2026-09-25** — Endureceu a autenticação antes da liberação: removeu integralmente o protótipo local de e-mail e senha e adotou Google como única entrada de produção. A sessão saiu do localStorage para um cookie HttpOnly/Secure/SameSite de 12 horas, sem dados pessoais no token; cada dispositivo mantém sua própria sessão revogável, e o logout encerra somente a sessão atual no servidor. API e frontend agora restringem origens, impedem cache de respostas privadas, aplicam limitação de tentativas e cabeçalhos CSP/anti-framing, validam emissor/audiência/identificador do token e descartam credenciais locais antigas. Previews permanecem públicos, com login Google e escritas de conta desativados.
 
