@@ -20,6 +20,8 @@ export default function HousingLogin({
   const { loginWithGoogle } = useAuth();
   const googleButtonRef = useRef(null);
   const creating = mode === 'signup';
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const googleEnabled = Boolean(googleClientId) && !allowExplore;
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
 
   function changeMode(nextMode) {
@@ -33,11 +35,10 @@ export default function HousingLogin({
   // (App.jsx) treats `authUser` as present across routes and forward navigation
   // happens when the component unmounts/re-renders.
   useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || !window.google?.accounts?.id || !googleButtonRef.current) return undefined;
+    if (!googleEnabled || !window.google?.accounts?.id || !googleButtonRef.current) return undefined;
 
     window.google.accounts.id.initialize({
-      client_id: clientId,
+      client_id: googleClientId,
       callback: async ({ credential }) => {
         try {
           setBusy(true);
@@ -63,7 +64,7 @@ export default function HousingLogin({
       width: 320,
     });
     return () => window.google.accounts.id.cancel();
-  }, [loginWithGoogle, navigate, creating, signedInDestination, afterSetupDestination]);
+  }, [loginWithGoogle, navigate, creating, signedInDestination, afterSetupDestination, googleClientId, googleEnabled]);
 
   async function submit(event) {
     event.preventDefault();
@@ -111,8 +112,10 @@ export default function HousingLogin({
           {error && <p role="alert" className="housing-error">{error}</p>}
           <button className="btn primary auth-submit" disabled={busy}>{busy ? 'Aguarde…' : creating ? 'Criar minha conta →' : 'Entrar →'}</button>
         </form>
-        <div className="auth-divider">ou</div>
-        <div className="auth-google" ref={googleButtonRef} aria-label={creating ? 'Criar conta com Google' : 'Entrar com Google'} />
+        {googleEnabled && <>
+          <div className="auth-divider">ou</div>
+          <div className="auth-google" ref={googleButtonRef} aria-label={creating ? 'Criar conta com Google' : 'Entrar com Google'} />
+        </>}
         <p className="auth-switch">{creating ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'} <button type="button" onClick={() => changeMode(creating ? 'signin' : 'signup')}>{creating ? 'Entrar' : 'Criar conta'}</button></p>
         {allowExplore
           ? <Link className="auth-explore" to="/?busca=todos">Explorar imóveis antes de criar a conta</Link>

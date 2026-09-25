@@ -81,8 +81,9 @@ no HTML do servidor, o que ainda não é feito.
   preço. A cidade pode ser digitada e escolhida em sugestões, inclusive sem
   informar os acentos durante a busca.
 - Entrar com Google cria uma sessão de 30 dias no servidor; o formulário de
-  continua sendo um protótipo somente deste navegador. É possível explorar o
-  catálogo sem configurar apenas nos previews de branch.
+  e-mail e senha continua sendo um protótipo somente deste navegador. O acesso
+  com Google aparece em produção, onde o domínio é autorizado; previews públicos
+  mantêm o formulário local para testar a conta sem simular um login Google.
 - Previews de branch abrem diretamente no catálogo público, sem exigir conta,
   para que a validação use os imóveis reais sem criar identidades de teste.
 - Cidade, tipo de imóvel e faixa de preço do questionário formam um perfil
