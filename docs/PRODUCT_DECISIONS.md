@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 24 de setembro de 2026.
+Última atualização: 25 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -18,6 +18,43 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - Mudanças apenas técnicas continuam somente no changelog de `AGENTS.md`.
 
 ## Decisões ativas de produto
+
+### PD-018 — Usar somente Google para criar conta e entrar
+
+- **Data:** 25 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** produção oferece somente “Continuar com Google”. O primeiro acesso
+  cria a conta Argos e os seguintes retomam a mesma identidade; não existe senha
+  própria do Argos. Previews mantêm o catálogo público e não iniciam Google.
+- **Motivo:** o protótipo local de e-mail e senha não constituía autenticação e
+  não deveria ser apresentado como uma conta segura. Google permite lançar sem
+  armazenar senha nem construir prematuramente confirmação e recuperação.
+- **Consequências:** credenciais locais antigas são descartadas; cada dispositivo
+  mantém uma sessão independente em cookie HttpOnly por até 12 horas, e sair
+  revoga apenas a sessão atual. Dados de perfil, Salvos e Vistos pertencem à
+  conta Google. Uma futura entrada por e-mail exigirá autenticação completa no
+  servidor antes de voltar ao produto.
+
+### PD-017 — Manter perfil cadastral separado dos filtros
+
+- **Data:** 25 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o questionário inicial pede somente cidade, tipo de imóvel e faixa
+  de preço, com escolhas grandes em vez de formulários extensos. Essas respostas
+  pertencem ao perfil cadastral e nunca são aplicadas automaticamente ao catálogo;
+  cada busca começa sem elas e muda apenas pelos filtros escolhidos na lista.
+- **Motivo:** a entrada precisa levar rapidamente a imóveis relevantes; quartos,
+  vagas, prazo de mudança, reserva para extras, pagamento e rotina exigiam dados
+  demais antes de a pessoa conhecer o catálogo.
+- **Consequências:** o perfil da conta Google é persistido no banco. Cidade, bairro, tipo e
+  orçamento são filtros explícitos e instantâneos numa única barra, sem “Suas
+  preferências”, aplicar, salvar ou restaurar. Cidade e bairro só aceitam opções
+  presentes no catálogo, e bairro depende da cidade; o limite de valor aceita
+  entrada monetária livre e, depois de alterado, fica lembrado neste navegador
+  até ser limpo. Essa memória é uma escolha explícita do filtro e não reutiliza o
+  orçamento cadastral do questionário. A busca ampla por texto deixa de duplicar
+  esses filtros. O limite considera somente o valor inicial, nunca o custo total.
+  Controles específicos de leilão aparecem apenas quando se aplicam ao tipo de venda.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 
@@ -35,7 +72,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 ### PD-002 — Manter a experiência sem conta enquanto não houver autenticação
 
 - **Data:** 12 de agosto de 2026
-- **Estado:** Ativa
+- **Estado:** Substituída por PD-008
 - **Decisão:** o produto atual é uma experiência de visitante, sem identidade ou
   personalização fictícia.
 - **Motivo:** simular uma conta passa uma confiança que a infraestrutura atual
@@ -198,6 +235,51 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   avanço por imóvel, mantém os prazos documentados, registra a leitura das regras
   ao chegar ao fim dessa área e não inclui uma etapa genérica de depósito.
 
+### PD-014 — Reservar ITBI em todo município
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** o custo total sempre reserva ITBI quando o imóvel possui município
+  e UF brasileiros. Uma referência municipal revisada prevalece; onde ela ainda
+  não existe, o Argos usa 3% do valor da compra como estimativa inicial.
+- **Motivo:** omitir o imposto subestima o dinheiro necessário para concluir a
+  compra e impede que o catálogo cresça para novas cidades e estados.
+- **Consequências:** estimativas são identificadas como estimativas e orientam a
+  confirmação na prefeitura, pois alíquota e base de cálculo podem variar. A
+  base municipal pode crescer progressivamente sem deixar imóveis novos fora da
+  conta. A ausência de comparação de mercado não esconde os custos que já podem
+  ser calculados com os dados oficiais do catálogo.
+
+### PD-015 — Centralizar identidade e preferências na conta
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** a entrada de conta fica no lado direito do cabeçalho e abre uma
+  central que reúne os dados informados pela pessoa, suas três preferências de
+  moradia e o acesso para alterá-las. Assinatura aparece em uma área separada,
+  marcada como “Em breve”.
+- **Motivo:** nome, e-mail e escolhas do cadastro precisam ser fáceis de
+  reencontrar sem disputar espaço com a navegação do catálogo nem exigir um
+  novo fluxo de configuração.
+- **Consequências:** a interface informa que os dados estão sincronizados pela
+  conta Google, reaproveita o questionário existente para alterações e não mostra
+  plano, preço ou cobrança enquanto assinaturas não existirem.
+
+### PD-016 — Exigir conta antes de acessar a plataforma
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** catálogo, páginas de imóveis, Salvos, Vistos e central de conta
+  só podem ser abertos em produção depois de Criar conta ou Entrar. Previews de
+  branch mantêm o catálogo público para validação.
+- **Motivo:** a experiência passa a começar pela identidade da pessoa e pelas
+  preferências que organizam sua busca, em vez de oferecer dois caminhos de
+  entrada incompatíveis.
+- **Consequências:** buscas e links diretos levam visitantes à entrada e são
+  retomados depois do acesso; contas novas concluem as preferências antes de
+  seguir. A única identidade aceita é a conta Google. A exceção do preview não
+  altera a regra de entrada da produção nem cria autorização de escrita.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR
@@ -236,6 +318,21 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** links públicos devem preferir o endereço com `www`.
   Registro.br mantém a zona DNS, a Vercel entrega o produto e renova o HTTPS
   automaticamente para os dois endereços.
+
+### OD-004 — Manter o banco fechado à API pública automática
+
+- **Data:** 25 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** nenhuma tabela de catálogo, operação ou conta fica disponível
+  diretamente ao navegador pela API automática do banco. O produto acessa esses
+  dados somente pelos serviços do Argos.
+- **Motivo:** uma chave destinada ao navegador não pode permitir leitura ou
+  alteração paralela dos dados, fora das regras de conta e das validações do
+  produto.
+- **Consequências:** catálogo, contas, Salvos, Vistos e rotinas programadas
+  continuam pelo mesmo caminho atual. Qualquer acesso direto futuro precisa de
+  regras próprias, revisão de segurança e uma decisão explícita antes de ser
+  disponibilizado.
 
 ## Modelo para uma nova decisão
 

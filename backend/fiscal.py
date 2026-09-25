@@ -24,6 +24,16 @@ ITBI_RATES = {
     },
 }
 
+# A municipal reference is preferable, but the buyer still needs to reserve
+# for ITBI when Argos has not yet reviewed that city's rule. Three percent is a
+# planning assumption, never an assertion about the municipality's exact rate
+# or taxable base.
+DEFAULT_ITBI_RATE = 0.03
+DEFAULT_ITBI_SOURCE = (
+    "Estimativa inicial do Argos para planejamento. A alíquota e a base de "
+    "cálculo variam por município; confirme o valor na prefeitura antes da compra."
+)
+
 
 # Simplified registration-cost references by state. Real-estate registry fees
 # are progressive and may include more than one act, so these percentages are
@@ -54,7 +64,19 @@ REGISTRATION_RATES = {
 
 
 def get_itbi(uf: str, city: str) -> dict | None:
-    return ITBI_RATES.get(((uf or "").upper(), _key(city)))
+    normalized_uf = (uf or "").upper().strip()
+    normalized_city = _key(city)
+    if normalized_uf not in _BRAZILIAN_UFS or not normalized_city:
+        return None
+
+    municipal_reference = ITBI_RATES.get((normalized_uf, normalized_city))
+    if municipal_reference:
+        return {**municipal_reference, "estimated": False}
+    return {
+        "rate": DEFAULT_ITBI_RATE,
+        "source": DEFAULT_ITBI_SOURCE,
+        "estimated": True,
+    }
 
 
 def get_registration_fee(uf: str) -> dict | None:

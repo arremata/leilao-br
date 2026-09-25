@@ -264,11 +264,16 @@ def _build_costs(state: AuctionState) -> list[CostLineItem] | None:
         rate_pct = metadata.itbi_rate * 100
         costs.append(CostLineItem(
             id="itbi",
-            label=f"ITBI · {metadata.city} ({rate_pct:g}%)",
+            label=(
+                f"ITBI estimado · {metadata.city} ({rate_pct:g}%)"
+                if metadata.itbi_is_estimate
+                else f"ITBI · {metadata.city} ({rate_pct:g}%)"
+            ),
             value=round(min_bid * metadata.itbi_rate),
             hint=metadata.itbi_source,
             kind="tax",
             rate=metadata.itbi_rate,
+            estimated=metadata.itbi_is_estimate,
         ))
 
     if commission_exempt:

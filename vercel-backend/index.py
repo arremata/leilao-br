@@ -10,23 +10,50 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import unicodedata
-from datetime import datetime, timezone
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
 from itertools import combinations
 from math import asin, cos, radians, sin, sqrt
 from statistics import median
+from threading import Lock
 from typing import Optional
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-PIPELINE_VERSION = "v13-area-similarity"
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parent))
+import auth as auth_module
+import users_db as users_db_module
+from auth import AuthError
+
+PIPELINE_VERSION = "v14-national-itbi-estimate"
+
+_MUNICIPAL_ITBI_RATES = {
+    ("PR", "curitiba"): {
+        "rate": 0.027,
+        "source": "Prefeitura de Curitiba — ITBI, alíquota geral de 2,7%",
+    },
+    ("PR", "londrina"): {
+        "rate": 0.02,
+        "source": "Prefeitura de Londrina — Código Tributário Municipal, ITBI 2%",
+    },
+}
+_DEFAULT_ITBI_RATE = 0.03
+_DEFAULT_ITBI_SOURCE = (
+    "Estimativa inicial do Argos para planejamento. A alíquota e a base de "
+    "cálculo variam por município; confirme o valor na prefeitura antes da compra."
+)
 
 _REGISTRATION_RATES = {
     "PR": 0.008, "SP": 0.009, "RJ": 0.0085, "MG": 0.0075,
@@ -46,6 +73,24 @@ _engine = None
 app = FastAPI(title="Arremate Demo API")
 
 
+def _configured_allowed_origins() -> list[str]:
+    origins = {
+        "https://www.argosleiloes.com.br",
+        "https://argosleiloes.com.br",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    origins.update(
+        origin.strip().rstrip("/")
+        for origin in os.environ.get("AUTH_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    )
+    for key in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        if value := os.environ.get(key):
+            origins.add(f"https://{value.strip().rstrip('/')}")
+    return sorted(origins)
+
+
 class ApiPrefixMiddleware:
     """Accept the public `/api` prefix used by the Vercel service router."""
 
@@ -63,15 +108,277 @@ class ApiPrefixMiddleware:
 app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
+    allow_origins=_configured_allowed_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    path = request.url.path
+    if path.startswith(("/auth/", "/me", "/api/auth/", "/api/me")):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 class AnalyzeRequest(BaseModel):
     url: str | None = None
     pdf_texts: str | None = None
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=100, max_length=8192)
+
+
+class SyncRequest(BaseModel):
+    watched: list[int] = Field(default_factory=list, max_length=500)
+    history: list[dict] = Field(default_factory=list, max_length=100)
+
+
+class HousingProfileRequest(BaseModel):
+    city: str = Field(default="", max_length=300)
+    property_type: str = "Todos"
+    budget: str | None = None
+
+
+class SavedToggleRequest(BaseModel):
+    saved: bool
+
+
+class ViewedRequest(BaseModel):
+    property_id: int = Field(gt=0)
+    snapshot: dict
+
+
+_LOGIN_WINDOW_SECONDS = 60
+_LOGIN_ATTEMPT_LIMIT = 10
+_login_attempts: dict[str, deque[float]] = defaultdict(deque)
+_login_attempts_lock = Lock()
+
+
+def _require_trusted_origin(request: Request) -> None:
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    if not origin:
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+    parsed = urlsplit(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    scheme = forwarded_proto if forwarded_proto in {"http", "https"} else request.url.scheme
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    host = forwarded_host or request.headers.get("host", "")
+    request_origin = f"{scheme}://{host}".rstrip("/")
+    if origin != request_origin and origin not in _configured_allowed_origins():
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+
+
+def _enforce_login_rate_limit(request: Request) -> None:
+    real_ip = request.headers.get("x-real-ip", "").strip()
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    client_key = real_ip or forwarded or (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    with _login_attempts_lock:
+        attempts = _login_attempts[client_key]
+        while attempts and attempts[0] <= now - _LOGIN_WINDOW_SECONDS:
+            attempts.popleft()
+        if len(attempts) >= _LOGIN_ATTEMPT_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail="Muitas tentativas. Aguarde um minuto e tente novamente.",
+                headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+            )
+        attempts.append(now)
+
+
+def _require_persistent_writes() -> None:
+    if not _should_persist_changes():
+        raise HTTPException(status_code=403, detail="Alterações estão desativadas neste preview")
+
+
+def _secure_cookie() -> bool:
+    if os.environ.get("VERCEL_ENV", "").casefold() in {"preview", "production"}:
+        return True
+    if os.environ.get("COOKIE_SECURE", "").casefold() in {"0", "false", "no"}:
+        return False
+    return False
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=auth_module.SESSION_COOKIE_NAME,
+        value=token,
+        max_age=auth_module.SESSION_TTL_HOURS * 60 * 60,
+        httponly=True,
+        secure=_secure_cookie(),
+        samesite="lax",
+        path="/",
+    )
+
+
+async def _current_user(request: Request) -> dict:
+    token = request.cookies.get(auth_module.SESSION_COOKIE_NAME)
+    if not token:
+        raise HTTPException(status_code=401, detail="Entre para continuar")
+    _, secret = auth_module.require_settings()
+    try:
+        payload = auth_module.verify_session_token(token, secret=secret)
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    try:
+        user_id = int(payload["sub"])
+        session_id = str(payload["jti"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Sessão inválida. Entre de novo.") from exc
+    with _get_engine().connect() as conn:
+        if not users_db_module.session_is_active(conn, user_id, session_id):
+            raise HTTPException(status_code=401, detail="Sua sessão foi encerrada. Entre de novo.")
+    return {
+        "id": user_id,
+        "session_id": session_id,
+    }
+
+
+CurrentUser = Depends(_current_user)
+
+
+@app.post("/auth/google")
+def auth_google(
+    body: GoogleLoginRequest,
+    response: Response,
+    request: Request,
+    _origin: None = Depends(_require_trusted_origin),
+    _rate_limit: None = Depends(_enforce_login_rate_limit),
+):
+    if _is_preview():
+        raise HTTPException(status_code=403, detail="Login Google disponível somente no ambiente oficial")
+    client_id, secret = auth_module.require_settings()
+    try:
+        payload = auth_module.verify_google_credential(body.credential, client_id)
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    profile = auth_module.user_from_google_payload(payload)
+    login_at = datetime.now(timezone.utc)
+    expires_at = login_at + timedelta(hours=auth_module.SESSION_TTL_HOURS)
+    session_id = auth_module.new_session_id()
+    with _get_engine().begin() as conn:
+        user = users_db_module.upsert_user(conn, profile, login_at=login_at)
+        users_db_module.create_session(
+            conn,
+            user["id"],
+            session_id,
+            expires_at,
+            created_at=login_at,
+        )
+    token = auth_module.issue_session_token(
+        user,
+        secret=secret,
+        session_id=session_id,
+        issued_at=login_at,
+        expires_at=expires_at,
+    )
+    _set_session_cookie(response, token)
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return {"user": user}
+
+
+@app.post("/auth/logout")
+def auth_logout(
+    response: Response,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+):
+    with _get_engine().begin() as conn:
+        users_db_module.revoke_session(conn, user["id"], user["session_id"])
+    response.delete_cookie(
+        key=auth_module.SESSION_COOKIE_NAME,
+        path="/",
+        secure=_secure_cookie(),
+        httponly=True,
+        samesite="lax",
+    )
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return {"ok": True}
+
+
+@app.get("/me")
+def me(user: dict = CurrentUser):
+    with _get_engine().connect() as conn:
+        account = users_db_module.get_user(conn, user["id"]) or user
+        saved = users_db_module.get_saved_ids(conn, user["id"])
+        viewed = users_db_module.get_viewed(conn, user["id"])
+    return {"user": account, "saved": saved, "viewed": viewed}
+
+
+@app.post("/me/sync")
+def sync(
+    body: SyncRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if len(json.dumps(body.history, ensure_ascii=False)) > 256_000:
+        raise HTTPException(status_code=413, detail="Histórico muito grande")
+    with _get_engine().begin() as conn:
+        users_db_module.sync_saved(conn, user["id"], body.watched)
+        users_db_module.sync_viewed(conn, user["id"], body.history)
+    return {"ok": True}
+
+
+@app.put("/me/housing-profile")
+def update_housing_profile(
+    body: HousingProfileRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    profile = body.model_dump()
+    profile["city"] = profile["city"].strip()
+    if profile["property_type"] not in {"Todos", "Casa", "Apartamento"}:
+        raise HTTPException(status_code=422, detail="Tipo de imóvel inválido")
+    if profile["budget"] not in {
+        None, "150000", "250000", "400000", "600000", "1000000", "above-1000000",
+    }:
+        raise HTTPException(status_code=422, detail="Faixa de preço inválida")
+    with _get_engine().begin() as conn:
+        account = users_db_module.set_housing_profile(conn, user["id"], profile)
+    return {"user": account}
+
+
+@app.put("/me/saved/{property_id}")
+def set_saved_route(
+    property_id: int,
+    body: SavedToggleRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if property_id <= 0:
+        raise HTTPException(status_code=422, detail="Imóvel inválido")
+    with _get_engine().begin() as conn:
+        users_db_module.set_saved(conn, user["id"], property_id, body.saved)
+    return {"ok": True}
+
+
+@app.post("/me/viewed")
+def record_viewed(
+    body: ViewedRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if len(json.dumps(body.snapshot, ensure_ascii=False)) > 64_000:
+        raise HTTPException(status_code=413, detail="Dados do imóvel muito grandes")
+    with _get_engine().begin() as conn:
+        users_db_module.sync_viewed(
+            conn, user["id"], [{"id": body.property_id, "snapshot": body.snapshot}],
+        )
+    return {"ok": True}
 
 
 def _is_preview() -> bool:
@@ -132,6 +439,21 @@ def _registration_rate(uf: str | None) -> float | None:
     if normalized_uf not in _BRAZILIAN_UFS:
         return None
     return _REGISTRATION_RATES.get(normalized_uf, _DEFAULT_REGISTRATION_RATE)
+
+
+def _itbi_reference(uf: str | None, city: str | None) -> dict | None:
+    normalized_uf = (uf or "").upper().strip()
+    normalized_city = _normalize_text(city)
+    if normalized_uf not in _BRAZILIAN_UFS or not normalized_city:
+        return None
+    municipal_reference = _MUNICIPAL_ITBI_RATES.get((normalized_uf, normalized_city))
+    if municipal_reference:
+        return {**municipal_reference, "estimated": False}
+    return {
+        "rate": _DEFAULT_ITBI_RATE,
+        "source": _DEFAULT_ITBI_SOURCE,
+        "estimated": True,
+    }
 
 
 def _extract_street(address: str | None) -> str:
@@ -408,9 +730,8 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     price_per_m2 = 0 if is_land else float(median(prices) if prices else reference["price_per_m2"])
     market = round(price_per_m2 * area, 2)
     discount = round((market - min_bid) / market * 100, 2) if market > 0 else 0
-    itbi_rate = {("PR", "CURITIBA"): 0.027, ("PR", "LONDRINA"): 0.02}.get(
-        ((p.get("uf") or "").upper(), (p.get("city") or "").upper())
-    )
+    itbi = _itbi_reference(p.get("uf"), p.get("city"))
+    itbi_rate = itbi["rate"] if itbi else None
     fee_rate = itbi_rate or 0
     normalized_modality = _normalize_text(p.get("modalidade"))
     is_direct_sale = "venda direta" in normalized_modality
@@ -442,9 +763,14 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     if itbi_rate is not None:
         costs.append({
             "id": "itbi",
-            "label": f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)",
-            "value": round(min_bid * itbi_rate), "hint": "Alíquota municipal cadastrada.", "kind": "tax",
+            "label": (
+                f"ITBI estimado · {p.get('city') or ''} ({itbi_rate * 100:g}%)"
+                if itbi["estimated"]
+                else f"ITBI · {p.get('city') or ''} ({itbi_rate * 100:g}%)"
+            ),
+            "value": round(min_bid * itbi_rate), "hint": itbi["source"], "kind": "tax",
             "rate": itbi_rate,
+            "estimated": itbi["estimated"],
         })
     edital_data = p.get("edital_data") if isinstance(p.get("edital_data"), dict) else {}
     official_commission_rate = edital_data.get("commissionRate")
@@ -605,6 +931,7 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     else:
         title = p.get("address") or ""
 
+    itbi = _itbi_reference(p.get("uf"), p.get("city"))
     card = {
         "id": p["id"],
         "sourceId": p.get("source_id"),
@@ -639,6 +966,9 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "matriculaUrl": p.get("matricula_url"),
         "status": p.get("status"),
         "canAnalyze": True,
+        "itbiRate": itbi["rate"] if itbi else None,
+        "itbiSource": itbi["source"] if itbi else None,
+        "itbiEstimated": itbi["estimated"] if itbi else None,
     }
     if include_edital_data:
         card["editalData"] = p.get("edital_data")

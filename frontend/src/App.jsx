@@ -1,35 +1,91 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, NavLink, Link } from 'react-router-dom';
-import Feed from './components/Feed';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Routes, Route, NavLink, Link, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import HousingFeed from './components/HousingFeed';
+import HousingQuestionnaire from './components/HousingQuestionnaire';
+import HousingLogin from './components/HousingLogin';
+import AccountPage, { UserMark } from './components/AccountPage';
+import { housingProfileForApi, housingProfileFromUser } from './housingProfile';
+import {
+  accountDestination,
+  housingPreferencesFlow,
+  postSetupDestination,
+  shouldShowHousingOnboarding,
+  shouldUseAccountScreen,
+} from './housingEntry';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
 import NotFound from './components/NotFound';
 import { fetchCatalog } from './api';
+import { useAuth } from './auth/useAuth';
+import { authApi } from './auth';
 
 const isPreview = import.meta.env.VITE_DEPLOY_ENV === 'preview';
 const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    user: authUser,
+    authReady,
+    isAuthed,
+    logout: authLogout,
+    updateHousingProfile,
+  } = useAuth();
   const [watched, setWatched] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
       return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
-  const [properties, setProperties] = useState([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
   const [history, setHistory] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_history') || '[]');
       return Array.isArray(stored) ? stored : [];
     } catch { return []; }
   });
+  const [properties, setProperties] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const cities = [...new Set(properties.map(p => p.city).filter(Boolean))].sort();
+  const requestedDestination = accountDestination(location.state?.from);
+  const afterSetupDestination = postSetupDestination(location.state?.from);
+  const preferencesFlow = housingPreferencesFlow(location.search, location.state?.after);
+
+  const effectiveAccount = authUser;
+  const effectiveHousingProfile = housingProfileFromUser(authUser);
+  const canOpenCatalog = isPreview || Boolean(effectiveAccount);
+
+  const saveProfile = useCallback(async (profile) => {
+    if (!isAuthed) throw new Error('Entre com o Google para salvar suas preferências.');
+    const updatedUser = await updateHousingProfile(housingProfileForApi(profile));
+    return housingProfileFromUser(updatedUser);
+  }, [isAuthed, updateHousingProfile]);
+  const signOut = useCallback(async () => {
+    try {
+      await authLogout();
+      if (!isPreview) {
+        setProperties([]);
+        setCatalogLoading(true);
+      }
+      navigate('/entrar');
+    } catch (error) {
+      console.warn('Não foi possível encerrar a sessão:', error);
+    }
+  }, [navigate, authLogout]);
+
+  const accountScreen = shouldUseAccountScreen({
+    pathname: location.pathname,
+    isPreview,
+    account: effectiveAccount,
+    hasSearch: Boolean(location.search),
+  });
 
   // O catálogo é carregado uma vez e compartilhado pelas telas de lista. Ele
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
   // aquele imóvel e não espera os outros 500.
   useEffect(() => {
+    if (!canOpenCatalog) return undefined;
     let cancelled = false;
     fetchCatalog()
       .then(catalogData => {
@@ -39,8 +95,9 @@ function App() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [canOpenCatalog]);
 
+  // Local persistence always-on; server sync layers on top when authed.
   useEffect(() => {
     localStorage.setItem('arremate_watched', JSON.stringify(watched));
   }, [watched]);
@@ -85,9 +142,50 @@ function App() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const toggleWatch = useCallback((id) => {
-    setWatched(w => w.includes(id) ? w.filter(x => x !== id) : [...w, id]);
+  // Auth: adopt server-backed saved/viewed lists once /me sync lands. The
+  // AuthContext effect emits `argos:synced` with `{ user, saved, viewed }`.
+  // Register unconditionally on mount — AuthContext may dispatch the event in
+  // the same tick it flips `synced`, before a gated effect would re-run.
+  useEffect(() => {
+    const onSynced = (event) => {
+      const data = event.detail || {};
+      setWatched(Array.isArray(data.saved) ? data.saved : []);
+      setHistory(
+        Array.isArray(data.viewed)
+          ? data.viewed.map(e => e && e.snapshot).filter(Boolean)
+          : [],
+      );
+    };
+    window.addEventListener('argos:synced', onSynced);
+    return () => window.removeEventListener('argos:synced', onSynced);
   }, []);
+
+  // On logout, drop the previous session's local lists so they don't leak
+  // into the next (anonymous or different-user) session.
+  const wasAuthedRef = useRef(isAuthed);
+  useEffect(() => {
+    if (wasAuthedRef.current && !isAuthed) {
+      setWatched([]);
+      setHistory([]);
+    }
+    wasAuthedRef.current = isAuthed;
+  }, [isAuthed]);
+
+  const toggleWatch = useCallback((id) => {
+    setWatched(current => {
+      const willSave = !current.includes(id);
+      const next = willSave ? [...current, id] : current.filter(x => x !== id);
+      if (isAuthed) {
+        authApi.setSaved(id, willSave).catch(() => {
+          // Roll the optimistic toggle back if the server write failed.
+          setWatched(now => (willSave
+            ? now.filter(x => x !== id)
+            : [...now, id]));
+        });
+      }
+      return next;
+    });
+  }, [isAuthed]);
 
   const clearHistory = useCallback(() => setHistory([]), []);
 
@@ -104,54 +202,93 @@ function App() {
       modalidade: prop.modalidade, endsAt: prop.endsAt,
     };
     setHistory(prev => [entry, ...prev.filter(h => h.id !== prop.id)].slice(0, 50));
-  }, []);
+    if (isAuthed) {
+      authApi.recordViewed(prop.id, entry).catch((err) => {
+        console.warn('Falha ao registrar visita no servidor:', err);
+      });
+    }
+  }, [isAuthed]);
+
+  if (!authReady && !isPreview) {
+    return <main className="auth-session-loading" role="status">
+      <span className="logo" aria-hidden="true" />
+      <p>Verificando seu acesso…</p>
+    </main>;
+  }
 
   return (
-    <div className="app-shell">
-      {isPreview && (
+    <div className={`app-shell${accountScreen ? ' account-screen' : ''}${isPreview ? ' preview-env' : ''}`}>
+      {isPreview && !accountScreen && (
         <div className="preview-banner" role="status">
-          Ambiente de validação · dados reais de produção
+          Preview · dados reais
           {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
-      <TopBar watchCount={watched.length} />
+      {!accountScreen && <TopBar watchCount={watched.length} account={effectiveAccount} />}
       <Routes>
-        <Route path="/" element={
-          <Feed
-            watched={watched}
-            toggleWatch={toggleWatch}
-            properties={properties}
-            loading={catalogLoading}
-          />
-        } />
-        <Route path="/imovel/:id" element={
-          <PropertyRoute
-            properties={properties}
-            watched={watched}
-            toggleWatch={toggleWatch}
-            onVisit={recordVisit}
-          />
-        } />
-        <Route path="/salvos" element={
-          <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
-        } />
-        <Route path="/vistos" element={
-          <History history={history} clearHistory={clearHistory} properties={properties} />
-        } />
-        <Route path="*" element={<NotFound />} />
+        <Route path="/entrar" element={effectiveAccount
+          ? <Navigate to={requestedDestination} replace />
+          : <HousingLogin
+              signedInDestination={requestedDestination}
+              afterSetupDestination={afterSetupDestination}
+              allowExplore={isPreview}
+            />} />
+        <Route element={<AccountGate account={effectiveAccount} allowPublic={isPreview} />}>
+          <Route path="/" element={
+            <HousingEntry
+              profile={effectiveHousingProfile}
+              account={effectiveAccount}
+              onSave={saveProfile}
+              cities={cities}
+              watched={watched}
+              toggleWatch={toggleWatch}
+              properties={properties}
+              loading={catalogLoading}
+            />
+          } />
+          <Route path="/imovel/:id" element={
+            <PropertyRoute
+              properties={properties}
+              watched={watched}
+              toggleWatch={toggleWatch}
+              onVisit={recordVisit}
+            />
+          } />
+          <Route path="/salvos" element={
+            <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
+          } />
+          <Route path="/vistos" element={
+            <History history={history} clearHistory={clearHistory} properties={properties} />
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+        <Route element={<AccountGate account={effectiveAccount} />}>
+          <Route path="/perfil" element={
+            <AccountPage account={effectiveAccount} profile={effectiveHousingProfile} serverAccount={isAuthed} onSignOut={signOut} />
+          } />
+          <Route path="/preferencias" element={
+            <HousingQuestionnaire
+              key={JSON.stringify(effectiveHousingProfile)}
+              initialProfile={effectiveHousingProfile}
+              cities={cities}
+              onSave={saveProfile}
+              {...preferencesFlow}
+            />
+          } />
+        </Route>
       </Routes>
     </div>
   );
 }
 
-function TopBar({ watchCount }) {
+function TopBar({ watchCount, account }) {
   return (
     <header className="topbar">
       <div id="argos-progress" style={{
         position: 'absolute', left: 0, bottom: 0, height: 2,
         width: 0, background: 'var(--accent)', transition: 'width .1s linear',
       }} />
-      <div className="row gap-6" style={{ alignItems: 'center' }}>
+      <div className="topbar-primary">
         <Link className="brand" to="/">
           <span className="logo"></span>
           Argos
@@ -163,9 +300,45 @@ function TopBar({ watchCount }) {
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
         </nav>
+        <div className="housing-account">
+          {account ? (
+            <Link className="account-trigger" to="/perfil" aria-label="Abrir minha conta">
+              <UserMark />
+              <span><b>{account.name?.split(' ')[0] || 'Minha conta'}</b><small>Minha conta</small></span>
+              <span className="account-trigger-arrow" aria-hidden="true">›</span>
+            </Link>
+          ) : (
+            <>
+              <Link to="/entrar">Entrar</Link>
+              <Link className="btn primary sm" to="/entrar">Criar conta</Link>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
+}
+
+function HousingEntry({ profile, account, onSave, ...catalogProps }) {
+  const [params] = useSearchParams();
+  // After login, the saved profile still decides whether first-time setup is
+  // needed before the catalog. Shared searches no longer bypass the account.
+  if (shouldShowHousingOnboarding({
+    isPreview,
+    account,
+    profile,
+    searchParamCount: params.size,
+  })) {
+    return <HousingQuestionnaire initialProfile={profile} cities={catalogProps.cities} onSave={onSave} />;
+  }
+  return <HousingFeed {...catalogProps} />;
+}
+
+function AccountGate({ account, allowPublic = false }) {
+  const location = useLocation();
+  if (account || allowPublic) return <Outlet />;
+  const from = `${location.pathname}${location.search}${location.hash}`;
+  return <Navigate to="/entrar" replace state={{ from }} />;
 }
 
 export default App;

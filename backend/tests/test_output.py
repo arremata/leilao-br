@@ -183,6 +183,19 @@ class TestBuildResultDetails:
         assert costs["property_registration"].rate == 0.009
         assert costs["occupant_removal"].value == 5000
 
+    def test_costs_identify_national_itbi_planning_estimate(self):
+        state = _make_full_state()
+        state.property_metadata.itbi_rate = 0.03
+        state.property_metadata.itbi_source = "Estimativa inicial; confirme na prefeitura."
+        state.property_metadata.itbi_is_estimate = True
+
+        itbi = {item.id: item for item in build_result(state).costs}["itbi"]
+
+        assert itbi.value == 9360
+        assert itbi.rate == 0.03
+        assert itbi.estimated is True
+        assert itbi.label == "ITBI estimado · São Paulo (3%)"
+
     def test_no_debt_line_when_there_is_no_evidence_of_debt(self):
         """Ausência de evidência não pode virar afirmação.
 

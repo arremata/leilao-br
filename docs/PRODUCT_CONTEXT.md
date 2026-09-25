@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 24 de setembro de 2026.
+Última atualização: 25 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -35,7 +35,7 @@ um MVP em evolução, concentrado no catálogo imobiliário da Caixa.
 
 O usuário principal é uma pessoa comprando um imóvel **para morar**. Ela não
 conhece o vocabulário de leilão, não quer aprendê-lo e não vai perguntar: vai
-fechar a aba. Ela tem quatro perguntas, nesta ordem:
+fechar a aba. Ela tem cinco perguntas, nesta ordem:
 
 1. Quanto vou pagar no total, até a chave estar na minha mão?
 2. Tem alguém morando? Quando eu consigo entrar?
@@ -74,7 +74,40 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Lista de imóveis
 
-- É a entrada principal do produto; não existe um Dashboard separado.
+- Em produção, Criar conta ou Entrar é obrigatório antes de acessar o catálogo,
+  um imóvel por link direto, Salvos, Vistos ou a central de conta. Após entrar,
+  a pessoa volta ao endereço que tentou abrir. Uma conta nova responde primeiro
+  ao questionário de moradia em três escolhas: cidade, tipo de imóvel e faixa de
+  preço. A cidade pode ser digitada e escolhida em sugestões, inclusive sem
+  informar os acentos durante a busca.
+- Google é a única forma de criar conta ou entrar. O primeiro acesso cria a
+  conta Argos automaticamente e abre o questionário; acessos seguintes retomam
+  a plataforma. Cada dispositivo mantém uma sessão própria por até 12 horas em
+  cookie protegido; sair encerra somente a sessão usada naquele dispositivo.
+- Previews de branch abrem diretamente no catálogo público, sem exigir conta,
+  para que a validação use os imóveis reais sem criar identidades de teste. O
+  login Google fica desativado nesses domínios temporários.
+- Cidade, tipo de imóvel e faixa de preço do questionário formam um perfil
+  cadastral, ficam vinculados à conta Google e não filtram o catálogo.
+- Todos os filtros da busca ficam numa única barra lateral e são aplicados pela
+  própria pessoa. Cidade e bairro usam autocomplete com opções reais do catálogo;
+  bairro fica disponível depois da escolha da cidade. O limite de valor inicial
+  aceita qualquer valor digitado, o apresenta em reais e, depois da primeira
+  alteração, fica lembrado neste navegador até a pessoa limpar o campo ou os
+  filtros. Esse valor lembrado pertence à busca e não vem do questionário. Tipo
+  de venda, localização, tipo de imóvel, orçamento, disponibilidade, modalidade,
+  rodada e desconto não têm uma seção separada de “preferências”, botão de
+  aplicar nem ações de salvar ou restaurar perfil. A barra usa a rolagem normal
+  da página, sem área interna rolável. Compra direta não mostra opções próprias
+  de leilão.
+- A lista não oferece uma segunda busca livre por endereço, bairro e cidade. A
+  localização é escolhida pelos autocompletes da lateral; acima dos resultados
+  ficam apenas o total encontrado, a ordenação e o modo de visualização.
+- A faixa cadastral do questionário vai de “Até R$ 150 mil” a “Acima de R$ 1
+  milhão” e não filtra o catálogo. O valor máximo digitado na lateral limita
+  somente o valor inicial do imóvel. Taxas, reforma, eventual desocupação e
+  outras despesas continuam explicadas em cada imóvel; nenhuma das duas escolhas
+  garante custo final nem aprovação de financiamento.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.
@@ -107,20 +140,39 @@ oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóvei
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
 
+O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
+alíquota municipal foi revisada, a conta usa essa referência e identifica a
+prefeitura. Enquanto ela ainda não foi cadastrada, o produto reserva 3% do valor
+informado para a compra, rotula a linha como estimativa do Argos e orienta a
+confirmação da alíquota e da base de cálculo na prefeitura. Preço, ITBI, registro,
+desocupação e reforma aparecem mesmo quando a comparação de mercado ainda não
+foi coletada; essa pendência não bloqueia a conta disponível.
+
 O acesso ao anúncio oficial permanece destacado como “Ver o leilão na Caixa” ou
 ação equivalente à modalidade.
 
-### Preferências locais
+### Conta, salvos e vistos
 
-- Salvos e Vistos existem sem login.
-- Esses dados ficam somente no navegador da pessoa.
-- Não existe conta de usuário, sincronização entre dispositivos ou identidade
-  fictícia na interface.
+- Quando a pessoa está conectada, um ícone de usuário no lado direito do
+  cabeçalho abre a central de conta. Ela mostra nome, e-mail, onde os dados são
+  mantidos e as preferências de cidade, tipo de imóvel e faixa de preço que a
+  própria pessoa informou. As preferências podem ser refeitas pelo mesmo
+  questionário do cadastro.
+- A central tem uma área de Assinatura identificada como **Em breve**. Ela não
+  apresenta planos fictícios e deixa explícito que não existe assinatura nem
+  cobrança ativa.
+- Em produção, Salvos e Vistos exigem uma conta Google ativa. Previews públicos
+  mantêm essas áreas como apoio de validação local, sem criar uma identidade.
+- Ao entrar com Google, os dados locais são unidos à conta e passam a ser
+  sincronizados pelo servidor entre dispositivos.
 
 ## Dados e confiança
 
 - Dados oficiais da Caixa e estimativas do Argos são conceitos diferentes e
   devem ser rotulados separadamente.
+- Uma estimativa de planejamento pode preencher um custo necessário quando sua
+  limitação estiver explícita; ela não se torna uma alíquota oficial por aparecer
+  na conta.
 - **Ausência de evidência nunca vira afirmação.** Uma linha de custo sem valor
   apurado não é emitida; uma dívida citada no documento sem valor aparece como
   menção, não como número; um veredito de risco não calculado não é publicado.
@@ -129,6 +181,8 @@ ação equivalente à modalidade.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
+- O navegador acessa catálogo e dados de conta somente pelos serviços do Argos;
+  as tabelas do banco não formam uma API pública paralela.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
@@ -174,14 +228,15 @@ venda, sem inventar um edital individual inexistente.
    A interface não usa "análise jurídica", "parecer", "assessoria jurídica" nem
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
-5. **Sem personalização fictícia:** enquanto não houver autenticação, não há
-   perfil, atividade ou recomendação atribuída a uma pessoa imaginária.
+5. **Sem personalização fictícia:** o perfil cadastral preenchido pela pessoa não
+   altera o catálogo sozinho. A identidade e o perfil pertencem à conta Google.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 
 ## Ainda não disponível
 
-- Autenticação, contas e sincronização entre dispositivos.
+- Conta própria de e-mail e senha, recuperação de senha e verificação de e-mail.
+  O lançamento usa exclusivamente a conta Google.
 - Mapa nacional e agregação de todos os leiloeiros do Brasil.
 - Alertas configuráveis e exportação CSV.
 - Parecer ou assistente jurídico operacional.
@@ -214,3 +269,17 @@ limitado e não destrutivo.
 - `AGENTS.md`: arquitetura, regras técnicas e changelog completo.
 - `frontend/src/components/`: comportamento atual das telas.
 - `backend/graph/contracts.py`: contrato detalhado dos dados de uma análise.
+
+## Variáveis de autenticação
+
+- `GOOGLE_CLIENT_ID` — client id OAuth do app web; o backend verifica os ID
+  tokens do Google contra essa audience.
+- `VITE_GOOGLE_CLIENT_ID` — o mesmo valor exposto ao Vite para o botão Google.
+- `JWT_SECRET` — string aleatória com pelo menos 32 bytes; assina o identificador
+  interno da sessão, que expira em 12 horas e fica somente em cookie HttpOnly.
+- `AUTH_ALLOWED_ORIGINS` — origens adicionais, separadas por vírgula, quando um
+  ambiente autorizado precisar chamar a API fora do mesmo domínio.
+
+A tela de consentimento OAuth precisa autorizar a origem de produção e
+`http://localhost:5173` para desenvolvimento local. Previews de branch mantêm o
+catálogo público e não oferecem login Google.

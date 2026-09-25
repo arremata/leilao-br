@@ -7,12 +7,19 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
+from fiscal import ITBI_RATES, get_itbi
 
 
 MODULE_PATH = Path(__file__).parents[2] / "vercel-backend" / "index.py"
 SPEC = spec_from_file_location("vercel_catalog_api", MODULE_PATH)
 vercel_api = module_from_spec(SPEC)
 SPEC.loader.exec_module(vercel_api)
+
+
+def test_vercel_itbi_references_stay_in_sync_with_worker_backend():
+    assert set(vercel_api._MUNICIPAL_ITBI_RATES) == set(ITBI_RATES)
+    for uf, city in [*ITBI_RATES, ("AM", "manaus"), ("SP", "sao paulo")]:
+        assert vercel_api._itbi_reference(uf, city) == get_itbi(uf, city)
 
 
 def test_catalog_card_matches_frontend_contract():
@@ -46,11 +53,26 @@ def test_catalog_card_matches_frontend_contract():
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"
     assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
+    assert card["itbiRate"] == 0.027
+    assert card["itbiEstimated"] is False
+    assert "Prefeitura" in card["itbiSource"]
     assert "editalData" not in card
     assert card["canAnalyze"] is True
 
     detail = vercel_api._catalog_card(row, include_edital_data=True)
     assert detail["editalData"] == {"lotNumber": "175", "registryOffice": "02"}
+
+
+def test_catalog_card_exposes_national_itbi_estimate_for_new_states():
+    card = vercel_api._catalog_card({
+        "id": 8, "source_id": "am-1", "source": "caixa", "uf": "AM",
+        "city": "Manaus", "address": "Rua B", "property_type": "Casa",
+        "preco": 180000.0, "status": "active",
+    })
+
+    assert card["itbiRate"] == 0.03
+    assert card["itbiEstimated"] is True
+    assert "confirme" in card["itbiSource"].casefold()
 
 
 def test_edital_data_is_selected_only_for_catalog_detail():
@@ -191,9 +213,29 @@ def test_persisted_enrichment_includes_dynamic_editable_costs():
     )
     costs = {item["id"]: item for item in result["costs"]}
 
+    assert costs["itbi"]["rate"] == 0.027
+    assert costs["itbi"]["estimated"] is False
     assert costs["auctioneer_commission"]["rate"] == 0.06
     assert costs["property_registration"]["rate"] == 0.008
     assert costs["occupant_removal"]["value"] == 5000
+
+
+def test_persisted_enrichment_includes_estimated_itbi_for_any_city():
+    row = {
+        "id": 9, "uf": "SC", "city": "Joinville", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Casa", "area_m2": 80,
+        "preco": 200_000, "avaliacao": 300_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/9",
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 5_000, "scope": "city"}, [],
+    )
+    itbi = next(item for item in result["costs"] if item["id"] == "itbi")
+
+    assert itbi["value"] == 6000
+    assert itbi["estimated"] is True
+    assert itbi["label"] == "ITBI estimado · Joinville (3%)"
 
 
 def test_persisted_enrichment_prefers_official_edital_commission():

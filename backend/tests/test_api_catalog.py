@@ -78,10 +78,30 @@ def test_catalog_card_has_title_and_auction_discount():
     assert card["matricula"] == "91.048"
     assert card["editalUrl"] == "https://example.com/edital.pdf"
     assert card["matriculaUrl"] == "https://example.com/matricula.pdf"
+    assert card["itbiRate"] == 0.027
+    assert card["itbiEstimated"] is False
+    assert "Prefeitura" in card["itbiSource"]
     assert "editalData" not in card
 
     detail = client.get(f"/catalog/{card['id']}").json()
     assert detail["editalData"] == {"lotNumber": "175", "registryOffice": "02"}
+    api.app.dependency_overrides.clear()
+
+
+def test_catalog_card_exposes_national_itbi_estimate_for_new_states():
+    client, factory = _client_with_db()
+    with factory() as s:
+        s.add(Property(
+            source="caixa", source_id="am-1", uf="AM", city="Manaus",
+            address="Rua A", property_type="Casa", preco=180000.0, status="active",
+        ))
+        s.commit()
+
+    card = client.get("/catalog?uf=AM").json()[0]
+
+    assert card["itbiRate"] == 0.03
+    assert card["itbiEstimated"] is True
+    assert "confirme" in card["itbiSource"].casefold()
     api.app.dependency_overrides.clear()
 
 

@@ -40,6 +40,7 @@ class PropertyMetadata:
     photo_url: str = ""
     itbi_rate: Optional[float] = None
     itbi_source: str = ""
+    itbi_is_estimate: bool = False
     commission_rate: Optional[float] = None
 
 

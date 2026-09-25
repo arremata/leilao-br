@@ -167,7 +167,7 @@ Frontend starts with an empty property list and populates exclusively from `GET 
 The full platform will include:
 - **Feed**: 3-column grid with real photos, score badges, countdown, filters (praca, type, occupancy, score, city)
 - **Analysis Modal**: 4 tabs (Viabilidade, Mercado, Encargos, Juridico)
-- **Fiscal Tables**: ITBI by municipality (13 cities), emolumentos by state (IRIB table)
+- **Fiscal Tables**: cobertura nacional de ITBI com referências municipais progressivas e emolumentos por estado (IRIB)
 - **Investor Profile**: Onboarding quiz, personalized feed
 - **Monetization**: Free (3/mo), Essencial R$97, Pro R$197, Expert R$490, Escritorio R$790/mo
 - **Legal Analysis**: Premium R$197 per property, lawyer review with ONR/DataJud
@@ -189,7 +189,7 @@ The full platform will include:
 ### Phase 3 - Full Platform
 - Map view with Airbnb-style filters
 - Investor profile and onboarding
-- ITBI/emolumentos calculators per city/state
+- Expand reviewed municipal ITBI references and state registry-fee tables
 - Watchlist, alerts, batch analysis
 - Subscription tiers and credit system
 
@@ -214,7 +214,52 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Fechou a API automática do Supabase para todas as tabelas do
+  Argos. Catálogo, enriquecimentos, filas operacionais e dados de conta —
+  incluindo sessões — agora usam RLS com bloqueio explícito para os papéis de
+  navegador; privilégios atuais e padrões também foram removidos desses papéis,
+  enquanto backend, ingestão e administração preservam seu acesso servidor a
+  servidor. Produção recebeu as migrations de hardening e de sessões; a tabela
+  de sessões nasceu vazia, sem privilégios de leitura/escrita para `anon` ou
+  `authenticated`, e o advisor de segurança ficou sem alertas.
+
+- **2026-09-25** — Endureceu a autenticação antes da liberação: removeu integralmente o protótipo local de e-mail e senha e adotou Google como única entrada de produção. A sessão saiu do localStorage para um cookie HttpOnly/Secure/SameSite de 12 horas, sem dados pessoais no token; cada dispositivo mantém sua própria sessão revogável, e o logout encerra somente a sessão atual no servidor. API e frontend agora restringem origens, impedem cache de respostas privadas, aplicam limitação de tentativas e cabeçalhos CSP/anti-framing, validam emissor/audiência/identificador do token e descartam credenciais locais antigas. Previews permanecem públicos, com login Google e escritas de conta desativados.
+
+- **2026-09-25** — Consolidou no PR de login a central de conta e a UX mais recente dos filtros. Produção mantém conta, Google e onboarding obrigatórios, enquanto previews abrem o catálogo público e oferecem somente a conta local, sem tentar iniciar Google em domínios temporários não autorizados; o perfil cadastral é salvo na conta sem filtrar resultados, e a busca preserva uma única lateral com autocompletes de cidade/bairro, limite monetário manual lembrado no navegador e controles coerentes com cada tipo de venda. Alterações rápidas de bairro e orçamento passam a compor a URL mais recente sem apagar o filtro anterior.
+
+- **2026-09-25** — Transformou a cidade do cadastro e da edição de preferências em uma busca com sugestões, tolerante a acentos e operável por mouse, toque ou teclado. Substituiu “Ainda não sei” por uma faixa cadastral real “Acima de R$ 1 milhão”, salva no perfil e exibida na central de conta sem ser aplicada automaticamente ao catálogo.
+
+- **2026-09-24** — Tornou a conta obrigatória para acessar qualquer área da plataforma, inclusive catálogo, imóveis por link direto, Salvos, Vistos e previews. Visitantes são encaminhados para Criar conta/Entrar sem carregar o catálogo; depois do acesso retornam ao endereço pretendido, enquanto contas novas concluem primeiro as preferências de moradia. A antiga exploração sem conta foi removida.
+
+- **2026-09-24** — Criou a central de conta do Argos, acessível por um ícone de usuário no lado direito do cabeçalho. A área reúne nome, e-mail, transparência sobre a persistência da conta e as três preferências de moradia já informadas; permite refazer essas escolhas e inclui uma aba de assinatura marcada como “Em breve”, sem sugerir plano ou cobrança ativa.
+
+- **2026-09-24** — Passou a lembrar neste navegador o limite de valor inicial digitado manualmente no catálogo. A primeira visita continua sem limite; depois da primeira alteração, o valor é restaurado e refletido na URL, enquanto limpar o campo ou todos os filtros remove também a preferência local. O valor do questionário permanece apenas cadastral e não alimenta esse filtro.
+
+- **2026-09-24** — Trocou o limite de valor inicial do catálogo por um campo livre com formatação monetária brasileira. Bairro agora usa o mesmo autocomplete acessível de cidade, oferece somente bairros reais do catálogo na cidade escolhida e é limpo quando a cidade muda. A busca ampla e redundante por endereço, bairro ou cidade saiu do topo dos resultados, que passou a reunir total, ordenação e modo de visualização em uma única barra compacta.
+
+- **2026-09-24** — Separou perfil e busca. Cidade, tipo de imóvel e faixa de preço informados no questionário passam a ser dados cadastrais da conta Google, persistidos no banco e nunca aplicados automaticamente ao catálogo. A barra lateral virou um conjunto único de filtros instantâneos, sem a seção “Suas preferências”, ações de salvar/restaurar ou botão de aplicar; cidade agora usa um autocomplete acessível e limitado em vez do seletor nativo extenso. A conta local de e-mail e senha preserva o perfil somente neste navegador enquanto continuar como protótipo.
+
+- **2026-09-24** — Compactou e unificou a barra lateral de filtros: tipo de venda virou um controle segmentado horizontal com explicações no hover, disponibilidade e desconto passaram a usar campos enxutos, rodada e modalidade seguem o mesmo padrão visual das preferências e desaparecem por completo na compra direta. A barra não tem mais rolagem interna; em telas baixas, acompanha a rolagem normal da página.
+
+- **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.
+
+- **2026-09-24** — Corrigiu a descoberta de previews do fluxo de entrega: o helper agora reconhece o nome real do ambiente criado pela integração Vercel e escolhe somente uma URL pública, ignorando deployments paralelos protegidos por SSO.
+
+- **2026-09-24** — Reuniu toda a filtragem do catálogo na barra lateral esquerda. Tipo de venda, disponibilidade, rodada, modalidade e desconto agora convivem com região, tipo de imóvel e orçamento; o segundo painel expansível sobre os resultados e seu botão foram removidos, inclusive no celular.
+
 - **2026-09-24** — Published the canonical production domain at `www.argosleiloes.com.br`, with the apex domain redirecting permanently to `www`. Registro.br continues to host DNS, Vercel serves the site, and valid automatically renewed Let's Encrypt certificates protect both addresses.
+
+- **2026-09-22** — Alinhou a navegação ao padrão de cabeçalho das aplicações web: marca e seções ficam à esquerda, enquanto perfil e saída ocupam a extremidade direita; em telas estreitas, a navegação passa para uma segunda linha sem apertar as ações da conta.
+
+- **2026-09-22** — Simplificou a entrada de moradia para três escolhas que realmente organizam o catálogo: cidade, tipo de imóvel e faixa de preço inicial. O questionário agora usa cartões grandes e cabe na tela, sem pedir quartos, vagas, prazo de mudança, reserva extra, pagamento ou rotina. A lista única de todos os imóveis abre com as preferências aplicadas e permite remover um filtro, limpar todos ou restaurar o perfil salvo.
+
+- **2026-09-22** — Repaired the account PR preview before release: branch previews now open the public production-backed catalog without onboarding, and the Vercel backend explicitly installs the HTTP transport required by Google token verification so importing the API no longer takes every catalog endpoint down.
+
+- **2026-09-16** — Corrigido o estado após sair da conta: o logout agora leva sempre para `/entrar`, mantendo a tela de login sem o cabeçalho da plataforma mesmo quando havia uma busca ou perfil salvo.
+
+- **2026-09-16** — Retirou o aviso extenso das telas de login e questionário. O preview mantém apenas uma identificação curta nas telas de catálogo, informando o uso de dados reais e o comportamento das ações.
+
+- **2026-09-16** — Added a complete local account prototype with create-account and sign-in modes, required name/e-mail/password/confirmation/terms fields, password visibility control, local session and salted password verifier, followed by a five-step housing questionnaire. Account and questionnaire screens occupy the viewport without application navigation or page scrolling; the questionnaire splits budget from payment and uses persistent previous/next arrows. The preview production-data notice moved from the top layout to a compact floating label. No server authentication or database was added; the adapter boundary is documented for that future integration.
 
 - **2026-09-15** — Removed section numbering from the “O que fazer agora” side guide and closed the numbering gap across the property tabs. The guide now introduces itself once when the buyer reaches the end of the property page, and reaching the end of the official-rules tab completes the corresponding reading step. Renamed the buyer-controlled occupancy reserve to “Desocupação”, placed the comparable evidence before the map, and rebuilt the regional-price summary as a compact, responsive evidence card without the large empty area created by equal-height columns.
 - **2026-09-15** — Turned “O que fazer agora” into an accessible collapsible guide on the right, so buyers can consult and update their progress without leaving costs, prices, or documents. Added completed-step percentage and count, retained per-property progress, adapted the panel to a full-width mobile sheet, and removed the generic deposit-to-participate step.

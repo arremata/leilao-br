@@ -41,6 +41,8 @@ def test_metadata_from_property_maps_fields():
     assert meta.edital_url == "https://example.com/edital.pdf"
     assert meta.matricula_url == "https://example.com/matricula.pdf"
     assert meta.edital_data["lotNumber"] == "175"
+    assert meta.itbi_rate == 0.027
+    assert meta.itbi_is_estimate is False
     assert meta.commission_rate is None
 
     result = run_structured_enrichment(meta, auction_url="http://x")
@@ -54,6 +56,20 @@ def test_metadata_from_property_maps_fields():
     commission = next(item for item in result.costs if item.id == "auctioneer_commission")
     assert commission.label == "Comissão isenta"
     assert commission.value == 0
+
+
+def test_metadata_uses_national_itbi_estimate_outside_reviewed_cities():
+    p = Property(
+        source="caixa", source_id="sp-1", uf="SP", city="Campinas",
+        address="Rua A", property_type="Casa", preco=200000.0,
+        modalidade="Venda Direta Online",
+    )
+
+    meta = metadata_from_property(p)
+
+    assert meta.itbi_rate == 0.03
+    assert meta.itbi_is_estimate is True
+    assert "confirme" in meta.itbi_source.casefold()
 
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):

@@ -445,6 +445,19 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       : 'Valor mínimo informado para o leilão.',
     kind: 'price',
   });
+  const catalogItbiRate = Number(p.itbiRate);
+  if (Number.isFinite(catalogItbiRate) && catalogItbiRate > 0) {
+    const ratePct = (catalogItbiRate * 100).toLocaleString('pt-BR');
+    ensureCost({
+      id: 'itbi',
+      label: `${p.itbiEstimated ? 'ITBI estimado' : 'ITBI'} · ${p.city || 'município'} (${ratePct}%)`,
+      value: Math.round(minBidFloor * catalogItbiRate),
+      rate: catalogItbiRate,
+      estimated: Boolean(p.itbiEstimated),
+      hint: p.itbiSource || 'Confirme a alíquota e a base de cálculo na prefeitura antes da compra.',
+      kind: 'tax',
+    });
+  }
   const editalData = p.editalData || p.edital?.editalData || {};
   const officialCommissionRate = Number(editalData.commissionRate);
   if (commissionExempt) {
@@ -683,7 +696,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               onClick={handleAnalyze}
               disabled={analyzing}
             >
-              {analyzing ? 'Calculando…' : 'Calcular os custos'}
+              {analyzing ? 'Buscando…' : 'Buscar preço na região'}
             </button>
           )}
         </div>
@@ -803,8 +816,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         </div>
       </div>
 
-      {isEnriched ? (<>
-      <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />
+      {isEnriched && <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />}
 
       {/* ===== TABS ===== */}
       <div className="detail-tabs" style={{
@@ -842,18 +854,19 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       {/* ===== TAB CONTENT ===== */}
       <div className="fade-in" key={tab}>
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
-        {tab === 'market' && <Market p={p} />}
+        {tab === 'market' && (isEnriched
+          ? <Market p={p} />
+          : (
+            <AnalyzeCTA
+              onAnalyze={handleAnalyze}
+              analyzing={analyzing}
+              error={analyzeError}
+              canAnalyze={p.canAnalyze === true}
+            />
+          ))}
         {tab === 'legal' && <LegalComingSoon />}
         {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} onReadToEnd={markRulesRead} />}
       </div>
-      </>) : (
-        <AnalyzeCTA
-          onAnalyze={handleAnalyze}
-          analyzing={analyzing}
-          error={analyzeError}
-          canAnalyze={p.canAnalyze === true}
-        />
-      )}
     </div>
   );
 }
@@ -862,15 +875,15 @@ function AnalyzeCTA({ onAnalyze, analyzing, error, canAnalyze }) {
   const collectionQueued = error?.toLowerCase().includes('priorizada');
   return (
     <div className="card fade-in" style={{ padding: 40, textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
-      <h2 style={{ fontSize: 18, margin: '0 0 8px', color: 'var(--fg-0)' }}>Ainda não calculamos as contas deste imóvel</h2>
+      <h2 style={{ fontSize: 18, margin: '0 0 8px', color: 'var(--fg-0)' }}>Preço na região ainda indisponível</h2>
       <p style={{ fontSize: 13, color: 'var(--fg-2)', lineHeight: 1.55, margin: canAnalyze ? '0 0 22px' : 0 }}>
         {canAnalyze
-          ? 'Você pode pedir o cálculo agora. Vamos somar tudo o que você pagaria até receber a chave e comparar o preço com imóveis parecidos na região.'
-          : 'O cálculo ainda não está disponível aqui. Os dados oficiais da Caixa continuam acima.'}
+          ? 'Os custos estimados já estão na primeira área. Você também pode pedir a busca de imóveis parecidos para comparar o preço.'
+          : 'Os custos estimados já estão na primeira área. A comparação com imóveis parecidos ainda não está disponível.'}
       </p>
       {canAnalyze && (
         <button className="btn primary" onClick={onAnalyze} disabled={analyzing} style={{ minWidth: 180 }}>
-          {analyzing ? 'Calculando…' : 'Calcular os custos'}
+          {analyzing ? 'Buscando…' : 'Buscar preço na região'}
         </button>
       )}
       {error && <p style={{ marginTop: 16, fontSize: 12.5, color: collectionQueued ? 'var(--fg-2)' : 'var(--bad)' }}>{error}</p>}

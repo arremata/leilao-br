@@ -114,6 +114,8 @@ class CostLineItem(BaseModel):
     # Decimal fraction of the considered bid when this is a percentage-based
     # cost. The frontend uses it to keep fees dynamic as the bid changes.
     rate: float | None = None
+    # Distinguishes a planning assumption from a reviewed municipal reference.
+    estimated: bool = False
 
 
 class EditalDetail(BaseModel):

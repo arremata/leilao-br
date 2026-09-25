@@ -32,14 +32,19 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   if (url.pathname.startsWith('/api/')) {
+    // Never cache personalized or auth-required responses: the Cache API keys
+    // by URL only, so a cached /api/me would leak user data across sessions.
+    if (request.headers.get('authorization')) return;
+    // Only cache successful public reads: /api/properties and /api/imovel/{id}.
+    if (!/^\/api\/(properties|imovel\/[^/]+)\/?$/.test(url.pathname)) return;
     event.respondWith(
-      fetch(request)
-        .then((response) => {
+      fetch(request).then((response) => {
+        if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request))
+        }
+        return response;
+      }).catch(() => caches.match(request))
     );
     return;
   }
