@@ -1,31 +1,44 @@
-# Login smoke — manual
+# Login Google — validação manual
 
-Pre-conditions:
-- `DATABASE_URL` points at a dev Postgres with migration applied
-- `GOOGLE_CLIENT_ID` + `JWT_SECRET` set for backend
-- `VITE_GOOGLE_CLIENT_ID` set for frontend (`.env.local` in `frontend/`)
-- Test Google account authorized in the OAuth consent screen
+Pré-condições de produção/local:
 
-## Logged-out
-1. Open `/`          → login screen renders, Google button visible
-2. Open `/salvos`    → login screen (not the Salvos page)
-3. Open `/imovel/1`  → property renders; "Entrar" button or nothing auth-dependent shows
-4. Reload `/`        → login screen, console has no errors
+- banco com a migration de usuários já aplicada;
+- `GOOGLE_CLIENT_ID`, `VITE_GOOGLE_CLIENT_ID` e `JWT_SECRET` configurados;
+- origem oficial autorizada no Google OAuth;
+- preview de branch continua público e não oferece login Google.
 
-## First login
-5. Click "Continuar com Google" → account chooser → redirect back
-6. App loads `/`, TopBar shows avatar + name + Sair
-7. localStorage has `argos_token`, `argos_user`; `arremate_watched`/`arremate_history` are gone
-8. Star two properties → reload → stars persist
+## Visitante em produção
 
-## Sync
-9. In an incognito window, log in with the SAME Google account
-10. Starred properties appear
+1. Abrir `/`, `/salvos`, `/vistos`, `/perfil` e um link `/imovel/{id}`: todos
+   levam a `/entrar`.
+2. Confirmar que a tela oferece somente “Continuar com Google”, sem campos de
+   e-mail ou senha do Argos.
+3. Confirmar console limpo e ausência de `argos_token`, `argos_user` e
+   `argos_local_account_v1` no localStorage.
 
-## Logout
-11. Click Sair → login screen returns; `argos_token` gone; `watched`/`history` cleared from UI
-12. `/imovel/1` still renders logged-out
+## Primeiro acesso
 
-## Token expiry
-13. In devtools, edit `argos_token` to garbage → refresh → login screen with "Sua sessão expirou."
-14. Or wait for token exp to pass naturally (30d) — should also redirect with the same message
+4. Continuar com Google: o backend valida o ID token e define `argos_session`
+   como cookie HttpOnly, Secure e SameSite=Lax.
+5. Confirmar que a pessoa segue para o questionário de moradia e que concluir o
+   questionário abre o catálogo sem aplicar o perfil como filtro.
+6. Abrir `/perfil`: nome, e-mail e preferências pertencem à conta Google.
+
+## Retorno, sincronização e saída
+
+7. Atualizar a página: a sessão é recuperada por `GET /me`, sem token acessível
+   ao JavaScript.
+8. Entrar com a mesma conta em outro navegador: Salvos e Vistos sincronizam.
+9. Entrar novamente em outro dispositivo ou navegador: as duas sessões
+   permanecem válidas e independentes.
+10. Sair em um dispositivo: o cookie expira e essa sessão é revogada no banco;
+    uma cópia anterior do cookie recebe `401`, mas a outra sessão continua ativa.
+
+## Segurança HTTP
+
+11. Origem externa recebe bloqueio de CORS e requisições mutáveis sem `Origin`
+    recebem `403`.
+12. Respostas `/api/auth/*` e `/api/me*` usam `Cache-Control: no-store`.
+13. Documento e API entregam CSP, anti-framing, `nosniff`, Referrer-Policy e
+    Permissions-Policy; o login Google e o catálogo continuam sem erros no
+    console.

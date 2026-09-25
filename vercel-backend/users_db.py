@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from typing import Iterable
 
@@ -17,17 +18,18 @@ def _user_dict(row) -> dict:
     return user
 
 
-def upsert_user(conn, profile: dict) -> dict:
+def upsert_user(conn, profile: dict, *, login_at: datetime | None = None) -> dict:
+    login_at = login_at or datetime.now(timezone.utc)
     row = conn.execute(
         text(
             """
             INSERT INTO users (google_sub, email, name, avatar_url, last_login_at)
-            VALUES (:sub, :email, :name, :avatar, CURRENT_TIMESTAMP)
+            VALUES (:sub, :email, :name, :avatar, :login_at)
             ON CONFLICT (google_sub) DO UPDATE SET
               email = EXCLUDED.email,
               name = EXCLUDED.name,
               avatar_url = EXCLUDED.avatar_url,
-              last_login_at = CURRENT_TIMESTAMP
+              last_login_at = EXCLUDED.last_login_at
             RETURNING id, email, name, avatar_url, housing_profile
             """
         ),
@@ -36,9 +38,73 @@ def upsert_user(conn, profile: dict) -> dict:
             "email": profile["email"],
             "name": profile.get("name"),
             "avatar": profile.get("avatar_url"),
+            "login_at": login_at,
         },
     ).mappings().one()
     return _user_dict(row)
+
+
+def create_session(
+    conn,
+    user_id: int,
+    session_id: str,
+    expires_at: datetime,
+    *,
+    created_at: datetime | None = None,
+) -> None:
+    created_at = created_at or datetime.now(timezone.utc)
+    conn.execute(
+        text("DELETE FROM user_sessions WHERE user_id = :u AND expires_at <= :now"),
+        {"u": user_id, "now": created_at},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO user_sessions (id, user_id, created_at, expires_at)"
+            " VALUES (:id, :u, :created_at, :expires_at)"
+        ),
+        {
+            "id": session_id,
+            "u": user_id,
+            "created_at": created_at,
+            "expires_at": expires_at,
+        },
+    )
+
+
+def session_is_active(
+    conn,
+    user_id: int,
+    session_id: str,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    now = now or datetime.now(timezone.utc)
+    value = conn.execute(
+        text(
+            "SELECT 1 FROM user_sessions"
+            " WHERE id = :id AND user_id = :u"
+            " AND revoked_at IS NULL AND expires_at > :now"
+        ),
+        {"id": session_id, "u": user_id, "now": now},
+    ).scalar_one_or_none()
+    return value == 1
+
+
+def revoke_session(
+    conn,
+    user_id: int,
+    session_id: str,
+    *,
+    revoked_at: datetime | None = None,
+) -> None:
+    revoked_at = revoked_at or datetime.now(timezone.utc)
+    conn.execute(
+        text(
+            "UPDATE user_sessions SET revoked_at = :revoked_at"
+            " WHERE id = :id AND user_id = :u AND revoked_at IS NULL"
+        ),
+        {"id": session_id, "u": user_id, "revoked_at": revoked_at},
+    )
 
 
 def get_user(conn, user_id: int) -> dict | None:

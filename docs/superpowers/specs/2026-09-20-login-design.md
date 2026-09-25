@@ -1,6 +1,11 @@
 # Argos Login Design
 
-**Date:** 2026-09-20 **Branch:** `codex/login-perfil-moradia` **Status:** Approved
+**Date:** 2026-09-20 **Branch:** `codex/login-perfil-moradia` **Status:** Superseded
+
+> Superseded on 2026-09-25 by PD-016 and PD-018. The current product requires
+> Google on every production route, keeps previews public, and stores the
+> 12-hour server session only in an HttpOnly cookie. The localStorage token and
+> public property exception below remain only as historical design context.
 
 ## Goal
 

@@ -26,5 +26,15 @@ CREATE TABLE IF NOT EXISTS user_viewed_properties (
   PRIMARY KEY (user_id, property_id)
 );
 
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id          TEXT PRIMARY KEY,
+  user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ NOT NULL,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  revoked_at  TIMESTAMPTZ
+);
+
 CREATE INDEX IF NOT EXISTS idx_user_saved_user ON user_saved_properties(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_viewed_user ON user_viewed_properties(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expiry ON user_sessions(expires_at);

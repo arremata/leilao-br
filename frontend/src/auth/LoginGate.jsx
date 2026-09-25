@@ -1,8 +1,7 @@
 /**
- * Gate logic moved inside the app: /entrar and /perfil are public HousingLogin /
- * HousingQuestionnaire routes; HousingEntry decides feed-vs-login-vs-onboarding;
- * /imovel/{id} is a public product contract. AuthContext still owns Google-login
- * session state; this wrapper only exists so main.jsx can compose cleanly.
+ * Route gating lives inside App so previews can keep the catalog public while
+ * production requires a server-validated Google session. This wrapper remains
+ * only as the composition boundary around AuthContext.
  */
 export default function LoginGate({ children }) {
   return children;

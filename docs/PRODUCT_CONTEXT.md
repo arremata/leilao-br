@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 24 de setembro de 2026.
+Última atualização: 25 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -80,16 +80,15 @@ no HTML do servidor, o que ainda não é feito.
   ao questionário de moradia em três escolhas: cidade, tipo de imóvel e faixa de
   preço. A cidade pode ser digitada e escolhida em sugestões, inclusive sem
   informar os acentos durante a busca.
-- Entrar com Google cria uma sessão de 30 dias no servidor; o formulário de
-  e-mail e senha continua sendo um protótipo somente deste navegador. O acesso
-  com Google aparece em produção, onde o domínio é autorizado; previews públicos
-  mantêm o formulário local para testar a conta sem simular um login Google.
+- Google é a única forma de criar conta ou entrar. O primeiro acesso cria a
+  conta Argos automaticamente e abre o questionário; acessos seguintes retomam
+  a plataforma. Cada dispositivo mantém uma sessão própria por até 12 horas em
+  cookie protegido; sair encerra somente a sessão usada naquele dispositivo.
 - Previews de branch abrem diretamente no catálogo público, sem exigir conta,
-  para que a validação use os imóveis reais sem criar identidades de teste.
+  para que a validação use os imóveis reais sem criar identidades de teste. O
+  login Google fica desativado nesses domínios temporários.
 - Cidade, tipo de imóvel e faixa de preço do questionário formam um perfil
-  cadastral e não filtram o catálogo. Na conta Google, esse perfil fica no banco;
-  na conta local de e-mail e senha, permanece somente neste navegador enquanto
-  essa entrada continuar como protótipo.
+  cadastral, ficam vinculados à conta Google e não filtram o catálogo.
 - Todos os filtros da busca ficam numa única barra lateral e são aplicados pela
   própria pessoa. Cidade e bairro usam autocomplete com opções reais do catálogo;
   bairro fica disponível depois da escolha da cidade. O limite de valor inicial
@@ -162,13 +161,10 @@ ação equivalente à modalidade.
 - A central tem uma área de Assinatura identificada como **Em breve**. Ela não
   apresenta planos fictícios e deixa explícito que não existe assinatura nem
   cobrança ativa.
-- Em produção, Salvos e Vistos exigem uma conta ativa. Na conta local, continuam
-  guardados somente neste navegador; previews públicos mantêm essas áreas como
-  apoio de validação local.
+- Em produção, Salvos e Vistos exigem uma conta Google ativa. Previews públicos
+  mantêm essas áreas como apoio de validação local, sem criar uma identidade.
 - Ao entrar com Google, os dados locais são unidos à conta e passam a ser
   sincronizados pelo servidor entre dispositivos.
-- O formulário de e-mail e senha continua local: ele não cria uma conta no
-  servidor nem sincroniza dados entre dispositivos.
 
 ## Dados e confiança
 
@@ -231,15 +227,14 @@ venda, sem inventar um edital individual inexistente.
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
 5. **Sem personalização fictícia:** o perfil cadastral preenchido pela pessoa não
-   altera o catálogo sozinho. Apenas a sessão Google e seu perfil são persistidos
-   no servidor; a sessão de e-mail e senha continua local.
+   altera o catálogo sozinho. A identidade e o perfil pertencem à conta Google.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 
 ## Ainda não disponível
 
-- Conta de e-mail e senha no servidor, recuperação de senha e verificação de
-  e-mail. A sincronização entre dispositivos existe somente para a conta Google.
+- Conta própria de e-mail e senha, recuperação de senha e verificação de e-mail.
+  O lançamento usa exclusivamente a conta Google.
 - Mapa nacional e agregação de todos os leiloeiros do Brasil.
 - Alertas configuráveis e exportação CSV.
 - Parecer ou assistente jurídico operacional.
@@ -278,9 +273,11 @@ limitado e não destrutivo.
 - `GOOGLE_CLIENT_ID` — client id OAuth do app web; o backend verifica os ID
   tokens do Google contra essa audience.
 - `VITE_GOOGLE_CLIENT_ID` — o mesmo valor exposto ao Vite para o botão Google.
-- `JWT_SECRET` — string aleatória com pelo menos 32 bytes; assina os tokens de
-  sessão HS256 que expiram em 30 dias.
+- `JWT_SECRET` — string aleatória com pelo menos 32 bytes; assina o identificador
+  interno da sessão, que expira em 12 horas e fica somente em cookie HttpOnly.
+- `AUTH_ALLOWED_ORIGINS` — origens adicionais, separadas por vírgula, quando um
+  ambiente autorizado precisar chamar a API fora do mesmo domínio.
 
 A tela de consentimento OAuth precisa autorizar a origem de produção e
-`http://localhost:5173` para desenvolvimento local. Previews de branch também
-exigem Criar conta/Entrar; a URL continua pública e não exige conta da Vercel.
+`http://localhost:5173` para desenvolvimento local. Previews de branch mantêm o
+catálogo público e não oferecem login Google.

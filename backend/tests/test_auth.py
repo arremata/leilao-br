@@ -67,20 +67,44 @@ def _fresh_conn():
             " viewed_at TEXT DEFAULT CURRENT_TIMESTAMP, snapshot TEXT,"
             " PRIMARY KEY (user_id, property_id))"
         )
+        conn.exec_driver_sql(
+            "CREATE TABLE user_sessions (id TEXT PRIMARY KEY, user_id INTEGER,"
+            " created_at TEXT, expires_at TEXT, revoked_at TEXT)"
+        )
     return conn
 
 
 def test_issue_and_verify_session_round_trip():
     user = {"id": 42, "email": "a@b.com", "name": "Ana", "avatar_url": None}
-    token = auth.issue_session_token(user, secret="s" * 32, ttl_days=30)
+    token = auth.issue_session_token(
+        user, secret="s" * 32, session_id="session-123", ttl_hours=12,
+    )
     decoded = auth.verify_session_token(token, secret="s" * 32)
     assert decoded["sub"] == "42"
-    assert decoded["email"] == "a@b.com"
+    assert decoded["iss"] == auth.SESSION_ISSUER
+    assert decoded["aud"] == auth.SESSION_AUDIENCE
+    assert decoded["jti"] == "session-123"
+    assert "email" not in decoded
 
 
 def test_verify_session_token_rejects_expired():
     user = {"id": 1, "email": "a@b.com", "name": "A", "avatar_url": None}
-    token = auth.issue_session_token(user, secret="s" * 32, ttl_days=-1)
+    token = auth.issue_session_token(
+        user, secret="s" * 32, session_id="expired-session", ttl_hours=-1,
+    )
+    with pytest.raises(auth.AuthError):
+        auth.verify_session_token(token, secret="s" * 32)
+
+
+def test_verify_session_token_rejects_wrong_audience():
+    import jwt
+
+    now = datetime.now(timezone.utc)
+    token = jwt.encode({
+        "sub": "1", "iss": auth.SESSION_ISSUER, "aud": "outro-app",
+        "jti": "j", "iat": now,
+        "exp": now + timedelta(hours=1),
+    }, "s" * 32, algorithm="HS256")
     with pytest.raises(auth.AuthError):
         auth.verify_session_token(token, secret="s" * 32)
 
@@ -140,6 +164,37 @@ def test_upsert_user_is_idempotent_and_tracks_login():
     # Email refresh on re-login: keyed by google_sub, single row.
     row = conn.execute(text("SELECT email, name FROM users WHERE google_sub='g-1'")).one()
     assert row == ("x2@y.com", "X2")
+
+
+def test_individual_sessions_can_be_revoked_without_ending_other_devices():
+    conn = _fresh_conn()
+    login_at = datetime(2026, 9, 25, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    user = users_db.upsert_user(conn, {
+        "google_sub": "g-session", "email": "x@y.com", "name": "X", "avatar_url": None,
+    }, login_at=login_at)
+    expires_at = login_at + timedelta(hours=12)
+    users_db.create_session(
+        conn, user["id"], "browser-a", expires_at, created_at=login_at,
+    )
+    users_db.create_session(
+        conn, user["id"], "browser-b", expires_at, created_at=login_at,
+    )
+    assert users_db.session_is_active(
+        conn, user["id"], "browser-a", now=login_at,
+    )
+    assert users_db.session_is_active(
+        conn, user["id"], "browser-b", now=login_at,
+    )
+
+    users_db.revoke_session(
+        conn, user["id"], "browser-a", revoked_at=login_at + timedelta(seconds=1),
+    )
+    assert not users_db.session_is_active(
+        conn, user["id"], "browser-a", now=login_at + timedelta(seconds=2),
+    )
+    assert users_db.session_is_active(
+        conn, user["id"], "browser-b", now=login_at + timedelta(seconds=2),
+    )
 
 
 def test_sync_merges_localstorage_into_server_rows():
@@ -246,7 +301,28 @@ import pytest
 def client(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
     monkeypatch.setenv("JWT_SECRET", "s" * 32)
+    monkeypatch.setenv("COOKIE_SECURE", "false")
+    monkeypatch.delenv("VERCEL_ENV", raising=False)
+    monkeypatch.delenv("ARREMATE_PREVIEW_ALLOW_WRITES", raising=False)
+    monkeypatch.setattr(
+        vercel_index.users_db_module, "session_is_active", lambda *_args: True,
+    )
+    vercel_index._login_attempts.clear()
     yield TestClient(vercel_index.app)
+
+
+ORIGIN = {"Origin": "http://testserver"}
+GOOGLE_CREDENTIAL = "g" * 200
+
+
+def _set_session_cookie(client, user_id: int, *, session_id: str = "test-session"):
+    token = vercel_index.auth_module.issue_session_token(
+        {"id": user_id},
+        secret="s" * 32,
+        session_id=session_id,
+    )
+    client.cookies.set(vercel_index.auth_module.SESSION_COOKIE_NAME, token)
+    return token
 
 
 def test_auth_google_returns_session(client, monkeypatch):
@@ -259,21 +335,28 @@ def test_auth_google_returns_session(client, monkeypatch):
     )
     monkeypatch.setattr(
         vercel_index.users_db_module, "upsert_user",
-        lambda conn, profile: {
+        lambda conn, profile, login_at: {
             "id": 7, "email": profile["email"], "name": profile.get("name"),
             "avatar_url": profile.get("avatar_url"),
         },
     )
     monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
 
-    res = client.post("/api/auth/google", json={"credential": "tok"})
+    res = client.post(
+        "/api/auth/google", headers=ORIGIN, json={"credential": GOOGLE_CREDENTIAL},
+    )
 
     assert res.status_code == 200
     body = res.json()
     assert body["user"]["email"] == "e@x.com"
-    assert body["token"]
+    assert "token" not in body
+    assert "HttpOnly" in res.headers["set-cookie"]
+    assert "SameSite=lax" in res.headers["set-cookie"]
+    assert res.headers["cache-control"] == "no-store, max-age=0"
+    token = res.cookies.get(vercel_index.auth_module.SESSION_COOKIE_NAME)
+    assert token
     decoded = vercel_index.auth_module.verify_session_token(
-        body["token"], secret="s" * 32,
+        token, secret="s" * 32,
     )
     assert decoded["sub"] == "7"
 
@@ -284,19 +367,88 @@ def test_auth_google_rejects_bad_credential(client, monkeypatch):
     monkeypatch.setattr(vercel_index.auth_module, "verify_google_credential", boom)
     monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
 
-    res = client.post("/api/auth/google", json={"credential": "x"})
+    res = client.post(
+        "/api/auth/google", headers=ORIGIN, json={"credential": GOOGLE_CREDENTIAL},
+    )
     assert res.status_code == 401
 
 
+def test_auth_google_rejects_missing_or_foreign_origin(client):
+    assert client.post(
+        "/api/auth/google", json={"credential": GOOGLE_CREDENTIAL},
+    ).status_code == 403
+    assert client.post(
+        "/api/auth/google",
+        headers={"Origin": "https://evil.example"},
+        json={"credential": GOOGLE_CREDENTIAL},
+    ).status_code == 403
+
+
+def test_auth_google_is_disabled_in_preview(client, monkeypatch):
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    res = client.post(
+        "/api/auth/google", headers=ORIGIN, json={"credential": GOOGLE_CREDENTIAL},
+    )
+    assert res.status_code == 403
+
+
+def test_auth_google_rate_limits_repeated_attempts(client, monkeypatch):
+    def boom(*_args):
+        raise vercel_index.auth_module.AuthError("bad")
+    monkeypatch.setattr(vercel_index.auth_module, "verify_google_credential", boom)
+    for _ in range(vercel_index._LOGIN_ATTEMPT_LIMIT):
+        assert client.post(
+            "/api/auth/google", headers=ORIGIN,
+            json={"credential": GOOGLE_CREDENTIAL},
+        ).status_code == 401
+    blocked = client.post(
+        "/api/auth/google", headers=ORIGIN,
+        json={"credential": GOOGLE_CREDENTIAL},
+    )
+    assert blocked.status_code == 429
+    assert blocked.headers["retry-after"] == str(vercel_index._LOGIN_WINDOW_SECONDS)
+
+
 def test_me_requires_session(client):
+    res = client.get("/api/me")
+    assert res.status_code == 401
+    assert res.headers["cache-control"] == "no-store, max-age=0"
+
+
+def test_bearer_token_is_not_accepted_from_javascript(client):
+    token = vercel_index.auth_module.issue_session_token(
+        {"id": 1}, secret="s" * 32, session_id="bearer-session",
+    )
+    assert client.get(
+        "/api/me", headers={"Authorization": f"Bearer {token}"},
+    ).status_code == 401
+
+
+def test_revoked_session_cookie_is_rejected(client, monkeypatch):
+    _set_session_cookie(client, 1)
+    monkeypatch.setattr(
+        vercel_index.users_db_module, "session_is_active", lambda *_args: False,
+    )
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
     assert client.get("/api/me").status_code == 401
+
+
+def test_foreign_origin_is_not_allowed_by_cors(client):
+    res = client.options(
+        "/api/auth/google",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res.status_code == 400
+    assert "access-control-allow-origin" not in res.headers
 
 
 def test_me_returns_profile_when_authed(client, monkeypatch):
     user = {"id": 11, "email": "a@b.com", "name": "A", "avatar_url": None}
-    token = vercel_index.auth_module.issue_session_token(
-        user, secret="s" * 32, ttl_days=30,
-    )
+    _set_session_cookie(client, user["id"])
     monkeypatch.setattr(
         vercel_index.users_db_module, "get_user", lambda conn, uid: {
             **user,
@@ -315,7 +467,7 @@ def test_me_returns_profile_when_authed(client, monkeypatch):
     )
     monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
 
-    res = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
+    res = client.get("/api/me")
     assert res.status_code == 200
     body = res.json()
     assert body["user"]["email"] == "a@b.com"
@@ -326,12 +478,12 @@ def test_me_returns_profile_when_authed(client, monkeypatch):
 
 def test_update_housing_profile_requires_auth_and_returns_account(client, monkeypatch):
     payload = {"city": " Curitiba ", "property_type": "Apartamento", "budget": "400000"}
-    assert client.put("/api/me/housing-profile", json=payload).status_code == 401
+    assert client.put(
+        "/api/me/housing-profile", headers=ORIGIN, json=payload,
+    ).status_code == 401
 
     user = {"id": 12, "email": "a@b.com", "name": "A", "avatar_url": None}
-    token = vercel_index.auth_module.issue_session_token(
-        user, secret="s" * 32, ttl_days=30,
-    )
+    _set_session_cookie(client, user["id"])
     captured = {}
 
     def save(_conn, user_id, profile):
@@ -343,7 +495,7 @@ def test_update_housing_profile_requires_auth_and_returns_account(client, monkey
 
     res = client.put(
         "/api/me/housing-profile",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=ORIGIN,
         json=payload,
     )
     assert res.status_code == 200
@@ -355,7 +507,7 @@ def test_update_housing_profile_requires_auth_and_returns_account(client, monkey
 
     res = client.put(
         "/api/me/housing-profile",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=ORIGIN,
         json={"city": "São Paulo", "property_type": "Casa", "budget": "above-1000000"},
     )
     assert res.status_code == 200
@@ -364,15 +516,65 @@ def test_update_housing_profile_requires_auth_and_returns_account(client, monkey
 
 def test_update_housing_profile_respects_preview_write_guard(client, monkeypatch):
     user = {"id": 12, "email": "a@b.com", "name": "A", "avatar_url": None}
-    token = vercel_index.auth_module.issue_session_token(
-        user, secret="s" * 32, ttl_days=30,
-    )
+    _set_session_cookie(client, user["id"])
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
     monkeypatch.setenv("VERCEL_ENV", "preview")
-    monkeypatch.delenv("ARREMATE_PREVIEW_ALLOW_WRITES", raising=False)
 
     res = client.put(
         "/api/me/housing-profile",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=ORIGIN,
         json={"city": "Curitiba", "property_type": "Casa", "budget": None},
     )
     assert res.status_code == 403
+
+
+def test_all_account_writes_respect_preview_guard(client, monkeypatch):
+    _set_session_cookie(client, 12)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    res = client.put(
+        "/api/me/saved/123", headers=ORIGIN, json={"saved": True},
+    )
+    assert res.status_code == 403
+
+
+def test_logout_invalidates_server_session_and_expires_cookie(client, monkeypatch):
+    _set_session_cookie(client, 15)
+    captured = {}
+    monkeypatch.setattr(
+        vercel_index.users_db_module,
+        "revoke_session",
+        lambda _conn, user_id, session_id: captured.update(
+            user_id=user_id, session_id=session_id,
+        ),
+    )
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.post("/api/auth/logout", headers=ORIGIN)
+
+    assert res.status_code == 200
+    assert captured == {"user_id": 15, "session_id": "test-session"}
+    assert "Max-Age=0" in res.headers["set-cookie"]
+    assert res.headers["cache-control"] == "no-store, max-age=0"
+
+
+def test_short_jwt_secret_is_rejected(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
+    monkeypatch.setenv("JWT_SECRET", "short")
+    with pytest.raises(Exception) as exc:
+        vercel_index.auth_module.require_settings()
+    assert exc.value.status_code == 503
+
+
+def test_production_cookie_is_secure_and_javascript_inaccessible(monkeypatch):
+    from starlette.responses import Response
+
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.setenv("COOKIE_SECURE", "false")
+    response = Response()
+    vercel_index._set_session_cookie(response, "signed-token")
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie
+    assert "Secure" in cookie
+    assert "SameSite=lax" in cookie
+    assert "Max-Age=43200" in cookie

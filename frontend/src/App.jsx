@@ -4,7 +4,6 @@ import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import AccountPage, { UserMark } from './components/AccountPage';
-import { readHousingProfile, saveHousingProfile } from './housingStorage';
 import { housingProfileForApi, housingProfileFromUser } from './housingProfile';
 import {
   accountDestination,
@@ -13,7 +12,6 @@ import {
   shouldShowHousingOnboarding,
   shouldUseAccountScreen,
 } from './housingEntry';
-import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
@@ -30,18 +28,11 @@ function App() {
   const navigate = useNavigate();
   const {
     user: authUser,
+    authReady,
     isAuthed,
     logout: authLogout,
     updateHousingProfile,
   } = useAuth();
-  // Local email/password account is their prototype layer; the real session is
-  // AuthContext. When a Google login lands, AuthContext's user takes over.
-  const [account, setAccount] = useState(() => {
-    try { return readLocalSession(); } catch { return null; }
-  });
-  const [housingProfile, setHousingProfile] = useState(() => {
-    try { return readHousingProfile(); } catch { return null; }
-  });
   const [watched, setWatched] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
@@ -61,41 +52,26 @@ function App() {
   const afterSetupDestination = postSetupDestination(location.state?.from);
   const preferencesFlow = housingPreferencesFlow(location.search, location.state?.after);
 
-  // Two user sources: Google (authUser) wins over local email/password (account).
-  // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
-  // hits the real backend; the email/password form stays as the local prototype.
-  const effectiveAccount = authUser || account;
-  const effectiveHousingProfile = authUser ? housingProfileFromUser(authUser) : housingProfile;
+  const effectiveAccount = authUser;
+  const effectiveHousingProfile = housingProfileFromUser(authUser);
   const canOpenCatalog = isPreview || Boolean(effectiveAccount);
 
   const saveProfile = useCallback(async (profile) => {
-    if (isAuthed) {
-      const updatedUser = await updateHousingProfile(housingProfileForApi(profile));
-      return housingProfileFromUser(updatedUser);
-    }
-    const saved = saveHousingProfile(profile);
-    setHousingProfile(saved);
-    return saved;
+    if (!isAuthed) throw new Error('Entre com o Google para salvar suas preferências.');
+    const updatedUser = await updateHousingProfile(housingProfileForApi(profile));
+    return housingProfileFromUser(updatedUser);
   }, [isAuthed, updateHousingProfile]);
-  const signUp = useCallback(async (input) => {
-    const user = await createLocalAccount(input);
-    setAccount(user);
-    return user;
-  }, []);
-  const signIn = useCallback(async (input) => {
-    const user = await signInLocal(input);
-    setAccount(user);
-    return user;
-  }, []);
-  const signOut = useCallback(() => {
-    signOutLocal();
-    authLogout();
-    setAccount(null);
-    if (!isPreview) {
-      setProperties([]);
-      setCatalogLoading(true);
+  const signOut = useCallback(async () => {
+    try {
+      await authLogout();
+      if (!isPreview) {
+        setProperties([]);
+        setCatalogLoading(true);
+      }
+      navigate('/entrar');
+    } catch (error) {
+      console.warn('Não foi possível encerrar a sessão:', error);
     }
-    navigate('/entrar');
   }, [navigate, authLogout]);
 
   const accountScreen = shouldUseAccountScreen({
@@ -233,6 +209,13 @@ function App() {
     }
   }, [isAuthed]);
 
+  if (!authReady && !isPreview) {
+    return <main className="auth-session-loading" role="status">
+      <span className="logo" aria-hidden="true" />
+      <p>Verificando seu acesso…</p>
+    </main>;
+  }
+
   return (
     <div className={`app-shell${accountScreen ? ' account-screen' : ''}${isPreview ? ' preview-env' : ''}`}>
       {isPreview && !accountScreen && (
@@ -246,8 +229,6 @@ function App() {
         <Route path="/entrar" element={effectiveAccount
           ? <Navigate to={requestedDestination} replace />
           : <HousingLogin
-              onSignUp={signUp}
-              onSignIn={signIn}
               signedInDestination={requestedDestination}
               afterSetupDestination={afterSetupDestination}
               allowExplore={isPreview}

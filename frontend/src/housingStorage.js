@@ -1,7 +1,7 @@
 import { validateHousingProfile } from './housingProfile.js';
 
-// Browser-only fallback for the local email/password prototype. Google-backed
-// accounts persist this profile through /me/housing-profile instead.
+// Legacy profile-storage adapter retained only to read and test old browser
+// data. Active Google accounts persist this profile through /me/housing-profile.
 export const housingProfileKey = 'argos_housing_profile_v1';
 const housingProfileVersion = 2;
 export function readHousingProfile(storage = window.localStorage) {

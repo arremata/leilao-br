@@ -19,6 +19,22 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
+### PD-018 — Usar somente Google para criar conta e entrar
+
+- **Data:** 25 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** produção oferece somente “Continuar com Google”. O primeiro acesso
+  cria a conta Argos e os seguintes retomam a mesma identidade; não existe senha
+  própria do Argos. Previews mantêm o catálogo público e não iniciam Google.
+- **Motivo:** o protótipo local de e-mail e senha não constituía autenticação e
+  não deveria ser apresentado como uma conta segura. Google permite lançar sem
+  armazenar senha nem construir prematuramente confirmação e recuperação.
+- **Consequências:** credenciais locais antigas são descartadas; cada dispositivo
+  mantém uma sessão independente em cookie HttpOnly por até 12 horas, e sair
+  revoga apenas a sessão atual. Dados de perfil, Salvos e Vistos pertencem à
+  conta Google. Uma futura entrada por e-mail exigirá autenticação completa no
+  servidor antes de voltar ao produto.
+
 ### PD-017 — Manter perfil cadastral separado dos filtros
 
 - **Data:** 25 de setembro de 2026
@@ -30,8 +46,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Motivo:** a entrada precisa levar rapidamente a imóveis relevantes; quartos,
   vagas, prazo de mudança, reserva para extras, pagamento e rotina exigiam dados
   demais antes de a pessoa conhecer o catálogo.
-- **Consequências:** o perfil da conta Google é persistido no banco; o protótipo
-  local de e-mail e senha continua restrito ao navegador. Cidade, bairro, tipo e
+- **Consequências:** o perfil da conta Google é persistido no banco. Cidade, bairro, tipo e
   orçamento são filtros explícitos e instantâneos numa única barra, sem “Suas
   preferências”, aplicar, salvar ou restaurar. Cidade e bairro só aceitam opções
   presentes no catálogo, e bairro depende da cidade; o limite de valor aceita
@@ -246,9 +261,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Motivo:** nome, e-mail e escolhas do cadastro precisam ser fáceis de
   reencontrar sem disputar espaço com a navegação do catálogo nem exigir um
   novo fluxo de configuração.
-- **Consequências:** a interface explica se os dados estão sincronizados ou
-  limitados ao navegador, reaproveita o questionário existente para alterações
-  e não mostra plano, preço ou cobrança enquanto assinaturas não existirem.
+- **Consequências:** a interface informa que os dados estão sincronizados pela
+  conta Google, reaproveita o questionário existente para alterações e não mostra
+  plano, preço ou cobrança enquanto assinaturas não existirem.
 
 ### PD-016 — Exigir conta antes de acessar a plataforma
 
@@ -262,9 +277,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   entrada incompatíveis.
 - **Consequências:** buscas e links diretos levam visitantes à entrada e são
   retomados depois do acesso; contas novas concluem as preferências antes de
-  seguir. O formulário de e-mail e senha permanece local ao navegador e não deve
-  ser tratado como autorização de backend. A exceção do preview não altera a
-  regra de entrada da produção nem cria autorização de escrita.
+  seguir. A única identidade aceita é a conta Google. A exceção do preview não
+  altera a regra de entrada da produção nem cria autorização de escrita.
 
 ## Decisões ativas de operação do produto
 

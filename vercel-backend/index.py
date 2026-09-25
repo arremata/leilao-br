@@ -10,15 +10,19 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import unicodedata
-from datetime import datetime, timezone
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
 from itertools import combinations
 from math import asin, cos, radians, sin, sqrt
 from statistics import median
+from threading import Lock
 from typing import Optional
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -69,6 +73,24 @@ _engine = None
 app = FastAPI(title="Arremate Demo API")
 
 
+def _configured_allowed_origins() -> list[str]:
+    origins = {
+        "https://www.argosleiloes.com.br",
+        "https://argosleiloes.com.br",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    origins.update(
+        origin.strip().rstrip("/")
+        for origin in os.environ.get("AUTH_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    )
+    for key in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+        if value := os.environ.get(key):
+            origins.add(f"https://{value.strip().rstrip('/')}")
+    return sorted(origins)
+
+
 class ApiPrefixMiddleware:
     """Accept the public `/api` prefix used by the Vercel service router."""
 
@@ -86,10 +108,23 @@ class ApiPrefixMiddleware:
 app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_configured_allowed_origins(),
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    path = request.url.path
+    if path.startswith(("/auth/", "/me", "/api/auth/", "/api/me")):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 class AnalyzeRequest(BaseModel):
@@ -98,12 +133,12 @@ class AnalyzeRequest(BaseModel):
 
 
 class GoogleLoginRequest(BaseModel):
-    credential: str
+    credential: str = Field(min_length=100, max_length=8192)
 
 
 class SyncRequest(BaseModel):
-    watched: list[int] = []
-    history: list[dict] = []
+    watched: list[int] = Field(default_factory=list, max_length=500)
+    history: list[dict] = Field(default_factory=list, max_length=100)
 
 
 class HousingProfileRequest(BaseModel):
@@ -117,24 +152,95 @@ class SavedToggleRequest(BaseModel):
 
 
 class ViewedRequest(BaseModel):
-    property_id: int
+    property_id: int = Field(gt=0)
     snapshot: dict
 
 
-async def _current_user(authorization: str | None = Header(default=None)) -> dict:
-    _, secret = auth_module.require_settings()
-    if not authorization or not authorization.startswith("Bearer "):
+_LOGIN_WINDOW_SECONDS = 60
+_LOGIN_ATTEMPT_LIMIT = 10
+_login_attempts: dict[str, deque[float]] = defaultdict(deque)
+_login_attempts_lock = Lock()
+
+
+def _require_trusted_origin(request: Request) -> None:
+    origin = (request.headers.get("origin") or "").strip().rstrip("/")
+    if not origin:
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+    parsed = urlsplit(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    scheme = forwarded_proto if forwarded_proto in {"http", "https"} else request.url.scheme
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    host = forwarded_host or request.headers.get("host", "")
+    request_origin = f"{scheme}://{host}".rstrip("/")
+    if origin != request_origin and origin not in _configured_allowed_origins():
+        raise HTTPException(status_code=403, detail="Origem da solicitação não permitida")
+
+
+def _enforce_login_rate_limit(request: Request) -> None:
+    real_ip = request.headers.get("x-real-ip", "").strip()
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    client_key = real_ip or forwarded or (request.client.host if request.client else "unknown")
+    now = time.monotonic()
+    with _login_attempts_lock:
+        attempts = _login_attempts[client_key]
+        while attempts and attempts[0] <= now - _LOGIN_WINDOW_SECONDS:
+            attempts.popleft()
+        if len(attempts) >= _LOGIN_ATTEMPT_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail="Muitas tentativas. Aguarde um minuto e tente novamente.",
+                headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+            )
+        attempts.append(now)
+
+
+def _require_persistent_writes() -> None:
+    if not _should_persist_changes():
+        raise HTTPException(status_code=403, detail="Alterações estão desativadas neste preview")
+
+
+def _secure_cookie() -> bool:
+    if os.environ.get("VERCEL_ENV", "").casefold() in {"preview", "production"}:
+        return True
+    if os.environ.get("COOKIE_SECURE", "").casefold() in {"0", "false", "no"}:
+        return False
+    return False
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=auth_module.SESSION_COOKIE_NAME,
+        value=token,
+        max_age=auth_module.SESSION_TTL_HOURS * 60 * 60,
+        httponly=True,
+        secure=_secure_cookie(),
+        samesite="lax",
+        path="/",
+    )
+
+
+async def _current_user(request: Request) -> dict:
+    token = request.cookies.get(auth_module.SESSION_COOKIE_NAME)
+    if not token:
         raise HTTPException(status_code=401, detail="Entre para continuar")
-    token = authorization.removeprefix("Bearer ").strip()
+    _, secret = auth_module.require_settings()
     try:
         payload = auth_module.verify_session_token(token, secret=secret)
     except AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+    try:
+        user_id = int(payload["sub"])
+        session_id = str(payload["jti"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Sessão inválida. Entre de novo.") from exc
+    with _get_engine().connect() as conn:
+        if not users_db_module.session_is_active(conn, user_id, session_id):
+            raise HTTPException(status_code=401, detail="Sua sessão foi encerrada. Entre de novo.")
     return {
-        "id": int(payload["sub"]),
-        "email": payload.get("email"),
-        "name": payload.get("name"),
-        "avatar_url": payload.get("avatar_url"),
+        "id": user_id,
+        "session_id": session_id,
     }
 
 
@@ -142,17 +248,62 @@ CurrentUser = Depends(_current_user)
 
 
 @app.post("/auth/google")
-def auth_google(body: GoogleLoginRequest):
+def auth_google(
+    body: GoogleLoginRequest,
+    response: Response,
+    request: Request,
+    _origin: None = Depends(_require_trusted_origin),
+    _rate_limit: None = Depends(_enforce_login_rate_limit),
+):
+    if _is_preview():
+        raise HTTPException(status_code=403, detail="Login Google disponível somente no ambiente oficial")
     client_id, secret = auth_module.require_settings()
     try:
         payload = auth_module.verify_google_credential(body.credential, client_id)
     except AuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     profile = auth_module.user_from_google_payload(payload)
+    login_at = datetime.now(timezone.utc)
+    expires_at = login_at + timedelta(hours=auth_module.SESSION_TTL_HOURS)
+    session_id = auth_module.new_session_id()
     with _get_engine().begin() as conn:
-        user = users_db_module.upsert_user(conn, profile)
-    token = auth_module.issue_session_token(user, secret=secret)
-    return {"token": token, "user": user}
+        user = users_db_module.upsert_user(conn, profile, login_at=login_at)
+        users_db_module.create_session(
+            conn,
+            user["id"],
+            session_id,
+            expires_at,
+            created_at=login_at,
+        )
+    token = auth_module.issue_session_token(
+        user,
+        secret=secret,
+        session_id=session_id,
+        issued_at=login_at,
+        expires_at=expires_at,
+    )
+    _set_session_cookie(response, token)
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return {"user": user}
+
+
+@app.post("/auth/logout")
+def auth_logout(
+    response: Response,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+):
+    with _get_engine().begin() as conn:
+        users_db_module.revoke_session(conn, user["id"], user["session_id"])
+    response.delete_cookie(
+        key=auth_module.SESSION_COOKIE_NAME,
+        path="/",
+        secure=_secure_cookie(),
+        httponly=True,
+        samesite="lax",
+    )
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return {"ok": True}
 
 
 @app.get("/me")
@@ -165,7 +316,14 @@ def me(user: dict = CurrentUser):
 
 
 @app.post("/me/sync")
-def sync(body: SyncRequest, user: dict = CurrentUser):
+def sync(
+    body: SyncRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if len(json.dumps(body.history, ensure_ascii=False)) > 256_000:
+        raise HTTPException(status_code=413, detail="Histórico muito grande")
     with _get_engine().begin() as conn:
         users_db_module.sync_saved(conn, user["id"], body.watched)
         users_db_module.sync_viewed(conn, user["id"], body.history)
@@ -173,7 +331,12 @@ def sync(body: SyncRequest, user: dict = CurrentUser):
 
 
 @app.put("/me/housing-profile")
-def update_housing_profile(body: HousingProfileRequest, user: dict = CurrentUser):
+def update_housing_profile(
+    body: HousingProfileRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
     profile = body.model_dump()
     profile["city"] = profile["city"].strip()
     if profile["property_type"] not in {"Todos", "Casa", "Apartamento"}:
@@ -182,22 +345,35 @@ def update_housing_profile(body: HousingProfileRequest, user: dict = CurrentUser
         None, "150000", "250000", "400000", "600000", "1000000", "above-1000000",
     }:
         raise HTTPException(status_code=422, detail="Faixa de preço inválida")
-    if not _should_persist_changes():
-        raise HTTPException(status_code=403, detail="Alterações estão desativadas neste preview")
     with _get_engine().begin() as conn:
         account = users_db_module.set_housing_profile(conn, user["id"], profile)
     return {"user": account}
 
 
 @app.put("/me/saved/{property_id}")
-def set_saved_route(property_id: int, body: SavedToggleRequest, user: dict = CurrentUser):
+def set_saved_route(
+    property_id: int,
+    body: SavedToggleRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if property_id <= 0:
+        raise HTTPException(status_code=422, detail="Imóvel inválido")
     with _get_engine().begin() as conn:
         users_db_module.set_saved(conn, user["id"], property_id, body.saved)
     return {"ok": True}
 
 
 @app.post("/me/viewed")
-def record_viewed(body: ViewedRequest, user: dict = CurrentUser):
+def record_viewed(
+    body: ViewedRequest,
+    user: dict = CurrentUser,
+    _origin: None = Depends(_require_trusted_origin),
+    _writes: None = Depends(_require_persistent_writes),
+):
+    if len(json.dumps(body.snapshot, ensure_ascii=False)) > 64_000:
+        raise HTTPException(status_code=413, detail="Dados do imóvel muito grandes")
     with _get_engine().begin() as conn:
         users_db_module.sync_viewed(
             conn, user["id"], [{"id": body.property_id, "snapshot": body.snapshot}],

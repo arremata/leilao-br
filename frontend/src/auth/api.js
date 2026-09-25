@@ -1,50 +1,7 @@
 /**
- * Auth-scoped API helpers. Every request goes through `/api/...`; the session JWT is
- * attached via Authorization when present. localStorage keys:
- *   argos_token — the JWT returned by /auth/google
- *   argos_user  — cached profile for fast first paint; /me is the source of truth
+ * Auth-scoped API helpers. The server owns the session in an HttpOnly cookie;
+ * JavaScript never reads, stores or forwards the credential itself.
  */
-
-const TOKEN_KEY = 'argos_token';
-const USER_KEY = 'argos_user';
-
-export function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) || null; } catch { return null; }
-}
-
-export function getCachedUser() {
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-export function getValidToken() {
-  const t = getToken();
-  if (!t) return null;
-  try {
-    const [, payload] = t.split('.');
-    const { exp } = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    if (exp && exp * 1000 < Date.now()) { clearSession(); return null; }
-    return t;
-  } catch { clearSession(); return null; }
-}
-
-export function saveSession({ token, user }) {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch { /* storage full — keep session in memory */ }
-}
-
-export function clearSession() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('arremate_watched');
-    localStorage.removeItem('arremate_history');
-  } catch { /* ignore */ }
-}
 
 export class AuthError extends Error {
   constructor(message, status) {
@@ -53,19 +10,19 @@ export class AuthError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+async function request(path, {
+  method = 'GET', body, session = true, notifyUnauthorized = true,
+} = {}) {
   const res = await fetch(`/api${path}`, {
     method,
-    headers,
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.status === 401) {
-    window.dispatchEvent(new Event('argos:session-expired'));
+    if (session && notifyUnauthorized) {
+      window.dispatchEvent(new Event('argos:session-expired'));
+    }
     throw new AuthError(await _detail(res) || 'Sua sessão expirou. Entre de novo.', 401);
   }
   if (!res.ok) throw new Error(await _detail(res) || `Erro ${res.status}`);
@@ -81,8 +38,10 @@ async function _detail(res) {
 
 export const authApi = {
   loginWithGoogle: (credential) =>
-    request('/auth/google', { method: 'POST', body: { credential }, auth: false }),
-  me: () => request('/me'),
+    request('/auth/google', { method: 'POST', body: { credential }, session: false }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  me: ({ notifyUnauthorized = true } = {}) =>
+    request('/me', { notifyUnauthorized }),
   sync: ({ watched, history }) =>
     request('/me/sync', { method: 'POST', body: { watched, history } }),
   updateHousingProfile: (profile) =>

@@ -67,6 +67,16 @@
 .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line-1)}
 .auth-google{display:flex;justify-content:center;margin-bottom:16px}
 .auth-google iframe{margin:0 auto}
+.auth-card-google-only{max-width:390px;text-align:center}
+.auth-card-google-only>.housing-eyebrow{display:block}
+.auth-card-google-only>.housing-muted{max-width:340px;margin:8px auto 0}
+.auth-google-primary{display:grid;justify-items:center;min-height:70px;margin:28px 0 10px}
+.auth-google-primary .auth-google{margin:0}
+.auth-google-primary>p{margin:10px 0 0}
+.auth-preview-login-note{margin:26px 0 12px;padding:15px;border:1px solid #d9cafa;border-radius:12px;background:var(--accent-soft);color:var(--accent-strong);font-size:11px;line-height:1.65}
+.auth-security-note{margin:14px auto 0;color:var(--fg-2);font-size:10px;line-height:1.6}
+.auth-session-loading{display:grid;min-height:100dvh;place-content:center;justify-items:center;gap:14px;background:radial-gradient(circle at 50% 40%,rgba(124,58,237,.1),transparent 28%),#fff;color:var(--fg-2);font-size:12px}
+.auth-session-loading .logo{width:32px;height:32px}
 
 /* Focused, answer-first housing setup. */
 .housing-onboarding{display:block;width:100%;height:100dvh;min-height:560px;margin:0;overflow:hidden;background:radial-gradient(circle at 50% 0,rgba(124,58,237,.08),transparent 35%),#fff}
