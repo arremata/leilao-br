@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Countdown, Photo, Specs } from './shared';
+import { Countdown, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
@@ -731,16 +731,14 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               border: '2px solid var(--accent)',
               position: 'relative',
               cursor: 'pointer',
+              background: '#ECEEF1',
+              backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
             }}>
-              {p.photoUrl ? (
-                <img src={p.photoUrl} alt="Fachada" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{
-                  width: '100%', height: '100%',
-                  background: '#ECEEF1',
-                  backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
-                }} />
-              )}
+              <PropertyImage
+                src={p.photoUrl}
+                alt="Fachada"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
               <span className="mono" style={{
                 position: 'absolute', bottom: 4, left: 4,
                 fontSize: 9, color: 'var(--fg-2)',

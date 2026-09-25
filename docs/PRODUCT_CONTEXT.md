@@ -112,7 +112,9 @@ no HTML do servidor, o que ainda não é feito.
   garante custo final nem aprovação de financiamento.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
-- Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.
+- Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis. Se
+  uma foto externa estiver temporariamente indisponível, a interface mantém uma
+  área neutra identificada em vez de mostrar o ícone de imagem quebrada.
 - A ordenação padrão é relevância: data mais próxima primeiro, depois quanto do
   imóvel realmente conhecemos. Desconto continua disponível, mas não é o padrão.
 - Diferenças de preço aparecem em reais, não em porcentagem.
@@ -125,7 +127,8 @@ Quatro áreas numeradas e um guia lateral:
    que ela pode ajustar, a conta aberta item por item, o total até a chave e o
    custo mensal de morar em bloco separado.
 2. **Preço na região:** comparação com a avaliação oficial e com imóveis
-   parecidos, os anúncios usados, e quanta evidência sustenta a estimativa.
+   parecidos, os anúncios usados, quanta evidência sustenta a estimativa e a
+   localização no mapa.
 3. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,
    preços, pagamento e responsabilidades quando publicados.
 4. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega

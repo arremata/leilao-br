@@ -214,6 +214,11 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-25** — Restaurou o mapa na página do imóvel ao autorizar somente o
+  embed do Google Maps na política de segurança. Fotos externas indisponíveis
+  recebem uma nova tentativa de carregamento e deixam de exibir o ícone quebrado
+  na capa, miniatura e lista quando a origem continua sem responder.
+
 - **2026-09-25** — Corrigiu a gravação do perfil de moradia que podia prender uma conta nova na última etapa com erro `422`. A API normaliza representações equivalentes já usadas por clientes Argos sem relaxar cidade e orçamento obrigatórios, e o questionário agora preserva as escolhas e apresenta a orientação específica devolvida pelo servidor.
 
 - **2026-09-25** — Tornou o perfil inicial realmente obrigatório depois do primeiro login: links e buscas não pulam mais cidade, tipo e orçamento, e não há saída para o catálogo antes de salvar as três escolhas. O questionário agora cabe no viewport sem rolagem própria ou da página, inclusive com o autocomplete aberto e em telas móveis; o rótulo “COMPRAR PARA MORAR” também saiu do catálogo.
