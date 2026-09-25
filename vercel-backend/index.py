@@ -142,9 +142,9 @@ class SyncRequest(BaseModel):
 
 
 class HousingProfileRequest(BaseModel):
-    city: str = Field(default="", max_length=300)
-    property_type: str = "Todos"
-    budget: str | None = None
+    city: str = Field(min_length=1, max_length=300)
+    property_type: str
+    budget: str = Field(min_length=1, max_length=32)
 
 
 class SavedToggleRequest(BaseModel):
@@ -339,10 +339,12 @@ def update_housing_profile(
 ):
     profile = body.model_dump()
     profile["city"] = profile["city"].strip()
+    if not profile["city"]:
+        raise HTTPException(status_code=422, detail="Cidade obrigatória")
     if profile["property_type"] not in {"Todos", "Casa", "Apartamento"}:
         raise HTTPException(status_code=422, detail="Tipo de imóvel inválido")
     if profile["budget"] not in {
-        None, "150000", "250000", "400000", "600000", "1000000", "above-1000000",
+        "150000", "250000", "400000", "600000", "1000000", "above-1000000",
     }:
         raise HTTPException(status_code=422, detail="Faixa de preço inválida")
     with _get_engine().begin() as conn:
