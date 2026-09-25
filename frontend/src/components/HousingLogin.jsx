@@ -9,6 +9,7 @@ export default function HousingLogin({
   initialMode = 'signup',
   signedInDestination = '/',
   afterSetupDestination = '/',
+  allowExplore = false,
 }) {
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', acceptedTerms: false });
@@ -41,10 +42,11 @@ export default function HousingLogin({
         try {
           setBusy(true);
           setError('');
-          await loginWithGoogle(credential);
+          const signedInUser = await loginWithGoogle(credential);
+          const needsSetup = creating || !signedInUser.housing_profile;
           navigate(
-            creating ? '/preferencias?origem=cadastro' : signedInDestination,
-            creating ? { replace: true, state: { after: afterSetupDestination } } : { replace: true },
+            needsSetup ? '/preferencias?origem=cadastro' : signedInDestination,
+            needsSetup ? { replace: true, state: { after: afterSetupDestination } } : { replace: true },
           );
         } catch (err) {
           setError(err.message || 'Não foi possível entrar com o Google. Tente de novo.');
@@ -90,14 +92,14 @@ export default function HousingLogin({
     <section className="auth-story">
       <Link className="auth-brand" to="/entrar"><span className="logo" />Argos</Link>
       <div><span className="housing-eyebrow">UM CAMINHO MAIS CLARO ATÉ SEU LAR</span><h1>Encontre uma oportunidade que caiba na sua vida.</h1><p>Organize sua busca, compare imóveis e entenda os custos antes de decidir.</p></div>
-      <ul><li><b>01</b> Preferências de moradia em um só lugar</li><li><b>02</b> Imóveis de acordo com seu orçamento</li><li><b>03</b> Próximos passos depois da arrematação</li></ul>
+      <ul><li><b>01</b> Seu perfil de moradia salvo</li><li><b>02</b> Filtros de busca sob seu controle</li><li><b>03</b> Próximos passos depois da arrematação</li></ul>
     </section>
     <section className="auth-panel" aria-labelledby="auth-title">
       <div className="auth-card">
         <div className="auth-tabs" aria-label="Acesso à conta"><button type="button" aria-pressed={creating} onClick={() => changeMode('signup')}>Criar conta</button><button type="button" aria-pressed={!creating} onClick={() => changeMode('signin')}>Entrar</button></div>
         <span className="housing-eyebrow">{creating ? 'COMECE SUA BUSCA' : 'BEM-VINDO DE VOLTA'}</span>
         <h2 id="auth-title">{creating ? 'Crie sua conta' : 'Acesse sua conta'}</h2>
-        <p className="housing-muted">{creating ? 'Depois, vamos entender onde e como você quer morar.' : 'Continue sua busca e reveja suas preferências.'}</p>
+        <p className="housing-muted">{creating ? 'Depois, vamos entender onde e como você quer morar.' : 'Continue sua busca e reveja seus imóveis.'}</p>
         <form onSubmit={submit}>
           <div className="housing-fields">
             {creating && <label className="housing-field"><span>Nome completo</span><input type="text" value={form.name} onChange={event => update('name', event.target.value)} required minLength={3} maxLength={120} autoComplete="name" placeholder="Como podemos chamar você?" /></label>}
@@ -112,7 +114,9 @@ export default function HousingLogin({
         <div className="auth-divider">ou</div>
         <div className="auth-google" ref={googleButtonRef} aria-label={creating ? 'Criar conta com Google' : 'Entrar com Google'} />
         <p className="auth-switch">{creating ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'} <button type="button" onClick={() => changeMode(creating ? 'signin' : 'signup')}>{creating ? 'Entrar' : 'Criar conta'}</button></p>
-        <p className="auth-required-note">Crie sua conta ou entre para acessar o catálogo e manter suas escolhas organizadas.</p>
+        {allowExplore
+          ? <Link className="auth-explore" to="/?busca=todos">Explorar imóveis antes de criar a conta</Link>
+          : <p className="auth-required-note">Crie sua conta ou entre para acessar o catálogo e manter suas escolhas organizadas.</p>}
       </div>
     </section>
   </main>;

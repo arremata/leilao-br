@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 24 de setembro de 2026.
+Última atualização: 25 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -19,23 +19,27 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
-### PD-014 — Perguntar somente o que organiza a primeira busca
+### PD-017 — Manter perfil cadastral separado dos filtros
 
-- **Data:** 22 de setembro de 2026
+- **Data:** 25 de setembro de 2026
 - **Estado:** Ativa
 - **Decisão:** o questionário inicial pede somente cidade, tipo de imóvel e faixa
-  de preço, com escolhas grandes em vez de formulários extensos. A lista única de
-  todos os imóveis abre com essas preferências aplicadas e permite retirar cada
-  filtro ou limpar todos.
+  de preço, com escolhas grandes em vez de formulários extensos. Essas respostas
+  pertencem ao perfil cadastral e nunca são aplicadas automaticamente ao catálogo;
+  cada busca começa sem elas e muda apenas pelos filtros escolhidos na lista.
 - **Motivo:** a entrada precisa levar rapidamente a imóveis relevantes; quartos,
   vagas, prazo de mudança, reserva para extras, pagamento e rotina exigiam dados
   demais antes de a pessoa conhecer o catálogo.
-- **Consequências:** bairro continua como ajuste opcional na lista. A faixa de
-  preço limita apenas o valor inicial do imóvel e nunca representa o custo total;
-  taxas, reforma, eventual desocupação e condições de pagamento ficam no detalhe.
-  O perfil salvo permanece disponível para restaurar depois de explorar sem os
-  filtros. Preferências e filtros do catálogo compartilham uma única barra
-  lateral, sem controles duplicados sobre a lista.
+- **Consequências:** o perfil da conta Google é persistido no banco; o protótipo
+  local de e-mail e senha continua restrito ao navegador. Cidade, bairro, tipo e
+  orçamento são filtros explícitos e instantâneos numa única barra, sem “Suas
+  preferências”, aplicar, salvar ou restaurar. Cidade e bairro só aceitam opções
+  presentes no catálogo, e bairro depende da cidade; o limite de valor aceita
+  entrada monetária livre e, depois de alterado, fica lembrado neste navegador
+  até ser limpo. Essa memória é uma escolha explícita do filtro e não reutiliza o
+  orçamento cadastral do questionário. A busca ampla por texto deixa de duplicar
+  esses filtros. O limite considera somente o valor inicial, nunca o custo total.
+  Controles específicos de leilão aparecem apenas quando se aplicam ao tipo de venda.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 
@@ -251,16 +255,16 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Data:** 24 de setembro de 2026
 - **Estado:** Ativa
 - **Decisão:** catálogo, páginas de imóveis, Salvos, Vistos e central de conta
-  só podem ser abertos depois de Criar conta ou Entrar. A mesma regra vale nos
-  previews de branch.
+  só podem ser abertos em produção depois de Criar conta ou Entrar. Previews de
+  branch mantêm o catálogo público para validação.
 - **Motivo:** a experiência passa a começar pela identidade da pessoa e pelas
   preferências que organizam sua busca, em vez de oferecer dois caminhos de
   entrada incompatíveis.
 - **Consequências:** buscas e links diretos levam visitantes à entrada e são
   retomados depois do acesso; contas novas concluem as preferências antes de
-  seguir. A URL do preview continua pública, mas o catálogo não aparece sem uma
-  conta. O formulário de e-mail e senha permanece local ao navegador e não deve
-  ser tratado como autorização de backend.
+  seguir. O formulário de e-mail e senha permanece local ao navegador e não deve
+  ser tratado como autorização de backend. A exceção do preview não altera a
+  regra de entrada da produção nem cria autorização de escrita.
 
 ## Decisões ativas de operação do produto
 

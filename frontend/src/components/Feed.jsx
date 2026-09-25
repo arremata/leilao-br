@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
+import { catalogSaleDetailVisibility } from '../catalogFilters';
 import { getEndsAtMs } from '../utils';
 
 const normalizeLocation = (value) => String(value || '')
@@ -15,12 +16,10 @@ const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
 // leigo, então são abas e não um filtro escondido.
 const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA DIRETA');
 
-// A busca mora na URL, e não em estado local: é isso que faz voltar de um
-// imóvel devolver a mesma lista, e faz uma busca ser compartilhável. Só o que
-// difere do padrão aparece no endereço, para não virar uma parede de
-// parâmetros.
+// Os filtros moram na URL: é isso que faz voltar de um imóvel devolver a mesma
+// lista. Só o que difere do padrão aparece no endereço.
 const DEFAULTS = {
-  aba: 'leiloes', q: '', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+  aba: 'leiloes', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
   rodada: 'Todos', modalidade: 'Todos', desconto: '0',
   ordem: 'relevance', vis: 'grid', pagina: '1', encerrados: '0',
 };
@@ -29,7 +28,6 @@ function readParams(searchParams) {
   const get = (key) => searchParams.get(key) ?? DEFAULTS[key];
   return {
     kind: get('aba') === 'direta' ? 'direct' : 'auction',
-    addressQuery: get('q'),
     filters: {
       state: get('estado'),
       city: get('cidade'),
@@ -47,6 +45,7 @@ function readParams(searchParams) {
 
 function patchSearchParams(current, patch) {
   const next = new URLSearchParams(current);
+  next.delete('q');
   Object.entries(patch).forEach(([key, value]) => {
     const asText = value == null ? '' : String(value);
     if (asText === '' || asText === DEFAULTS[key]) next.delete(key);
@@ -56,7 +55,15 @@ function patchSearchParams(current, patch) {
   return next;
 }
 
-export function CatalogSidebarFilters({ properties, hideHousingDuplicates = false, onCollapse }) {
+export function CatalogSidebarFilters({
+  properties,
+  hideHousingDuplicates = false,
+  onCollapse,
+  onClearAdditionalFilters,
+  additionalFilters = null,
+  additionalFilterCount = 0,
+  additionalClearPatch = {},
+}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, filters } = readParams(searchParams);
   const setParams = useCallback((patch) => {
@@ -109,6 +116,10 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
         .sort((a, b) => a.localeCompare(b, 'pt-BR')),
     ];
   }, [byKind, filters.modalidade]);
+  const saleDetailVisibility = catalogSaleDetailVisibility(kind, pracaOptions, modalityOptions);
+  const showDetailSection = hideHousingDuplicates
+    ? saleDetailVisibility.showGroup
+    : propertyTypeOptions.length > 2 || saleDetailVisibility.showGroup;
   const visibleFilterCount =
     (filters.discountMin > 0 ? 1 : 0)
     + (filters.state !== 'Todos' ? 1 : 0)
@@ -116,7 +127,8 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
     + (filters.modalidade !== 'Todos' ? 1 : 0)
     + (filters.showExpired ? 1 : 0)
     + (!hideHousingDuplicates && filters.city !== 'Todas' ? 1 : 0)
-    + (!hideHousingDuplicates && filters.propertyType !== 'Todos' ? 1 : 0);
+    + (!hideHousingDuplicates && filters.propertyType !== 'Todos' ? 1 : 0)
+    + additionalFilterCount;
 
   function setKind(value) {
     setParams({
@@ -127,15 +139,17 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
   }
 
   function clearVisibleFilters() {
+    onClearAdditionalFilters?.();
     const cleared = {
       estado: 'Todos', rodada: 'Todos', modalidade: 'Todos',
       desconto: '0', encerrados: '0',
+      ...additionalClearPatch,
     };
     if (!hideHousingDuplicates) Object.assign(cleared, { cidade: 'Todas', tipo: 'Todos' });
     setParams(cleared);
   }
 
-  return <div className="feed-rail-inner">
+  return <div className={`feed-rail-inner${hideHousingDuplicates ? ' feed-rail-inner--compact' : ''}`}>
     <div className="feed-rail-head">
       <span className="uppy" style={{ color: 'var(--fg-3)' }}>Tipo de venda</span>
       {onCollapse && <button
@@ -151,36 +165,43 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       <button
         role="tab"
         aria-selected={kind === 'auction'}
+        aria-label={hideHousingDuplicates ? 'Leilões: têm disputa e data' : undefined}
+        title="Leilões têm disputa e uma data para terminar."
         className={kind === 'auction' ? 'active' : ''}
         onClick={() => setKind('auction')}
       >
-        <div><strong>Leilões</strong><small>tem disputa e data</small></div>
+        <div><strong>Leilões</strong>{!hideHousingDuplicates && <small>tem disputa e data</small>}</div>
       </button>
       <button
         role="tab"
         aria-selected={kind === 'direct'}
+        aria-label={hideHousingDuplicates ? 'Compra direta: sem disputa, quem fechar primeiro leva' : undefined}
+        title="Compra direta não tem disputa: quem concluir primeiro fica com o imóvel."
         className={kind === 'direct' ? 'active' : ''}
         onClick={() => setKind('direct')}
         disabled={directCount === 0}
       >
         <div>
           <strong>Compra direta</strong>
-          <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>
+          {!hideHousingDuplicates && <small>{directCount === 0 ? 'nenhum disponível agora' : 'sem disputa, quem fecha primeiro leva'}</small>}
         </div>
       </button>
     </div>
 
+    {additionalFilters}
+
     {stateOptions.length > 2 && <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Estado</span>
+      {!hideHousingDuplicates && <span className="uppy feed-rail-section-title">Estado</span>}
       <div className="feed-rail-stack">
         <Filter label="Estado" value={filters.state}
+          field={hideHousingDuplicates}
           options={stateOptions}
           onChange={(value) => setFilters({ ...filters, state: value, city: 'Todas' })} />
       </div>
     </div>}
 
     {!hideHousingDuplicates && <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Localização</span>
+      <span className="uppy feed-rail-section-title">Localização</span>
       <div className="feed-rail-stack">
         <Filter label="Cidade" value={filters.city}
           options={cityOptions}
@@ -188,41 +209,45 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       </div>
     </div>}
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>Disponibilidade</span>
+    <div className="feed-rail-section feed-rail-section--availability">
+      <span className="uppy feed-rail-section-title">Disponibilidade</span>
       <FilterSwitch
         checked={filters.showExpired}
         onChange={(value) => setFilters({ ...filters, showExpired: value })}
-        label="Mostrar imóveis encerrados"
-        helper="Incluir imóveis cuja janela de compra já fechou"
+        label={hideHousingDuplicates ? 'Incluir encerrados' : 'Mostrar imóveis encerrados'}
+        helper={hideHousingDuplicates ? null : 'Incluir imóveis cuja janela de compra já fechou'}
+        title="Inclui imóveis cuja janela de compra já terminou."
       />
     </div>
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 10 }}>
-        {hideHousingDuplicates ? 'Detalhes da venda' : 'Tipo de imóvel'}
-      </span>
+    {showDetailSection && <div className="feed-rail-section feed-rail-section--details">
+      {!hideHousingDuplicates && <span className="uppy feed-rail-section-title">Tipo de imóvel</span>}
       <div className="feed-rail-stack">
         {!hideHousingDuplicates && propertyTypeOptions.length > 2 && <Filter
           label="Tipo" value={filters.propertyType}
           options={propertyTypeOptions}
           onChange={(value) => setFilters({ ...filters, propertyType: value })}
         />}
-        {pracaOptions.length > 1 && <Filter label="Rodada" value={filters.praca}
+        {saleDetailVisibility.showPraca && <Filter label="Rodada" value={filters.praca}
+          field={hideHousingDuplicates}
           options={pracaOptions}
           onChange={(value) => setFilters({ ...filters, praca: value })} />}
-        {modalityOptions.length > 2 && <Filter label="Modalidade" value={filters.modalidade}
+        {saleDetailVisibility.showModalidade && <Filter label="Modalidade" value={filters.modalidade}
+          field={hideHousingDuplicates}
           options={modalityOptions}
           onChange={(value) => setFilters({ ...filters, modalidade: value, praca: 'Todos' })} />}
       </div>
-    </div>
+    </div>}
 
-    <div className="feed-rail-section">
-      <span className="uppy" style={{ color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
-        Abaixo da avaliação
+    <div className="feed-rail-section feed-rail-section--discount">
+      <span className="uppy feed-rail-section-title">
+        {hideHousingDuplicates ? 'Desconto mínimo' : 'Abaixo da avaliação'}
       </span>
       <div className="feed-rail-slider">
-        <div className="feed-rail-slider-row"><strong className="mono">{filters.discountMin}%</strong></div>
+        <div className="feed-rail-slider-row">
+          {hideHousingDuplicates && <span>Abaixo da avaliação</span>}
+          <strong className="mono">{filters.discountMin}%</strong>
+        </div>
         <input
           type="range" min="0" max="60" step="1"
           value={filters.discountMin}
@@ -239,13 +264,13 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       className="btn ghost sm feed-rail-clear"
       onClick={clearVisibleFilters}
       style={{ color: 'var(--accent)' }}
-    >Limpar filtros do catálogo ({visibleFilterCount})</button>}
+    >Limpar filtros ({visibleFilterCount})</button>}
   </div>;
 }
 
 export default function Feed({ watched, toggleWatch, properties, loading = false, embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { kind, addressQuery, filters, sort, view, page } = readParams(searchParams);
+  const { kind, filters, sort, view, page } = readParams(searchParams);
   const [sortNow, setSortNow] = useState(() => Date.now());
   // Mobile: railOpen controla se o rail aparece ou não E ("drawer" aberto/fechado).
   // Desktop: rail também começa aberto. O clique no « fecha, e o botão ⚙ na
@@ -253,13 +278,11 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const [railOpen, setRailOpen] = useState(() => !embedded);
   const PAGE_SIZE = 12;
 
-  // `replace` para o que a pessoa ajusta em rajada (texto e paginação): cada
-  // tecla não deve virar uma entrada no histórico.
+  // `replace` na paginação evita uma entrada de histórico para cada expansão.
   const setParams = useCallback((patch, { replace = false } = {}) => {
     setSearchParams(current => patchSearchParams(current, patch), { replace });
   }, [setSearchParams]);
 
-  const setAddressQuery = (value) => setParams({ q: value }, { replace: true });
   const setSort = (value) => setParams({ ordem: value });
   const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
   const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
@@ -270,15 +293,6 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const filtered = useMemo(() => {
     let list = [...byKind];
 
-    if (addressQuery.trim()) {
-      const q = addressQuery.toLowerCase();
-      list = list.filter(p =>
-        p.address?.toLowerCase().includes(q) ||
-        p.neighborhood?.toLowerCase().includes(q) ||
-        p.city?.toLowerCase().includes(q) ||
-        p.title?.toLowerCase().includes(q)
-      );
-    }
     if (filters.propertyType !== 'Todos') list = list.filter(p => p.type === filters.propertyType);
     if (filters.discountMin > 0) list = list.filter(p => (p.discount ?? p.auctionDiscount ?? 0) >= filters.discountMin);
     if (filters.state !== 'Todos') list = list.filter(p => normalizeLocation(p.uf) === normalizeLocation(filters.state));
@@ -336,7 +350,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [addressQuery, filters, sort, sortNow, byKind]);
+  }, [filters, sort, sortNow, byKind]);
 
   useEffect(() => {
     if (sort !== 'soonest' && sort !== 'relevance') return undefined;
@@ -346,9 +360,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
   const paginated = filtered.slice(0, page * PAGE_SIZE);
 
-  // Chip count no botão ⚙: apenas filtros não-search que desviam do padrão.
-  // A query de busca tem seu próprio campo sempre visível; contá-la aqui
-  // faria o chip piscar "1" sempre que alguém digita, o que confunde.
+  // Chip count no botão ⚙: filtros que desviam do padrão.
   const activeFilterCount =
     (filters.propertyType !== 'Todos' ? 1 : 0) +
     (filters.discountMin > 0 ? 1 : 0) +
@@ -408,7 +420,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
 
         {/* ─── Main: toolbar horizontal + resultados ─── */}
         <div className="feed-main">
-          {/* Toolbar — busca, toggle do rail, sort, view */}
+          {/* Toolbar — total, toggle do rail, ordenação e visualização */}
           <div className="feed-toolbar" role="region" aria-label="Barra de ferramentas do feed">
             {!embedded && !railOpen && (
               <button
@@ -426,23 +438,9 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
               </button>
             )}
 
-            <div className="feed-search">
-              <span className="mono feed-search-icon">⌕</span>
-              <input
-                placeholder="Endereço, bairro, cidade..."
-                value={addressQuery}
-                onChange={(e) => setAddressQuery(e.target.value)}
-                aria-label="Buscar por endereço, bairro ou cidade"
-              />
-              {addressQuery && (
-                <button
-                  onClick={() => setAddressQuery('')}
-                  aria-label="Limpar busca"
-                  className="feed-search-clear"
-                >
-                  ×
-                </button>
-              )}
+            <div className="feed-result-count" aria-live="polite">
+              <span><b>{filtered.length}</b>{filtered.length === 1 ? ' imóvel' : ' imóveis'}</span>
+              <span className="mono">{filtered.length ? `1–${paginated.length} de ${filtered.length}` : '0 de 0'}</span>
             </div>
 
             <Sort value={sort} onChange={(value) => {
@@ -451,17 +449,6 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
             }} />
             <ViewToggle value={view} onChange={setView} />
           </div>
-
-      {/* Result count */}
-      <div className="row between" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <span style={{ fontSize: 13, color: 'var(--fg-2)' }}>
-          <b style={{ color: 'var(--fg-0)' }}>{filtered.length}</b>
-          {filtered.length === 1 ? ' imóvel' : ' imóveis'}
-        </span>
-        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-          1–{paginated.length} de {filtered.length}
-        </span>
-      </div>
 
       {/* Content */}
       {loading && properties.length === 0 ? (
@@ -536,14 +523,19 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   );
 }
 
-function Filter({ label, value, options, onChange }) {
+function Filter({ label, value, options, onChange, field = false }) {
   const [open, setOpen] = useState(false);
   const active = value !== options[0];
   return (
-    <div style={{ position: 'relative' }}>
+    <div className={`feed-filter${field ? ' feed-filter--field' : ''}${active ? ' active' : ''}`} style={{ position: 'relative' }}>
+      {field && <span className="feed-filter-field-label">{label}</span>}
       <button
+        type="button"
+        className="feed-filter-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
-        style={{
+        style={field ? undefined : {
           display: 'inline-flex', alignItems: 'center', gap: 8,
           height: 32, padding: '0 12px',
           borderRadius: 8,
@@ -553,9 +545,9 @@ function Filter({ label, value, options, onChange }) {
           fontSize: 12.5,
         }}
       >
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{label}:</span>
+        {!field && <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>{label}:</span>}
         <span style={{ fontWeight: active ? 500 : 400 }}>{value}</span>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)' }}>▾</span>
+        <span className="mono feed-filter-caret">▾</span>
       </button>
       {open && (
         <>
@@ -613,6 +605,7 @@ function Sort({ value, onChange }) {
           backgroundPosition: 'right 10px center',
         }}
       >
+        <option value="relevance">mais relevantes</option>
         <option value="discount">maior desconto estimado</option>
         <option value="soonest">encerra em breve</option>
         <option value="price-asc">menor preço</option>
@@ -684,12 +677,13 @@ function Empty() {
 // Switch iOS-style para filtros binários no rail.
 // O knob se move horizontalmente e muda de cor quando ligado. Marcar com
 // role="switch" comunica o estado binário para leitores de tela.
-function FilterSwitch({ checked, onChange, label, helper }) {
+function FilterSwitch({ checked, onChange, label, helper, title }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      title={title}
       onClick={() => onChange(!checked)}
       className={`feed-switch${checked ? ' on' : ''}`}
     >

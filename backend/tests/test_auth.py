@@ -52,6 +52,7 @@ def _fresh_conn():
               google_sub TEXT NOT NULL UNIQUE,
               email TEXT NOT NULL,
               name TEXT, avatar_url TEXT,
+              housing_profile TEXT,
               created_at TEXT DEFAULT CURRENT_TIMESTAMP,
               last_login_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
@@ -158,6 +159,20 @@ def test_sync_merges_localstorage_into_server_rows():
     assert viewed[0]["snapshot"]["title"] == "t2"
 
 
+def test_housing_profile_is_persisted_on_the_user():
+    conn = _fresh_conn()
+    user = users_db.upsert_user(conn, {
+        "google_sub": "g-profile", "email": "a@b.com", "name": "A", "avatar_url": None,
+    })
+    updated = users_db.set_housing_profile(conn, user["id"], {
+        "city": "Curitiba", "property_type": "Apartamento", "budget": "400000",
+    })
+    assert updated["housing_profile"] == {
+        "city": "Curitiba", "property_type": "Apartamento", "budget": "400000",
+    }
+    assert users_db.get_user(conn, user["id"])["housing_profile"]["city"] == "Curitiba"
+
+
 def test_unsave_removes_row():
     conn = _fresh_conn()
     user = users_db.upsert_user(conn, {
@@ -213,6 +228,7 @@ def _capture_conn():
                                 "email": params.get("email", "e@x.com"),
                                 "name": params.get("name"),
                                 "avatar_url": params.get("avatar"),
+                                "housing_profile": None,
                             }
                         def all(self):
                             return []
@@ -282,6 +298,14 @@ def test_me_returns_profile_when_authed(client, monkeypatch):
         user, secret="s" * 32, ttl_days=30,
     )
     monkeypatch.setattr(
+        vercel_index.users_db_module, "get_user", lambda conn, uid: {
+            **user,
+            "housing_profile": {
+                "city": "Curitiba", "property_type": "Casa", "budget": "250000",
+            },
+        },
+    )
+    monkeypatch.setattr(
         vercel_index.users_db_module, "get_saved_ids", lambda conn, uid: [1, 2],
     )
     monkeypatch.setattr(
@@ -295,5 +319,60 @@ def test_me_returns_profile_when_authed(client, monkeypatch):
     assert res.status_code == 200
     body = res.json()
     assert body["user"]["email"] == "a@b.com"
+    assert body["user"]["housing_profile"]["city"] == "Curitiba"
     assert body["saved"] == [1, 2]
     assert body["viewed"][0]["property_id"] == 5
+
+
+def test_update_housing_profile_requires_auth_and_returns_account(client, monkeypatch):
+    payload = {"city": " Curitiba ", "property_type": "Apartamento", "budget": "400000"}
+    assert client.put("/api/me/housing-profile", json=payload).status_code == 401
+
+    user = {"id": 12, "email": "a@b.com", "name": "A", "avatar_url": None}
+    token = vercel_index.auth_module.issue_session_token(
+        user, secret="s" * 32, ttl_days=30,
+    )
+    captured = {}
+
+    def save(_conn, user_id, profile):
+        captured.update({"user_id": user_id, "profile": profile})
+        return {**user, "housing_profile": profile}
+
+    monkeypatch.setattr(vercel_index.users_db_module, "set_housing_profile", save)
+    monkeypatch.setattr(vercel_index, "_get_engine", lambda: _fake_engine_with(_capture_conn()))
+
+    res = client.put(
+        "/api/me/housing-profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert res.status_code == 200
+    assert captured == {
+        "user_id": 12,
+        "profile": {"city": "Curitiba", "property_type": "Apartamento", "budget": "400000"},
+    }
+    assert res.json()["user"]["housing_profile"]["property_type"] == "Apartamento"
+
+    res = client.put(
+        "/api/me/housing-profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"city": "São Paulo", "property_type": "Casa", "budget": "above-1000000"},
+    )
+    assert res.status_code == 200
+    assert captured["profile"]["budget"] == "above-1000000"
+
+
+def test_update_housing_profile_respects_preview_write_guard(client, monkeypatch):
+    user = {"id": 12, "email": "a@b.com", "name": "A", "avatar_url": None}
+    token = vercel_index.auth_module.issue_session_token(
+        user, secret="s" * 32, ttl_days=30,
+    )
+    monkeypatch.setenv("VERCEL_ENV", "preview")
+    monkeypatch.delenv("ARREMATE_PREVIEW_ALLOW_WRITES", raising=False)
+
+    res = client.put(
+        "/api/me/housing-profile",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"city": "Curitiba", "property_type": "Casa", "budget": None},
+    )
+    assert res.status_code == 403

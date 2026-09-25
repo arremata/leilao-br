@@ -74,26 +74,40 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Lista de imóveis
 
-- Criar conta ou Entrar é obrigatório antes de acessar o catálogo, um imóvel por
-  link direto, Salvos, Vistos ou a central de conta. Após entrar, a pessoa volta
-  ao endereço que tentou abrir. Uma conta nova responde primeiro ao questionário
-  de moradia em três escolhas: cidade, tipo de imóvel e faixa de preço. A cidade
-  pode ser digitada e escolhida em sugestões, inclusive sem informar os acentos
-  durante a busca.
+- Em produção, Criar conta ou Entrar é obrigatório antes de acessar o catálogo,
+  um imóvel por link direto, Salvos, Vistos ou a central de conta. Após entrar,
+  a pessoa volta ao endereço que tentou abrir. Uma conta nova responde primeiro
+  ao questionário de moradia em três escolhas: cidade, tipo de imóvel e faixa de
+  preço. A cidade pode ser digitada e escolhida em sugestões, inclusive sem
+  informar os acentos durante a busca.
 - Entrar com Google cria uma sessão de 30 dias no servidor; o formulário de
-  e-mail e senha continua sendo um protótipo somente deste navegador. Previews
-  seguem a mesma entrada obrigatória e podem ser validados com uma conta local
-  de teste, sem criar uma identidade no servidor.
-- Preferências de moradia ficam neste navegador. Nos próximos acessos, a lista
-  única de todos os imóveis abre com cidade, tipo e faixa de preço já aplicados.
-  Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
-  tudo sem perder o perfil salvo. Tipo de venda, disponibilidade, modalidade,
-  rodada e desconto ficam na mesma barra lateral; não existe um segundo painel
-  de filtros sobre os resultados.
-- A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
-  eventual desocupação e outras despesas continuam explicadas em cada imóvel;
-  a faixa não garante custo final nem aprovação de financiamento. As opções vão
-  de “Até R$ 150 mil” a “Acima de R$ 1 milhão”.
+  continua sendo um protótipo somente deste navegador. É possível explorar o
+  catálogo sem configurar apenas nos previews de branch.
+- Previews de branch abrem diretamente no catálogo público, sem exigir conta,
+  para que a validação use os imóveis reais sem criar identidades de teste.
+- Cidade, tipo de imóvel e faixa de preço do questionário formam um perfil
+  cadastral e não filtram o catálogo. Na conta Google, esse perfil fica no banco;
+  na conta local de e-mail e senha, permanece somente neste navegador enquanto
+  essa entrada continuar como protótipo.
+- Todos os filtros da busca ficam numa única barra lateral e são aplicados pela
+  própria pessoa. Cidade e bairro usam autocomplete com opções reais do catálogo;
+  bairro fica disponível depois da escolha da cidade. O limite de valor inicial
+  aceita qualquer valor digitado, o apresenta em reais e, depois da primeira
+  alteração, fica lembrado neste navegador até a pessoa limpar o campo ou os
+  filtros. Esse valor lembrado pertence à busca e não vem do questionário. Tipo
+  de venda, localização, tipo de imóvel, orçamento, disponibilidade, modalidade,
+  rodada e desconto não têm uma seção separada de “preferências”, botão de
+  aplicar nem ações de salvar ou restaurar perfil. A barra usa a rolagem normal
+  da página, sem área interna rolável. Compra direta não mostra opções próprias
+  de leilão.
+- A lista não oferece uma segunda busca livre por endereço, bairro e cidade. A
+  localização é escolhida pelos autocompletes da lateral; acima dos resultados
+  ficam apenas o total encontrado, a ordenação e o modo de visualização.
+- A faixa cadastral do questionário vai de “Até R$ 150 mil” a “Acima de R$ 1
+  milhão” e não filtra o catálogo. O valor máximo digitado na lateral limita
+  somente o valor inicial do imóvel. Taxas, reforma, eventual desocupação e
+  outras despesas continuam explicadas em cada imóvel; nenhuma das duas escolhas
+  garante custo final nem aprovação de financiamento.
 - Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
   opostas: um tem disputa e data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis.
@@ -147,8 +161,9 @@ ação equivalente à modalidade.
 - A central tem uma área de Assinatura identificada como **Em breve**. Ela não
   apresenta planos fictícios e deixa explícito que não existe assinatura nem
   cobrança ativa.
-- Salvos e Vistos exigem uma conta ativa. Na conta local, continuam guardados
-  somente neste navegador.
+- Em produção, Salvos e Vistos exigem uma conta ativa. Na conta local, continuam
+  guardados somente neste navegador; previews públicos mantêm essas áreas como
+  apoio de validação local.
 - Ao entrar com Google, os dados locais são unidos à conta e passam a ser
   sincronizados pelo servidor entre dispositivos.
 - O formulário de e-mail e senha continua local: ele não cria uma conta no
@@ -214,9 +229,9 @@ venda, sem inventar um edital individual inexistente.
    A interface não usa "análise jurídica", "parecer", "assessoria jurídica" nem
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
-5. **Sem personalização fictícia:** a interface usa somente nome, conta e
-   preferências preenchidos pela própria pessoa. Apenas a sessão Google é
-   autenticação no servidor; a sessão de e-mail e senha continua local.
+5. **Sem personalização fictícia:** o perfil cadastral preenchido pela pessoa não
+   altera o catálogo sozinho. Apenas a sessão Google e seu perfil são persistidos
+   no servidor; a sessão de e-mail e senha continua local.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 

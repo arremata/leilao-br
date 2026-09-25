@@ -2,16 +2,15 @@ export function shouldShowHousingOnboarding({
   isPreview,
   account,
   profile,
-  appliedProfile,
   searchParamCount,
 }) {
   if (isPreview) return false;
-  return (!account || !profile) && !appliedProfile && searchParamCount === 0;
+  return (!account || !profile) && searchParamCount === 0;
 }
 
-export function shouldUseAccountScreen({ pathname, account }) {
-  if (!account) return true;
+export function shouldUseAccountScreen({ pathname, isPreview, account }) {
   if (pathname === '/entrar' || pathname === '/preferencias') return true;
+  if (!account && (!isPreview || pathname === '/perfil')) return true;
   return false;
 }
 

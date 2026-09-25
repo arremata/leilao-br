@@ -5,6 +5,7 @@ import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import AccountPage, { UserMark } from './components/AccountPage';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
+import { housingProfileForApi, housingProfileFromUser } from './housingProfile';
 import {
   accountDestination,
   housingPreferencesFlow,
@@ -27,7 +28,12 @@ const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user: authUser, isAuthed, logout: authLogout } = useAuth();
+  const {
+    user: authUser,
+    isAuthed,
+    logout: authLogout,
+    updateHousingProfile,
+  } = useAuth();
   // Local email/password account is their prototype layer; the real session is
   // AuthContext. When a Google login lands, AuthContext's user takes over.
   const [account, setAccount] = useState(() => {
@@ -36,7 +42,6 @@ function App() {
   const [housingProfile, setHousingProfile] = useState(() => {
     try { return readHousingProfile(); } catch { return null; }
   });
-  const [housingSearch, setHousingSearch] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
@@ -60,13 +65,18 @@ function App() {
   // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
   // hits the real backend; the email/password form stays as the local prototype.
   const effectiveAccount = authUser || account;
-  const hasAccount = Boolean(effectiveAccount);
+  const effectiveHousingProfile = authUser ? housingProfileFromUser(authUser) : housingProfile;
+  const canOpenCatalog = isPreview || Boolean(effectiveAccount);
 
   const saveProfile = useCallback(async (profile) => {
+    if (isAuthed) {
+      const updatedUser = await updateHousingProfile(housingProfileForApi(profile));
+      return housingProfileFromUser(updatedUser);
+    }
     const saved = saveHousingProfile(profile);
     setHousingProfile(saved);
-    setHousingSearch(null);
-  }, []);
+    return saved;
+  }, [isAuthed, updateHousingProfile]);
   const signUp = useCallback(async (input) => {
     const user = await createLocalAccount(input);
     setAccount(user);
@@ -81,9 +91,10 @@ function App() {
     signOutLocal();
     authLogout();
     setAccount(null);
-    setHousingSearch(null);
-    setProperties([]);
-    setCatalogLoading(true);
+    if (!isPreview) {
+      setProperties([]);
+      setCatalogLoading(true);
+    }
     navigate('/entrar');
   }, [navigate, authLogout]);
 
@@ -98,7 +109,7 @@ function App() {
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
   // aquele imóvel e não espera os outros 500.
   useEffect(() => {
-    if (!hasAccount) return undefined;
+    if (!canOpenCatalog) return undefined;
     let cancelled = false;
     fetchCatalog()
       .then(catalogData => {
@@ -108,7 +119,7 @@ function App() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, [hasAccount]);
+  }, [canOpenCatalog]);
 
   // Local persistence always-on; server sync layers on top when authed.
   useEffect(() => {
@@ -239,32 +250,19 @@ function App() {
               onSignIn={signIn}
               signedInDestination={requestedDestination}
               afterSetupDestination={afterSetupDestination}
+              allowExplore={isPreview}
             />} />
-        <Route element={<AccountGate account={effectiveAccount} />}>
+        <Route element={<AccountGate account={effectiveAccount} allowPublic={isPreview} />}>
           <Route path="/" element={
             <HousingEntry
-              profile={housingProfile}
+              profile={effectiveHousingProfile}
               account={effectiveAccount}
               onSave={saveProfile}
-              appliedProfile={housingSearch}
-              onApply={setHousingSearch}
               cities={cities}
               watched={watched}
               toggleWatch={toggleWatch}
               properties={properties}
               loading={catalogLoading}
-            />
-          } />
-          <Route path="/perfil" element={
-            <AccountPage account={effectiveAccount} profile={housingProfile} serverAccount={isAuthed} onSignOut={signOut} />
-          } />
-          <Route path="/preferencias" element={
-            <HousingQuestionnaire
-              key={JSON.stringify(housingProfile)}
-              initialProfile={housingProfile}
-              cities={cities}
-              onSave={saveProfile}
-              {...preferencesFlow}
             />
           } />
           <Route path="/imovel/:id" element={
@@ -282,6 +280,20 @@ function App() {
             <History history={history} clearHistory={clearHistory} properties={properties} />
           } />
           <Route path="*" element={<NotFound />} />
+        </Route>
+        <Route element={<AccountGate account={effectiveAccount} />}>
+          <Route path="/perfil" element={
+            <AccountPage account={effectiveAccount} profile={effectiveHousingProfile} serverAccount={isAuthed} onSignOut={signOut} />
+          } />
+          <Route path="/preferencias" element={
+            <HousingQuestionnaire
+              key={JSON.stringify(effectiveHousingProfile)}
+              initialProfile={effectiveHousingProfile}
+              cities={cities}
+              onSave={saveProfile}
+              {...preferencesFlow}
+            />
+          } />
         </Route>
       </Routes>
     </div>
@@ -326,25 +338,24 @@ function TopBar({ watchCount, account }) {
   );
 }
 
-function HousingEntry(props) {
+function HousingEntry({ profile, account, onSave, ...catalogProps }) {
   const [params] = useSearchParams();
   // After login, the saved profile still decides whether first-time setup is
   // needed before the catalog. Shared searches no longer bypass the account.
   if (shouldShowHousingOnboarding({
     isPreview,
-    account: props.account,
-    profile: props.profile,
-    appliedProfile: props.appliedProfile,
+    account,
+    profile,
     searchParamCount: params.size,
   })) {
-    return <HousingQuestionnaire initialProfile={props.profile} cities={props.cities} onSave={props.onSave} />;
+    return <HousingQuestionnaire initialProfile={profile} cities={catalogProps.cities} onSave={onSave} />;
   }
-  return <HousingFeed {...props} />;
+  return <HousingFeed {...catalogProps} />;
 }
 
-function AccountGate({ account }) {
+function AccountGate({ account, allowPublic = false }) {
   const location = useLocation();
-  if (account) return <Outlet />;
+  if (account || allowPublic) return <Outlet />;
   const from = `${location.pathname}${location.search}${location.hash}`;
   return <Navigate to="/entrar" replace state={{ from }} />;
 }

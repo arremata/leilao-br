@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.pool import NullPool
@@ -106,6 +106,12 @@ class SyncRequest(BaseModel):
     history: list[dict] = []
 
 
+class HousingProfileRequest(BaseModel):
+    city: str = Field(default="", max_length=300)
+    property_type: str = "Todos"
+    budget: str | None = None
+
+
 class SavedToggleRequest(BaseModel):
     saved: bool
 
@@ -152,9 +158,10 @@ def auth_google(body: GoogleLoginRequest):
 @app.get("/me")
 def me(user: dict = CurrentUser):
     with _get_engine().connect() as conn:
+        account = users_db_module.get_user(conn, user["id"]) or user
         saved = users_db_module.get_saved_ids(conn, user["id"])
         viewed = users_db_module.get_viewed(conn, user["id"])
-    return {"user": user, "saved": saved, "viewed": viewed}
+    return {"user": account, "saved": saved, "viewed": viewed}
 
 
 @app.post("/me/sync")
@@ -163,6 +170,23 @@ def sync(body: SyncRequest, user: dict = CurrentUser):
         users_db_module.sync_saved(conn, user["id"], body.watched)
         users_db_module.sync_viewed(conn, user["id"], body.history)
     return {"ok": True}
+
+
+@app.put("/me/housing-profile")
+def update_housing_profile(body: HousingProfileRequest, user: dict = CurrentUser):
+    profile = body.model_dump()
+    profile["city"] = profile["city"].strip()
+    if profile["property_type"] not in {"Todos", "Casa", "Apartamento"}:
+        raise HTTPException(status_code=422, detail="Tipo de imóvel inválido")
+    if profile["budget"] not in {
+        None, "150000", "250000", "400000", "600000", "1000000", "above-1000000",
+    }:
+        raise HTTPException(status_code=422, detail="Faixa de preço inválida")
+    if not _should_persist_changes():
+        raise HTTPException(status_code=403, detail="Alterações estão desativadas neste preview")
+    with _get_engine().begin() as conn:
+        account = users_db_module.set_housing_profile(conn, user["id"], profile)
+    return {"user": account}
 
 
 @app.put("/me/saved/{property_id}")

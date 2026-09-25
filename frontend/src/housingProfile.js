@@ -15,32 +15,15 @@ export const housingBudgetOptions = [
 ];
 
 export function housingBudgetLabel(value) {
-  if (value === '' || value === null || value === undefined) return 'Qualquer faixa';
-  return housingBudgetOptions.find(option => option.value === String(value))?.label
-    || `Até R$ ${Number(value).toLocaleString('pt-BR')}`;
+  if (value === aboveOneMillionBudget) return 'Acima de R$ 1 milhão';
+  const amount = Number(value);
+  return amount > 0 && Number.isFinite(amount)
+    ? `Até R$ ${amount.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+    : 'Sem limite';
 }
 
 export function hasHousingBudget(value) {
   return value === aboveOneMillionBudget || Number(value) > 0;
-}
-
-export function housingCitySuggestions(cities, query = '', limit = 6) {
-  const needle = normalize(query);
-  const uniqueCities = new Map();
-  for (const value of Array.isArray(cities) ? cities : []) {
-    const city = String(value || '').trim();
-    const key = normalize(city);
-    if (key && !uniqueCities.has(key)) uniqueCities.set(key, city);
-  }
-  return [...uniqueCities.entries()]
-    .filter(([key]) => !needle || key.includes(needle))
-    .sort(([leftKey, left], [rightKey, right]) => {
-      const leftStarts = needle && leftKey.startsWith(needle) ? 0 : 1;
-      const rightStarts = needle && rightKey.startsWith(needle) ? 0 : 1;
-      return leftStarts - rightStarts || left.localeCompare(right, 'pt-BR');
-    })
-    .slice(0, Math.max(0, limit))
-    .map(([, city]) => city);
 }
 
 export function validateHousingProfile(value) {
@@ -54,12 +37,43 @@ export function validateHousingProfile(value) {
   if (!['Todos', 'Casa', 'Apartamento'].includes(profile.propertyType)) profile.propertyType = 'Todos';
   return profile;
 }
+
+export function housingProfileFromUser(user) {
+  const stored = user?.housing_profile;
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return null;
+  return validateHousingProfile({
+    city: stored.city,
+    propertyType: stored.property_type,
+    budget: stored.budget ?? '',
+  });
+}
+
+export function housingProfileForApi(value) {
+  const profile = validateHousingProfile(value);
+  if (!profile) throw new Error('Perfil inválido.');
+  return {
+    city: profile.city,
+    property_type: profile.propertyType,
+    budget: profile.budget || null,
+  };
+}
+
+export function housingFiltersFromSearchParams(searchParams) {
+  const requestedPropertyType = searchParams.get('tipo');
+  return {
+    city: searchParams.get('cidade') || '',
+    neighborhood: searchParams.get('bairro') || '',
+    propertyType: ['Casa', 'Apartamento'].includes(requestedPropertyType) ? requestedPropertyType : 'Todos',
+    budget: searchParams.get('orcamento') || '',
+  };
+}
+
 export function filterHousingProperties(properties, profile) {
   if (!profile) return properties;
   return properties.filter(p => {
     if (!['CASA', 'APARTAMENTO'].includes(normalize(p.type))) return false;
     if (profile.city && normalize(p.city) !== normalize(profile.city)) return false;
-    if (profile.neighborhood && !normalize(p.neighborhood).includes(normalize(profile.neighborhood))) return false;
+    if (profile.neighborhood && normalize(p.neighborhood) !== normalize(profile.neighborhood)) return false;
     if (profile.propertyType !== 'Todos' && normalize(p.type) !== normalize(profile.propertyType)) return false;
     if (profile.budget === aboveOneMillionBudget) {
       if (!Number.isFinite(Number(p.minBid)) || Number(p.minBid) <= 1000000) return false;

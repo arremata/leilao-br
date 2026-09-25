@@ -1,11 +1,11 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   emptyHousingProfile,
   housingBudgetOptions,
-  housingCitySuggestions,
   validateHousingProfile,
 } from '../housingProfile';
+import CityAutocomplete from './CityAutocomplete';
 import './housing.css';
 
 const housingSteps = ['Localização', 'Tipo de imóvel', 'Orçamento'];
@@ -15,9 +15,9 @@ const stepTitles = [
   'Qual faixa cabe no seu plano?',
 ];
 const stepDescriptions = [
-  'Digite uma cidade para começar. Você poderá mudar isso quando quiser.',
-  'Selecione uma opção para organizar o catálogo ao seu redor.',
-  'Escolha a faixa do valor inicial do imóvel que cabe no seu plano.',
+  'Conte onde pretende procurar. Essa resposta fica no seu perfil e não filtra o catálogo.',
+  'Essa informação nos ajuda a entender sua necessidade, sem limitar os imóveis exibidos.',
+  'Registre a faixa que cabe no seu plano. Você continuará vendo o catálogo completo.',
 ];
 
 const propertyTypeOptions = [
@@ -42,106 +42,6 @@ function ChoiceGroup({ name, value, options, onChange, columns = 3 }) {
   </div>;
 }
 
-function CityAutocomplete({ value, cities, onChange }) {
-  const inputId = useId();
-  const listId = `${inputId}-options`;
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const suggestions = housingCitySuggestions(cities, value);
-  const options = value
-    ? suggestions.map(city => ({ value: city, label: city }))
-    : [{ value: '', label: 'Todas as cidades' }, ...suggestions.map(city => ({ value: city, label: city }))];
-
-  function selectCity(city) {
-    onChange(city);
-    setOpen(false);
-    setActiveIndex(-1);
-  }
-
-  function onKeyDown(event) {
-    if (event.key === 'Escape') {
-      setOpen(false);
-      setActiveIndex(-1);
-      return;
-    }
-    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return;
-    if (!open) {
-      setOpen(true);
-      if (event.key !== 'Enter' && options.length) setActiveIndex(event.key === 'ArrowDown' ? 0 : options.length - 1);
-      event.preventDefault();
-      return;
-    }
-    if (event.key === 'Enter') {
-      if (activeIndex >= 0 && options[activeIndex]) {
-        selectCity(options[activeIndex].value);
-        event.preventDefault();
-      } else {
-        setOpen(false);
-      }
-      return;
-    }
-    if (!options.length) return;
-    setActiveIndex(current => event.key === 'ArrowDown'
-      ? (current + 1 + options.length) % options.length
-      : (current - 1 + options.length) % options.length);
-    event.preventDefault();
-  }
-
-  return <div className="housing-field">
-    <label htmlFor={inputId}>Cidade</label>
-    <div
-      className={`housing-city-autocomplete${open ? ' open' : ''}`}
-      onBlur={event => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-          setActiveIndex(-1);
-        }
-      }}
-    >
-      <input
-        id={inputId}
-        name="city"
-        type="text"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
-        autoComplete="off"
-        maxLength={300}
-        placeholder="Digite o nome da cidade"
-        value={value}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onKeyDown={onKeyDown}
-        onChange={event => {
-          onChange(event.target.value);
-          setOpen(true);
-          setActiveIndex(-1);
-        }}
-      />
-      <span className="housing-city-chevron" aria-hidden="true">⌄</span>
-      {open && <div className="housing-city-options" id={listId} role="listbox" aria-label="Sugestões de cidade">
-        {options.length ? options.map((option, index) => <button
-          id={`${listId}-${index}`}
-          key={option.value || 'all'}
-          type="button"
-          role="option"
-          aria-selected={option.value === value}
-          className={index === activeIndex ? 'active' : ''}
-          onMouseDown={event => event.preventDefault()}
-          onMouseEnter={() => setActiveIndex(index)}
-          onClick={() => selectCity(option.value)}
-        >
-          <span>{option.label}</span>
-          {option.value === value && <b aria-hidden="true">✓</b>}
-        </button>) : <p role="status">Nenhuma cidade encontrada</p>}
-      </div>}
-    </div>
-    <small>Digite para buscar ou escolha uma sugestão.</small>
-  </div>;
-}
-
 export function HousingFields({
   step,
   profile,
@@ -161,8 +61,13 @@ export function HousingFields({
     {hint && <small>{hint}</small>}
   </label>;
   if (step === 0) {
+    const availableCities = [...new Set([profile.city, ...cities].filter(Boolean))].sort();
     return <div className="housing-fields">
-      <CityAutocomplete value={profile.city} cities={cities} onChange={value => onChange('city', value)} />
+      <CityAutocomplete
+        cities={availableCities}
+        value={profile.city}
+        onChange={value => onChange('city', value)}
+      />
       {variant === 'filters' && field('neighborhood', 'Bairro · opcional', { hint: 'Deixe em branco para considerar a cidade inteira.' })}
     </div>;
   }

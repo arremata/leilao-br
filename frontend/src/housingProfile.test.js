@@ -6,7 +6,9 @@ import {
   filterHousingProperties,
   hasHousingBudget,
   housingBudgetLabel,
-  housingCitySuggestions,
+  housingFiltersFromSearchParams,
+  housingProfileForApi,
+  housingProfileFromUser,
   validateHousingProfile,
 } from './housingProfile.js';
 import { readHousingProfile, saveHousingProfile } from './housingStorage.js';
@@ -25,7 +27,7 @@ test('normalizes location and excludes land from the housing search', () => {
 test('filters the selected property type', () => {
   assert.deepEqual(filterHousingProperties(properties, profile({ propertyType: 'Casa' })).map(p => p.id), [2, 4]);
 });
-test('budget choices cap the initial property price and reject unknown prices', () => {
+test('a manually entered budget caps the initial property price and rejects unknown prices', () => {
   assert.deepEqual(filterHousingProperties(properties, profile({ budget: 199999 })), []);
   assert.deepEqual(filterHousingProperties(properties, profile({ budget: 200000 })).map(p => p.id), [1, 2]);
 });
@@ -43,17 +45,32 @@ test('rejects malformed profiles and unsafe numeric values', () => {
   assert.equal(validateHousingProfile({ city: 'Curitiba', reserve: 20000, beds: 2 }).reserve, undefined);
   assert.equal(validateHousingProfile({ city: 'x'.repeat(500) }).city.length, 300);
 });
-test('budget labels use the visible onboarding choices', () => {
-  assert.equal(housingBudgetLabel('250000'), 'Até R$ 250 mil');
+test('budget labels show the full manually entered amount', () => {
+  assert.equal(housingBudgetLabel('250000'), 'Até R$ 250.000');
   assert.equal(housingBudgetLabel(aboveOneMillionBudget), 'Acima de R$ 1 milhão');
-  assert.equal(housingBudgetLabel(''), 'Qualquer faixa');
+  assert.equal(housingBudgetLabel(''), 'Sem limite');
 });
-test('city autocomplete ignores accents, removes duplicates and prioritizes prefixes', () => {
-  const cities = ['São Paulo', 'SÃO PAULO', 'Santos', 'Curitiba', 'Londrina', '', null];
-  assert.deepEqual(housingCitySuggestions(cities, 'sao'), ['São Paulo']);
-  assert.deepEqual(housingCitySuggestions(cities, 'on'), ['Londrina']);
-  assert.deepEqual(housingCitySuggestions(cities, '', 2), ['Curitiba', 'Londrina']);
-  assert.deepEqual(housingCitySuggestions(null, 'cur'), []);
+test('maps the account profile to and from the server contract', () => {
+  const user = {
+    housing_profile: { city: 'Curitiba', property_type: 'Apartamento', budget: '400000' },
+  };
+  assert.deepEqual(housingProfileFromUser(user), profile({
+    city: 'Curitiba', propertyType: 'Apartamento', budget: '400000',
+  }));
+  assert.deepEqual(housingProfileForApi(profile({
+    city: 'Londrina', propertyType: 'Casa', budget: '', neighborhood: 'Centro',
+  })), { city: 'Londrina', property_type: 'Casa', budget: null });
+  assert.deepEqual(housingProfileForApi(profile({
+    city: 'São Paulo', propertyType: 'Apartamento', budget: aboveOneMillionBudget,
+  })), { city: 'São Paulo', property_type: 'Apartamento', budget: aboveOneMillionBudget });
+  assert.equal(housingProfileFromUser({}), null);
+});
+test('catalog filters come only from the URL, not from the saved account profile', () => {
+  assert.deepEqual(housingFiltersFromSearchParams(new URLSearchParams()), emptyHousingProfile);
+  assert.deepEqual(
+    housingFiltersFromSearchParams(new URLSearchParams('cidade=Curitiba&tipo=Casa&orcamento=250000')),
+    profile({ city: 'Curitiba', propertyType: 'Casa', budget: '250000' }),
+  );
 });
 test('browser adapter removes retired fields while migrating a stored profile', () => {
   let stored;

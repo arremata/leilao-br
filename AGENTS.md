@@ -214,11 +214,21 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-09-25** — Transformou a cidade do cadastro e da edição de preferências em uma busca com sugestões, tolerante a acentos e operável por mouse, toque ou teclado. Substituiu “Ainda não sei” por uma faixa real “Acima de R$ 1 milhão”, aplicada também ao catálogo e exibida na central de conta.
+- **2026-09-25** — Consolidou no PR de login a central de conta e a UX mais recente dos filtros. Produção mantém conta e onboarding obrigatórios, enquanto previews abrem o catálogo público; o perfil cadastral é salvo na conta sem filtrar resultados, e a busca preserva uma única lateral com autocompletes de cidade/bairro, limite monetário manual lembrado no navegador e controles coerentes com cada tipo de venda.
+
+- **2026-09-25** — Transformou a cidade do cadastro e da edição de preferências em uma busca com sugestões, tolerante a acentos e operável por mouse, toque ou teclado. Substituiu “Ainda não sei” por uma faixa cadastral real “Acima de R$ 1 milhão”, salva no perfil e exibida na central de conta sem ser aplicada automaticamente ao catálogo.
 
 - **2026-09-24** — Tornou a conta obrigatória para acessar qualquer área da plataforma, inclusive catálogo, imóveis por link direto, Salvos, Vistos e previews. Visitantes são encaminhados para Criar conta/Entrar sem carregar o catálogo; depois do acesso retornam ao endereço pretendido, enquanto contas novas concluem primeiro as preferências de moradia. A antiga exploração sem conta foi removida.
 
 - **2026-09-24** — Criou a central de conta do Argos, acessível por um ícone de usuário no lado direito do cabeçalho. A área reúne nome, e-mail, transparência sobre a persistência da conta e as três preferências de moradia já informadas; permite refazer essas escolhas e inclui uma aba de assinatura marcada como “Em breve”, sem sugerir plano ou cobrança ativa.
+
+- **2026-09-24** — Passou a lembrar neste navegador o limite de valor inicial digitado manualmente no catálogo. A primeira visita continua sem limite; depois da primeira alteração, o valor é restaurado e refletido na URL, enquanto limpar o campo ou todos os filtros remove também a preferência local. O valor do questionário permanece apenas cadastral e não alimenta esse filtro.
+
+- **2026-09-24** — Trocou o limite de valor inicial do catálogo por um campo livre com formatação monetária brasileira. Bairro agora usa o mesmo autocomplete acessível de cidade, oferece somente bairros reais do catálogo na cidade escolhida e é limpo quando a cidade muda. A busca ampla e redundante por endereço, bairro ou cidade saiu do topo dos resultados, que passou a reunir total, ordenação e modo de visualização em uma única barra compacta.
+
+- **2026-09-24** — Separou perfil e busca. Cidade, tipo de imóvel e faixa de preço informados no questionário passam a ser dados cadastrais da conta Google, persistidos no banco e nunca aplicados automaticamente ao catálogo. A barra lateral virou um conjunto único de filtros instantâneos, sem a seção “Suas preferências”, ações de salvar/restaurar ou botão de aplicar; cidade agora usa um autocomplete acessível e limitado em vez do seletor nativo extenso. A conta local de e-mail e senha preserva o perfil somente neste navegador enquanto continuar como protótipo.
+
+- **2026-09-24** — Compactou e unificou a barra lateral de filtros: tipo de venda virou um controle segmentado horizontal com explicações no hover, disponibilidade e desconto passaram a usar campos enxutos, rodada e modalidade seguem o mesmo padrão visual das preferências e desaparecem por completo na compra direta. A barra não tem mais rolagem interna; em telas baixas, acompanha a rolagem normal da página.
 
 - **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.
 

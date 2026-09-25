@@ -11,13 +11,13 @@ import {
 const emptyEntry = {
   account: null,
   profile: null,
-  appliedProfile: null,
   searchParamCount: 0,
 };
 
 test('branch previews skip preference onboarding after login', () => {
   assert.equal(shouldShowHousingOnboarding({ ...emptyEntry, isPreview: true }), false);
   assert.equal(shouldUseAccountScreen({ pathname: '/', isPreview: true, account: { id: 1 }, hasSearch: false }), false);
+  assert.equal(shouldUseAccountScreen({ pathname: '/', isPreview: true, account: null, hasSearch: false }), false);
 });
 
 test('production keeps onboarding for a new visitor', () => {
@@ -31,10 +31,17 @@ test('searches skip preference setup only after the account gate', () => {
   assert.equal(shouldUseAccountScreen({ pathname: '/entrar', isPreview: true, account: null, hasSearch: false }), true);
 });
 
-test('every platform route uses the account screen before login', () => {
+test('every production platform route uses the account screen before login', () => {
   for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos', '/perfil']) {
-    assert.equal(shouldUseAccountScreen({ pathname, isPreview: true, account: null, hasSearch: true }), true);
+    assert.equal(shouldUseAccountScreen({ pathname, isPreview: false, account: null, hasSearch: true }), true);
   }
+});
+
+test('preview keeps the public catalog while protecting account-only pages', () => {
+  for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos']) {
+    assert.equal(shouldUseAccountScreen({ pathname, isPreview: true, account: null }), false);
+  }
+  assert.equal(shouldUseAccountScreen({ pathname: '/perfil', isPreview: true, account: null }), true);
 });
 
 test('account keeps the app navigation while preference editing stays focused', () => {

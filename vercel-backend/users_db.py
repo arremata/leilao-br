@@ -8,6 +8,15 @@ from typing import Iterable
 from sqlalchemy import text
 
 
+def _user_dict(row) -> dict:
+    user = dict(row)
+    profile = user.get("housing_profile")
+    if isinstance(profile, str):
+        profile = json.loads(profile)
+    user["housing_profile"] = profile if isinstance(profile, dict) else None
+    return user
+
+
 def upsert_user(conn, profile: dict) -> dict:
     row = conn.execute(
         text(
@@ -19,7 +28,7 @@ def upsert_user(conn, profile: dict) -> dict:
               name = EXCLUDED.name,
               avatar_url = EXCLUDED.avatar_url,
               last_login_at = CURRENT_TIMESTAMP
-            RETURNING id, email, name, avatar_url
+            RETURNING id, email, name, avatar_url, housing_profile
             """
         ),
         {
@@ -29,7 +38,34 @@ def upsert_user(conn, profile: dict) -> dict:
             "avatar": profile.get("avatar_url"),
         },
     ).mappings().one()
-    return dict(row)
+    return _user_dict(row)
+
+
+def get_user(conn, user_id: int) -> dict | None:
+    row = conn.execute(
+        text(
+            "SELECT id, email, name, avatar_url, housing_profile"
+            " FROM users WHERE id = :u"
+        ),
+        {"u": user_id},
+    ).mappings().one_or_none()
+    return _user_dict(row) if row else None
+
+
+def set_housing_profile(conn, user_id: int, profile: dict) -> dict:
+    profile_json = json.dumps(profile)
+    if conn.dialect.name == "postgresql":
+        statement = text(
+            "UPDATE users SET housing_profile = CAST(:profile AS JSONB) WHERE id = :u"
+        )
+    else:
+        statement = text(
+            "UPDATE users SET housing_profile = :profile WHERE id = :u"
+        )
+    result = conn.execute(statement, {"u": user_id, "profile": profile_json})
+    if result.rowcount != 1:
+        raise ValueError("Usuário não encontrado")
+    return get_user(conn, user_id)
 
 
 def get_saved_ids(conn, user_id: int) -> list[int]:

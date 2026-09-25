@@ -85,6 +85,8 @@ export const authApi = {
   me: () => request('/me'),
   sync: ({ watched, history }) =>
     request('/me/sync', { method: 'POST', body: { watched, history } }),
+  updateHousingProfile: (profile) =>
+    request('/me/housing-profile', { method: 'PUT', body: profile }),
   setSaved: (propertyId, saved) =>
     request(`/me/saved/${propertyId}`, { method: 'PUT', body: { saved } }),
   recordViewed: (propertyId, snapshot) =>
