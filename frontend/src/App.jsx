@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Routes, Route, NavLink, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Routes, Route, NavLink, Link, Navigate, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import AccountPage, { UserMark } from './components/AccountPage';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
-import { housingPreferencesFlow, shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
+import {
+  accountDestination,
+  housingPreferencesFlow,
+  postSetupDestination,
+  shouldShowHousingOnboarding,
+  shouldUseAccountScreen,
+} from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
 import Watchlist from './components/Watchlist';
@@ -46,12 +52,15 @@ function App() {
   const [properties, setProperties] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const cities = [...new Set(properties.map(p => p.city).filter(Boolean))].sort();
-  const preferencesFlow = housingPreferencesFlow(location.search);
+  const requestedDestination = accountDestination(location.state?.from);
+  const afterSetupDestination = postSetupDestination(location.state?.from);
+  const preferencesFlow = housingPreferencesFlow(location.search, location.state?.after);
 
   // Two user sources: Google (authUser) wins over local email/password (account).
   // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
   // hits the real backend; the email/password form stays as the local prototype.
   const effectiveAccount = authUser || account;
+  const hasAccount = Boolean(effectiveAccount);
 
   const saveProfile = useCallback(async (profile) => {
     const saved = saveHousingProfile(profile);
@@ -73,6 +82,8 @@ function App() {
     authLogout();
     setAccount(null);
     setHousingSearch(null);
+    setProperties([]);
+    setCatalogLoading(true);
     navigate('/entrar');
   }, [navigate, authLogout]);
 
@@ -87,6 +98,7 @@ function App() {
   // NÃO bloqueia mais a renderização: quem abre /imovel/{id} direto busca só
   // aquele imóvel e não espera os outros 500.
   useEffect(() => {
+    if (!hasAccount) return undefined;
     let cancelled = false;
     fetchCatalog()
       .then(catalogData => {
@@ -96,7 +108,7 @@ function App() {
       .catch(() => {})
       .finally(() => { if (!cancelled) setCatalogLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [hasAccount]);
 
   // Local persistence always-on; server sync layers on top when authed.
   useEffect(() => {
@@ -220,50 +232,57 @@ function App() {
       )}
       {!accountScreen && <TopBar watchCount={watched.length} account={effectiveAccount} />}
       <Routes>
-        <Route path="/" element={
-          <HousingEntry
-            profile={housingProfile}
-            account={effectiveAccount}
-            onSignUp={signUp}
-            onSignIn={signIn}
-            onSave={saveProfile}
-            appliedProfile={housingSearch}
-            onApply={setHousingSearch}
-            cities={cities}
-            watched={watched}
-            toggleWatch={toggleWatch}
-            properties={properties}
-            loading={catalogLoading}
-          />
-        } />
-        <Route path="/entrar" element={<HousingLogin onSignUp={signUp} onSignIn={signIn} initialMode={effectiveAccount ? 'signin' : 'signup'} signedInDestination={housingProfile ? '/' : '/perfil'} />} />
-        <Route path="/perfil" element={effectiveAccount
-          ? <AccountPage account={effectiveAccount} profile={housingProfile} serverAccount={isAuthed} onSignOut={signOut} />
-          : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
-        <Route path="/preferencias" element={effectiveAccount
-          ? <HousingQuestionnaire
+        <Route path="/entrar" element={effectiveAccount
+          ? <Navigate to={requestedDestination} replace />
+          : <HousingLogin
+              onSignUp={signUp}
+              onSignIn={signIn}
+              signedInDestination={requestedDestination}
+              afterSetupDestination={afterSetupDestination}
+            />} />
+        <Route element={<AccountGate account={effectiveAccount} />}>
+          <Route path="/" element={
+            <HousingEntry
+              profile={housingProfile}
+              account={effectiveAccount}
+              onSave={saveProfile}
+              appliedProfile={housingSearch}
+              onApply={setHousingSearch}
+              cities={cities}
+              watched={watched}
+              toggleWatch={toggleWatch}
+              properties={properties}
+              loading={catalogLoading}
+            />
+          } />
+          <Route path="/perfil" element={
+            <AccountPage account={effectiveAccount} profile={housingProfile} serverAccount={isAuthed} onSignOut={signOut} />
+          } />
+          <Route path="/preferencias" element={
+            <HousingQuestionnaire
               key={JSON.stringify(housingProfile)}
               initialProfile={housingProfile}
               cities={cities}
               onSave={saveProfile}
               {...preferencesFlow}
             />
-          : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/preferencias" />} />
-        <Route path="/imovel/:id" element={
-          <PropertyRoute
-            properties={properties}
-            watched={watched}
-            toggleWatch={toggleWatch}
-            onVisit={recordVisit}
-          />
-        } />
-        <Route path="/salvos" element={
-          <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
-        } />
-        <Route path="/vistos" element={
-          <History history={history} clearHistory={clearHistory} properties={properties} />
-        } />
-        <Route path="*" element={<NotFound />} />
+          } />
+          <Route path="/imovel/:id" element={
+            <PropertyRoute
+              properties={properties}
+              watched={watched}
+              toggleWatch={toggleWatch}
+              onVisit={recordVisit}
+            />
+          } />
+          <Route path="/salvos" element={
+            <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
+          } />
+          <Route path="/vistos" element={
+            <History history={history} clearHistory={clearHistory} properties={properties} />
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Route>
       </Routes>
     </div>
   );
@@ -309,7 +328,8 @@ function TopBar({ watchCount, account }) {
 
 function HousingEntry(props) {
   const [params] = useSearchParams();
-  // Existing shared feed URLs and public property URLs stay accessible.
+  // After login, the saved profile still decides whether first-time setup is
+  // needed before the catalog. Shared searches no longer bypass the account.
   if (shouldShowHousingOnboarding({
     isPreview,
     account: props.account,
@@ -317,10 +337,16 @@ function HousingEntry(props) {
     appliedProfile: props.appliedProfile,
     searchParamCount: params.size,
   })) {
-    if (!props.account) return <HousingLogin onSignUp={props.onSignUp} onSignIn={props.onSignIn} signedInDestination={props.profile ? '/' : '/perfil'} />;
     return <HousingQuestionnaire initialProfile={props.profile} cities={props.cities} onSave={props.onSave} />;
   }
   return <HousingFeed {...props} />;
+}
+
+function AccountGate({ account }) {
+  const location = useLocation();
+  if (account) return <Outlet />;
+  const from = `${location.pathname}${location.search}${location.hash}`;
+  return <Navigate to="/entrar" replace state={{ from }} />;
 }
 
 export default App;

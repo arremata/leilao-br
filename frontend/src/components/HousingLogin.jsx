@@ -3,7 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import './housing.css';
 
-export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup', signedInDestination = '/' }) {
+export default function HousingLogin({
+  onSignUp,
+  onSignIn,
+  initialMode = 'signup',
+  signedInDestination = '/',
+  afterSetupDestination = '/',
+}) {
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', acceptedTerms: false });
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +42,10 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
           setBusy(true);
           setError('');
           await loginWithGoogle(credential);
-          navigate(creating ? '/preferencias?origem=cadastro' : signedInDestination, { replace: true });
+          navigate(
+            creating ? '/preferencias?origem=cadastro' : signedInDestination,
+            creating ? { replace: true, state: { after: afterSetupDestination } } : { replace: true },
+          );
         } catch (err) {
           setError(err.message || 'Não foi possível entrar com o Google. Tente de novo.');
         } finally {
@@ -52,7 +61,7 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
       width: 320,
     });
     return () => window.google.accounts.id.cancel();
-  }, [loginWithGoogle, navigate, creating, signedInDestination]);
+  }, [loginWithGoogle, navigate, creating, signedInDestination, afterSetupDestination]);
 
   async function submit(event) {
     event.preventDefault();
@@ -62,7 +71,10 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
       if (creating) {
         if (form.password !== form.confirmPassword) throw new Error('As senhas precisam ser iguais.');
         await onSignUp(form);
-        navigate('/preferencias?origem=cadastro', { replace: true });
+        navigate('/preferencias?origem=cadastro', {
+          replace: true,
+          state: { after: afterSetupDestination },
+        });
       } else {
         await onSignIn({ email: form.email, password: form.password });
         navigate(signedInDestination, { replace: true });
@@ -76,7 +88,7 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
 
   return <main className="auth-shell">
     <section className="auth-story">
-      <Link className="auth-brand" to="/?busca=todos"><span className="logo" />Argos</Link>
+      <Link className="auth-brand" to="/entrar"><span className="logo" />Argos</Link>
       <div><span className="housing-eyebrow">UM CAMINHO MAIS CLARO ATÉ SEU LAR</span><h1>Encontre uma oportunidade que caiba na sua vida.</h1><p>Organize sua busca, compare imóveis e entenda os custos antes de decidir.</p></div>
       <ul><li><b>01</b> Preferências de moradia em um só lugar</li><li><b>02</b> Imóveis de acordo com seu orçamento</li><li><b>03</b> Próximos passos depois da arrematação</li></ul>
     </section>
@@ -100,7 +112,7 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
         <div className="auth-divider">ou</div>
         <div className="auth-google" ref={googleButtonRef} aria-label={creating ? 'Criar conta com Google' : 'Entrar com Google'} />
         <p className="auth-switch">{creating ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'} <button type="button" onClick={() => changeMode(creating ? 'signin' : 'signup')}>{creating ? 'Entrar' : 'Criar conta'}</button></p>
-        <Link className="auth-explore" to="/?busca=todos">Explorar imóveis antes de criar a conta</Link>
+        <p className="auth-required-note">Crie sua conta ou entre para acessar o catálogo e manter suas escolhas organizadas.</p>
       </div>
     </section>
   </main>;

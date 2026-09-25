@@ -74,13 +74,14 @@ no HTML do servidor, o que ainda não é feito.
 
 ### Lista de imóveis
 
-- O primeiro acesso oferece Criar conta/Entrar e, em seguida, um questionário de
-  moradia em três escolhas: cidade, tipo de imóvel e faixa de preço. Entrar com
-  Google cria uma sessão de 30 dias no servidor; o formulário de e-mail e senha
-  continua sendo um protótipo somente deste navegador. É possível explorar o
-  catálogo sem configurar.
-- Previews de branch abrem diretamente no catálogo público, sem exigir conta,
-  para que a validação use os imóveis reais sem criar identidades de teste.
+- Criar conta ou Entrar é obrigatório antes de acessar o catálogo, um imóvel por
+  link direto, Salvos, Vistos ou a central de conta. Após entrar, a pessoa volta
+  ao endereço que tentou abrir. Uma conta nova responde primeiro ao questionário
+  de moradia em três escolhas: cidade, tipo de imóvel e faixa de preço.
+- Entrar com Google cria uma sessão de 30 dias no servidor; o formulário de
+  e-mail e senha continua sendo um protótipo somente deste navegador. Previews
+  seguem a mesma entrada obrigatória e podem ser validados com uma conta local
+  de teste, sem criar uma identidade no servidor.
 - Preferências de moradia ficam neste navegador. Nos próximos acessos, a lista
   única de todos os imóveis abre com cidade, tipo e faixa de preço já aplicados.
   Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
@@ -143,7 +144,8 @@ ação equivalente à modalidade.
 - A central tem uma área de Assinatura identificada como **Em breve**. Ela não
   apresenta planos fictícios e deixa explícito que não existe assinatura nem
   cobrança ativa.
-- Salvos e Vistos continuam disponíveis sem login e ficam neste navegador.
+- Salvos e Vistos exigem uma conta ativa. Na conta local, continuam guardados
+  somente neste navegador.
 - Ao entrar com Google, os dados locais são unidos à conta e passam a ser
   sincronizados pelo servidor entre dispositivos.
 - O formulário de e-mail e senha continua local: ele não cria uma conta no
@@ -261,5 +263,5 @@ limitado e não destrutivo.
   sessão HS256 que expiram em 30 dias.
 
 A tela de consentimento OAuth precisa autorizar a origem de produção e
-`http://localhost:5173` para desenvolvimento local. Previews de branch pulam a
-entrada por conta e abrem diretamente no catálogo público.
+`http://localhost:5173` para desenvolvimento local. Previews de branch também
+exigem Criar conta/Entrar; a URL continua pública e não exige conta da Vercel.

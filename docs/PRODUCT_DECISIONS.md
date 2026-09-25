@@ -246,6 +246,22 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   limitados ao navegador, reaproveita o questionário existente para alterações
   e não mostra plano, preço ou cobrança enquanto assinaturas não existirem.
 
+### PD-016 — Exigir conta antes de acessar a plataforma
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** catálogo, páginas de imóveis, Salvos, Vistos e central de conta
+  só podem ser abertos depois de Criar conta ou Entrar. A mesma regra vale nos
+  previews de branch.
+- **Motivo:** a experiência passa a começar pela identidade da pessoa e pelas
+  preferências que organizam sua busca, em vez de oferecer dois caminhos de
+  entrada incompatíveis.
+- **Consequências:** buscas e links diretos levam visitantes à entrada e são
+  retomados depois do acesso; contas novas concluem as preferências antes de
+  seguir. A URL do preview continua pública, mas o catálogo não aparece sem uma
+  conta. O formulário de e-mail e senha permanece local ao navegador e não deve
+  ser tratado como autorização de backend.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR
