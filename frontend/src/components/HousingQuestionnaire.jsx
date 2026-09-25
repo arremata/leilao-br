@@ -95,7 +95,15 @@ export function HousingFields({
   </div>;
 }
 
-export default function HousingQuestionnaire({ initialProfile, cities, onSave }) {
+export default function HousingQuestionnaire({
+  initialProfile,
+  cities,
+  onSave,
+  successDestination = '/',
+  finalLabel = 'Ver imóveis',
+  cancelDestination = '/?busca=todos',
+  cancelLabel = 'Agora não',
+}) {
   const [profile, setProfile] = useState(() => ({ ...emptyHousingProfile, ...initialProfile }));
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
@@ -118,7 +126,7 @@ export default function HousingQuestionnaire({ initialProfile, cities, onSave })
     setSaving(true);
     try {
       await onSave(valid);
-      navigate('/', { replace: true });
+      navigate(successDestination, { replace: true });
     } catch {
       setError('Não foi possível salvar o perfil. Tente novamente.');
     } finally {
@@ -151,9 +159,9 @@ export default function HousingQuestionnaire({ initialProfile, cities, onSave })
       <footer className="housing-form-footer">
         {step > 0
           ? <button className="housing-back" type="button" onClick={() => { setStep(current => current - 1); setError(''); }}><span aria-hidden="true">←</span><b>Voltar</b></button>
-          : <button className="housing-skip" type="button" onClick={() => navigate('/?busca=todos')}>Agora não</button>}
+          : <button className="housing-skip" type="button" onClick={() => navigate(cancelDestination)}>{cancelLabel}</button>}
         <button className="housing-next" disabled={saving}>
-          <b>{saving ? 'Salvando…' : step < housingSteps.length - 1 ? 'Continuar' : 'Ver imóveis'}</b>
+          <b>{saving ? 'Salvando…' : step < housingSteps.length - 1 ? 'Continuar' : finalLabel}</b>
           <span aria-hidden="true">→</span>
         </button>
       </footer>

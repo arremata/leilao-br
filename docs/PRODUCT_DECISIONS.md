@@ -231,6 +231,21 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   conta. A ausência de comparação de mercado não esconde os custos que já podem
   ser calculados com os dados oficiais do catálogo.
 
+### PD-015 — Centralizar identidade e preferências na conta
+
+- **Data:** 24 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** a entrada de conta fica no lado direito do cabeçalho e abre uma
+  central que reúne os dados informados pela pessoa, suas três preferências de
+  moradia e o acesso para alterá-las. Assinatura aparece em uma área separada,
+  marcada como “Em breve”.
+- **Motivo:** nome, e-mail e escolhas do cadastro precisam ser fáceis de
+  reencontrar sem disputar espaço com a navegação do catálogo nem exigir um
+  novo fluxo de configuração.
+- **Consequências:** a interface explica se os dados estão sincronizados ou
+  limitados ao navegador, reaproveita o questionário existente para alterações
+  e não mostra plano, preço ou cobrança enquanto assinaturas não existirem.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

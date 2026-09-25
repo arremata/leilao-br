@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-24** — Criou a central de conta do Argos, acessível por um ícone de usuário no lado direito do cabeçalho. A área reúne nome, e-mail, transparência sobre a persistência da conta e as três preferências de moradia já informadas; permite refazer essas escolhas e inclui uma aba de assinatura marcada como “Em breve”, sem sugerir plano ou cobrança ativa.
+
 - **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.
 
 - **2026-09-24** — Corrigiu a descoberta de previews do fluxo de entrega: o helper agora reconhece o nome real do ambiente criado pela integração Vercel e escolhe somente uma URL pública, ignorando deployments paralelos protegidos por SSO.

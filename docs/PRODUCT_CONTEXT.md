@@ -135,6 +135,14 @@ ação equivalente à modalidade.
 
 ### Conta, salvos e vistos
 
+- Quando a pessoa está conectada, um ícone de usuário no lado direito do
+  cabeçalho abre a central de conta. Ela mostra nome, e-mail, onde os dados são
+  mantidos e as preferências de cidade, tipo de imóvel e faixa de preço que a
+  própria pessoa informou. As preferências podem ser refeitas pelo mesmo
+  questionário do cadastro.
+- A central tem uma área de Assinatura identificada como **Em breve**. Ela não
+  apresenta planos fictícios e deixa explícito que não existe assinatura nem
+  cobrança ativa.
 - Salvos e Vistos continuam disponíveis sem login e ficam neste navegador.
 - Ao entrar com Google, os dados locais são unidos à conta e passam a ser
   sincronizados pelo servidor entre dispositivos.

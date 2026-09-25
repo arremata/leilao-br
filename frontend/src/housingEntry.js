@@ -10,6 +10,7 @@ export function shouldShowHousingOnboarding({
 }
 
 export function shouldUseAccountScreen({ pathname, isPreview, account, hasSearch }) {
-  if (pathname === '/entrar' || pathname === '/perfil') return true;
+  if (pathname === '/entrar' || pathname === '/preferencias') return true;
+  if (pathname === '/perfil') return !account;
   return pathname === '/' && !isPreview && !account && !hasSearch;
 }

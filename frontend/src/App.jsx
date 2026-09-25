@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Link, useLocation, useNavigate, useSearchParams
 import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
+import AccountPage, { UserMark } from './components/AccountPage';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
 import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
@@ -216,7 +217,7 @@ function App() {
           {previewCanWrite ? ' · ações podem alterar produção' : ' · alterações não são salvas'}
         </div>
       )}
-      {!accountScreen && <TopBar watchCount={watched.length} account={effectiveAccount} onSignOut={signOut} />}
+      {!accountScreen && <TopBar watchCount={watched.length} account={effectiveAccount} />}
       <Routes>
         <Route path="/" element={
           <HousingEntry
@@ -235,7 +236,21 @@ function App() {
           />
         } />
         <Route path="/entrar" element={<HousingLogin onSignUp={signUp} onSignIn={signIn} initialMode={effectiveAccount ? 'signin' : 'signup'} signedInDestination={housingProfile ? '/' : '/perfil'} />} />
-        <Route path="/perfil" element={effectiveAccount ? <HousingQuestionnaire key={JSON.stringify(housingProfile)} initialProfile={housingProfile} cities={cities} onSave={saveProfile} /> : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
+        <Route path="/perfil" element={effectiveAccount
+          ? <AccountPage account={effectiveAccount} profile={housingProfile} serverAccount={isAuthed} onSignOut={signOut} />
+          : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
+        <Route path="/preferencias" element={effectiveAccount
+          ? <HousingQuestionnaire
+              key={JSON.stringify(housingProfile)}
+              initialProfile={housingProfile}
+              cities={cities}
+              onSave={saveProfile}
+              successDestination="/perfil"
+              finalLabel="Salvar preferências"
+              cancelDestination="/perfil"
+              cancelLabel="Cancelar"
+            />
+          : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/preferencias" />} />
         <Route path="/imovel/:id" element={
           <PropertyRoute
             properties={properties}
@@ -256,7 +271,7 @@ function App() {
   );
 }
 
-function TopBar({ watchCount, account, onSignOut }) {
+function TopBar({ watchCount, account }) {
   return (
     <header className="topbar">
       <div id="argos-progress" style={{
@@ -277,10 +292,11 @@ function TopBar({ watchCount, account, onSignOut }) {
         </nav>
         <div className="housing-account">
           {account ? (
-            <>
-              <Link to="/perfil">{account.name?.split(' ')[0] || account.email} · Meu perfil</Link>
-              <button type="button" className="btn ghost sm" onClick={onSignOut}>Sair</button>
-            </>
+            <Link className="account-trigger" to="/perfil" aria-label="Abrir minha conta">
+              <UserMark />
+              <span><b>{account.name?.split(' ')[0] || 'Minha conta'}</b><small>Minha conta</small></span>
+              <span className="account-trigger-arrow" aria-hidden="true">›</span>
+            </Link>
           ) : (
             <>
               <Link to="/entrar">Entrar</Link>
