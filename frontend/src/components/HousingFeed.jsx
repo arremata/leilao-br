@@ -1,13 +1,21 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import Feed, { CatalogSidebarFilters } from './Feed';
-import { HousingFields } from './HousingQuestionnaire';
+import CityAutocomplete from './CityAutocomplete';
 import {
   emptyHousingProfile,
   filterHousingProperties,
   housingBudgetLabel,
-  validateHousingProfile,
+  housingBudgetOptions,
+  housingFiltersFromSearchParams,
 } from '../housingProfile';
+
+const housingParamKeys = {
+  city: 'cidade',
+  neighborhood: 'bairro',
+  propertyType: 'tipo',
+  budget: 'orcamento',
+};
 
 function FilterChip({ children, onRemove }) {
   return <button className="housing-filter-chip" type="button" onClick={onRemove} title={`Remover filtro: ${children}`}>
@@ -15,126 +23,113 @@ function FilterChip({ children, onRemove }) {
   </button>;
 }
 
-export default function HousingFeed({ profile, onSave, cities, appliedProfile, onApply, ...feedProps }) {
+function HousingCatalogFilters({ cities, filters, onChange }) {
+  return <div className="housing-catalog-filters">
+    <CityAutocomplete key={filters.city} cities={cities} value={filters.city} onChange={value => onChange('city', value)} />
+
+    <label className="housing-field">
+      <span>Bairro <small>opcional</small></span>
+      <input
+        name="neighborhood"
+        type="text"
+        maxLength={300}
+        placeholder="Todos os bairros"
+        value={filters.neighborhood}
+        onChange={event => onChange('neighborhood', event.target.value)}
+      />
+    </label>
+
+    <div className="housing-field">
+      <span>Tipo de imóvel</span>
+      <div className="housing-filter-segments" role="group" aria-label="Tipo de imóvel">
+        {[
+          ['Todos', 'Todos'],
+          ['Casa', 'Casa'],
+          ['Apartamento', 'Apartamento'],
+        ].map(([value, label]) => <button
+          type="button"
+          key={value}
+          aria-pressed={filters.propertyType === value}
+          onClick={() => onChange('propertyType', value)}
+        >{label}</button>)}
+      </div>
+    </div>
+
+    <label className="housing-field">
+      <span>Valor inicial máximo</span>
+      <select value={filters.budget} onChange={event => onChange('budget', event.target.value)}>
+        <option value="">Sem limite</option>
+        {housingBudgetOptions.filter(option => option.value).map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  </div>;
+}
+
+export default function HousingFeed({ cities, ...feedProps }) {
   const [params, setParams] = useSearchParams();
-  const exploringWithoutProfile = params.get('busca') === 'todos';
-  const savedOrAppliedProfile = appliedProfile || profile || emptyHousingProfile;
-  const linkedCity = params.get('cidade');
-  const linkedPropertyType = params.get('tipo');
-  const profileWithLinkFilters = appliedProfile ? savedOrAppliedProfile : {
-    ...savedOrAppliedProfile,
-    ...(linkedCity && linkedCity !== 'Todas' ? { city: linkedCity } : {}),
-    ...(['Casa', 'Apartamento'].includes(linkedPropertyType) ? { propertyType: linkedPropertyType } : {}),
-  };
-  const current = exploringWithoutProfile ? emptyHousingProfile : profileWithLinkFilters;
-  const [draft, setDraft] = useState(() => ({ ...emptyHousingProfile, ...profileWithLinkFilters }));
   const [open, setOpen] = useState(() => window.innerWidth > 1100);
-  const [notice, setNotice] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState(0);
-  const selectedState = params.get('estado');
-  const stateFilteredProperties = selectedState && selectedState !== 'Todos'
-    ? feedProps.properties.filter(property => property.uf === selectedState)
-    : feedProps.properties;
-  const visibleProperties = filterHousingProperties(stateFilteredProperties, current);
-  const hasFilters = Boolean(
-    current.city
-    || current.neighborhood
-    || (current.propertyType && current.propertyType !== 'Todos')
-    || Number(current.budget) > 0,
-  );
-  const update = (key, value) => setDraft(previous => ({ ...previous, [key]: value }));
+  const current = housingFiltersFromSearchParams(params);
+  const visibleProperties = filterHousingProperties(feedProps.properties, current);
+  const activeHousingFilterCount =
+    (current.city ? 1 : 0)
+    + (current.neighborhood ? 1 : 0)
+    + (current.propertyType !== 'Todos' ? 1 : 0)
+    + (Number(current.budget) > 0 ? 1 : 0);
 
-  function clearExploreAllOverride() {
-    setParams(currentParams => {
-      const nextParams = new URLSearchParams(currentParams);
-      nextParams.delete('busca');
-      nextParams.delete('cidade');
-      nextParams.delete('tipo');
-      return nextParams;
+  function setHousingFilter(key, value) {
+    const paramKey = housingParamKeys[key];
+    const defaultValue = emptyHousingProfile[key];
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (value === '' || value === defaultValue) next.delete(paramKey);
+      else next.set(paramKey, value);
+      if (key === 'city' && !value) next.delete(housingParamKeys.neighborhood);
+      next.delete('busca');
+      next.delete('pagina');
+      return next;
+    }, { replace: key === 'neighborhood' });
+  }
+
+  function clearHousingFilters() {
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      Object.values(housingParamKeys).forEach(key => next.delete(key));
+      next.delete('busca');
+      next.delete('pagina');
+      return next;
     });
-  }
-
-  function activate(next, message) {
-    const valid = validateHousingProfile(next);
-    if (!valid) return;
-    setDraft(valid);
-    onApply(valid);
-    clearExploreAllOverride();
-    setNotice(message);
-  }
-
-  async function apply(save) {
-    const valid = validateHousingProfile(draft);
-    if (!valid) {
-      setNotice('Não foi possível aplicar essas escolhas.');
-      return;
-    }
-    setSaving(true);
-    try {
-      if (save) await onSave(valid);
-      activate(valid, save ? 'Perfil de moradia salvo.' : 'Filtros aplicados.');
-      if (window.innerWidth <= 1100) setOpen(false);
-    } catch {
-      setNotice('Não foi possível salvar. Tente novamente.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function removeFilter(key) {
-    const next = { ...current, [key]: emptyHousingProfile[key] };
-    if (key === 'city') next.neighborhood = '';
-    activate(next, 'Filtro removido.');
-  }
-
-  function clearFilters() {
-    activate({ ...emptyHousingProfile }, 'Todos os filtros pessoais foram removidos.');
-  }
-
-  function restoreProfile() {
-    const restored = { ...emptyHousingProfile, ...profile };
-    setDraft(restored);
-    onApply(null);
-    clearExploreAllOverride();
-    setNotice('Perfil salvo restaurado.');
   }
 
   return <div className="housing-dashboard">
     <section className="housing-dashboard-heading">
-      <div><span className="housing-eyebrow">COMPRAR PARA MORAR</span><h1>Todos os imóveis</h1><p>Suas preferências começam aplicadas. Remova ou ajuste qualquer filtro quando quiser.</p></div>
+      <div><span className="housing-eyebrow">COMPRAR PARA MORAR</span><h1>Todos os imóveis</h1><p>Use os filtros para encontrar imóveis que façam sentido para você.</p></div>
       <button className="btn ghost" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="housing-search">☷ {open ? 'Ocultar' : 'Ajustar'} filtros</button>
     </section>
     <div className="housing-dashboard-layout">
       {open && <aside className="housing-search" id="housing-search" aria-label="Filtros da busca">
         <h2>Filtros</h2>
-        <p className="housing-help">Tudo o que muda esta busca fica reunido aqui.</p>
-        <CatalogSidebarFilters properties={feedProps.properties} hideHousingDuplicates />
-        <div className="housing-search-divider" />
-        <h3 className="housing-search-subtitle">Suas preferências</h3>
-        <div className="housing-mini-tabs" role="tablist" aria-label="Preferências">
-          {['Região', 'Imóvel', 'Orçamento'].map((label, index) => <button key={label} role="tab" aria-selected={step === index} onClick={() => setStep(index)}>{label}</button>)}
-        </div>
-        <HousingFields step={step} profile={draft} onChange={update} cities={cities} />
-        <button className="btn primary" disabled={saving} onClick={() => apply(false)}>Aplicar filtros</button>
-        <button className="btn ghost" disabled={saving} onClick={() => apply(true)}>{saving ? 'Salvando…' : 'Salvar no meu perfil'}</button>
-        {profile && <button className="housing-text-button" onClick={restoreProfile}>Restaurar perfil salvo</button>}
-        <Link className="housing-text-button" to="/perfil">Refazer escolhas iniciais →</Link>
+        <p className="housing-help">Todos os ajustes desta busca ficam reunidos aqui.</p>
+        <CatalogSidebarFilters
+          properties={feedProps.properties}
+          hideHousingDuplicates
+          additionalFilters={<HousingCatalogFilters cities={cities} filters={current} onChange={setHousingFilter} />}
+          additionalFilterCount={activeHousingFilterCount}
+          additionalClearPatch={{ cidade: 'Todas', bairro: '', tipo: 'Todos', orcamento: '' }}
+        />
       </aside>}
       <section className="housing-feed-main">
-        {notice && <p role="status" className="housing-notice">{notice}</p>}
-        <div className="housing-summary" aria-label="Filtros pessoais aplicados">
-          {current.city && <FilterChip onRemove={() => removeFilter('city')}>{current.city}</FilterChip>}
-          {current.neighborhood && <FilterChip onRemove={() => removeFilter('neighborhood')}>{current.neighborhood}</FilterChip>}
-          {current.propertyType && current.propertyType !== 'Todos' && <FilterChip onRemove={() => removeFilter('propertyType')}>{current.propertyType}</FilterChip>}
-          {Number(current.budget) > 0 && <FilterChip onRemove={() => removeFilter('budget')}>{housingBudgetLabel(current.budget)}</FilterChip>}
-          {!hasFilters && <span className="housing-summary-empty">Sem filtros pessoais</span>}
-          {hasFilters && <button className="housing-clear-filters" type="button" onClick={clearFilters}>Limpar todos</button>}
-          {exploringWithoutProfile && profile && <button className="housing-clear-filters" type="button" onClick={restoreProfile}>Usar meu perfil</button>}
-        </div>
+        {activeHousingFilterCount > 0 && <div className="housing-summary" aria-label="Filtros de moradia aplicados">
+          {current.city && <FilterChip onRemove={() => setHousingFilter('city', '')}>{current.city}</FilterChip>}
+          {current.neighborhood && <FilterChip onRemove={() => setHousingFilter('neighborhood', '')}>{current.neighborhood}</FilterChip>}
+          {current.propertyType !== 'Todos' && <FilterChip onRemove={() => setHousingFilter('propertyType', 'Todos')}>{current.propertyType}</FilterChip>}
+          {Number(current.budget) > 0 && <FilterChip onRemove={() => setHousingFilter('budget', '')}>{housingBudgetLabel(current.budget)}</FilterChip>}
+          <button className="housing-clear-filters" type="button" onClick={clearHousingFilters}>Limpar estes filtros</button>
+        </div>}
         {Number(current.budget) > 0 && <div className="housing-budget-note"><b>Faixa aplicada ao valor inicial do imóvel.</b><p>Taxas, ocupação, reforma e condições de pagamento continuam detalhadas em cada imóvel.</p></div>}
         <Feed {...feedProps} properties={visibleProperties} embedded />
-        {!feedProps.loading && !visibleProperties.length && <div className="housing-no-results"><p>Nenhum imóvel corresponde a esses filtros no catálogo disponível.</p><button className="btn primary" onClick={clearFilters}>Limpar filtros</button></div>}
+        {!feedProps.loading && !visibleProperties.length && <div className="housing-no-results"><p>Nenhum imóvel corresponde a esses filtros no catálogo disponível.</p><button className="btn primary" onClick={clearHousingFilters}>Limpar filtros</button></div>}
       </section>
     </div>
   </div>;

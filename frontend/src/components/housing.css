@@ -122,6 +122,25 @@
 .housing-search .kind-tabs--rail button strong{white-space:nowrap}
 .housing-search .kind-tabs--rail button.active{border:0;background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}
 .housing-search .feed-rail-inner--compact .feed-rail-section{display:grid;gap:7px;padding:0;border:0;border-radius:0;background:transparent}
+.housing-catalog-filters{display:grid;gap:12px}
+.housing-catalog-filters .housing-field{gap:7px}
+.housing-catalog-filters .housing-field>span{color:var(--fg-1);font-size:11px;font-weight:550}
+.housing-catalog-filters .housing-field>span small{margin-left:3px;color:var(--fg-3);font-weight:400}
+.housing-catalog-filters .housing-field input,.housing-catalog-filters .housing-field select{height:40px;border-radius:9px}
+.housing-filter-segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
+.housing-filter-segments button{min-width:0;height:34px;padding:0 3px;border-radius:7px;color:var(--fg-2);font-size:10.5px;font-weight:550}
+.housing-filter-segments button[aria-pressed=true]{background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}
+.city-autocomplete{position:relative}
+.city-autocomplete-input{display:flex;align-items:center;gap:7px;height:40px;padding:0 10px;border:1px solid var(--line-1);border-radius:9px;background:var(--bg-1)}
+.city-autocomplete-input:focus-within{border-color:var(--accent);outline:3px solid #c4b5fd;outline-offset:2px}
+.city-autocomplete-input>span{color:var(--fg-3);font-family:var(--f-mono);font-size:10px}
+.city-autocomplete-input input{flex:1;width:100%;height:auto!important;padding:0!important;border:0!important;border-radius:0!important;outline:0;background:transparent;font-size:12.5px}
+.city-autocomplete-input button{padding:0 3px;color:var(--fg-3);font-size:17px;line-height:1}
+.city-autocomplete-menu{position:absolute;z-index:40;top:calc(100% + 5px);left:0;right:0;display:grid;max-height:238px;overflow-y:auto;padding:5px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-1);box-shadow:0 14px 35px rgba(17,24,39,.14)}
+.city-autocomplete-menu button{padding:8px 9px;border-radius:7px;color:var(--fg-1);font-size:11.5px;text-align:left}
+.city-autocomplete-menu button:hover,.city-autocomplete-menu button.active{background:var(--bg-2);color:var(--fg-0)}
+.city-autocomplete-menu button[aria-selected=true]{color:var(--accent-strong);font-weight:650}
+.city-autocomplete-menu p{margin:0;padding:10px;color:var(--fg-3);font-size:11px}
 .housing-search .feed-rail-section--availability .feed-switch{min-height:40px;padding:7px 10px;border:1px solid var(--line-1);border-radius:9px;background:var(--bg-1)}
 .housing-search .feed-rail-section--availability .feed-switch-body{order:1}
 .housing-search .feed-rail-section--availability .feed-switch-knob{order:2}

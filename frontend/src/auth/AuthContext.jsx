@@ -39,6 +39,13 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const updateHousingProfile = useCallback(async (profile) => {
+    const data = await authApi.updateHousingProfile(profile);
+    saveSession({ token: getToken(), user: data.user });
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   // One-time sync of localStorage watchlist/history into the account, then
   // continuity: every later toggle/view writes server-side.
   useEffect(() => {
@@ -78,9 +85,10 @@ export function AuthProvider({ children }) {
     synced,
     sessionExpired,
     loginWithGoogle,
+    updateHousingProfile,
     logout,
     setSessionExpired,
-  }), [user, isAuthed, synced, sessionExpired, loginWithGoogle, logout]);
+  }), [user, isAuthed, synced, sessionExpired, loginWithGoogle, updateHousingProfile, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

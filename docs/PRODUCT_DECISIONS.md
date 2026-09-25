@@ -19,24 +19,23 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
-### PD-014 — Perguntar somente o que organiza a primeira busca
+### PD-014 — Manter perfil cadastral separado dos filtros
 
 - **Data:** 22 de setembro de 2026
 - **Estado:** Ativa
 - **Decisão:** o questionário inicial pede somente cidade, tipo de imóvel e faixa
-  de preço, com escolhas grandes em vez de formulários extensos. A lista única de
-  todos os imóveis abre com essas preferências aplicadas e permite retirar cada
-  filtro ou limpar todos.
+  de preço, com escolhas grandes em vez de formulários extensos. Essas respostas
+  pertencem ao perfil cadastral e nunca são aplicadas automaticamente ao catálogo;
+  cada busca começa sem elas e muda apenas pelos filtros escolhidos na lista.
 - **Motivo:** a entrada precisa levar rapidamente a imóveis relevantes; quartos,
   vagas, prazo de mudança, reserva para extras, pagamento e rotina exigiam dados
   demais antes de a pessoa conhecer o catálogo.
-- **Consequências:** bairro continua como ajuste opcional na lista. A faixa de
-  preço limita apenas o valor inicial do imóvel e nunca representa o custo total;
-  taxas, reforma, eventual desocupação e condições de pagamento ficam no detalhe.
-  O perfil salvo permanece disponível para restaurar depois de explorar sem os
-  filtros. Preferências e filtros do catálogo compartilham uma única barra
-  lateral, sem controles duplicados sobre a lista ou rolagem interna. Controles
-  específicos de leilão aparecem somente quando se aplicam ao tipo de venda.
+- **Consequências:** o perfil da conta Google é persistido no banco; o protótipo
+  local de e-mail e senha continua restrito ao navegador. Cidade, bairro, tipo e
+  orçamento são filtros explícitos e instantâneos numa única barra, sem “Suas
+  preferências”, aplicar, salvar ou restaurar. A faixa limita somente o valor
+  inicial, nunca o custo total. Controles específicos de leilão aparecem apenas
+  quando se aplicam ao tipo de venda.
 
 ### PD-001 — Separar fatos oficiais de estimativas
 

@@ -5,6 +5,7 @@ import {
   housingBudgetOptions,
   validateHousingProfile,
 } from '../housingProfile';
+import CityAutocomplete from './CityAutocomplete';
 import './housing.css';
 
 const housingSteps = ['Localização', 'Tipo de imóvel', 'Orçamento'];
@@ -14,9 +15,9 @@ const stepTitles = [
   'Qual faixa cabe no seu plano?',
 ];
 const stepDescriptions = [
-  'Escolha uma cidade para começar. Você poderá mudar isso quando quiser.',
-  'Selecione uma opção para organizar o catálogo ao seu redor.',
-  'Considere o maior valor que pretende pagar pelo imóvel.',
+  'Conte onde pretende procurar. Essa resposta fica no seu perfil e não filtra o catálogo.',
+  'Essa informação nos ajuda a entender sua necessidade, sem limitar os imóveis exibidos.',
+  'Registre o maior valor que pretende pagar. Você continuará vendo o catálogo completo.',
 ];
 
 const propertyTypeOptions = [
@@ -59,17 +60,15 @@ export function HousingFields({
     />
     {hint && <small>{hint}</small>}
   </label>;
-  const select = (key, label, options) => <label className="housing-field" key={key}>
-    <span>{label}</span>
-    <select name={key} value={profile[key]} onChange={event => onChange(key, event.target.value)}>
-      {options.map(([optionValue, text]) => <option key={optionValue} value={optionValue}>{text}</option>)}
-    </select>
-  </label>;
-
   if (step === 0) {
     const availableCities = [...new Set([profile.city, ...cities].filter(Boolean))].sort();
     return <div className="housing-fields">
-      {select('city', 'Cidade', [['', 'Todas as cidades'], ...availableCities.map(city => [city, city])])}
+      <CityAutocomplete
+        key={profile.city}
+        cities={availableCities}
+        value={profile.city}
+        onChange={value => onChange('city', value)}
+      />
       {variant === 'filters' && field('neighborhood', 'Bairro · opcional', { hint: 'Deixe em branco para considerar a cidade inteira.' })}
     </div>;
   }
@@ -153,7 +152,7 @@ export default function HousingQuestionnaire({ initialProfile, cities, onSave })
           ? <button className="housing-back" type="button" onClick={() => { setStep(current => current - 1); setError(''); }}><span aria-hidden="true">←</span><b>Voltar</b></button>
           : <button className="housing-skip" type="button" onClick={() => navigate('/?busca=todos')}>Agora não</button>}
         <button className="housing-next" disabled={saving}>
-          <b>{saving ? 'Salvando…' : step < housingSteps.length - 1 ? 'Continuar' : 'Ver imóveis'}</b>
+          <b>{saving ? 'Salvando…' : step < housingSteps.length - 1 ? 'Continuar' : 'Salvar e ver imóveis'}</b>
           <span aria-hidden="true">→</span>
         </button>
       </footer>

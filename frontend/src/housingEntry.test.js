@@ -5,7 +5,6 @@ import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEn
 const emptyEntry = {
   account: null,
   profile: null,
-  appliedProfile: null,
   searchParamCount: 0,
 };
 

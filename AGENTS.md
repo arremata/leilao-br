@@ -214,6 +214,8 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-24** — Separou perfil e busca. Cidade, tipo de imóvel e faixa de preço informados no questionário passam a ser dados cadastrais da conta Google, persistidos no banco e nunca aplicados automaticamente ao catálogo. A barra lateral virou um conjunto único de filtros instantâneos, sem a seção “Suas preferências”, ações de salvar/restaurar ou botão de aplicar; cidade agora usa um autocomplete acessível e limitado em vez do seletor nativo extenso. A conta local de e-mail e senha preserva o perfil somente neste navegador enquanto continuar como protótipo.
+
 - **2026-09-24** — Compactou e unificou a barra lateral de filtros: tipo de venda virou um controle segmentado horizontal com explicações no hover, disponibilidade e desconto passaram a usar campos enxutos, rodada e modalidade seguem o mesmo padrão visual das preferências e desaparecem por completo na compra direta. A barra não tem mais rolagem interna; em telas baixas, acompanha a rolagem normal da página.
 
 - **2026-09-24** — Incluiu o ITBI no custo total de imóveis de qualquer município e estado brasileiro. Curitiba e Londrina mantêm as referências municipais revisadas; as demais cidades recebem uma estimativa inicial de 3%, claramente identificada e acompanhada da orientação para confirmar alíquota e base de cálculo na prefeitura. O catálogo agora entrega essa referência mesmo antes do enriquecimento, e a próxima materialização agendada atualizará análises persistidas sob a nova versão da regra.

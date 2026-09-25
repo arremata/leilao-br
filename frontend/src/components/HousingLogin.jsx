@@ -35,8 +35,8 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
         try {
           setBusy(true);
           setError('');
-          await loginWithGoogle(credential);
-          navigate(creating ? '/perfil' : signedInDestination, { replace: true });
+          const signedInUser = await loginWithGoogle(credential);
+          navigate(creating || !signedInUser.housing_profile ? '/perfil' : '/', { replace: true });
         } catch (err) {
           setError(err.message || 'Não foi possível entrar com o Google. Tente de novo.');
         } finally {
@@ -78,14 +78,14 @@ export default function HousingLogin({ onSignUp, onSignIn, initialMode = 'signup
     <section className="auth-story">
       <Link className="auth-brand" to="/?busca=todos"><span className="logo" />Argos</Link>
       <div><span className="housing-eyebrow">UM CAMINHO MAIS CLARO ATÉ SEU LAR</span><h1>Encontre uma oportunidade que caiba na sua vida.</h1><p>Organize sua busca, compare imóveis e entenda os custos antes de decidir.</p></div>
-      <ul><li><b>01</b> Preferências de moradia em um só lugar</li><li><b>02</b> Imóveis de acordo com seu orçamento</li><li><b>03</b> Próximos passos depois da arrematação</li></ul>
+      <ul><li><b>01</b> Seu perfil de moradia salvo</li><li><b>02</b> Filtros de busca sob seu controle</li><li><b>03</b> Próximos passos depois da arrematação</li></ul>
     </section>
     <section className="auth-panel" aria-labelledby="auth-title">
       <div className="auth-card">
         <div className="auth-tabs" aria-label="Acesso à conta"><button type="button" aria-pressed={creating} onClick={() => changeMode('signup')}>Criar conta</button><button type="button" aria-pressed={!creating} onClick={() => changeMode('signin')}>Entrar</button></div>
         <span className="housing-eyebrow">{creating ? 'COMECE SUA BUSCA' : 'BEM-VINDO DE VOLTA'}</span>
         <h2 id="auth-title">{creating ? 'Crie sua conta' : 'Acesse sua conta'}</h2>
-        <p className="housing-muted">{creating ? 'Depois, vamos entender onde e como você quer morar.' : 'Continue sua busca e reveja suas preferências.'}</p>
+        <p className="housing-muted">{creating ? 'Depois, vamos entender onde e como você quer morar.' : 'Continue sua busca e reveja seus imóveis.'}</p>
         <form onSubmit={submit}>
           <div className="housing-fields">
             {creating && <label className="housing-field"><span>Nome completo</span><input type="text" value={form.name} onChange={event => update('name', event.target.value)} required minLength={3} maxLength={120} autoComplete="name" placeholder="Como podemos chamar você?" /></label>}

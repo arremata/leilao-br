@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS housing_profile JSONB;
+
 CREATE TABLE IF NOT EXISTS user_saved_properties (
   user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   property_id  BIGINT NOT NULL,

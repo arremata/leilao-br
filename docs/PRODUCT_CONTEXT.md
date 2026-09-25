@@ -81,14 +81,16 @@ no HTML do servidor, o que ainda não é feito.
   catálogo sem configurar.
 - Previews de branch abrem diretamente no catálogo público, sem exigir conta,
   para que a validação use os imóveis reais sem criar identidades de teste.
-- Preferências de moradia ficam neste navegador. Nos próximos acessos, a lista
-  única de todos os imóveis abre com cidade, tipo e faixa de preço já aplicados.
-  Cada escolha aparece como filtro removível, e a pessoa pode ajustar ou limpar
-  tudo sem perder o perfil salvo. Tipo de venda, disponibilidade, modalidade,
-  rodada e desconto ficam na mesma barra lateral; não existe um segundo painel
-  de filtros sobre os resultados. A barra usa controles compactos e a rolagem
-  normal da página, sem uma área interna rolável. Compra direta não mostra
-  opções de rodada ou modalidade próprias de leilão.
+- Cidade, tipo de imóvel e faixa de preço do questionário formam um perfil
+  cadastral e não filtram o catálogo. Na conta Google, esse perfil fica no banco;
+  na conta local de e-mail e senha, permanece somente neste navegador enquanto
+  essa entrada continuar como protótipo.
+- Todos os filtros da busca ficam numa única barra lateral e são aplicados pela
+  própria pessoa. Cidade usa autocomplete; tipo de venda, localização, tipo de
+  imóvel, orçamento, disponibilidade, modalidade, rodada e desconto não têm uma
+  seção separada de “preferências”, botão de aplicar nem ações de salvar ou
+  restaurar perfil. A barra usa a rolagem normal da página, sem área interna
+  rolável. Compra direta não mostra opções próprias de leilão.
 - A faixa de preço limita somente o valor inicial do imóvel. Taxas, reforma,
   eventual desocupação e outras despesas continuam explicadas em cada imóvel;
   a faixa não garante custo final nem aprovação de financiamento.
@@ -203,9 +205,9 @@ venda, sem inventar um edital individual inexistente.
    A interface não usa "análise jurídica", "parecer", "assessoria jurídica" nem
    "consultoria jurídica" — o que o produto faz é leitura de documento e
    organização de informação.
-5. **Sem personalização fictícia:** a interface usa somente nome, conta e
-   preferências preenchidos pela própria pessoa. Apenas a sessão Google é
-   autenticação no servidor; a sessão de e-mail e senha continua local.
+5. **Sem personalização fictícia:** o perfil cadastral preenchido pela pessoa não
+   altera o catálogo sozinho. Apenas a sessão Google e seu perfil são persistidos
+   no servidor; a sessão de e-mail e senha continua local.
 6. **Segurança proporcional ao impacto:** qualquer ação que grave em produção é
    tratada como uma ação real, inclusive quando executada em preview.
 

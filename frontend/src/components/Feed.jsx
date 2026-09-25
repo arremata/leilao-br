@@ -57,7 +57,14 @@ function patchSearchParams(current, patch) {
   return next;
 }
 
-export function CatalogSidebarFilters({ properties, hideHousingDuplicates = false, onCollapse }) {
+export function CatalogSidebarFilters({
+  properties,
+  hideHousingDuplicates = false,
+  onCollapse,
+  additionalFilters = null,
+  additionalFilterCount = 0,
+  additionalClearPatch = {},
+}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { kind, filters } = readParams(searchParams);
   const setParams = useCallback((patch) => {
@@ -121,7 +128,8 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
     + (filters.modalidade !== 'Todos' ? 1 : 0)
     + (filters.showExpired ? 1 : 0)
     + (!hideHousingDuplicates && filters.city !== 'Todas' ? 1 : 0)
-    + (!hideHousingDuplicates && filters.propertyType !== 'Todos' ? 1 : 0);
+    + (!hideHousingDuplicates && filters.propertyType !== 'Todos' ? 1 : 0)
+    + additionalFilterCount;
 
   function setKind(value) {
     setParams({
@@ -135,6 +143,7 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
     const cleared = {
       estado: 'Todos', rodada: 'Todos', modalidade: 'Todos',
       desconto: '0', encerrados: '0',
+      ...additionalClearPatch,
     };
     if (!hideHousingDuplicates) Object.assign(cleared, { cidade: 'Todas', tipo: 'Todos' });
     setParams(cleared);
@@ -178,6 +187,8 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
         </div>
       </button>
     </div>
+
+    {additionalFilters}
 
     {stateOptions.length > 2 && <div className="feed-rail-section">
       {!hideHousingDuplicates && <span className="uppy feed-rail-section-title">Estado</span>}
@@ -253,7 +264,7 @@ export function CatalogSidebarFilters({ properties, hideHousingDuplicates = fals
       className="btn ghost sm feed-rail-clear"
       onClick={clearVisibleFilters}
       style={{ color: 'var(--accent)' }}
-    >Limpar filtros do catálogo ({visibleFilterCount})</button>}
+    >Limpar filtros ({visibleFilterCount})</button>}
   </div>;
 }
 

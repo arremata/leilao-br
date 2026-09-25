@@ -1,7 +1,7 @@
 import { validateHousingProfile } from './housingProfile.js';
 
-// Adapter boundary for future authenticated persistence. This is browser
-// storage, never an authentication token or an authorization check.
+// Browser-only fallback for the local email/password prototype. Google-backed
+// accounts persist this profile through /me/housing-profile instead.
 export const housingProfileKey = 'argos_housing_profile_v1';
 const housingProfileVersion = 2;
 export function readHousingProfile(storage = window.localStorage) {

@@ -4,6 +4,7 @@ import HousingFeed from './components/HousingFeed';
 import HousingQuestionnaire from './components/HousingQuestionnaire';
 import HousingLogin from './components/HousingLogin';
 import { readHousingProfile, saveHousingProfile } from './housingStorage';
+import { housingProfileForApi, housingProfileFromUser } from './housingProfile';
 import { shouldShowHousingOnboarding, shouldUseAccountScreen } from './housingEntry';
 import { createLocalAccount, readLocalSession, signInLocal, signOutLocal } from './localAuth';
 import PropertyRoute from './components/PropertyRoute';
@@ -20,7 +21,12 @@ const previewCanWrite = import.meta.env.VITE_PREVIEW_WRITES === 'true';
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user: authUser, isAuthed, logout: authLogout } = useAuth();
+  const {
+    user: authUser,
+    isAuthed,
+    logout: authLogout,
+    updateHousingProfile,
+  } = useAuth();
   // Local email/password account is their prototype layer; the real session is
   // AuthContext. When a Google login lands, AuthContext's user takes over.
   const [account, setAccount] = useState(() => {
@@ -29,7 +35,6 @@ function App() {
   const [housingProfile, setHousingProfile] = useState(() => {
     try { return readHousingProfile(); } catch { return null; }
   });
-  const [housingSearch, setHousingSearch] = useState(null);
   const [watched, setWatched] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('arremate_watched') || '[]');
@@ -50,12 +55,17 @@ function App() {
   // This lets the HousingLogin screen serve both mechanisms: "Entrar com Google"
   // hits the real backend; the email/password form stays as the local prototype.
   const effectiveAccount = authUser || account;
+  const effectiveHousingProfile = authUser ? housingProfileFromUser(authUser) : housingProfile;
 
   const saveProfile = useCallback(async (profile) => {
+    if (isAuthed) {
+      const updatedUser = await updateHousingProfile(housingProfileForApi(profile));
+      return housingProfileFromUser(updatedUser);
+    }
     const saved = saveHousingProfile(profile);
     setHousingProfile(saved);
-    setHousingSearch(null);
-  }, []);
+    return saved;
+  }, [isAuthed, updateHousingProfile]);
   const signUp = useCallback(async (input) => {
     const user = await createLocalAccount(input);
     setAccount(user);
@@ -70,7 +80,6 @@ function App() {
     signOutLocal();
     authLogout();
     setAccount(null);
-    setHousingSearch(null);
     navigate('/entrar');
   }, [navigate, authLogout]);
 
@@ -220,13 +229,11 @@ function App() {
       <Routes>
         <Route path="/" element={
           <HousingEntry
-            profile={housingProfile}
+            profile={effectiveHousingProfile}
             account={effectiveAccount}
             onSignUp={signUp}
             onSignIn={signIn}
             onSave={saveProfile}
-            appliedProfile={housingSearch}
-            onApply={setHousingSearch}
             cities={cities}
             watched={watched}
             toggleWatch={toggleWatch}
@@ -234,8 +241,8 @@ function App() {
             loading={catalogLoading}
           />
         } />
-        <Route path="/entrar" element={<HousingLogin onSignUp={signUp} onSignIn={signIn} initialMode={effectiveAccount ? 'signin' : 'signup'} signedInDestination={housingProfile ? '/' : '/perfil'} />} />
-        <Route path="/perfil" element={effectiveAccount ? <HousingQuestionnaire key={JSON.stringify(housingProfile)} initialProfile={housingProfile} cities={cities} onSave={saveProfile} /> : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
+        <Route path="/entrar" element={<HousingLogin onSignUp={signUp} onSignIn={signIn} initialMode={effectiveAccount ? 'signin' : 'signup'} signedInDestination={effectiveHousingProfile ? '/' : '/perfil'} />} />
+        <Route path="/perfil" element={effectiveAccount ? <HousingQuestionnaire key={JSON.stringify(effectiveHousingProfile)} initialProfile={effectiveHousingProfile} cities={cities} onSave={saveProfile} /> : <HousingLogin onSignUp={signUp} onSignIn={signIn} signedInDestination="/perfil" />} />
         <Route path="/imovel/:id" element={
           <PropertyRoute
             properties={properties}
@@ -300,7 +307,6 @@ function HousingEntry(props) {
     isPreview,
     account: props.account,
     profile: props.profile,
-    appliedProfile: props.appliedProfile,
     searchParamCount: params.size,
   })) {
     if (!props.account) return <HousingLogin onSignUp={props.onSignUp} onSignIn={props.onSignIn} signedInDestination={props.profile ? '/' : '/perfil'} />;

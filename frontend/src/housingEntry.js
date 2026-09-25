@@ -2,11 +2,10 @@ export function shouldShowHousingOnboarding({
   isPreview,
   account,
   profile,
-  appliedProfile,
   searchParamCount,
 }) {
   if (isPreview) return false;
-  return (!account || !profile) && !appliedProfile && searchParamCount === 0;
+  return (!account || !profile) && searchParamCount === 0;
 }
 
 export function shouldUseAccountScreen({ pathname, isPreview, account, hasSearch }) {

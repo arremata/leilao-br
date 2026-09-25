@@ -29,6 +29,37 @@ export function validateHousingProfile(value) {
   if (!['Todos', 'Casa', 'Apartamento'].includes(profile.propertyType)) profile.propertyType = 'Todos';
   return profile;
 }
+
+export function housingProfileFromUser(user) {
+  const stored = user?.housing_profile;
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return null;
+  return validateHousingProfile({
+    city: stored.city,
+    propertyType: stored.property_type,
+    budget: stored.budget ?? '',
+  });
+}
+
+export function housingProfileForApi(value) {
+  const profile = validateHousingProfile(value);
+  if (!profile) throw new Error('Perfil inválido.');
+  return {
+    city: profile.city,
+    property_type: profile.propertyType,
+    budget: profile.budget || null,
+  };
+}
+
+export function housingFiltersFromSearchParams(searchParams) {
+  const requestedPropertyType = searchParams.get('tipo');
+  return {
+    city: searchParams.get('cidade') || '',
+    neighborhood: searchParams.get('bairro') || '',
+    propertyType: ['Casa', 'Apartamento'].includes(requestedPropertyType) ? requestedPropertyType : 'Todos',
+    budget: searchParams.get('orcamento') || '',
+  };
+}
+
 export function filterHousingProperties(properties, profile) {
   if (!profile) return properties;
   return properties.filter(p => {
