@@ -132,8 +132,10 @@ export default function HousingQuestionnaire({
     try {
       await onSave(valid);
       navigate(successDestination, { replace: true });
-    } catch {
-      setError('Não foi possível salvar o perfil. Tente novamente.');
+    } catch (saveError) {
+      setError(saveError instanceof Error && saveError.message
+        ? saveError.message
+        : 'Não foi possível salvar o perfil. Tente novamente.');
     } finally {
       setSaving(false);
     }

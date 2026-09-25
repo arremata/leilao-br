@@ -31,9 +31,22 @@ async function request(path, {
 
 async function _detail(res) {
   try {
-    const data = await res.json();
-    return typeof data?.detail === 'string' ? data.detail : null;
+    return apiErrorMessage(await res.json());
   } catch { return null; }
+}
+
+export function apiErrorMessage(data) {
+  if (typeof data?.detail === 'string') return data.detail;
+  if (!Array.isArray(data?.detail)) return null;
+  const invalidFields = new Set(data.detail.flatMap(item => (
+    Array.isArray(item?.loc) ? item.loc.slice(-1) : []
+  )));
+  if (invalidFields.has('city')) return 'Informe uma cidade válida para continuar.';
+  if (invalidFields.has('budget')) return 'Escolha uma faixa de preço para concluir seu perfil.';
+  if (invalidFields.has('property_type') || invalidFields.has('propertyType')) {
+    return 'Escolha um tipo de imóvel válido para continuar.';
+  }
+  return 'Revise os dados informados e tente novamente.';
 }
 
 export const authApi = {
