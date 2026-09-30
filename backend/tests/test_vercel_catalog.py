@@ -95,8 +95,10 @@ def test_vercel_catalog_promotes_current_second_round_price():
 
 
 def test_edital_data_is_selected_only_for_catalog_detail():
-    assert "edital_data" not in vercel_api._CATALOG_COLUMNS
-    assert "edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS
+    # A lista lê só a ocupação e as formas de pagamento, nunca a ficha inteira.
+    assert "AS edital_data" not in vercel_api._CATALOG_COLUMNS
+    assert vercel_api._CATALOG_COLUMNS.count("'edital_data'->>") == 2
+    assert "AS edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS
 
 
 def test_catalog_condominium_cost_uses_type_and_official_description():

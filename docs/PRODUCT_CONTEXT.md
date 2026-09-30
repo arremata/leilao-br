@@ -141,9 +141,11 @@ chegar ao fim das regras oficiais registra essa leitura como concluída. O avan�
 de cada imóvel pertence à conta Google: ao voltar ao imóvel, em qualquer
 dispositivo, as etapas marcadas continuam marcadas.
 
-O produto não chama nenhum valor de “seu limite”: a comparação com a avaliação
-oficial continua disponível na área de preços, sem parecer uma recomendação de
-oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
+O produto não calcula um limite de oferta a partir da avaliação oficial: essa
+comparação continua disponível na área de preços, sem parecer uma recomendação.
+A conta começa pelo orçamento total que a pessoa informa, com todos os custos
+dentro; a tela mostra até onde o lance pode ir, a margem acima do valor inicial
+para disputar e, num slider, o total e a sobra para cada lance simulado. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
 
@@ -152,6 +154,21 @@ vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
 encerrada; a interface não mistura o rótulo de uma rodada com os dados da outra.
 Esse mesmo valor vigente alimenta a proposta inicial, os custos, o desconto e o
 prazo mostrados na página.
+
+O prazo nunca aparece como um “Encerrado” genérico: o card e a página dizem de
+qual rodada é a contagem (“2ª rodada termina em”) e qual rodada já passou
+(“1ª rodada encerrada em 28 de set.”). No card de Leilão SFI, as duas rodadas
+aparecem lado a lado, com preço, data e quanto a segunda custa a menos. A
+licitação aberta aparece como “Rodada única”, com o aviso de que não existe 2ª
+rodada com preço menor. Na página, os valores aparecem na ordem valor inicial,
+outra rodada e avaliação. Os cards do catálogo têm todos a mesma altura.
+
+Cada card e cada página mostram, pela ficha oficial da Caixa, se o imóvel está
+ocupado, desocupado ou sem essa informação, se aceita FGTS e se aceita
+financiamento (ou se é só à vista). Quando a Caixa informa que o imóvel está
+desocupado, a desocupação entra na conta como zero; ocupado ou sem informação
+mantém a reserva sugerida de R$ 5.000. A pessoa pode ajustar o valor em qualquer
+caso.
 
 O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
 alíquota municipal foi revisada, a conta usa essa referência e identifica a

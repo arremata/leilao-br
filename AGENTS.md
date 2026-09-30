@@ -214,6 +214,27 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
+  do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
+  `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da
+  Caixa (lendo só esses dois campos, não a ficha inteira). O card ganhou selos
+  de ocupação, FGTS e financiamento e, em Leilão SFI, as duas rodadas lado a
+  lado; o contador e a página dizem de qual rodada é o prazo e qual já passou,
+  em vez de um “Encerrado” genérico. A desocupação sugerida é zero quando a
+  Caixa afirma que o imóvel está desocupado. A busca de cidade perdeu o anel de
+  foco duplo e ficou com uma borda só. Na mesma entrega: “Quanto você vai pagar”
+  passou a começar pelo orçamento total (PD-017), com lance máximo, margem para
+  disputar, slider de lance e barra lance/custos/sobra; licitação aberta é
+  identificada como “Rodada única”; os cards do grid têm a mesma altura; a
+  avaliação vai por último no quadro de preços. Corrigido: salvar de dentro da
+  página de um imóvel já analisado gravava o id da análise (hash), não o do
+  catálogo, e o imóvel nunca aparecia em Salvos. Ainda: a avaliação subiu para
+  o lado do prazo no topo da página, liberando o quadro de preços para as duas
+  rodadas; os dois quadros de rodada do card seguem a mesma grade (título,
+  situação, preço sem centavos, data e rodapé reservado) e o mesmo tamanho de
+  letra; “Carregar mais” deixou de levar a página ao topo, porque mudar só
+  `pagina` no endereço não conta mais como tela nova.
+
 - **2026-09-30** — Incluiu a situação oficial dos lances nos imóveis da Caixa,
   sem confundir valor inicial com valor já ofertado. Quando a Caixa ou o
   leiloeiro oficial publica o dado, a página mostra o maior lance, a quantidade

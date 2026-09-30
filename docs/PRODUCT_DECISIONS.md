@@ -303,6 +303,23 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   seguir. A única identidade aceita é a conta Google. A exceção do preview não
   altera a regra de entrada da produção nem cria autorização de escrita.
 
+### PD-017 — Começar a conta pelo orçamento total da pessoa
+
+- **Data:** 30 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** “Quanto você vai pagar” começa perguntando quanto a pessoa tem
+  para gastar no total, com todos os custos dentro. A tela responde até onde o
+  lance pode ir e quanto isso fica acima do valor inicial, e um slider simula
+  cada lance com o total e a sobra do orçamento.
+- **Motivo:** o campo de lance sozinho não respondia à pergunta de quem compra
+  para morar (“até quanto posso dar de lance com o dinheiro que tenho?”), porque
+  o lance é só uma parte do que se paga até a chave.
+- **Consequências:** o valor-limite do lance vem do número que a própria pessoa
+  informou, não de uma referência do Argos; por isso não contradiz a PD-012,
+  que retirou um limite calculado a partir da avaliação. Sem orçamento
+  informado, a tela mostra o total até a chave com o valor inicial. Venda direta
+  mostra apenas se cabe e quanto sobra, sem simular lance.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

@@ -973,6 +973,36 @@ def _current_auction(p: dict, now: datetime) -> tuple[int | None, float, datetim
     return None, minimum, None
 
 
+def _normalized_text(value) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    return "".join(ch for ch in text if not unicodedata.combining(ch)).casefold().strip()
+
+
+def _listing_facts(occupancy, payment_methods) -> dict:
+    """Ocupação, FGTS e financiamento para o card.
+
+    Cópia de `backend/listing_facts.py`; `test_listing_facts.py` mantém as duas
+    em sincronia.
+    """
+    occupancy_text = _normalized_text(occupancy)
+    # "desocupado" contém "ocupado": a ordem importa.
+    status = (
+        "vacant" if "desocupad" in occupancy_text
+        else "occupied" if "ocupad" in occupancy_text
+        else "unknown"
+    )
+    payment_text = _normalized_text(payment_methods)
+    if not payment_text:
+        return {"occupancy": status, "acceptsFgts": None, "acceptsFinancing": None}
+    return {
+        "occupancy": status,
+        "acceptsFgts": "fgts" in payment_text
+        and "nao permite utilizacao de fgts" not in payment_text,
+        "acceptsFinancing": "permite financiamento" in payment_text
+        and "nao permite financiamento" not in payment_text,
+    }
+
+
 def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     p = dict(row)
     auction_dates = [
@@ -1052,6 +1082,11 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "itbiSource": itbi["source"] if itbi else None,
         "itbiEstimated": itbi["estimated"] if itbi else None,
     }
+    edital = p.get("edital_data") if isinstance(p.get("edital_data"), dict) else {}
+    card.update(_listing_facts(
+        edital.get("occupancy") or p.get("edital_occupancy"),
+        edital.get("paymentMethods") or p.get("edital_payment_methods"),
+    ))
     if include_edital_data:
         card["editalData"] = p.get("edital_data")
     return card
@@ -1063,7 +1098,9 @@ _CATALOG_COLUMNS = """
     second_auction_price, lat, lng, photo_url, detail_url, status, descricao_raw,
     to_jsonb(properties)->>'matricula' AS matricula,
     to_jsonb(properties)->>'edital_url' AS edital_url,
-    to_jsonb(properties)->>'matricula_url' AS matricula_url
+    to_jsonb(properties)->>'matricula_url' AS matricula_url,
+    to_jsonb(properties)->'edital_data'->>'occupancy' AS edital_occupancy,
+    to_jsonb(properties)->'edital_data'->>'paymentMethods' AS edital_payment_methods
 """
 
 _CATALOG_DETAIL_COLUMNS = _CATALOG_COLUMNS + """,
