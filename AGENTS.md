@@ -214,6 +214,12 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-30** — Corrigiu a disponibilidade da Venda Direta Online para não
+  declarar encerrado um imóvel que continua ativo na Caixa. Datas antigas de
+  outras etapas deixam de reaparecer no catálogo ou em análises salvas; quando
+  a Caixa publica uma disputa vigente, a página usa somente o prazo futuro do
+  contador oficial. Sem prazo atual confirmado, mostra “Sem prazo divulgado”.
+
 - **2026-09-30** — Incluiu a situação oficial dos lances nos imóveis da Caixa,
   sem confundir valor inicial com valor já ofertado. Quando a Caixa ou o
   leiloeiro oficial publica o dado, a página mostra o maior lance, a quantidade

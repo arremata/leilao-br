@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sfiAuctionPricing } from './auctionPricing.js';
+import {
+  catalogDeadline,
+  currentPriceDate,
+  sfiAuctionPricing,
+} from './auctionPricing.js';
 
 test('uses the second-round price and date when the second round is current', () => {
   const pricing = sfiAuctionPricing({
@@ -51,4 +55,26 @@ test('falls back to the API current minimum if the second-round detail is missin
 
   assert.equal(pricing.current.price, 230_100.35);
   assert.equal(pricing.current.date, '2026-10-02T10:00:00-03:00');
+});
+
+test('an explicit missing catalog deadline cannot revive a stale analysis date', () => {
+  assert.equal(catalogDeadline(
+    { endsAt: null },
+    { endsAt: '2026-09-02T10:00:00-03:00' },
+  ), null);
+  assert.equal(catalogDeadline(
+    {},
+    { endsAt: '2026-10-03T18:00:00-03:00' },
+  ), '2026-10-03T18:00:00-03:00');
+});
+
+test('direct-sale price never displays a historical auction date', () => {
+  assert.equal(currentPriceDate({
+    modalidade: 'Venda Direta Online',
+    firstAuctionAt: '2026-09-02T10:00:00-03:00',
+  }), null);
+  assert.equal(currentPriceDate({
+    modalidade: 'Licitação Aberta',
+    firstAuctionAt: '2026-10-05T10:00:00-03:00',
+  }), '2026-10-05T10:00:00-03:00');
 });

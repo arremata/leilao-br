@@ -42,3 +42,25 @@ export function sfiAuctionPricing(property) {
     ? { current: second, previous: first, upcoming: null }
     : { current: first, previous: null, upcoming: second };
 }
+
+/**
+ * `null` from the current catalog is meaningful: it says there is no verified
+ * current deadline. Only fall back when talking to an older API that omitted
+ * the field entirely.
+ */
+export function catalogDeadline(catalogProperty, enrichment) {
+  const catalog = catalogProperty || {};
+  if (Object.prototype.hasOwnProperty.call(catalog, 'endsAt')) {
+    return catalog.endsAt ?? null;
+  }
+  return enrichment?.endsAt ?? null;
+}
+
+/** Historical auction dates do not describe the current direct-sale price. */
+export function currentPriceDate(property) {
+  const p = property || {};
+  if (String(p.modalidade || '').toLowerCase().includes('venda direta')) {
+    return null;
+  }
+  return p.edital?.firstBidDate || p.firstAuctionAt || null;
+}

@@ -166,6 +166,8 @@ detail pipeline:
   - `full_description` — tag-stripped page text.
   - property-specific edital facts such as item, IPTU registration, registry
     office, occupancy, accepted payment methods, and expense rules.
+  - the current Venda Online dispute deadline embedded in Caixa's official
+    countdown, stored as `onlineDisputeEndAt`.
 - Each shared edital PDF is downloaded once per run. Its text is parsed without
   an LLM, and Annex II rows are matched by Caixa property number to recover the
   official auction number, auctioneer contacts, commission, deadlines, values,
@@ -179,6 +181,9 @@ detail pipeline:
   and consultation time—never bidder names or identifiers. A failed or
   unsupported source preserves the last verified fact and never becomes a
   synthetic zero.
+- Active direct sales ignore legacy auction-date columns. Only a future
+  `onlineDisputeEndAt` can drive their countdown; otherwise the API returns no
+  deadline so persisted analyses cannot revive a stale “ended” state.
 
 ---
 

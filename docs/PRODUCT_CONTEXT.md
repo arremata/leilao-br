@@ -237,7 +237,9 @@ leiloeiro. A interface deve falar em preço, proposta, documentos e regras da
 venda, sem inventar um edital individual inexistente. A Caixa pode transformar
 propostas da Venda Online em uma disputa pública; nesse caso, o maior lance
 registrado aparece separado do preço mínimo e continua sem transformar a
-modalidade em Leilão SFI.
+modalidade em Leilão SFI. Um imóvel ainda ativo nunca é declarado encerrado por
+uma data antiga: durante uma disputa, vale somente o prazo futuro do contador
+oficial da Caixa; fora dela, a interface informa que não há prazo divulgado.
 
 ## Princípios de produto
 

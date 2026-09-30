@@ -58,6 +58,11 @@ _AUCTION_PRICE_RE = re.compile(
     r"\s*:\s*R\$\s*([\d.]+,\d{2})",
     re.IGNORECASE,
 )
+_ONLINE_DISPUTE_END_RE = re.compile(
+    r"carregaContador\.asp.*?['\"]1@@['\"]\s*\+\s*"
+    r"['\"](\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2})['\"]",
+    re.IGNORECASE | re.DOTALL,
+)
 _SAO_PAULO = ZoneInfo("America/Sao_Paulo")
 _DETAIL_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -94,6 +99,18 @@ def _parse_auction_prices(text: str) -> tuple[float | None, float | None]:
         for number, value in _AUCTION_PRICE_RE.findall(text)
     }
     return prices.get("1"), prices.get("2")
+
+
+def _parse_online_dispute_end(html: str) -> datetime | None:
+    match = _ONLINE_DISPUTE_END_RE.search(html or "")
+    if not match:
+        return None
+    try:
+        return datetime.strptime(match.group(1), "%d/%m/%Y %H:%M:%S").replace(
+            tzinfo=_SAO_PAULO
+        )
+    except ValueError:
+        return None
 
 
 def _detail_value(text: str, pattern: str) -> str:
@@ -201,6 +218,9 @@ def parse_detail_html(html: str, base_url: str) -> dict:
     first_auction_price, second_auction_price = _parse_auction_prices(text)
 
     edital_data = _parse_detail_edital_data(text)
+    online_dispute_end = _parse_online_dispute_end(html)
+    if online_dispute_end is not None:
+        edital_data["onlineDisputeEndAt"] = online_dispute_end.isoformat()
     if sale_rules_url:
         edital_data["saleRulesUrl"] = sale_rules_url
 

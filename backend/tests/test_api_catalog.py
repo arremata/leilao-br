@@ -151,6 +151,29 @@ def test_catalog_card_uses_current_second_round_price_and_discount():
     api.app.dependency_overrides.clear()
 
 
+def test_direct_sale_never_reuses_stale_date_and_detail_uses_online_deadline():
+    client, factory = _client_with_db()
+    tz = ZoneInfo("America/Sao_Paulo")
+    with factory() as s:
+        prop = Property(
+            source="caixa", source_id="1155533600447", uf="PR",
+            address="Rua Rubens Sebastiao Marin", modalidade="Venda Direta Online",
+            preco=366_455.72, status="active",
+            first_auction_at=datetime(2026, 9, 2, 10, 0, tzinfo=tz),
+            edital_data={"onlineDisputeEndAt": "2099-10-03T18:00:00-03:00"},
+        )
+        s.add(prop)
+        s.commit()
+        property_id = prop.id
+
+    list_card = client.get("/catalog?uf=PR").json()[0]
+    detail_card = client.get(f"/catalog/{property_id}").json()
+
+    assert list_card["endsAt"] is None
+    assert detail_card["endsAt"] == "2099-10-03T18:00:00-03:00"
+    api.app.dependency_overrides.clear()
+
+
 def test_catalog_card_title_falls_back_to_address_without_type():
     client, factory = _client_with_db()
     with factory() as s:

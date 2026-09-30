@@ -124,28 +124,21 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
             value = value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
         return value.isoformat()
 
-    auction_dates = [
-        value for value in (p.first_auction_at, p.second_auction_at)
-        if value is not None
-    ]
     now = datetime.now(timezone.utc)
-    comparable_dates = [
-        value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
-        if value.tzinfo is None else value
-        for value in auction_dates
-    ]
-    next_auction_at = next(
-        (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
-        comparable_dates[-1] if comparable_dates else None,
-    )
     modalidade = p.modalidade or ""
-    round_number, current_price, _ = resolve_current_auction(
+    edital_data = (
+        p.edital_data
+        if include_edital_data and isinstance(p.edital_data, dict)
+        else {}
+    )
+    round_number, current_price, current_at = resolve_current_auction(
         modalidade=modalidade,
         minimum_price=p.preco,
         first_at=p.first_auction_at,
         second_at=p.second_auction_at,
         first_price=p.first_auction_price,
         second_price=p.second_auction_price,
+        online_end_at=edital_data.get("onlineDisputeEndAt"),
         now=now,
     )
     praca = f"{round_number}ª praça" if round_number else None
@@ -178,7 +171,7 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         "secondAuctionAt": _iso(p.second_auction_at),
         "firstAuctionPrice": p.first_auction_price,
         "secondAuctionPrice": p.second_auction_price,
-        "endsAt": _iso(next_auction_at),
+        "endsAt": _iso(current_at),
         "lat": p.lat,
         "lng": p.lng,
         "photoUrl": p.photo_url,

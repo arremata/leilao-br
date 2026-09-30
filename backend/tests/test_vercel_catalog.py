@@ -94,6 +94,25 @@ def test_vercel_catalog_promotes_current_second_round_price():
     assert card["endsAt"] == "2099-10-02T10:00:00-03:00"
 
 
+def test_vercel_direct_sale_suppresses_stale_date_and_uses_online_deadline():
+    tz = ZoneInfo("America/Sao_Paulo")
+    base = {
+        "id": 592, "source_id": "1155533600447", "source": "caixa",
+        "uf": "PR", "address": "Rua Rubens Sebastiao Marin",
+        "preco": 366_455.72, "modalidade": "Venda Direta Online",
+        "status": "active",
+        "first_auction_at": datetime(2026, 9, 2, 10, tzinfo=tz),
+    }
+
+    assert vercel_api._catalog_card(base)["endsAt"] is None
+
+    detail = vercel_api._catalog_card({
+        **base,
+        "edital_data": {"onlineDisputeEndAt": "2099-10-03T18:00:00-03:00"},
+    }, include_edital_data=True)
+    assert detail["endsAt"] == "2099-10-03T18:00:00-03:00"
+
+
 def test_edital_data_is_selected_only_for_catalog_detail():
     assert "edital_data" not in vercel_api._CATALOG_COLUMNS
     assert "edital_data" in vercel_api._CATALOG_DETAIL_COLUMNS

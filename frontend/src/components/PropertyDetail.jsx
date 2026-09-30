@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Countdown, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
-import { sfiAuctionPricing } from '../auctionPricing';
+import { catalogDeadline, currentPriceDate, sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 import { useStepProgress } from '../useStepProgress';
@@ -171,7 +171,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         minBid: catalogProperty.minBid ?? enrichment.minBid,
         auctionDiscount: catalogProperty.auctionDiscount ?? enrichment.auctionDiscount,
         desconto: catalogProperty.desconto ?? enrichment.desconto,
-        endsAt: catalogProperty.endsAt ?? enrichment.endsAt,
+        endsAt: catalogDeadline(catalogProperty, enrichment),
         modalidade: catalogProperty.modalidade || enrichment.modalidade,
         auctionType: catalogProperty.auctionType || enrichment.auctionType,
         matricula: catalogProperty.matricula || enrichment.matricula,
@@ -947,7 +947,7 @@ function PricingGrid({ p }) {
     : (p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid);
   const currentBidDate = isSfiAuction
     ? sfiPricing.current.date
-    : (p.edital?.firstBidDate || p.firstAuctionAt);
+    : currentPriceDate(p);
   const otherRound = sfiPricing.upcoming || sfiPricing.previous;
   const otherRoundPrice = otherRound?.price || 0;
   const appraisal = p.appraisal || 0;

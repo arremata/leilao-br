@@ -175,6 +175,28 @@ def test_parse_detail_html_extracts_direct_sale_documents_without_script_noise()
     assert "function" not in data["expenseRules"]
 
 
+def test_parse_detail_html_extracts_official_online_dispute_deadline():
+    html = """
+      <span>Número do imóvel: 115553360044-7</span>
+      <a onclick="ExibeDoc('/editais/matricula/PR/1155533600447.pdf')">Matrícula</a>
+      <script>
+        function carregaContador() {
+          $.post("venda-online/carregaContador.asp", {
+            strLista: ("1@@" + "03/10/2026 18:00:00" + "||" + "366.456,00")
+          });
+        }
+      </script>
+    """
+
+    parsed = parse_detail_html(
+        html, base_url="https://venda-imoveis.caixa.gov.br",
+    )
+
+    assert parsed["edital_data"]["onlineDisputeEndAt"] == (
+        "2026-10-03T18:00:00-03:00"
+    )
+
+
 def test_date_batch_retries_http_200_without_dates_in_fresh_session(monkeypatch):
     sessions_created = 0
 

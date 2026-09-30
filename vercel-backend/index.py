@@ -954,7 +954,7 @@ def _iso(value) -> Optional[str]:
 
 
 def _current_auction(p: dict, now: datetime) -> tuple[int | None, float, datetime | None]:
-    """Resolve the active SFI round; keep single-event modalities unchanged."""
+    """Resolve the current official event without reviving stale deadlines."""
     minimum = float(p.get("preco") or 0)
     first = p.get("first_auction_at")
     second = p.get("second_auction_at")
@@ -962,7 +962,30 @@ def _current_auction(p: dict, now: datetime) -> tuple[int | None, float, datetim
         first = first.replace(tzinfo=SAO_PAULO)
     if second is not None and second.tzinfo is None:
         second = second.replace(tzinfo=SAO_PAULO)
-    if "sfi" not in (p.get("modalidade") or "").casefold():
+    normalized_modality = (p.get("modalidade") or "").casefold()
+    if "venda direta" in normalized_modality:
+        edital_data = p.get("edital_data")
+        raw_deadline = (
+            edital_data.get("onlineDisputeEndAt")
+            if isinstance(edital_data, dict) else None
+        )
+        try:
+            deadline = (
+                datetime.fromisoformat(raw_deadline.replace("Z", "+00:00"))
+                if isinstance(raw_deadline, str)
+                else raw_deadline if isinstance(raw_deadline, datetime) else None
+            )
+        except ValueError:
+            deadline = None
+        if deadline is not None and deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=SAO_PAULO)
+        if (
+            deadline is not None
+            and deadline.astimezone(timezone.utc) > now.astimezone(timezone.utc)
+        ):
+            return None, minimum, deadline
+        return None, minimum, None
+    if "sfi" not in normalized_modality:
         return None, minimum, first
     if first and first.astimezone(timezone.utc) >= now.astimezone(timezone.utc):
         return 1, float(p.get("first_auction_price") or minimum), first
@@ -975,19 +998,7 @@ def _current_auction(p: dict, now: datetime) -> tuple[int | None, float, datetim
 
 def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     p = dict(row)
-    auction_dates = [
-        value for value in (p.get("first_auction_at"), p.get("second_auction_at"))
-        if value is not None
-    ]
-    comparable_dates = [
-        value.replace(tzinfo=SAO_PAULO) if value.tzinfo is None else value
-        for value in auction_dates
-    ]
     now = datetime.now(timezone.utc)
-    next_auction = next(
-        (value for value in comparable_dates if value.astimezone(timezone.utc) >= now),
-        comparable_dates[-1] if comparable_dates else None,
-    )
     modalidade = p.get("modalidade") or ""
     modalidade_normalized = modalidade.lower()
     auction_type = (
@@ -996,7 +1007,7 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
             "leilão sfi", "leilao sfi", "licitação aberta", "licitacao aberta", "venda direta",
         )) else None
     )
-    round_number, current_price, _ = _current_auction(p, now)
+    round_number, current_price, current_at = _current_auction(p, now)
     praca = f"{round_number}ª praça" if round_number else None
     auction_discount = p.get("desconto_oficial")
     if p.get("avaliacao") and current_price:
@@ -1038,7 +1049,7 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "secondAuctionAt": _iso(p.get("second_auction_at")),
         "firstAuctionPrice": p.get("first_auction_price"),
         "secondAuctionPrice": p.get("second_auction_price"),
-        "endsAt": _iso(next_auction),
+        "endsAt": _iso(current_at),
         "lat": p.get("lat"),
         "lng": p.get("lng"),
         "photoUrl": p.get("photo_url"),

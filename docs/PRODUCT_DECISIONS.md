@@ -34,7 +34,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   lances. Uma fonte indisponível ou ainda não suportada não vira “nenhum lance”.
   Venda Online continua sem praça ou comissão de leiloeiro, ainda que a Caixa
   publique uma disputa entre propostas; Leilão SFI usa o site do leiloeiro
-  indicado nas regras oficiais.
+  indicado nas regras oficiais. Em Venda Online ativa, somente o prazo futuro
+  do contador oficial pode encerrar a disponibilidade; uma data histórica não
+  reaparece como prazo atual.
 
 ### PD-018 — Usar somente Google para criar conta e entrar
 

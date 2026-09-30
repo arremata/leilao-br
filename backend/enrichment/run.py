@@ -55,6 +55,7 @@ def metadata_from_property(prop) -> PropertyMetadata:
         second_at=getattr(prop, "second_auction_at", None),
         first_price=getattr(prop, "first_auction_price", None),
         second_price=getattr(prop, "second_auction_price", None),
+        online_end_at=edital_data.get("onlineDisputeEndAt"),
     )
     return PropertyMetadata(
         address=prop.address or "",
