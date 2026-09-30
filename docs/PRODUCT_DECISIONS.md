@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 25 de setembro de 2026.
+Última atualização: 30 de setembro de 2026.
 
 ## Como manter este registro
 
@@ -18,6 +18,23 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - Mudanças apenas técnicas continuam somente no changelog de `AGENTS.md`.
 
 ## Decisões ativas de produto
+
+### PD-019 — Separar lance registrado de valor inicial
+
+- **Data:** 30 de setembro de 2026
+- **Estado:** Ativa
+- **Decisão:** em imóveis da Caixa, o Argos mostra a situação dos lances somente
+  quando a Caixa ou o leiloeiro oficial publica essa informação. Maior lance,
+  quantidade e momento da consulta ficam separados do valor inicial; dados de
+  participantes não entram no produto.
+- **Motivo:** preço mínimo e lance efetivamente registrado respondem a perguntas
+  diferentes. Misturá-los esconde a concorrência real e pode levar a pessoa a
+  planejar a compra com um valor que já foi superado.
+- **Consequências:** zero só aparece quando a fonte oficial confirma que não há
+  lances. Uma fonte indisponível ou ainda não suportada não vira “nenhum lance”.
+  Venda Online continua sem praça ou comissão de leiloeiro, ainda que a Caixa
+  publique uma disputa entre propostas; Leilão SFI usa o site do leiloeiro
+  indicado nas regras oficiais.
 
 ### PD-018 — Usar somente Google para criar conta e entrar
 
@@ -189,6 +206,10 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** a ordenação padrão passa a ser relevância (proximidade da
   data mais completude dos dados); desconto continua disponível como opção, mas
   deixa de ser o padrão, porque premiava terreno sistematicamente.
+- **Emendada em 30 de setembro de 2026 por PD-019:** a separação entre as áreas
+  permanece, mas Venda Online pode entrar em disputa depois de receber
+  propostas. Quando isso ocorre, o lance oficial é mostrado sem introduzir
+  praça, leiloeiro ou comissão nessa modalidade.
 
 ### PD-011 — Cada imóvel tem um endereço próprio
 

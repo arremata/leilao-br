@@ -172,6 +172,13 @@ detail pipeline:
   and documented regularization alerts.
 - The merged payload is persisted in `properties.edital_data`; extraction is
   best-effort and incomplete rows remain eligible for retry.
+- Official aggregate bid facts are refreshed every 24 hours into
+  `edital_data.bid`. Venda Online reads Caixa's own public bid endpoint; Leilão
+  SFI reads only explicitly supported official auctioneers named in the
+  edital. The stored record contains status, count, highest amount, source URL,
+  and consultation time—never bidder names or identifiers. A failed or
+  unsupported source preserves the last verified fact and never becomes a
+  synthetic zero.
 
 ---
 

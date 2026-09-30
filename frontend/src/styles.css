@@ -249,6 +249,67 @@ a { color: inherit; text-decoration: none; }
   transform: translateY(-2px);
 }
 
+/* ---------- Official Caixa bid status ---------- */
+.official-bid-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-1);
+  border-radius: 12px;
+  background: var(--bg-0);
+}
+.official-bid-status.is-registered {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line-1));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-0));
+}
+.official-bid-status__main { min-width: 0; }
+.official-bid-status__label { color: var(--fg-3); }
+.official-bid-status.is-registered .official-bid-status__label { color: var(--accent); }
+.official-bid-status__value {
+  margin-top: 4px;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: clamp(17px, 2vw, 21px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.official-bid-status__note {
+  margin: 4px 0 0;
+  color: var(--fg-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.official-bid-status__source {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  color: var(--fg-3);
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: right;
+}
+.official-bid-status__source a {
+  margin-top: 3px;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .official-bid-status {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .official-bid-status__source {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 /* ---------- Image placeholder ---------- */
 .ph {
   position: relative;

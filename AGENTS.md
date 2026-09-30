@@ -214,6 +214,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-30** — Incluiu a situação oficial dos lances nos imóveis da Caixa,
+  sem confundir valor inicial com valor já ofertado. Quando a Caixa ou o
+  leiloeiro oficial publica o dado, a página mostra o maior lance, a quantidade
+  registrada, a origem e o horário da consulta; zero só aparece quando a fonte
+  confirma que ainda não houve lance. Fontes ainda não suportadas permanecem
+  sem afirmação. Nenhum nome ou identificador de participante é armazenado.
+
 - **2026-09-29** — Corrigiu a troca de rodada nos Leilões SFI: quando a 2ª
   rodada é a vigente, a página do imóvel agora destaca seu próprio preço e sua
   data, calcula proposta, custos e desconto contra esse valor e identifica a 1ª

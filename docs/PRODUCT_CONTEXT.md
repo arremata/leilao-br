@@ -194,6 +194,10 @@ ação equivalente à modalidade.
   menção, não como número; um veredito de risco não calculado não é publicado.
 - Valor de avaliação, preço mínimo, preços de 1º/2º leilão e estimativa de
   mercado não podem ser apresentados como se fossem o mesmo valor.
+- Em imóveis da Caixa, valor inicial e maior lance registrado também são fatos
+  diferentes. O Argos mostra um lance somente quando a Caixa ou o leiloeiro
+  oficial o publica, informa quando consultou a fonte e não guarda identidade
+  de participantes.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
@@ -217,7 +221,9 @@ ação equivalente à modalidade.
 
 É uma modalidade extrajudicial que pode ter 1º e 2º leilão, com datas e preços
 distintos. Praça e comissão de leiloeiro só aparecem quando aplicáveis e
-documentadas.
+documentadas. Quando o site do leiloeiro oficial suportado publica a disputa, a
+página pode mostrar o maior lance e a quantidade registrada; outros leiloeiros
+permanecem sem essa afirmação até terem uma leitura oficial compatível.
 
 ### Licitação Aberta
 
@@ -228,7 +234,10 @@ semântica de duas praças de um Leilão SFI.
 
 Venda direta não é leilão. Não possui praça, lote, leiloeiro ou comissão de
 leiloeiro. A interface deve falar em preço, proposta, documentos e regras da
-venda, sem inventar um edital individual inexistente.
+venda, sem inventar um edital individual inexistente. A Caixa pode transformar
+propostas da Venda Online em uma disputa pública; nesse caso, o maior lance
+registrado aparece separado do preço mínimo e continua sem transformar a
+modalidade em Leilão SFI.
 
 ## Princípios de produto
 

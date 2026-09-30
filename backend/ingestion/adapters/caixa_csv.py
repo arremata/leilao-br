@@ -19,6 +19,7 @@ import asyncio
 import os
 import unicodedata
 from typing import Optional
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from loguru import logger
 from playwright.async_api import async_playwright
@@ -217,12 +218,57 @@ class CaixaCsvAdapter:
         if self._page is None:
             return [None] * len(detail_urls)
 
+        from ingestion.adapters.caixa_bids import (
+            caixa_online_bid_state, caixa_online_bid_status_from_html,
+        )
         from ingestion.adapters.caixa_detail import detail_result_from_html
 
         results: list[dict | None] = []
         for detail_url in detail_urls:
             html = await self._fetch_detail_html(detail_url)
-            results.append(detail_result_from_html(html))
+            result = detail_result_from_html(html)
+            if result is not None:
+                table_html = ""
+                if caixa_online_bid_state(html) in {"open", "registered"}:
+                    property_number = parse_qs(
+                        urlparse(detail_url).query
+                    ).get("hdnimovel", [""])[0]
+                    if property_number:
+                        endpoint = urljoin(
+                            detail_url, "venda-online/carregaLances.asp",
+                        )
+                        try:
+                            table_html = await self._page.evaluate(
+                                """async ({ endpoint, propertyNumber }) => {
+                                  const response = await fetch(endpoint, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                      'X-Requested-With': 'XMLHttpRequest',
+                                    },
+                                    body: new URLSearchParams({
+                                      p_hdnProposta: '',
+                                      p_hdnImovel: propertyNumber,
+                                    }),
+                                  });
+                                  return response.ok ? response.text() : '';
+                                }""",
+                                {
+                                    "endpoint": endpoint,
+                                    "propertyNumber": property_number,
+                                },
+                            )
+                        except Exception as exc:
+                            logger.debug(
+                                "Browser bid table fetch failed for {}: {}",
+                                detail_url, exc,
+                            )
+                bid_status = caixa_online_bid_status_from_html(
+                    detail_url, html, bid_table_html=table_html,
+                )
+                if bid_status is not None:
+                    result.setdefault("edital_data", {})["bid"] = bid_status
+            results.append(result)
         return results
 
     def fetch_detail_html(self, detail_url: Optional[str]) -> str:

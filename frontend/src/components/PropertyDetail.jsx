@@ -5,6 +5,7 @@ import { Countdown, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
+import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 import { useStepProgress } from '../useStepProgress';
 
@@ -768,6 +769,12 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
 
+          <OfficialBidNotice p={p} />
+
+          {officialBidStatus(p) && (
+            <div className="divider" style={{ margin: '16px 0' }}></div>
+          )}
+
           {/* Pricing labels follow the official sale modality. */}
           <PricingGrid p={p} />
 
@@ -877,6 +884,55 @@ function Meta({ lbl, val }) {
       <span className="uppy" style={{ color: 'var(--fg-3)' }}>{lbl}</span>
       <div style={{ fontSize: 12.5, color: 'var(--fg-0)', marginTop: 2 }}>{val}</div>
     </div>
+  );
+}
+
+function OfficialBidNotice({ p }) {
+  const bid = officialBidStatus(p);
+  if (!bid) return null;
+
+  const checkedAt = formatBidCheckedAt(bid.fetchedAt);
+  const registered = bid.status === 'registered';
+  const countLabel = bid.count == null
+    ? ''
+    : `${bid.count} ${bid.count === 1 ? 'lance registrado' : 'lances registrados'}`;
+  return (
+    <section
+      className={`official-bid-status${registered ? ' is-registered' : ' is-empty'}`}
+      aria-label="Situação oficial dos lances"
+    >
+      <div className="official-bid-status__main">
+        <span className="uppy official-bid-status__label">
+          {registered ? 'Maior lance registrado' : 'Situação dos lances'}
+        </span>
+        <div className="official-bid-status__value">
+          {registered
+            ? bid.highestAmount
+              ? `R$ ${fmtBRL(bid.highestAmount)}`
+              : 'Há lance registrado'
+            : 'Nenhum lance registrado'}
+        </div>
+        <p className="official-bid-status__note">
+          {registered
+            ? [
+                countLabel,
+                bid.highestAmount
+                  ? 'Este é o maior valor visto na fonte oficial, não o valor inicial.'
+                  : 'A fonte oficial confirma a disputa, mas não retornou o maior valor.',
+              ].filter(Boolean).join(' · ')
+            : 'A fonte oficial informava zero lances na última consulta.'}
+        </p>
+      </div>
+      <div className="official-bid-status__source">
+        <span>{bid.sourceLabel}</span>
+        {checkedAt && <span>Consultado em {checkedAt}</span>}
+        {bid.sourceUrl && (
+          <a href={bid.sourceUrl} target="_blank" rel="noopener noreferrer">
+            Conferir agora <span aria-hidden="true">↗</span>
+          </a>
+        )}
+      </div>
+    </section>
   );
 }
 

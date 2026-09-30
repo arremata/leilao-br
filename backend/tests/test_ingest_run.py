@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from db.base import get_engine, init_db, make_session_factory
@@ -18,7 +18,7 @@ from db.models import Property
 from ingestion.adapters.base import NormalizedProperty, RawListing
 from ingestion.adapters.caixa_csv import CaixaCsvAdapter, build_photo_url
 from ingestion.run import (
-    _needs_auction_dates, _needs_detail_fetch, _needs_documents,
+    _needs_auction_dates, _needs_bid_status, _needs_detail_fetch, _needs_documents,
     _validate_photos_concurrently,
     ingest,
 )
@@ -351,6 +351,69 @@ def test_needs_documents_collects_direct_sale_once_without_requiring_edital():
     }
     assert prop.edital_url is None
     assert _needs_documents(prop) is False
+
+
+def test_needs_bid_status_refreshes_only_supported_caixa_modalities():
+    now = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    prop = Property(
+        source="caixa", source_id="1", modalidade="Venda Direta Online",
+        detail_url="https://x/detail", edital_data={},
+    )
+    assert _needs_bid_status(prop, now) is True
+
+    prop.edital_data = {
+        "bid": {"status": "none", "count": 0, "fetchedAt": now.isoformat()},
+    }
+    assert _needs_bid_status(prop, now) is False
+    assert _needs_bid_status(prop, now + timedelta(hours=25)) is True
+
+    prop.modalidade = "Licitação Aberta"
+    assert _needs_bid_status(prop, now + timedelta(hours=25)) is False
+
+
+def test_ingest_persists_official_auctioneer_bid_status_without_identity_data():
+    factory = _factory()
+    row = _row("8555534255569")
+    row.raw["modalidade"] = "Leilão SFI"
+
+    async def _fetch_details(_urls):
+        return [{
+            "first_auction_at": datetime(2026, 9, 28, 10, 0),
+            "second_auction_at": datetime(2026, 10, 2, 10, 0),
+            "first_auction_price": 344000.0,
+            "second_auction_price": 230100.35,
+            "matricula": "184967",
+            "edital_url": "https://x/edital.pdf",
+            "matricula_url": "https://x/matricula.pdf",
+            "edital_data": {
+                "lotNumber": "256",
+                "matricula": "184967",
+                "auctioneerSite": "www.kleiloes.com.br",
+            },
+        }]
+
+    async def _fetch_bids(candidates):
+        assert candidates[0]["sourceId"] == "8555534255569"
+        assert candidates[0]["editalData"]["lotNumber"] == "256"
+        return [{
+            "status": "none", "count": 0,
+            "sourceLabel": "Leiloeiro oficial",
+            "sourceUrl": "https://www.kleiloes.com.br/lote/256",
+            "fetchedAt": "2026-09-30T03:00:00+00:00",
+        }]
+
+    summary = asyncio.run(ingest(
+        factory, _StubAdapter("PR", [row]),
+        validate_photo_url=_validator([], set()),
+        fetch_auction_dates=_fetch_details,
+        fetch_official_bid_statuses=_fetch_bids,
+    ))
+
+    prop = _get_prop(factory, "8555534255569")
+    assert prop.edital_data["bid"]["status"] == "none"
+    assert prop.edital_data["bid"]["count"] == 0
+    assert "bidder" not in prop.edital_data["bid"]
+    assert summary.bids_refreshed == 1
 
 
 def test_ingest_fetches_and_persists_auction_dates_without_blocking_csv_upsert():
