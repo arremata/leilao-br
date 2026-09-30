@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 25 de setembro de 2026.
+Última atualização: 29 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -147,6 +147,12 @@ oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóvei
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
 
+Em Leilão SFI, o valor inicial e a data em destaque pertencem sempre à rodada
+vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
+encerrada; a interface não mistura o rótulo de uma rodada com os dados da outra.
+Esse mesmo valor vigente alimenta a proposta inicial, os custos, o desconto e o
+prazo mostrados na página.
+
 O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
 alíquota municipal foi revisada, a conta usa essa referência e identifica a
 prefeitura. Enquanto ela ainda não foi cadastrada, o produto reserva 3% do valor
@@ -188,6 +194,10 @@ ação equivalente à modalidade.
   menção, não como número; um veredito de risco não calculado não é publicado.
 - Valor de avaliação, preço mínimo, preços de 1º/2º leilão e estimativa de
   mercado não podem ser apresentados como se fossem o mesmo valor.
+- Em imóveis da Caixa, valor inicial e maior lance registrado também são fatos
+  diferentes. O Argos mostra um lance somente quando a Caixa ou o leiloeiro
+  oficial o publica, informa quando consultou a fonte e não guarda identidade
+  de participantes.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
@@ -211,7 +221,9 @@ ação equivalente à modalidade.
 
 É uma modalidade extrajudicial que pode ter 1º e 2º leilão, com datas e preços
 distintos. Praça e comissão de leiloeiro só aparecem quando aplicáveis e
-documentadas.
+documentadas. Quando o site do leiloeiro oficial suportado publica a disputa, a
+página pode mostrar o maior lance e a quantidade registrada; outros leiloeiros
+permanecem sem essa afirmação até terem uma leitura oficial compatível.
 
 ### Licitação Aberta
 
@@ -222,7 +234,10 @@ semântica de duas praças de um Leilão SFI.
 
 Venda direta não é leilão. Não possui praça, lote, leiloeiro ou comissão de
 leiloeiro. A interface deve falar em preço, proposta, documentos e regras da
-venda, sem inventar um edital individual inexistente.
+venda, sem inventar um edital individual inexistente. A Caixa pode transformar
+propostas da Venda Online em uma disputa pública; nesse caso, o maior lance
+registrado aparece separado do preço mínimo e continua sem transformar a
+modalidade em Leilão SFI.
 
 ## Princípios de produto
 

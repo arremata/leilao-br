@@ -80,6 +80,7 @@ class IngestSummary:
     dates_deferred: int = 0
     documents_updated: int = 0
     edital_data_updated: int = 0
+    bids_refreshed: int = 0
     browser_details_recovered: int = 0
 
 
@@ -109,6 +110,7 @@ def _needs_detail_fetch(existing: "Property | None", n: NormalizedProperty) -> b
 
 
 AUCTION_DATES_TTL = timedelta(hours=24)
+BID_STATUS_TTL = timedelta(hours=24)
 
 
 def _needs_auction_dates(prop: Property, now: datetime) -> bool:
@@ -160,6 +162,28 @@ def _needs_documents(prop: Property) -> bool:
     )
 
 
+def _needs_bid_status(prop: Property, now: datetime) -> bool:
+    """Whether an official Caixa bid source should be consulted again."""
+    if not (
+        prop.source == "caixa"
+        and prop.modalidade in {"Leilão SFI", "Venda Direta Online"}
+        and prop.detail_url
+    ):
+        return False
+    edital_data = prop.edital_data if isinstance(prop.edital_data, dict) else {}
+    bid = edital_data.get("bid") if isinstance(edital_data.get("bid"), dict) else {}
+    fetched_at = bid.get("fetchedAt")
+    if not fetched_at:
+        return True
+    try:
+        parsed = datetime.fromisoformat(str(fetched_at).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return now - parsed.astimezone(timezone.utc) >= BID_STATUS_TTL
+
+
 def _apply_fields(prop: Property, n: NormalizedProperty) -> None:
     prop.uf = n.uf
     prop.city = n.city
@@ -185,6 +209,7 @@ async def ingest(
     date_limit: Optional[int] = None,
     validate_photo_url: Callable[[str], bool] = _default_validate_photo_url,
     fetch_auction_dates=None,
+    fetch_official_bid_statuses=None,
 ) -> IngestSummary:
     summary = IngestSummary()
     try:
@@ -213,7 +238,7 @@ async def ingest(
         # operator supplies a temporary --date-limit.
         # Document-only modalities use the same paced detail-page request but
         # do not affect auction-date health metrics.
-        pending_details: list[tuple[int, str, bool, bool]] = []
+        pending_details: list[tuple[int, str, bool, bool, bool, dict]] = []
 
         with session_factory() as session:
             for raw in raws:
@@ -281,11 +306,20 @@ async def ingest(
                 if _needs_detail_fetch(existing, n) and n.photo_url:
                     pending_photos.append((prop, n.photo_url))
                 requires_date = _needs_auction_dates(prop, now)
-                if requires_date or _needs_documents(prop):
+                requires_bid = _needs_bid_status(prop, now)
+                if requires_date or _needs_documents(prop) or requires_bid:
                     pending_details.append((
                         prop.id, prop.detail_url,
                         requires_date and prop.dates_fetched_at is None,
                         requires_date,
+                        requires_bid,
+                        {
+                            "sourceId": prop.source_id,
+                            "address": prop.address,
+                            "matricula": prop.matricula,
+                            "modalidade": prop.modalidade,
+                            "editalData": prop.edital_data or {},
+                        },
                     ))
 
             # Removed detection is valid only for a complete source snapshot.
@@ -340,7 +374,7 @@ async def ingest(
             if fetch_auction_dates is None:
                 from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
                 fetch_auction_dates = fetch_auction_dates_batch
-            urls = [url for _, url, _, _ in selected_details]
+            urls = [candidate[1] for candidate in selected_details]
             detail_results = await fetch_auction_dates(urls)
 
             # The headed Chrome context used to obtain the CSV has already
@@ -375,8 +409,43 @@ async def ingest(
                     summary.browser_details_recovered, len(failed_urls),
                 )
 
+            # Caixa hosts Venda Online bids itself; those are attached while
+            # fetching the detail page above. In Leilao SFI, Caixa delegates
+            # bidding to the official auctioneer named in the notice. Resolve
+            # only supported official auctioneers and keep the aligned result
+            # best-effort so a temporary source outage never erases a previous
+            # verified value.
+            sfi_indexes: list[int] = []
+            sfi_candidates: list[dict] = []
+            for index, (candidate, result) in enumerate(
+                zip(selected_details, detail_results)
+            ):
+                metadata = candidate[5]
+                if (
+                    not candidate[4]
+                    or metadata.get("modalidade") != "Leilão SFI"
+                    or not isinstance(result, dict)
+                ):
+                    continue
+                combined_edital = {
+                    **(metadata.get("editalData") or {}),
+                    **(result.get("edital_data") or {}),
+                }
+                sfi_indexes.append(index)
+                sfi_candidates.append({**metadata, "editalData": combined_edital})
+            if sfi_candidates:
+                if fetch_official_bid_statuses is None:
+                    from ingestion.adapters.caixa_bids import (
+                        fetch_official_auctioneer_bid_statuses,
+                    )
+                    fetch_official_bid_statuses = fetch_official_auctioneer_bid_statuses
+                bid_results = await fetch_official_bid_statuses(sfi_candidates)
+                for index, bid_status in zip(sfi_indexes, bid_results):
+                    if bid_status is not None and detail_results[index] is not None:
+                        detail_results[index].setdefault("edital_data", {})["bid"] = bid_status
+
             with session_factory() as session:
-                for (property_id, _, _, requires_date), result in zip(
+                for (property_id, _, _, requires_date, _, _), result in zip(
                     selected_details, detail_results,
                 ):
                     if result is None:
@@ -402,19 +471,40 @@ async def ingest(
                         previous_documents = (
                             prop.matricula, prop.edital_url, prop.matricula_url,
                         )
-                        previous_edital_data = prop.edital_data
+                        previous_edital_data = (
+                            prop.edital_data if isinstance(prop.edital_data, dict) else {}
+                        )
                         prop.matricula = result.get("matricula") or prop.matricula
                         prop.edital_url = result.get("edital_url") or prop.edital_url
                         prop.matricula_url = (
                             result.get("matricula_url") or prop.matricula_url
                         )
-                        prop.edital_data = result.get("edital_data") or prop.edital_data
+                        incoming_edital_data = result.get("edital_data") or {}
+                        if incoming_edital_data:
+                            merged_edital_data = {
+                                **previous_edital_data,
+                                **incoming_edital_data,
+                            }
+                            old_alerts = previous_edital_data.get("alerts", [])
+                            new_alerts = incoming_edital_data.get("alerts", [])
+                            if not isinstance(old_alerts, list):
+                                old_alerts = []
+                            if not isinstance(new_alerts, list):
+                                new_alerts = []
+                            combined_alerts = list(dict.fromkeys([
+                                *old_alerts, *new_alerts,
+                            ]))
+                            if combined_alerts:
+                                merged_edital_data["alerts"] = combined_alerts
+                            prop.edital_data = merged_edital_data
                         if previous_documents != (
                             prop.matricula, prop.edital_url, prop.matricula_url,
                         ):
                             summary.documents_updated += 1
                         if previous_edital_data != prop.edital_data:
                             summary.edital_data_updated += 1
+                        if incoming_edital_data.get("bid") is not None:
+                            summary.bids_refreshed += 1
                     if requires_date:
                         if not returned_dates:
                             summary.dates_failed += 1
@@ -441,6 +531,7 @@ async def ingest(
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
         f"{summary.dates_deferred}deferred documents={summary.documents_updated} "
         f"edital_data={summary.edital_data_updated} "
+        f"bids={summary.bids_refreshed} "
         f"browser_recovered={summary.browser_details_recovered}"
     )
     return summary

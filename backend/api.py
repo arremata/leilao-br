@@ -29,6 +29,7 @@ from ingestion.run import run_cli
 from graph.output import _extract_street
 from graph.state import ComparableProperty
 from fiscal import get_itbi
+from auction_round import resolve_current_auction
 
 class IngestRequest(BaseModel):
     source: str = "caixa"
@@ -138,17 +139,19 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         comparable_dates[-1] if comparable_dates else None,
     )
     modalidade = p.modalidade or ""
-    praca = None
-    if "sfi" in modalidade.lower():
-        first = p.first_auction_at
-        if first is not None and first.tzinfo is None:
-            first = first.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
-        if first and first.astimezone(timezone.utc) >= now:
-            praca = "1ª praça"
-        elif p.second_auction_at is not None:
-            praca = "2ª praça"
-        elif p.first_auction_at is not None:
-            praca = "1ª praça"
+    round_number, current_price, _ = resolve_current_auction(
+        modalidade=modalidade,
+        minimum_price=p.preco,
+        first_at=p.first_auction_at,
+        second_at=p.second_auction_at,
+        first_price=p.first_auction_price,
+        second_price=p.second_auction_price,
+        now=now,
+    )
+    praca = f"{round_number}ª praça" if round_number else None
+    auction_discount = p.desconto_oficial
+    if p.avaliacao and current_price:
+        auction_discount = round((p.avaliacao - current_price) / p.avaliacao * 100, 2)
 
     itbi = get_itbi(p.uf or "", p.city or "")
     card = {
@@ -164,10 +167,10 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         "hasCondominium": has_condominium_cost(p),
         "area": p.area_m2,
         "beds": p.beds,
-        "minBid": p.preco,
+        "minBid": current_price,
         "appraisal": p.avaliacao,
-        "desconto": p.desconto_oficial,
-        "auctionDiscount": p.desconto_oficial,
+        "desconto": auction_discount,
+        "auctionDiscount": auction_discount,
         "modalidade": p.modalidade,
         "auctionType": _catalog_auction_type(p.modalidade),
         "praca": praca,

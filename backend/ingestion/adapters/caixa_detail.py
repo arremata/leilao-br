@@ -18,6 +18,7 @@ from loguru import logger
 from ingestion.adapters.caixa_edital import (
     extract_pdf_text, merge_edital_data, parse_edital_text,
 )
+from ingestion.adapters.caixa_bids import fetch_caixa_online_bid_status
 
 _PHOTO_RE = re.compile(r'<img[^>]+src="([^"]*/fotos/[^"]+)"', re.IGNORECASE)
 _PDF_HREF_RE = re.compile(
@@ -352,6 +353,11 @@ async def fetch_auction_dates_batch(
                         # and/or official documents; document-only modalities
                         # are valid even when no scheduled date is published.
                         if result is not None:
+                            bid_status = await fetch_caixa_online_bid_status(
+                                client, url, response.text,
+                            )
+                            if bid_status is not None:
+                                result.setdefault("edital_data", {})["bid"] = bid_status
                             return result
                         logger.debug(
                             "Unusable Caixa detail response for {}: {} ({} chars)",

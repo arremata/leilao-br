@@ -127,6 +127,30 @@ def test_catalog_card_exposes_both_auction_dates_as_iso_strings():
     api.app.dependency_overrides.clear()
 
 
+def test_catalog_card_uses_current_second_round_price_and_discount():
+    client, factory = _client_with_db()
+    tz = ZoneInfo("America/Sao_Paulo")
+    with factory() as s:
+        s.add(Property(
+            source="caixa", source_id="8555534255569", uf="PR",
+            address="Rua Lothario Boutin", modalidade="Leilão SFI",
+            preco=344_000, avaliacao=344_000, desconto_oficial=0,
+            status="active",
+            first_auction_at=datetime(2026, 9, 28, 10, 0, tzinfo=tz),
+            second_auction_at=datetime(2099, 10, 2, 10, 0, tzinfo=tz),
+            first_auction_price=344_000, second_auction_price=230_100.35,
+        ))
+        s.commit()
+
+    card = client.get("/catalog?uf=PR").json()[0]
+
+    assert card["praca"] == "2ª praça"
+    assert card["minBid"] == 230_100.35
+    assert card["auctionDiscount"] == 33.11
+    assert card["endsAt"] == "2099-10-02T10:00:00-03:00"
+    api.app.dependency_overrides.clear()
+
+
 def test_catalog_card_title_falls_back_to_address_without_type():
     client, factory = _client_with_db()
     with factory() as s:

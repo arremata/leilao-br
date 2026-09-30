@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { Countdown, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
 import { analyzeCatalogItem } from '../api';
+import { sfiAuctionPricing } from '../auctionPricing';
+import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 import { useStepProgress } from '../useStepProgress';
 
@@ -166,6 +168,10 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         // Caixa republicar preço, modalidade ou documento.
         firstAuctionPrice: catalogProperty.firstAuctionPrice ?? enrichment.firstAuctionPrice,
         secondAuctionPrice: catalogProperty.secondAuctionPrice ?? enrichment.secondAuctionPrice,
+        minBid: catalogProperty.minBid ?? enrichment.minBid,
+        auctionDiscount: catalogProperty.auctionDiscount ?? enrichment.auctionDiscount,
+        desconto: catalogProperty.desconto ?? enrichment.desconto,
+        endsAt: catalogProperty.endsAt ?? enrichment.endsAt,
         modalidade: catalogProperty.modalidade || enrichment.modalidade,
         auctionType: catalogProperty.auctionType || enrichment.auctionType,
         matricula: catalogProperty.matricula || enrichment.matricula,
@@ -763,6 +769,12 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
 
+          <OfficialBidNotice p={p} />
+
+          {officialBidStatus(p) && (
+            <div className="divider" style={{ margin: '16px 0' }}></div>
+          )}
+
           {/* Pricing labels follow the official sale modality. */}
           <PricingGrid p={p} />
 
@@ -875,21 +887,77 @@ function Meta({ lbl, val }) {
   );
 }
 
+function OfficialBidNotice({ p }) {
+  const bid = officialBidStatus(p);
+  if (!bid) return null;
+
+  const checkedAt = formatBidCheckedAt(bid.fetchedAt);
+  const registered = bid.status === 'registered';
+  const countLabel = bid.count == null
+    ? ''
+    : `${bid.count} ${bid.count === 1 ? 'lance registrado' : 'lances registrados'}`;
+  return (
+    <section
+      className={`official-bid-status${registered ? ' is-registered' : ' is-empty'}`}
+      aria-label="Situação oficial dos lances"
+    >
+      <div className="official-bid-status__main">
+        <span className="uppy official-bid-status__label">
+          {registered ? 'Maior lance registrado' : 'Situação dos lances'}
+        </span>
+        <div className="official-bid-status__value">
+          {registered
+            ? bid.highestAmount
+              ? `R$ ${fmtBRL(bid.highestAmount)}`
+              : 'Há lance registrado'
+            : 'Nenhum lance registrado'}
+        </div>
+        <p className="official-bid-status__note">
+          {registered
+            ? [
+                countLabel,
+                bid.highestAmount
+                  ? 'Este é o maior valor visto na fonte oficial, não o valor inicial.'
+                  : 'A fonte oficial confirma a disputa, mas não retornou o maior valor.',
+              ].filter(Boolean).join(' · ')
+            : 'A fonte oficial informava zero lances na última consulta.'}
+        </p>
+      </div>
+      <div className="official-bid-status__source">
+        <span>{bid.sourceLabel}</span>
+        {checkedAt && <span>Consultado em {checkedAt}</span>}
+        {bid.sourceUrl && (
+          <a href={bid.sourceUrl} target="_blank" rel="noopener noreferrer">
+            Conferir agora <span aria-hidden="true">↗</span>
+          </a>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function PricingGrid({ p }) {
   const modality = normalizedCostLabel(p.modalidade);
   const isDirectSale = modality.includes('venda direta');
   const isOpenTender = modality.includes('licitacao');
   const isSfiAuction = modality.includes('leilao sfi');
-  const firstBidPrice = p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid;
-  const secondBidPrice = p.secondAuctionPrice || p.edital?.secondBidPrice || 0;
+  const sfiPricing = sfiAuctionPricing(p);
+  const currentBidPrice = isSfiAuction
+    ? (sfiPricing.current.price || 0)
+    : (p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid);
+  const currentBidDate = isSfiAuction
+    ? sfiPricing.current.date
+    : (p.edital?.firstBidDate || p.firstAuctionAt);
+  const otherRound = sfiPricing.upcoming || sfiPricing.previous;
+  const otherRoundPrice = otherRound?.price || 0;
   const appraisal = p.appraisal || 0;
-  const has2nd = secondBidPrice > 0;
+  const hasOtherRound = otherRoundPrice > 0;
   // O edital guarda a data como ISO, não como texto pronto — renderizá-la
   // direto colocava "2026-09-14T13:00:00+00:00" na tela. formatAuctionDate
   // converte para o fuso de São Paulo e devolve a própria string quando a fonte
   // já vem formatada.
-  const firstBidDate = formatAuctionDayTime(p.edital?.firstBidDate || p.firstAuctionAt);
-  const secondBidDate = formatAuctionDayTime(p.edital?.secondBidDate || p.secondAuctionAt);
+  const currentDateLabel = formatAuctionDayTime(currentBidDate);
+  const otherRoundDateLabel = formatAuctionDayTime(otherRound?.date);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
       <div>
@@ -898,11 +966,16 @@ function PricingGrid({ p }) {
             ? 'Preço de venda'
             : isOpenTender
               ? 'Valor inicial'
-              : `Valor inicial${p.praca ? ` · ${pracaLabel(p.praca)}` : ''}`}
+              : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
         </span>
-        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(firstBidPrice)}</div>
-        {firstBidDate && (
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{firstBidDate}</div>
+        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
+        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > currentBidPrice && (
+          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
+            R$ {fmtBRL(sfiPricing.previous.price - currentBidPrice)} a menos
+          </div>
+        )}
+        {currentDateLabel && (
+          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{currentDateLabel}</div>
         )}
       </div>
       <div>
@@ -910,9 +983,9 @@ function PricingGrid({ p }) {
         {appraisal > 0 ? (
           <>
             <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
-            {firstBidPrice > 0 && appraisal > firstBidPrice && (
+            {currentBidPrice > 0 && appraisal > currentBidPrice && (
               <div className="mono" style={{ fontSize: 11, color: 'var(--good)', marginTop: 2 }}>
-                R$ {fmtBRL(appraisal - firstBidPrice)} abaixo da avaliação
+                R$ {fmtBRL(appraisal - currentBidPrice)} abaixo da avaliação
               </div>
             )}
           </>
@@ -924,26 +997,30 @@ function PricingGrid({ p }) {
       </div>
       {isSfiAuction && (
         <div>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>Se não vender · 2ª rodada</span>
-          {has2nd ? (
+          <span className="uppy" style={{ color: 'var(--fg-3)' }}>
+            {sfiPricing.upcoming ? 'Se não vender · 2ª rodada' : '1ª rodada encerrada'}
+          </span>
+          {hasOtherRound ? (
             <>
-              <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(secondBidPrice)}</div>
-              {firstBidPrice > secondBidPrice && (
+              <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(otherRoundPrice)}</div>
+              {sfiPricing.upcoming && currentBidPrice > otherRoundPrice && (
                 <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
-                  R$ {fmtBRL(firstBidPrice - secondBidPrice)} a menos
+                  R$ {fmtBRL(currentBidPrice - otherRoundPrice)} a menos
                 </div>
               )}
-              {secondBidDate && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
+              {otherRoundDateLabel && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
               )}
             </>
           ) : (
             <>
               <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)' }}>
-                O valor da segunda rodada ainda não foi divulgado.
+                {sfiPricing.upcoming
+                  ? 'O valor da segunda rodada ainda não foi divulgado.'
+                  : 'O valor da primeira rodada não foi publicado.'}
               </div>
-              {secondBidDate && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{secondBidDate}</div>
+              {otherRoundDateLabel && (
+                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
               )}
             </>
           )}
@@ -997,8 +1074,7 @@ function Market({ p }) {
     );
   }
 
-  const has2nd = p.edital?.secondBidPrice && p.edital.secondBidPrice > 0;
-  const bid = has2nd ? p.edital.secondBidPrice : p.minBid;
+  const bid = p.minBid;
   const appraisal = p.appraisal || 0;
   const market = p.market || 0;
 
@@ -2134,8 +2210,8 @@ function Edital({ p, auctionUrl, onReadToEnd }) {
       label: 'Leilões anteriores que não venderam',
       value: d.negativeAuctionRegistration,
     },
-    Number(d.minimumSalePrice ?? p.minBid) > 0 && {
-      label: 'Valor inicial', value: `R$ ${fmtBRL(Number(d.minimumSalePrice ?? p.minBid))}`,
+    Number(isSfiAuction ? p.minBid : (d.minimumSalePrice ?? p.minBid)) > 0 && {
+      label: 'Valor inicial', value: `R$ ${fmtBRL(Number(isSfiAuction ? p.minBid : (d.minimumSalePrice ?? p.minBid)))}`,
     },
     Number(d.appraisalValue ?? p.appraisal) > 0 && {
       label: 'Valor de avaliação', value: `R$ ${fmtBRL(Number(d.appraisalValue ?? p.appraisal))}`,
