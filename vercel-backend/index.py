@@ -37,7 +37,7 @@ import auth as auth_module
 import users_db as users_db_module
 from auth import AuthError
 
-PIPELINE_VERSION = "v14-national-itbi-estimate"
+PIPELINE_VERSION = "v15-current-auction-round"
 
 _MUNICIPAL_ITBI_RATES = {
     ("PR", "curitiba"): {
@@ -786,7 +786,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
     """Build the public result without importing the worker/LLM package."""
     p = dict(row)
     area = float(p.get("area_m2") or 0)
-    min_bid = float(p.get("preco") or 0)
+    _, min_bid, current_at = _current_auction(p, datetime.now(timezone.utc))
     appraisal = float(p.get("avaliacao") or min_bid)
     is_land = _is_land_property_type(p.get("property_type"))
     usable = _prepare_market_comparables(p, comparable_rows)
@@ -917,7 +917,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         # Sem "risk": o valor era fixo no código ({"j": "bad", "f": "good"}) para
         # todo imóvel, porque o nó jurídico está desligado. Um veredito constante
         # não é um veredito. Nada de risco é publicado enquanto não houver cálculo.
-        "area": area, "beds": p.get("beds"), "endsAt": "",
+        "area": area, "beds": p.get("beds"), "endsAt": _iso(current_at) or "",
         "viability": {"riskDimensions": [], "alerts": [], "description": "", "features": {}},
         "marketDetail": market_detail, "costs": costs, "edital": None,
         "auctionUrl": p.get("detail_url"), "photoUrl": p.get("photo_url"),
@@ -953,6 +953,26 @@ def _iso(value) -> Optional[str]:
     return value.isoformat()
 
 
+def _current_auction(p: dict, now: datetime) -> tuple[int | None, float, datetime | None]:
+    """Resolve the active SFI round; keep single-event modalities unchanged."""
+    minimum = float(p.get("preco") or 0)
+    first = p.get("first_auction_at")
+    second = p.get("second_auction_at")
+    if first is not None and first.tzinfo is None:
+        first = first.replace(tzinfo=SAO_PAULO)
+    if second is not None and second.tzinfo is None:
+        second = second.replace(tzinfo=SAO_PAULO)
+    if "sfi" not in (p.get("modalidade") or "").casefold():
+        return None, minimum, first
+    if first and first.astimezone(timezone.utc) >= now.astimezone(timezone.utc):
+        return 1, float(p.get("first_auction_price") or minimum), first
+    if second is not None:
+        return 2, float(p.get("second_auction_price") or minimum), second
+    if first is not None:
+        return 1, float(p.get("first_auction_price") or minimum), first
+    return None, minimum, None
+
+
 def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
     p = dict(row)
     auction_dates = [
@@ -976,17 +996,14 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
             "leilão sfi", "leilao sfi", "licitação aberta", "licitacao aberta", "venda direta",
         )) else None
     )
-    praca = None
-    if "sfi" in modalidade_normalized:
-        first = p.get("first_auction_at")
-        if first is not None and first.tzinfo is None:
-            first = first.replace(tzinfo=SAO_PAULO)
-        if first and first.astimezone(timezone.utc) >= now:
-            praca = "1ª praça"
-        elif p.get("second_auction_at") is not None:
-            praca = "2ª praça"
-        elif p.get("first_auction_at") is not None:
-            praca = "1ª praça"
+    round_number, current_price, _ = _current_auction(p, now)
+    praca = f"{round_number}ª praça" if round_number else None
+    auction_discount = p.get("desconto_oficial")
+    if p.get("avaliacao") and current_price:
+        auction_discount = round(
+            (float(p["avaliacao"]) - current_price) / float(p["avaliacao"]) * 100,
+            2,
+        )
     property_type = p.get("property_type")
     if property_type:
         title = f"{property_type} {p.get('area_m2') or 0:.0f} m²"
@@ -1010,10 +1027,10 @@ def _catalog_card(row, *, include_edital_data: bool = False) -> dict:
         "hasCondominium": _has_condominium_cost(property_type, p.get("descricao_raw")),
         "area": p.get("area_m2"),
         "beds": p.get("beds"),
-        "minBid": p.get("preco"),
+        "minBid": current_price,
         "appraisal": p.get("avaliacao"),
-        "desconto": p.get("desconto_oficial"),
-        "auctionDiscount": p.get("desconto_oficial"),
+        "desconto": auction_discount,
+        "auctionDiscount": auction_discount,
         "modalidade": p.get("modalidade"),
         "auctionType": auction_type,
         "praca": praca,

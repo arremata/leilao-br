@@ -17,6 +17,8 @@ class PropertyMetadata:
     market_value_estimate: Optional[float] = None
     auction_date: str = ""
     auction_date_2nd: str = ""
+    current_auction_date: str = ""
+    current_auction_round: int | None = None
     auction_type: str = ""
     matricula: str = ""
     edital_url: str = ""

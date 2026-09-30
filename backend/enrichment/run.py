@@ -13,8 +13,9 @@ from graph.scoring import scoring_node
 from graph.output import build_result
 from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
+from auction_round import resolve_current_auction
 
-PIPELINE_VERSION = "v14-national-itbi-estimate"
+PIPELINE_VERSION = "v15-current-auction-round"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -47,16 +48,26 @@ def metadata_from_property(prop) -> PropertyMetadata:
         and 0 < float(official_commission_rate) <= 0.3
         else None
     )
+    current_round, current_price, current_at = resolve_current_auction(
+        modalidade=prop.modalidade,
+        minimum_price=prop.preco,
+        first_at=getattr(prop, "first_auction_at", None),
+        second_at=getattr(prop, "second_auction_at", None),
+        first_price=getattr(prop, "first_auction_price", None),
+        second_price=getattr(prop, "second_auction_price", None),
+    )
     return PropertyMetadata(
         address=prop.address or "",
         property_type=prop.property_type or "",
         area_m2=prop.area_m2 or 0.0,
-        auction_price=prop.preco or 0.0,
+        auction_price=current_price or 0.0,
         auction_price_1st=getattr(prop, "first_auction_price", None) or prop.preco or 0.0,
         auction_price_2nd=getattr(prop, "second_auction_price", None) or 0.0,
         market_value_estimate=prop.avaliacao,
         auction_date=_iso(getattr(prop, "first_auction_at", None)),
         auction_date_2nd=_iso(getattr(prop, "second_auction_at", None)),
+        current_auction_date=_iso(current_at),
+        current_auction_round=current_round,
         auction_type=prop.modalidade or "",
         auctioneer_name=edital_data.get("auctioneerName", ""),
         matricula=prop.matricula or "",

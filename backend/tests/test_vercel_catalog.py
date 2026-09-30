@@ -46,7 +46,8 @@ def test_catalog_card_matches_frontend_contract():
     # Nome pela rua, não pelo bairro: o card e a análise precisam concordar.
     assert card["title"] == "Apartamento 80 m², Rua A"
     assert card["hasCondominium"] is True
-    assert card["auctionDiscount"] == 50.0
+    assert card["minBid"] == 300000.0
+    assert card["auctionDiscount"] == 25.0
     assert card["endsAt"] == "2099-08-04T10:00:00-03:00"
     assert card["photoUrl"] == "https://example.com/photo.jpg"
     assert card["auctionUrl"] == "https://example.com/property"
@@ -73,6 +74,24 @@ def test_catalog_card_exposes_national_itbi_estimate_for_new_states():
     assert card["itbiRate"] == 0.03
     assert card["itbiEstimated"] is True
     assert "confirme" in card["itbiSource"].casefold()
+
+
+def test_vercel_catalog_promotes_current_second_round_price():
+    tz = ZoneInfo("America/Sao_Paulo")
+    card = vercel_api._catalog_card({
+        "id": 770, "source_id": "8555534255569", "source": "caixa",
+        "uf": "PR", "address": "Rua Lothario Boutin", "preco": 344_000,
+        "avaliacao": 344_000, "desconto_oficial": 0,
+        "modalidade": "Leilão SFI", "status": "active",
+        "first_auction_at": datetime(2026, 9, 28, 10, tzinfo=tz),
+        "second_auction_at": datetime(2099, 10, 2, 10, tzinfo=tz),
+        "first_auction_price": 344_000, "second_auction_price": 230_100.35,
+    })
+
+    assert card["praca"] == "2ª praça"
+    assert card["minBid"] == 230_100.35
+    assert card["auctionDiscount"] == 33.11
+    assert card["endsAt"] == "2099-10-02T10:00:00-03:00"
 
 
 def test_edital_data_is_selected_only_for_catalog_detail():

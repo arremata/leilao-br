@@ -214,6 +214,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-29** — Corrigiu a troca de rodada nos Leilões SFI: quando a 2ª
+  rodada é a vigente, a página do imóvel agora destaca seu próprio preço e sua
+  data, calcula proposta, custos e desconto contra esse valor e identifica a 1ª
+  rodada como encerrada, sem combinar o rótulo da segunda com os dados da
+  primeira. O catálogo e as análises passam a resolver a rodada vigente a partir
+  dos campos oficiais de cada rodada, mesmo quando o preço geral está defasado.
+
 - **2026-09-25** — Restaurou o mapa na página do imóvel ao autorizar somente o
   embed do Google Maps na política de segurança. O cache offline deixa recursos
   externos sob responsabilidade do navegador, em vez de bloquear as fotos da

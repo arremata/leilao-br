@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 25 de setembro de 2026.
+Última atualização: 29 de setembro de 2026.
 
 ## Como usar no Claude
 
@@ -146,6 +146,12 @@ oficial continua disponível na área de preços, sem parecer uma recomendação
 oferta. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
+
+Em Leilão SFI, o valor inicial e a data em destaque pertencem sempre à rodada
+vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
+encerrada; a interface não mistura o rótulo de uma rodada com os dados da outra.
+Esse mesmo valor vigente alimenta a proposta inicial, os custos, o desconto e o
+prazo mostrados na página.
 
 O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
 alíquota municipal foi revisada, a conta usa essa referência e identifica a

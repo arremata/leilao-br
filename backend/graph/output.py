@@ -450,7 +450,10 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         neighborhood=neighborhood,
         city=f"{metadata.city}, {state_abbrev}" if metadata.city else "",
         auction_type=_classify_auction_type(metadata.auction_type),
-        praca=_extract_praca(metadata.auction_type),
+        praca=(
+            f"{metadata.current_auction_round}ª praça"
+            if metadata.current_auction_round else _extract_praca(metadata.auction_type)
+        ),
         modalidade=_extract_modalidade(metadata.auction_type),
         auctioneer=_determine_auctioneer(metadata.auctioneer_name, metadata.court_or_leiloeiro),
         court=_determine_court(metadata.auction_type, metadata.court_name, metadata.court_or_leiloeiro),
@@ -468,7 +471,7 @@ def build_result(state: AuctionState) -> AuctionPropertyResult:
         baths=metadata.baths,
         parking=metadata.parking,
         floor=metadata.floor,
-        ends_at=_parse_auction_date(metadata.auction_date),
+        ends_at=_parse_auction_date(metadata.current_auction_date or metadata.auction_date),
         risk=risk,
         viability=_build_viability(state),
         market_detail=_build_market_detail(state),
