@@ -214,6 +214,17 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Simulador de financiamento na página do imóvel, só quando a
+  Caixa informa que o imóvel aceita financiamento (PD-018): uma linha com a
+  parcela estimada perto dos valores e, na conta, “E se você financiar?” no
+  modelo do SBPE (cota de 80% SAC / 70% PRICE sobre o menor entre lance e
+  avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
+  As condições de referência ficam com data em `frontend/src/financing.js`. Na
+  conta, dívida de condomínio e IPTU atrasado aparecem fechadas, com cadeado e
+  valor desfocado, fora do total, à espera da consulta paga (PD-019;
+  `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
+  virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da

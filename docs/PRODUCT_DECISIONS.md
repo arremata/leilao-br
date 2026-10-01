@@ -320,6 +320,33 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   informado, a tela mostra o total até a chave com o valor inicial. Venda direta
   mostra apenas se cabe e quanto sobra, sem simular lance.
 
+### PD-018 — Simular financiamento só onde a Caixa aceita financiamento
+
+- **Data:** 1 de outubro de 2026
+- **Estado:** Ativa
+- **Decisão:** a parcela estimada e o simulador de financiamento aparecem
+  somente nos imóveis em que a Caixa informa que aceita financiamento. Imóvel
+  só à vista ou sem essa informação não recebe simulação.
+- **Motivo:** quem compra para morar decide pela parcela; mostrar uma parcela
+  num imóvel que não pode ser financiado levaria a pessoa a contar com um
+  crédito que não existe.
+- **Consequências:** a simulação segue as condições de referência do SBPE da
+  Caixa, com data, e é rotulada como estimativa. Aceitar financiamento é um fato
+  do imóvel; a aprovação do crédito continua sendo da Caixa.
+
+### PD-019 — Dívidas de condomínio e IPTU como consulta à parte
+
+- **Data:** 1 de outubro de 2026
+- **Estado:** Ativa
+- **Decisão:** a dívida de condomínio e o IPTU atrasado entram na conta do
+  imóvel como linhas fechadas, com o valor desfocado, até existir a consulta
+  paga dessas dívidas.
+- **Motivo:** essas dívidas pesam na decisão de comprar, mas o Argos ainda não
+  tem os valores; esconder as linhas faria a conta parecer completa.
+- **Consequências:** as linhas fechadas não entram no total até a chave, e o
+  total avisa isso. Nenhum valor é inventado. Preço e forma de pagamento da
+  consulta ainda não foram definidos.
+
 ## Decisões ativas de operação do produto
 
 ### OD-001 — Validar em preview antes de abrir o PR

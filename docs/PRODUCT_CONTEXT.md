@@ -131,8 +131,11 @@ Quatro áreas numeradas e um guia lateral:
    localização no mapa.
 3. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,
    preços, pagamento e responsabilidades quando publicados.
-4. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega
-   parecer jurídico nem classificação automática de risco legal.
+4. **Consultoria:** aparece fechada, com cadeado e “em breve”: uma prévia
+   desfocada do acompanhamento e do chat sobre o imóvel, atrás do aviso de que a
+   decisão do lance é da pessoa e que o resultado do leilão não é garantido.
+   Ainda não há atendimento nem chat disponível, nem plano ou preço. O produto
+   não entrega parecer jurídico nem classificação automática de risco legal.
 
 **O que fazer agora** acompanha a página como painel lateral sem numeração.
 Organiza as etapas antes e depois da compra, mostra o percentual concluído e usa
@@ -148,6 +151,23 @@ dentro; a tela mostra até onde o lance pode ir, a margem acima do valor inicial
 para disputar e, num slider, o total e a sobra para cada lance simulado. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
+
+A dívida de condomínio (só quando há condomínio) e o IPTU atrasado aparecem na
+conta como linhas fechadas, com cadeado e o valor desfocado. O Argos ainda não
+tem esses valores: a consulta das dívidas vai ser liberada à parte, e o botão
+“Ver as dívidas” fica marcado como “em breve”. Essas linhas não entram no total
+até a chave, e o total diz isso; até a consulta existir, a tela orienta a
+confirmar no condomínio e na prefeitura antes do lance.
+
+Quando a Caixa informa que o imóvel aceita financiamento, e só nesse caso, a
+página mostra uma linha com a parcela estimada perto dos valores e, na conta, o
+simulador “E se você financiar?” no modelo do SBPE da Caixa: entrada mínima pela
+cota (80% no SAC, 70% no PRICE, sobre o menor entre lance e avaliação), FGTS na
+entrada, prazo, juros, renda mínima para a parcela caber em 30% da renda e o
+dinheiro próprio até a chave, com os custos fora do financiamento. Se a Caixa
+diz que não aceita, nada aparece além do selo “Só à vista”; se não informou, só
+um aviso para confirmar no edital. A simulação é estimativa: não inclui TR nem
+seguros, e o imóvel aceitar financiamento não garante a aprovação do crédito.
 
 Em Leilão SFI, o valor inicial e a data em destaque pertencem sempre à rodada
 vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
