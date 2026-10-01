@@ -15,9 +15,15 @@ test('searchable options remove duplicate spellings and prioritize prefix matche
   assert.deepEqual(matchingSearchOptions(options, 'pinh'), ['Pinhais', 'São José dos Pinhais']);
 });
 
-test('searchable options accept accents and limit the initial menu', () => {
+test('searchable options accept accents and limit the menu only when asked', () => {
   const options = ['Maringá', 'Curitiba', 'Londrina'];
 
   assert.equal(exactSearchOption(options, 'maringa'), 'Maringá');
   assert.deepEqual(matchingSearchOptions(options, '', 2), ['Curitiba', 'Londrina']);
+});
+
+test('searchable options list every city when the query is empty', () => {
+  const options = Array.from({ length: 30 }, (_, index) => `Cidade ${String(index).padStart(2, '0')}`);
+
+  assert.equal(matchingSearchOptions(options, '').length, 30);
 });

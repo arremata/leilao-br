@@ -15,7 +15,7 @@ export function uniqueSearchOptions(values) {
   return [...byNormalizedName.values()].sort((left, right) => left.localeCompare(right, 'pt-BR'));
 }
 
-export function matchingSearchOptions(values, query, limit = 8) {
+export function matchingSearchOptions(values, query, limit = Infinity) {
   const normalizedQuery = normalizeSearchOption(query);
   const options = uniqueSearchOptions(values);
   if (!normalizedQuery) return options.slice(0, limit);

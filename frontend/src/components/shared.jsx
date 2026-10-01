@@ -191,7 +191,12 @@ export function RoundStrip({ schedule, compact }) {
         return (
           <div key={round.round} className={`round-step is-${round.state}`}>
             <span className="round-step-title"><Term>{`${round.round}ª rodada`}</Term></span>
-            <span className="round-step-state">{ROUND_STATE_LABEL[round.state]}</span>
+            <span className="round-step-state">
+              {/* Na rodada que está valendo, quanto falta — como na foto do card. */}
+              {round.state === 'current'
+                ? <Countdown until={round.at} compact />
+                : ROUND_STATE_LABEL[round.state]}
+            </span>
             <span
               className={`round-step-price${longPrices ? ' is-long' : ''}`}
               title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}
