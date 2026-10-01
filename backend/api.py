@@ -30,6 +30,7 @@ from graph.output import _extract_street
 from graph.state import ComparableProperty
 from fiscal import get_itbi
 from auction_round import resolve_current_auction
+from listing_facts import listing_facts
 
 class IngestRequest(BaseModel):
     source: str = "caixa"
@@ -116,7 +117,15 @@ def _catalog_auction_type(modalidade: str | None) -> str | None:
     return None
 
 
-def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
+def _property_card(
+    p: Property,
+    *,
+    include_edital_data: bool = False,
+    occupancy: str | None = None,
+    payment_methods: str | None = None,
+) -> dict:
+    """Card do catálogo. A lista passa ocupação e pagamento já extraídos para
+    não carregar o `edital_data` inteiro de cada imóvel."""
     def _iso(value):
         if value is None:
             return None
@@ -194,8 +203,28 @@ def _property_card(p: Property, *, include_edital_data: bool = False) -> dict:
         "itbiEstimated": itbi["estimated"] if itbi else None,
     }
     if include_edital_data:
+        edital = p.edital_data or {}
+        occupancy = edital.get("occupancy")
+        payment_methods = edital.get("paymentMethods")
         card["editalData"] = p.edital_data
+    card.update(listing_facts(occupancy, payment_methods))
     return card
+
+
+def _catalog_statement():
+    """Imóveis ativos com só os dois textos da ficha que o card usa."""
+    return select(
+        Property,
+        Property.edital_data["occupancy"].as_string(),
+        Property.edital_data["paymentMethods"].as_string(),
+    ).options(defer(Property.edital_data)).where(Property.status == "active")
+
+
+def _catalog_cards(session: Session, stmt) -> list[dict]:
+    return [
+        _property_card(prop, occupancy=occupancy, payment_methods=payment_methods)
+        for prop, occupancy, payment_methods in session.execute(stmt).all()
+    ]
 
 
 app.add_middleware(
@@ -209,19 +238,15 @@ app.add_middleware(
 @app.get("/properties")
 def get_properties(session: Session = Depends(get_session)) -> list[dict]:
     """Compatibility alias backed by the real catalog, never fixture data."""
-    props = session.execute(
-        select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
-    ).scalars().all()
-    return [_property_card(prop) for prop in props]
+    return _catalog_cards(session, _catalog_statement())
 
 
 @app.get("/catalog")
 def list_catalog(uf: Optional[str] = None, session: Session = Depends(get_session)) -> list[dict]:
-    stmt = select(Property).options(defer(Property.edital_data)).where(Property.status == "active")
+    stmt = _catalog_statement()
     if uf:
         stmt = stmt.where(Property.uf == uf.upper())
-    props = session.execute(stmt).scalars().all()
-    return [_property_card(p) for p in props]
+    return _catalog_cards(session, stmt)
 
 
 @app.get("/catalog/{prop_id}")

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { Countdown, Photo, PropertyImage, Specs } from './shared';
-import { fmtBRL, pracaLabel, mapsQuery } from '../utils';
+import { Countdown, ListingBadges, Photo, PropertyImage, Specs } from './shared';
+import { fmtBRL, mapsQuery } from '../utils';
+import { auctionSchedule, saleTagLabel } from '../auctionRounds';
+import { occupancyStatus } from '../listingFacts';
+import { budgetPlan } from '../bidBudget';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
@@ -27,6 +30,11 @@ function readStoredObject(key, fallback = {}) {
   } catch {
     return fallback;
   }
+}
+
+// Só roda no clique de "Adicionar gasto", nunca durante a renderização.
+function newCustomCostId() {
+  return `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function normalizedCostLabel(value) {
@@ -163,6 +171,10 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     ? catalogProperty
     : (enrichment ? {
         ...mergeEnrichment(catalogProperty, enrichment),
+        // A análise tem um id próprio (hash do anúncio). Deixá-lo vencer fazia
+        // "Salvar" gravar esse hash, que não existe no catálogo, e o imóvel
+        // nunca aparecia em Salvos. A identidade é sempre a do catálogo.
+        id: catalogProperty.id,
         // Estes são a exceção à regra acima: o catálogo manda mesmo quando a
         // análise TAMBÉM tem valor, porque a análise pode ser de antes de a
         // Caixa republicar preço, modalidade ou documento.
@@ -183,6 +195,8 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const p = enriched || catalogProperty;
   const isDirectSale = isDirectSaleProperty(p);
   const commissionExempt = isDirectSale;
+  const schedule = auctionSchedule(p);
+  const occupancy = occupancyStatus(p);
   const isWatched = watched?.includes(p.id);
   // Catalog responses historically used both names. Keep the official listing
   // reachable while older/newer backends converge on `auctionUrl`.
@@ -318,7 +332,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     const trimmedLabel = String(label || '').trim();
     const amount = Number(value);
     if (!trimmedLabel || !Number.isFinite(amount) || amount < 0) return;
-    const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = newCustomCostId();
     persistCostPreferences(current => ({
       ...(current || {}),
       scenario: current?.scenario || {},
@@ -348,9 +362,22 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     && Number.isFinite(Number(legacyCostOverrides.occupant_removal));
   const legacyEvictionCost = Number(legacyCostOverrides.occupant_removal);
   const evictionAdjusted = hasScenarioValue('evictionCost') || hasLegacyEvictionCost;
+  // Quando a Caixa afirma que o imóvel está desocupado, não há quem tirar: a
+  // sugestão é zero. Ocupado ou sem informação mantém a reserva de R$ 5.000.
+  const suggestedEvictionCost = occupancy === 'vacant' ? 0 : 5000;
+  const evictionSuggestionLabel = {
+    vacant: 'Zero: a Caixa informa que está desocupado',
+    occupied: 'Reserva sugerida: a Caixa informa que está ocupado',
+    unknown: 'Reserva sugerida: ocupação não informada',
+  }[occupancy];
+  const evictionSuggestionHint = {
+    vacant: 'A Caixa informa que o imóvel está desocupado, então não há custo de desocupação. Se quiser uma margem de segurança, ajuste o valor.',
+    occupied: 'A Caixa informa que há alguém morando no imóvel. Reserva inicial de R$ 5.000 para a desocupação; ajuste o valor se souber mais.',
+    unknown: 'A Caixa não informou se há alguém morando. Reserva inicial de R$ 5.000, caso seja preciso desocupar; confirme a situação antes de dar lance.',
+  }[occupancy];
   const evictionCost = hasScenarioValue('evictionCost')
     ? Math.max(0, Number(scenarioPreferences.evictionCost))
-    : (hasLegacyEvictionCost ? Math.max(0, legacyEvictionCost) : 5000);
+    : (hasLegacyEvictionCost ? Math.max(0, legacyEvictionCost) : suggestedEvictionCost);
   const renovationAdjusted = hasScenarioValue('renovationCost');
   const renoCost = renovationAdjusted
     ? Math.max(0, Number(scenarioPreferences.renovationCost))
@@ -471,8 +498,8 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
     });
   }
   ensureCost({
-    id: 'occupant_removal', label: 'Desocupação', value: 5000,
-    hint: 'Reserva inicial, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.',
+    id: 'occupant_removal', label: 'Desocupação', value: suggestedEvictionCost,
+    hint: evictionSuggestionHint,
     kind: 'fee',
   });
   ensureCost({
@@ -516,7 +543,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           value: evictionCost,
           hint: evictionAdjusted
             ? 'Valor informado por você.'
-            : 'Reserva inicial de R$ 5.000, caso seja preciso desocupar o imóvel. Confirme a situação antes de dar lance e ajuste o valor.',
+            : evictionSuggestionHint,
         };
       }
       if (r.id === 'renovation' || r.kind === 'reno') {
@@ -583,18 +610,34 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const dynamicTotal = dynamicRows.reduce((total, row) => total + (Number(row.value) || 0), 0);
   const externalCosts = Math.max(0, dynamicTotal - consideredBid);
 
+  // O orçamento é o total que a pessoa tem, com todos os custos dentro. Os
+  // custos percentuais crescem com o lance; os demais são fixos. Com isso dá
+  // para dizer até onde o lance pode subir sem estourar o orçamento.
+  const budgetModel = {
+    rates: sourceRows.filter(r => r.kind !== 'price' && _isScalingFee(r)).map(rateForRow),
+    fixed: sourceRows
+      .filter(r => r.kind !== 'price' && !_isScalingFee(r))
+      .reduce((total, row) => total + (Number(row.value) || 0), 0)
+      + customCosts.reduce((total, row) => total + Math.max(0, Number(row.value) || 0), 0),
+  };
+  const budgetAdjusted = hasScenarioValue('budget') && Number(scenarioPreferences.budget) > 0;
+  const budget = budgetAdjusted ? Number(scenarioPreferences.budget) : null;
+  const plan = budgetPlan({ model: budgetModel, budget, minBid: minBidFloor, bid: consideredBid });
+
   const sim = {
     renoPct, setRenoPct: setRenoLevel,
     renoCost, renovationAdjusted, renoRate: appliedRenoRate, regionPricePerM2, isLand,
     hasCondominium, monthlyCondo, monthlyIptu, monthlyToLive,
     expenseEstimates, setExpenseEstimate, expenseReference: p.expenseEstimate,
-    evictionCost, evictionAdjusted,
+    evictionCost, evictionAdjusted, evictionSuggestionLabel,
     setEvictionCost: (value) => setScenarioPreference('evictionCost', value),
     resetEvictionCost: () => setScenarioPreference('evictionCost', null),
     setRenovationCost: setRenovationBudget,
     offer: consideredBid, offerAdjusted, minBidFloor,
     setOffer: (value) => setScenarioPreference('offer', value),
     resetOffer: () => setScenarioPreference('offer', null),
+    budget, plan,
+    setBudget: (value) => setScenarioPreference('budget', Number(value) > 0 ? Number(value) : null),
     dynamicTotal, dynamicRows,
     externalCosts, customCosts, addCustomCost, removeCustomCost,
     resetScenarioPreferences, resetExpenseEstimates,
@@ -734,7 +777,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         {/* Key facts panel */}
         <div className="card" style={{ padding: 22 }}>
           <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <span className="tag accent">{pracaLabel(p.praca) || p.modalidade || p.auctionType}</span>
+            <span className="tag accent">{saleTagLabel(p, schedule)}</span>
             <span className="tag">{p.type}</span>
           </div>
 
@@ -746,25 +789,33 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           {/* Specs — only shows fields with real data */}
           <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} />
 
+          <ListingBadges p={p} size="lg" />
+
           <div className="divider" style={{ margin: '16px 0' }}></div>
 
-          {/* Countdown + risk summary */}
+          {/* Countdown: sempre diz de qual rodada é o prazo */}
           <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
             <div style={{ minWidth: 0 }}>
               <div className="uppy" style={{ color: 'var(--fg-3)' }}>
-                {isDirectSale ? 'Disponibilidade' : 'Encerra em'}
+                {isDirectSale ? 'Disponibilidade' : schedule.headline.label}
               </div>
               <div style={{ marginTop: 4 }}>
                 {isDirectSale && !p.endsAt
                   ? <span style={{ color: 'var(--fg-2)', fontSize: 13 }}>Sem prazo divulgado</span>
-                  : <Countdown until={p.endsAt} dark />}
+                  : <Countdown until={schedule.headline.until} dark endedLabel={schedule.headline.short || 'Encerrado'} />}
               </div>
               <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-                {p.endsAt
-                  ? formatAuctionDayTime(p.endsAt)
+                {schedule.headline.until
+                  ? formatAuctionDayTime(schedule.headline.until)
                   : isDirectSale ? 'Sujeito à disponibilidade na Caixa' : '—'}
               </div>
+              {!isDirectSale && schedule.headline.note && (
+                <div className="auction-headline-note">{schedule.headline.note}</div>
+              )}
             </div>
+            {/* Avaliação ao lado do prazo: o quadro de preços abaixo fica só
+                com o que se paga em cada rodada. */}
+            <AppraisalFact p={p} />
           </div>
 
           <div className="divider" style={{ margin: '16px 0' }}></div>
@@ -936,6 +987,31 @@ function OfficialBidNotice({ p }) {
   );
 }
 
+function AppraisalFact({ p }) {
+  const appraisal = Number(p.appraisal) || 0;
+  const current = Number(p.minBid) || 0;
+  return (
+    <div className="appraisal-fact">
+      <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
+      {appraisal > 0 ? (
+        <>
+          <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
+          {current > 0 && appraisal > current && (
+            <div className="appraisal-fact-gap">R$ {fmtBRL(appraisal - current)} abaixo da avaliação</div>
+          )}
+          {current > 0 && current > appraisal && (
+            <div className="appraisal-fact-gap is-above">Valor inicial R$ {fmtBRL(current - appraisal)} acima da avaliação</div>
+          )}
+        </>
+      ) : (
+        <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fg-3)' }}>
+          A Caixa não informou.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PricingGrid({ p }) {
   const modality = normalizedCostLabel(p.modalidade);
   const isDirectSale = modality.includes('venda direta');
@@ -950,7 +1026,6 @@ function PricingGrid({ p }) {
     : (p.edital?.firstBidDate || p.firstAuctionAt);
   const otherRound = sfiPricing.upcoming || sfiPricing.previous;
   const otherRoundPrice = otherRound?.price || 0;
-  const appraisal = p.appraisal || 0;
   const hasOtherRound = otherRoundPrice > 0;
   // O edital guarda a data como ISO, não como texto pronto — renderizá-la
   // direto colocava "2026-09-14T13:00:00+00:00" na tela. formatAuctionDate
@@ -965,34 +1040,18 @@ function PricingGrid({ p }) {
           {isDirectSale
             ? 'Preço de venda'
             : isOpenTender
-              ? 'Valor inicial'
+              ? 'Valor inicial · rodada única'
               : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
         </span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
-        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > currentBidPrice && (
-          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
-            R$ {fmtBRL(sfiPricing.previous.price - currentBidPrice)} a menos
+        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > 0
+          && sfiPricing.previous.price !== currentBidPrice && (
+          <div style={{ fontSize: 11, color: sfiPricing.previous.price > currentBidPrice ? 'var(--good)' : 'var(--bad)', fontWeight: 500, marginTop: 2 }}>
+            R$ {fmtBRL(Math.abs(sfiPricing.previous.price - currentBidPrice))} {sfiPricing.previous.price > currentBidPrice ? 'a menos' : 'a mais'} que a 1ª rodada
           </div>
         )}
         {currentDateLabel && (
           <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{currentDateLabel}</div>
-        )}
-      </div>
-      <div>
-        <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
-        {appraisal > 0 ? (
-          <>
-            <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
-            {currentBidPrice > 0 && appraisal > currentBidPrice && (
-              <div className="mono" style={{ fontSize: 11, color: 'var(--good)', marginTop: 2 }}>
-                R$ {fmtBRL(appraisal - currentBidPrice)} abaixo da avaliação
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)' }}>
-            A Caixa não informou o valor de avaliação deste imóvel.
-          </div>
         )}
       </div>
       {isSfiAuction && (
@@ -1006,6 +1065,12 @@ function PricingGrid({ p }) {
               {sfiPricing.upcoming && currentBidPrice > otherRoundPrice && (
                 <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
                   R$ {fmtBRL(currentBidPrice - otherRoundPrice)} a menos
+                </div>
+              )}
+              {sfiPricing.upcoming && otherRoundPrice > currentBidPrice && (
+                <div style={{ fontSize: 11, color: 'var(--bad)', fontWeight: 500, marginTop: 2, lineHeight: 1.45 }}>
+                  R$ {fmtBRL(otherRoundPrice - currentBidPrice)} a mais. Na 2ª rodada, o mínimo é a
+                  dívida com as despesas, e aqui ela passa do valor da 1ª.
                 </div>
               )}
               {otherRoundDateLabel && (
@@ -1382,9 +1447,10 @@ function CostBreakdown({ p, sim }) {
     renoCost, renovationAdjusted, isLand,
     hasCondominium, monthlyCondo, monthlyIptu, monthlyToLive,
     expenseEstimates, setExpenseEstimate, expenseReference,
-    evictionCost, evictionAdjusted, setEvictionCost, resetEvictionCost,
+    evictionCost, evictionAdjusted, evictionSuggestionLabel, setEvictionCost, resetEvictionCost,
     setRenovationCost,
     offer, offerAdjusted, minBidFloor, setOffer, resetOffer,
+    budget, plan, setBudget,
     dynamicRows, dynamicTotal, externalCosts, customCosts,
     addCustomCost, removeCustomCost, resetScenarioPreferences, resetExpenseEstimates,
   } = sim;
@@ -1410,7 +1476,7 @@ function CostBreakdown({ p, sim }) {
           <div>
             <h3 className="h2">Quanto você vai pagar até receber a chave</h3>
             <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 560 }}>
-              Comece pelo valor que pretende oferecer. Tudo abaixo recalcula sozinho.
+              Diga quanto você tem para gastar no total. A conta desconta todos os custos e mostra até onde o seu lance pode ir.
             </p>
           </div>
           <button className="btn sm simulator-reset-btn" onClick={() => {
@@ -1422,25 +1488,18 @@ function CostBreakdown({ p, sim }) {
           </button>
         </div>
 
-        {/* Quanto você pretende oferecer */}
-        <div className="buyer-offer">
-          <div className="buyer-offer-field">
-            <span className="uppy">
-              {isDirectSale ? 'Quanto você vai pagar' : 'Quanto você pretende oferecer'}
-            </span>
-            <OfferInput value={offer} onCommit={setOffer} />
-            <div className="buyer-offer-meta">
-              <span>
-                {offerAdjusted
-                  ? 'Valor informado por você'
-                  : `Valor inicial publicado: R$ ${fmtBRL(minBidFloor)}`}
-              </span>
-              {offerAdjusted && (
-                <button type="button" onClick={resetOffer}>Voltar ao valor inicial</button>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Orçamento total → lance máximo → simulação */}
+        <BudgetPlanner
+          isDirectSale={isDirectSale}
+          budget={budget}
+          onBudget={setBudget}
+          plan={plan}
+          offer={offer}
+          offerAdjusted={offerAdjusted}
+          minBid={minBidFloor}
+          onOffer={setOffer}
+          onResetOffer={resetOffer}
+        />
 
         {/* ── Valores que dependem de você ── */}
         <div className="scenario-cost-panel" style={{ marginTop: 24 }}>
@@ -1461,7 +1520,7 @@ function CostBreakdown({ p, sim }) {
               label="Desocupação"
               value={evictionCost}
               adjusted={evictionAdjusted}
-              defaultLabel="Reserva sugerida por nós"
+              defaultLabel={evictionSuggestionLabel}
               onCommit={setEvictionCost}
               onReset={resetEvictionCost}
             />
@@ -1688,12 +1747,15 @@ function MoneyMaskInput({ value, onCommit, onReset, disabled, ariaLabel, placeho
     setDraft(applyMoneyMask(raw));
   };
 
-  const handleFocus = () => {
+  const handleFocus = (event) => {
     // Quando ganha foco, já mostramos a versão formatada atual para que o
     // usuário não veja um salto visual. Se o valor for zero/empty, mantemos
     // o campo vazio para mostrar o placeholder "0".
     const num = Number(value);
     setDraft(Number.isFinite(num) && num > 0 ? numericToDisplay(num) : '');
+    // Seleciona o valor atual: digitar substitui, em vez de colar no fim.
+    const input = event.currentTarget;
+    requestAnimationFrame(() => input.select());
   };
 
   const handleBlur = (event) => {
@@ -1730,12 +1792,159 @@ function MoneyMaskInput({ value, onCommit, onReset, disabled, ariaLabel, placeho
 // Agora: cada campo usa MoneyMaskInput por dentro, mantendo as mesmas
 // promessas de commit/reset/adjusted e os mesmos rótulos abaixo.
 
-function OfferInput({ value, onCommit }) {
+/**
+ * Orçamento total → quanto sobra para o lance.
+ *
+ * A pessoa informa o que tem para gastar com tudo dentro; a tela responde até
+ * onde o lance pode ir, quanto isso é acima do valor inicial (a margem para
+ * disputar) e, no slider, o que sobra ou falta para cada lance simulado.
+ */
+function BudgetPlanner({
+  isDirectSale, budget, onBudget, plan, offer, offerAdjusted, minBid, onOffer, onResetOffer,
+}) {
+  const hasBudget = plan.hasBudget;
+  const step = minBid >= 200000 ? 1000 : 500;
+  const sliderMin = Math.floor(minBid);
+  const sliderMax = Math.max(
+    Math.ceil((minBid * 1.4) / step) * step,
+    hasBudget && plan.maxBid > 0 ? Math.ceil((plan.maxBid * 1.12) / step) * step : 0,
+    Math.ceil(offer / step) * step,
+  );
+  const position = (value) => (sliderMax > sliderMin
+    ? Math.max(0, Math.min(100, ((value - sliderMin) / (sliderMax - sliderMin)) * 100))
+    : 0);
+  const fill = position(offer);
+  const limitMark = hasBudget && plan.maxBid > sliderMin ? position(plan.maxBid) : null;
+  const overBudget = hasBudget && plan.leftover < 0;
+
+  const handleSlide = (event) => {
+    const raw = Number(event.target.value);
+    const snapped = raw <= sliderMin ? minBid : Math.round(raw / step) * step;
+    if (Math.abs(snapped - minBid) < 1) onResetOffer();
+    else onOffer(Math.max(minBid, snapped));
+  };
+
+  // Barra do orçamento: lance, custos e o que sobra do total.
+  const scale = Math.max(budget || 0, plan.total) || 1;
+  const segments = [
+    { key: 'bid', label: isDirectSale ? 'Preço' : 'Lance', value: offer },
+    { key: 'costs', label: 'Custos', value: plan.costs },
+    hasBudget && plan.leftover > 0 && { key: 'left', label: 'Sobra do orçamento', value: plan.leftover },
+  ].filter(Boolean);
+
   return (
-    <label className="buyer-offer-input">
-      <span>R$</span>
-      <MoneyMaskInput value={value} onCommit={onCommit} ariaLabel="Quanto você pretende oferecer" />
-    </label>
+    <div className="budget-planner">
+      <div className="budget-planner-top">
+        <label className="budget-field">
+          <span className="uppy">Quanto você tem para gastar no total?</span>
+          <span className="buyer-offer-input">
+            <span>R$</span>
+            <MoneyMaskInput
+              value={budget}
+              onCommit={onBudget}
+              onReset={() => onBudget(null)}
+              ariaLabel="Quanto você tem para gastar no total"
+              placeholder="0"
+            />
+          </span>
+          <span className="budget-field-hint">
+            Com tudo dentro: {isDirectSale ? 'preço' : 'lance'}, ITBI, comissão, cartório, desocupação, reforma e os gastos que você adicionar.
+          </span>
+        </label>
+
+        <div className={`budget-verdict${!hasBudget ? ' is-empty' : plan.fits ? ' is-fit' : ' is-short'}`} aria-live="polite">
+          {!hasBudget ? (
+            <>
+              <span className="uppy">Total até a chave com o valor inicial</span>
+              <strong>R$ {fmtBRL(plan.minTotal)}</strong>
+              <p>Informe quanto você tem para ver até onde o lance pode ir.</p>
+            </>
+          ) : !plan.fits ? (
+            <>
+              <span className="uppy">Não cabe no seu orçamento</span>
+              <strong>Faltam R$ {fmtBRL(plan.shortfall)}</strong>
+              <p>para pagar o valor inicial de R$ {fmtBRL(minBid)} e os custos (total de R$ {fmtBRL(plan.minTotal)}).</p>
+            </>
+          ) : isDirectSale ? (
+            <>
+              <span className="uppy">Cabe no seu orçamento</span>
+              <strong>Sobram R$ {fmtBRL(Math.max(0, budget - plan.minTotal))}</strong>
+              <p>depois de pagar o preço e todos os custos (total de R$ {fmtBRL(plan.minTotal)}).</p>
+            </>
+          ) : (
+            <>
+              <span className="uppy">Seu lance pode ir até</span>
+              <strong>R$ {fmtBRL(plan.maxBid)}</strong>
+              <p>
+                São <b>R$ {fmtBRL(plan.headroom)}</b> acima do valor inicial para disputar,
+                já contando todos os custos.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {!isDirectSale && (
+        <div className="bid-simulator">
+          <div className="bid-simulator-head">
+            <span className="uppy">Simule seu lance</span>
+            <label className="bid-simulator-value">
+              <span>R$</span>
+              <MoneyMaskInput value={offer} onCommit={onOffer} ariaLabel="Valor do lance simulado" />
+            </label>
+          </div>
+          <div className="bid-slider-wrap">
+            <input
+              type="range"
+              className={`slider bid-slider${overBudget ? ' is-over' : ''}`}
+              min={sliderMin}
+              max={sliderMax}
+              step={1}
+              value={Math.min(Math.max(offer, sliderMin), sliderMax)}
+              onChange={handleSlide}
+              style={{ '--fill': `${fill}%` }}
+              aria-label="Simule seu lance"
+            />
+            {limitMark != null && (
+              <span className="bid-slider-limit" style={{ left: `${limitMark}%` }} aria-hidden="true">
+                <span>até aqui cabe</span>
+              </span>
+            )}
+          </div>
+          <div className="bid-slider-scale">
+            <span>Valor inicial R$ {fmtBRL(minBid)}</span>
+            {offerAdjusted && (
+              <button type="button" onClick={onResetOffer}>Voltar ao valor inicial</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="budget-bar-block">
+        <div className="budget-bar" role="img" aria-label={segments.map(seg => `${seg.label} R$ ${fmtBRL(seg.value)}`).join(', ')}>
+          {segments.map(seg => (
+            <span
+              key={seg.key}
+              className={`budget-bar-seg budget-bar-seg--${seg.key}`}
+              style={{ width: `${(seg.value / scale) * 100}%` }}
+            />
+          ))}
+        </div>
+        <div className="budget-bar-legend">
+          {segments.map(seg => (
+            <span key={seg.key} className={`budget-bar-key budget-bar-key--${seg.key}`}>
+              {seg.label} <b>R$ {fmtBRL(seg.value)}</b>
+            </span>
+          ))}
+          <span className="budget-bar-total">
+            Total até a chave <b>R$ {fmtBRL(plan.total)}</b>
+          </span>
+          {overBudget && (
+            <span className="budget-bar-over">Passa R$ {fmtBRL(-plan.leftover)} do seu orçamento</span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

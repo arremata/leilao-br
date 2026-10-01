@@ -91,7 +91,13 @@ export default function SearchableAutocomplete({
         />
         {query && !disabled && <button type="button" onClick={() => select('')} aria-label={clearLabel}>×</button>}
       </div>
-      {!disabled && open && <div className="search-autocomplete-menu" id={listId} role="listbox">
+      {!disabled && open && <div
+        className="search-autocomplete-menu"
+        id={listId}
+        role="listbox"
+        // Keeps focus on the input while the user drags the menu scrollbar.
+        onMouseDown={event => event.preventDefault()}
+      >
         {matches.length > 0
           ? matches.map((option, index) => <button
             type="button"
@@ -100,7 +106,6 @@ export default function SearchableAutocomplete({
             className={index === activeIndex ? 'active' : ''}
             id={`${listId}-${index}`}
             key={option}
-            onMouseDown={event => event.preventDefault()}
             onMouseEnter={() => setActiveIndex(index)}
             onClick={() => select(option)}
           >{option}</button>)

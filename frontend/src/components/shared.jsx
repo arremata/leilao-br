@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fmtBRL, getEndsAtMs, pracaLabel } from '../utils';
+import { fmtBRL, getEndsAtMs } from '../utils';
 import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
 import { imageSourceForAttempt } from '../imageFallback';
+import { auctionSchedule, formatDayTime, saleTagLabel } from '../auctionRounds';
+import { listingBadges } from '../listingFacts';
 
 // ============================================================
 // Countdown timer
 // ============================================================
-export function Countdown({ until, compact, dark }) {
+export function Countdown({ until, compact, dark, endedLabel = 'Encerrado' }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -36,7 +38,7 @@ export function Countdown({ until, compact, dark }) {
     return (
       <span className="countdown" style={{ color: 'var(--fg-2)' }}>
         <span className="dot" style={{ background: 'var(--fg-3)' }}></span>
-        <span>Encerrado</span>
+        <span>{endedLabel}</span>
       </span>
     );
   }
@@ -133,30 +135,117 @@ export function Specs({ area, beds, baths, parking, floor, dense }) {
 }
 
 // ============================================================
+// Selos do imóvel: quem mora lá, FGTS, financiamento
+// ============================================================
+export function ListingBadges({ p, size }) {
+  return (
+    <ul className={`listing-badges${size === 'lg' ? ' listing-badges--lg' : ''}`} aria-label="Situação e formas de pagamento">
+      {listingBadges(p).map(badge => (
+        <li key={badge.key} className={`listing-badge listing-badge--${badge.tone}`} title={badge.title}>
+          {badge.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const ROUND_STATE_LABEL = {
+  ended: 'encerrada',
+  current: 'agora',
+  upcoming: 'se não vender',
+};
+
+// ============================================================
+// As duas rodadas de um Leilão SFI, lado a lado
+// ============================================================
+/** "R$ 134 mil", "R$ 1,2 mi": cabe numa linha do quadro da rodada. */
+function shortBRL(value) {
+  if (value >= 1_000_000) {
+    return `R$ ${(value / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  }
+  if (value >= 1_000) return `R$ ${Math.round(value / 1_000).toLocaleString('pt-BR')} mil`;
+  return `R$ ${fmtBRL(value)}`;
+}
+
+export function RoundStrip({ schedule, compact }) {
+  if (schedule.kind !== 'rounds') return null;
+  const [first, second] = schedule.rounds;
+  // No Leilão SFI o mínimo da 2ª rodada é a dívida com as despesas. Quase
+  // sempre fica abaixo da 1ª, mas não sempre: quando a dívida passa do valor
+  // do imóvel, a 2ª rodada é MAIS cara, e o quadro tem de dizer isso.
+  const diff = first.price && second.price ? second.price - first.price : 0;
+  // Os dois quadros têm sempre as mesmas cinco linhas; a do rodapé fica
+  // reservada mesmo vazia, para os dois terem a mesma altura e alinhamento.
+  // Sem centavos: o quadro é estreito e o valor exato está na página.
+  const priceLabel = (price) => (price ? `R$ ${Math.round(price).toLocaleString('pt-BR')}` : 'a publicar');
+  // Se um preço é longo, os dois usam a letra menor: o par segue um padrão só.
+  const longPrices = schedule.rounds.some(round => priceLabel(round.price).length > 11);
+  return (
+    <div className={`round-strip${compact ? ' round-strip--compact' : ''}`}>
+      {schedule.rounds.map(round => {
+        const price = priceLabel(round.price);
+        const footer = round.round === 2 && diff !== 0 && round.state !== 'ended'
+          ? `${shortBRL(Math.abs(diff))} a ${diff < 0 ? 'menos' : 'mais'}`
+          : '';
+        return (
+          <div key={round.round} className={`round-step is-${round.state}`}>
+            <span className="round-step-title">{round.round}ª rodada</span>
+            <span className="round-step-state">
+              {/* Na rodada que está valendo, quanto falta — como na foto do card. */}
+              {round.state === 'current'
+                ? <Countdown until={round.at} compact />
+                : ROUND_STATE_LABEL[round.state]}
+            </span>
+            <span
+              className={`round-step-price${longPrices ? ' is-long' : ''}`}
+              title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}
+            >
+              {price}
+            </span>
+            <span className="round-step-date">{formatDayTime(round.at) || 'data a publicar'}</span>
+            <span
+              className={`round-step-drop${round.round === 2 && diff > 0 ? ' is-up' : ''}`}
+              aria-hidden={!footer}
+            >
+              {footer || ' '}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
 // Property card — DENSE, lots of information
 // ============================================================
 export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   const isDirectSale = /venda direta/i.test(p.modalidade || '');
+  const schedule = auctionSchedule(p);
   const link = usePropertyLink(p.id);
   return (
     <Link
       {...link}
       className="card hov fade-in property-card"
-      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms`, display: 'block' }}
+      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}
     >
       {/* Photo with overlays */}
       <div style={{ position: 'relative' }}>
         <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
-        {/* Countdown top-right */}
-        <div style={{
-          position: 'absolute', top: 14, right: 12,
-          background: 'rgba(255,255,255,0.78)',
-          padding: '5px 10px', borderRadius: 8,
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.6)',
-        }}>
-          <Countdown until={p.endsAt} compact dark />
+        {/* Rodada + contagem, no canto: "2ª rodada · 2d 18:51:13" */}
+        <div className="property-card-clock">
+          {schedule.current ? (
+            <span className="property-card-clock-round">{schedule.current.round}ª rodada</span>
+          ) : schedule.isOpenTender && !schedule.ended ? (
+            <span className="property-card-clock-round">Rodada única</span>
+          ) : null}
+          <Countdown
+            until={schedule.headline.until}
+            compact
+            dark
+            endedLabel={schedule.headline.short || 'Encerrado'}
+          />
         </div>
         {/* Watch button bottom-right */}
         <button
@@ -177,10 +266,10 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
       </div>
 
       {/* Body */}
-      <div style={{ padding: 18 }}>
+      <div className="property-card-body">
         {/* Tags */}
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="tag">{pracaLabel(p.praca) || p.modalidade || p.auctionType}</span>
+          <span className="tag">{saleTagLabel(p, schedule, { compact: true })}</span>
           <span className="tag">{p.type}</span>
         </div>
 
@@ -195,29 +284,46 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
         {/* Specs */}
         <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} dense />
 
+        {/* Quem mora lá e como dá para pagar */}
+        <ListingBadges p={p} />
+
         <div className="divider" style={{ margin: '16px 0' }}></div>
 
-        {/* Preço de partida */}
-        <div className="row between baseline" style={{ marginBottom: 16 }}>
-          <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-            {isDirectSale ? 'preço de venda' : 'valor inicial'}
-          </span>
-          <span className="num-md" style={{ color: 'var(--fg-0)' }}>
-            R$ {fmtBRL(p.minBid)}
-          </span>
-        </div>
+        {/* Leilão SFI: as duas rodadas, com a que está valendo em destaque.
+            Demais modalidades: o preço de partida numa linha. */}
+        {schedule.kind === 'rounds' ? (
+          <div style={{ marginBottom: 16 }}>
+            <RoundStrip schedule={schedule} compact />
+          </div>
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <div className="row between baseline">
+              <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+                {isDirectSale ? 'preço de venda' : 'valor inicial'}
+              </span>
+              <span className="num-md" style={{ color: 'var(--fg-0)' }}>
+                R$ {fmtBRL(p.minBid)}
+              </span>
+            </div>
+            {schedule.isOpenTender && (
+              <p className="single-round-note">
+                <b>Rodada única.</b> Não tem 2ª rodada com preço menor.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Economia em reais, nunca em porcentagem: "38% de deságio" não diz
             nada para quem nunca comprou um imóvel. */}
-        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 'auto' }}>
           <div>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
-            {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
-              <div style={{ fontSize: 11.5, color: 'var(--good)', marginTop: 4, fontWeight: 500 }}>
-                R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+            {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
+              <div style={{ fontSize: 11.5, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', marginTop: 4, fontWeight: 500 }}>
+                R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
               </div>
             )}
           </div>
@@ -253,6 +359,8 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
 export function PropertyRow({ p, watched, onToggleWatch }) {
   const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
   const isDirectSale = /venda direta/i.test(p.modalidade || '');
+  const schedule = auctionSchedule(p);
+  const badges = listingBadges(p);
   const link = usePropertyLink(p.id);
   return (
     <Link
@@ -283,7 +391,14 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
           {p.title}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {pracaLabel(p.praca) || p.modalidade || p.auctionType}
+          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {saleTagLabel(p, schedule)}
+        </div>
+        <div className="property-row-badges">
+          {badges.map(badge => (
+            <span key={badge.key} className={`listing-badge listing-badge--${badge.tone}`} title={badge.title}>
+              {badge.label}
+            </span>
+          ))}
         </div>
       </div>
       <div>
@@ -294,9 +409,9 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
-        {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
-          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>
-            R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+        {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
+          <div style={{ fontSize: 11, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', fontWeight: 500 }}>
+            R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
           </div>
         )}
       </div>
@@ -313,7 +428,18 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
           </div>
         </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>ainda não calculado</div>}
       </div>
-      <Countdown until={p.endsAt} compact />
+      <div>
+        <Countdown
+          until={schedule.headline.until}
+          compact
+          endedLabel={schedule.headline.short || 'Encerrado'}
+        />
+        {schedule.current && (
+          <div style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
+            {schedule.current.round}ª rodada
+          </div>
+        )}
+      </div>
       <button
         onClick={(e) => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
         style={{

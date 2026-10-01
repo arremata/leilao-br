@@ -1180,9 +1180,30 @@ a { color: inherit; text-decoration: none; }
   min-width: 0;
 }
 
+/* Todos os cards do grid com a mesma altura: as linhas têm a altura do card
+   mais alto e o bloco de valores fica sempre alinhado no rodapé. */
+.feed-grid {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
 .property-card {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
+.property-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+}
+.single-round-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--fg-2);
+}
+.single-round-note b { color: var(--fg-1); font-weight: 600; }
 
 /* ---------- Fade-in animation ---------- */
 .fade-in {
@@ -2752,3 +2773,224 @@ a { color: inherit; text-decoration: none; }
 
 .removed-notice strong { color: var(--warn); }
 .removed-notice span { color: var(--fg-1); }
+
+/* ---------- Card do imóvel: rodada, selos e linha do tempo ---------- */
+.property-card-clock {
+  position: absolute; top: 12px; right: 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.86);
+  border: 1px solid rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+}
+.property-card-clock-round {
+  font-size: 11px; font-weight: 600;
+  color: var(--accent-strong);
+  padding-right: 8px;
+  border-right: 1px solid var(--line-2);
+}
+
+.listing-badges {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 12px 0 0; padding: 0; list-style: none;
+}
+.listing-badges--lg { margin-top: 14px; }
+.listing-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px; font-weight: 550;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.listing-badges--lg .listing-badge { font-size: 12.5px; padding: 4px 11px; }
+.listing-badge::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.listing-badge--good { background: var(--good-soft); color: #15803D; }
+.listing-badge--warn { background: var(--warn-soft); color: var(--warn); }
+.listing-badge--neutral { background: var(--bg-1); color: var(--fg-2); border-color: var(--line-2); border-style: dashed; }
+.listing-badge--muted { background: var(--bg-2); color: var(--fg-2); }
+
+.property-row-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.property-row-badges .listing-badge { font-size: 10.5px; padding: 1px 7px; }
+
+.round-strip {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+/* Os dois quadros seguem a mesma grade de cinco linhas. */
+.round-step {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto auto auto auto;
+  row-gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-1);
+}
+.round-step-title { font-size: 11.5px; font-weight: 650; color: var(--fg-1); white-space: nowrap; }
+.round-step-state {
+  justify-self: start;
+  font-size: 10.5px; line-height: 1.5; color: var(--fg-2); white-space: nowrap;
+}
+.round-step-price {
+  margin-top: 4px;
+  font-family: var(--f-mono); font-feature-settings: 'tnum';
+  font-size: 15px; line-height: 22px; font-weight: 600; color: var(--fg-0);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.round-step-price.is-long { font-size: 12.5px; }
+.round-step-date { font-family: var(--f-mono); font-size: 10.5px; color: var(--fg-2); white-space: nowrap; }
+.round-step-drop {
+  margin-top: 2px;
+  font-size: 11px; line-height: 16px; font-weight: 500; color: var(--good);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.round-step.is-current { border-color: var(--accent); background: var(--accent-soft); }
+.round-step.is-current .round-step-state,
+.round-step.is-current .round-step-title { color: var(--accent-strong); font-weight: 600; }
+.round-step.is-ended { background: var(--bg-2); border-color: var(--bg-2); }
+.round-step.is-ended .round-step-price { color: var(--fg-3); text-decoration: line-through; font-weight: 500; }
+.round-step.is-ended .round-step-title,
+.round-step.is-ended .round-step-state { color: var(--fg-3); }
+.round-step.is-ended .round-step-state::before { content: "✓ "; }
+/* Contagem dentro do quadro da rodada: mesmo tamanho da linha de situação. */
+.round-step-state .countdown { font-size: 10.5px; gap: 5px; }
+.round-step-state .countdown .dot { width: 5px; height: 5px; }
+
+.auction-headline-note {
+  margin-top: 6px;
+  font-size: 12px; color: var(--fg-1);
+}
+
+@media (max-width: 640px) {
+  .round-step { padding: 9px 10px; }
+  .round-step-price { font-size: 14px; }
+}
+.round-strip--compact .round-step-price { font-size: 14px; }
+.round-strip--compact .round-step-price.is-long { font-size: 12px; }
+
+/* ---------- Orçamento total → até onde o lance pode ir ---------- */
+.budget-planner {
+  display: grid;
+  gap: 22px;
+}
+.budget-planner-top {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+.budget-field { display: flex; flex-direction: column; gap: 8px; }
+.budget-field > .uppy { color: var(--fg-2); }
+.budget-field-hint { font-size: 11.5px; color: var(--fg-2); line-height: 1.45; }
+
+.budget-verdict {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--line-1);
+  background: var(--bg-2);
+}
+.budget-verdict .uppy { color: var(--fg-2); }
+.budget-verdict strong {
+  font-family: var(--f-mono); font-feature-settings: 'tnum';
+  font-size: 26px; font-weight: 650; letter-spacing: -0.02em;
+  color: var(--fg-0);
+}
+.budget-verdict p { margin: 0; font-size: 12.5px; color: var(--fg-1); line-height: 1.45; }
+.budget-verdict.is-fit { background: var(--good-soft); border-color: transparent; }
+.budget-verdict.is-fit strong, .budget-verdict.is-fit b { color: #15803D; }
+.budget-verdict.is-short { background: var(--bad-soft); border-color: transparent; }
+.budget-verdict.is-short strong { color: var(--bad); }
+
+.bid-simulator {
+  padding: 16px 20px 14px;
+  border: 1px solid var(--line-1);
+  border-radius: 12px;
+  background: var(--bg-1);
+}
+.bid-simulator-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.bid-simulator-head .uppy { color: var(--fg-2); }
+.bid-simulator-value {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  font-family: var(--f-mono); color: var(--fg-2);
+}
+.bid-simulator-value:focus-within { border-color: var(--accent); }
+.bid-simulator-value input {
+  width: 130px; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--fg-0); text-align: right;
+}
+.bid-slider-wrap { position: relative; padding-top: 18px; }
+.bid-slider { margin-top: 0; height: 6px; }
+.bid-slider.is-over {
+  background:
+    linear-gradient(var(--bad), var(--bad)) 0/var(--fill, 0%) 100% no-repeat,
+    var(--bg-3);
+}
+.bid-slider.is-over::-webkit-slider-thumb { background: var(--bad); }
+.bid-slider.is-over::-moz-range-thumb { background: var(--bad); }
+.bid-slider-limit {
+  position: absolute; top: 12px; bottom: -6px;
+  width: 2px; margin-left: -1px;
+  background: var(--good);
+  pointer-events: none;
+}
+.bid-slider-limit > span {
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-weight: 600; color: #15803D; white-space: nowrap;
+}
+.bid-slider-scale {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  margin-top: 10px; font-size: 11.5px; color: var(--fg-2);
+}
+.bid-slider-scale button { color: var(--accent-strong); font-size: 11.5px; text-decoration: underline; }
+
+.budget-bar {
+  display: flex; height: 12px; overflow: hidden;
+  border-radius: 999px; background: var(--bg-3);
+}
+.budget-bar-seg { height: 100%; min-width: 2px; transition: width .2s ease; }
+.budget-bar-seg--bid { background: var(--accent); }
+.budget-bar-seg--costs { background: #F59E0B; }
+.budget-bar-seg--left { background: #86EFAC; }
+.budget-bar-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px;
+  font-size: 12px; color: var(--fg-2);
+}
+.budget-bar-legend b { color: var(--fg-0); font-family: var(--f-mono); font-weight: 600; }
+.budget-bar-key { display: inline-flex; align-items: center; gap: 6px; }
+.budget-bar-key::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
+.budget-bar-key--bid::before { background: var(--accent); }
+.budget-bar-key--costs::before { background: #F59E0B; }
+.budget-bar-key--left::before { background: #86EFAC; }
+.budget-bar-total { margin-left: auto; }
+.budget-bar-total b { color: var(--accent-strong); }
+.budget-bar-over { flex-basis: 100%; color: var(--bad); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .budget-planner-top { grid-template-columns: 1fr; }
+  .budget-bar-total { margin-left: 0; }
+  .bid-simulator { padding: 14px; }
+}
+@media (max-width: 860px) {
+  .feed-grid { grid-auto-rows: auto; }
+}
+
+/* Avaliação no topo da página, ao lado do prazo da rodada */
+.appraisal-fact { text-align: right; min-width: 0; }
+.appraisal-fact-gap { margin-top: 2px; font-size: 11.5px; font-weight: 500; color: var(--good); }
+@media (max-width: 520px) {
+  .appraisal-fact { text-align: left; }
+}
+.round-step-drop.is-up { color: var(--bad); }
+.appraisal-fact-gap.is-above { color: var(--warn); }
