@@ -1,4 +1,5 @@
-/* ==================================================   Argos — Arctic / Violet identity
+/* =========================================================
+   Argos — Arctic / Violet identity
    Fonts: Plus Jakarta Sans (display), Inter (body), JetBrains Mono (numbers)
    ========================================================= */
 
@@ -3144,6 +3145,5 @@ a { color: inherit; text-decoration: none; }
   color: var(--fg-3) !important;
 }
 
-=======
 .round-step-drop.is-up { color: var(--bad); }
 .appraisal-fact-gap.is-above { color: var(--warn); }
