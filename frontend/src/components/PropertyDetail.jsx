@@ -999,6 +999,9 @@ function AppraisalFact({ p }) {
           {current > 0 && appraisal > current && (
             <div className="appraisal-fact-gap">R$ {fmtBRL(appraisal - current)} abaixo da avaliação</div>
           )}
+          {current > 0 && current > appraisal && (
+            <div className="appraisal-fact-gap is-above">Valor inicial R$ {fmtBRL(current - appraisal)} acima da avaliação</div>
+          )}
         </>
       ) : (
         <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fg-3)' }}>
@@ -1041,9 +1044,10 @@ function PricingGrid({ p }) {
               : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
         </span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
-        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > currentBidPrice && (
-          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
-            R$ {fmtBRL(sfiPricing.previous.price - currentBidPrice)} a menos
+        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > 0
+          && sfiPricing.previous.price !== currentBidPrice && (
+          <div style={{ fontSize: 11, color: sfiPricing.previous.price > currentBidPrice ? 'var(--good)' : 'var(--bad)', fontWeight: 500, marginTop: 2 }}>
+            R$ {fmtBRL(Math.abs(sfiPricing.previous.price - currentBidPrice))} {sfiPricing.previous.price > currentBidPrice ? 'a menos' : 'a mais'} que a 1ª rodada
           </div>
         )}
         {currentDateLabel && (
@@ -1061,6 +1065,12 @@ function PricingGrid({ p }) {
               {sfiPricing.upcoming && currentBidPrice > otherRoundPrice && (
                 <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
                   R$ {fmtBRL(currentBidPrice - otherRoundPrice)} a menos
+                </div>
+              )}
+              {sfiPricing.upcoming && otherRoundPrice > currentBidPrice && (
+                <div style={{ fontSize: 11, color: 'var(--bad)', fontWeight: 500, marginTop: 2, lineHeight: 1.45 }}>
+                  R$ {fmtBRL(otherRoundPrice - currentBidPrice)} a mais. Na 2ª rodada, o mínimo é a
+                  dívida com as despesas, e aqui ela passa do valor da 1ª.
                 </div>
               )}
               {otherRoundDateLabel && (

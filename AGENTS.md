@@ -234,6 +234,10 @@ The full platform will include:
   situação, preço sem centavos, data e rodapé reservado) e o mesmo tamanho de
   letra; “Carregar mais” deixou de levar a página ao topo, porque mudar só
   `pagina` no endereço não conta mais como tela nova.
+  Quando a Caixa publica a 2ª rodada mais cara que a 1ª (o mínimo da 2ª é a
+  dívida com as despesas, que pode passar do valor do imóvel), o card mostra
+  “a mais” em vermelho e a página explica o motivo; valor inicial acima da
+  avaliação passa a aparecer como “acima”, em vez de ficar sem comparação.
 
 - **2026-09-30** — Incluiu a situação oficial dos lances nos imóveis da Caixa,
   sem confundir valor inicial com valor já ofertado. Quando a Caixa ou o

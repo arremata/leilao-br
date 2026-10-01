@@ -2989,3 +2989,5 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 520px) {
   .appraisal-fact { text-align: left; }
 }
+.round-step-drop.is-up { color: var(--bad); }
+.appraisal-fact-gap.is-above { color: var(--warn); }
