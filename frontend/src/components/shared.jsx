@@ -171,9 +171,10 @@ function shortBRL(value) {
 export function RoundStrip({ schedule, compact }) {
   if (schedule.kind !== 'rounds') return null;
   const [first, second] = schedule.rounds;
-  const drop = first.price && second.price && first.price > second.price
-    ? first.price - second.price
-    : null;
+  // No Leilão SFI o mínimo da 2ª rodada é a dívida com as despesas. Quase
+  // sempre fica abaixo da 1ª, mas não sempre: quando a dívida passa do valor
+  // do imóvel, a 2ª rodada é MAIS cara, e o quadro tem de dizer isso.
+  const diff = first.price && second.price ? second.price - first.price : 0;
   // Os dois quadros têm sempre as mesmas cinco linhas; a do rodapé fica
   // reservada mesmo vazia, para os dois terem a mesma altura e alinhamento.
   // Sem centavos: o quadro é estreito e o valor exato está na página.
@@ -184,8 +185,8 @@ export function RoundStrip({ schedule, compact }) {
     <div className={`round-strip${compact ? ' round-strip--compact' : ''}`}>
       {schedule.rounds.map(round => {
         const price = priceLabel(round.price);
-        const footer = round.round === 2 && drop && round.state !== 'ended'
-          ? `${shortBRL(drop)} a menos`
+        const footer = round.round === 2 && diff !== 0 && round.state !== 'ended'
+          ? `${shortBRL(Math.abs(diff))} a ${diff < 0 ? 'menos' : 'mais'}`
           : '';
         return (
           <div key={round.round} className={`round-step is-${round.state}`}>
@@ -198,7 +199,12 @@ export function RoundStrip({ schedule, compact }) {
               {price}
             </span>
             <span className="round-step-date">{formatDayTime(round.at) || 'data a publicar'}</span>
-            <span className="round-step-drop" aria-hidden={!footer}>{footer || ' '}</span>
+            <span
+              className={`round-step-drop${round.round === 2 && diff > 0 ? ' is-up' : ''}`}
+              aria-hidden={!footer}
+            >
+              {footer || ' '}
+            </span>
           </div>
         );
       })}
@@ -311,9 +317,9 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
-            {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
-              <div style={{ fontSize: 11.5, color: 'var(--good)', marginTop: 4, fontWeight: 500 }}>
-                R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+            {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
+              <div style={{ fontSize: 11.5, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', marginTop: 4, fontWeight: 500 }}>
+                R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
               </div>
             )}
           </div>
@@ -399,9 +405,9 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
       </div>
       <div>
         <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
-        {p.appraisal > 0 && p.minBid > 0 && p.appraisal > p.minBid && (
-          <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500 }}>
-            R$ {fmtBRL(p.appraisal - p.minBid)} abaixo
+        {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
+          <div style={{ fontSize: 11, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', fontWeight: 500 }}>
+            R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
           </div>
         )}
       </div>
