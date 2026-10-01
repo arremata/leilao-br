@@ -214,6 +214,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Adotou a logo oficial: casa branca com um ponto, sobre o roxo
+  da marca (`#7C3AED`, o mesmo `--accent`). `frontend/public/brand/` guarda o
+  original (`argos-logo.png`, 1080×1080, também usado como `og:image`) e o
+  símbolo em SVG (`argos-mark.svg`). O selo `.logo` do menu, do login e da tela
+  de carregamento usa o símbolo; favicon, ícones do app instalado (192, 512,
+  maskable) e o ícone da tela inicial do iPhone foram refeitos a partir dele. O
+  favicon anterior ainda era o do Vite. O cache do service worker passou para
+  `argos-v3` para trocar os ícones de quem já instalou.
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da
