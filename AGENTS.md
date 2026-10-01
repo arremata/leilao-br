@@ -220,8 +220,9 @@ The full platform will include:
   modelo do SBPE (cota de 80% SAC / 70% PRICE sobre o menor entre lance e
   avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
   As condições de referência ficam com data em `frontend/src/financing.js`. Na
-  conta, dívida de condomínio e IPTU atrasado aparecem fechadas, com cadeado e
-  valor desfocado, fora do total, à espera da consulta paga (PD-019;
+  conta, eventuais dívidas de condomínio e IPTU aparecem como as demais linhas,
+  com o valor desfocado e um cadeado no lugar dele, fora do total e com o aviso
+  de que pode não haver dívida, à espera da consulta paga (PD-019;
   `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
   virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
 

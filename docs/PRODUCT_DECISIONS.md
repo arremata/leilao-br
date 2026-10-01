@@ -338,13 +338,14 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 - **Data:** 1 de outubro de 2026
 - **Estado:** Ativa
-- **Decisão:** a dívida de condomínio e o IPTU atrasado entram na conta do
-  imóvel como linhas fechadas, com o valor desfocado, até existir a consulta
-  paga dessas dívidas.
+- **Decisão:** eventuais dívidas de condomínio e de IPTU atrasado entram na
+  conta do imóvel como linhas fechadas, com o valor desfocado, até existir a
+  consulta paga dessas dívidas.
 - **Motivo:** essas dívidas pesam na decisão de comprar, mas o Argos ainda não
   tem os valores; esconder as linhas faria a conta parecer completa.
 - **Consequências:** as linhas fechadas não entram no total até a chave, e o
-  total avisa isso. Nenhum valor é inventado. Preço e forma de pagamento da
+  total avisa isso. A tela sempre diz que pode não haver dívida; nenhum valor é
+  inventado nem a existência da dívida é presumida. Preço e forma de pagamento da
   consulta ainda não foram definidos.
 
 ## Decisões ativas de operação do produto

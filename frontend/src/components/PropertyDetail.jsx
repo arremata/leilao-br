@@ -1635,7 +1635,7 @@ function CostBreakdown({ p, sim }) {
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
             <span>
               <span style={{ fontSize: 15, fontWeight: 600 }}>Total até a chave</span>
-              <small className="cost-total-note">Sem as dívidas de condomínio e IPTU.</small>
+              <small className="cost-total-note">Sem eventuais dívidas de condomínio e IPTU.</small>
             </span>
             <span></span>
             <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: 0 }}>R$ {fmtBRL(dynamicTotal)}</span>
@@ -2232,9 +2232,10 @@ function RenovationMoneyEditor({ value, adjusted, disabled, onCommit }) {
 }
 
 /**
- * Dívidas atrasadas do imóvel (condomínio e IPTU). Pesam muito na decisão, mas
- * o Argos ainda não tem o valor: a consulta vai ser paga à parte. Por enquanto
- * as linhas aparecem fechadas, com o valor desfocado e fora do total.
+ * Eventuais dívidas atrasadas do imóvel (condomínio e IPTU). Pesam muito na
+ * decisão, mas o Argos ainda não sabe se existem nem quanto são: a consulta vai
+ * ser paga à parte. Por enquanto as linhas aparecem fechadas, com o valor
+ * desfocado e fora do total, sempre dizendo que pode não haver dívida.
  *
  * Paywall: quando a consulta existir, passe `onUnlock` (abre o pagamento). Sem
  * ele, o botão fica desativado como "em breve".
@@ -2243,13 +2244,13 @@ const LOCKED_DEBTS = [
   {
     id: 'overdue_condo',
     label: 'Dívida de condomínio',
-    hint: 'Quanto o imóvel deve de condomínio até hoje. Quem paga essa dívida está nas regras da venda.',
+    hint: 'Se houver, quanto o imóvel deve de condomínio até hoje. Pode não haver nenhum valor em aberto. Quem paga essa dívida está nas regras da venda.',
     condominiumOnly: true,
   },
   {
     id: 'overdue_iptu',
     label: 'IPTU atrasado',
-    hint: 'Quanto o imóvel deve de IPTU à prefeitura. Quem paga essa dívida está nas regras da venda.',
+    hint: 'Se houver, quanto o imóvel deve de IPTU à prefeitura. Pode não haver nenhum valor em aberto. Quem paga essa dívida está nas regras da venda.',
   },
 ];
 
@@ -2258,24 +2259,13 @@ function LockedDebtRows({ hasCondominium, onUnlock }) {
   return (
     <div className="debt-locked" aria-label="Dívidas do imóvel, ainda bloqueadas">
       {debts.map(debt => (
-        <div key={debt.id} className="cost-row debt-locked-row">
-          <span className="debt-locked-icon"><LockIcon size={13} /></span>
-          <div>
-            <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{debt.label}</div>
-            <div className="debt-locked-hint">{debt.hint}</div>
-          </div>
-          <span></span>
-          <span className="debt-locked-value">
-            <span aria-hidden="true">R$ 0.000,00</span>
-            <span className="sr-only">Valor bloqueado</span>
-          </span>
-        </div>
+        <CostRow key={debt.id} l={debt.label} v={0} pct={0} hint={debt.hint} locked />
       ))}
       <div className="debt-locked-cta">
         <p>
-          <strong>Quanto este imóvel deve?</strong> A consulta das dívidas de
-          {hasCondominium ? ' condomínio e' : ''} IPTU é liberada à parte. Até lá, confirme
-          {hasCondominium ? ' no condomínio e' : ''} na prefeitura antes do lance.
+          <strong>Este imóvel tem dívidas?</strong> Pode não haver nenhum valor em aberto. A
+          consulta, liberada à parte, mostra se há dívida de{hasCondominium ? ' condomínio e' : ''} IPTU
+          e quanto. Até lá, confirme{hasCondominium ? ' no condomínio e' : ''} na prefeitura antes do lance.
         </p>
         <button type="button" className="btn sm" onClick={onUnlock} disabled={!onUnlock}>
           <LockIcon size={13} />
@@ -2287,7 +2277,7 @@ function LockedDebtRows({ hasCondominium, onUnlock }) {
   );
 }
 
-function CostRow({ l, v, hint, pct, custom, onDelete }) {
+function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -2341,10 +2331,18 @@ function CostRow({ l, v, hint, pct, custom, onDelete }) {
           </div>
         )}
       </div>
-      <span className="mono cost-money-value" style={{
-        minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
-        fontWeight: 500, letterSpacing: '-0.02em',
-      }}>R$ {fmtBRL(v)}</span>
+      {locked ? (
+        <span className="mono cost-money-value cost-money-locked">
+          <LockIcon size={13} />
+          <span aria-hidden="true" className="cost-money-blur">R$ 0.000,00</span>
+          <span className="sr-only">Valor bloqueado</span>
+        </span>
+      ) : (
+        <span className="mono cost-money-value" style={{
+          minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
+          fontWeight: 500, letterSpacing: '-0.02em',
+        }}>R$ {fmtBRL(v)}</span>
+      )}
     </div>
   );
 }

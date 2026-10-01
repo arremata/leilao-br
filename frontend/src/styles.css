@@ -3154,13 +3154,11 @@ a { color: inherit; text-decoration: none; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.debt-locked-row {
-  display: grid; grid-template-columns: 24px minmax(180px, 1fr) 120px minmax(210px, 260px); gap: 14px;
-  padding: 14px 20px; border-top: 1px solid var(--line-1); align-items: baseline; }
-.debt-locked-icon { color: var(--fg-3); display: inline-flex; }
-.debt-locked-hint { margin-top: 4px; font-size: 11.5px; color: var(--fg-2); max-width: 480px; line-height: 1.45; }
-.debt-locked-value { text-align: right; font-family: var(--f-mono); font-size: 15px; font-weight: 600; color: var(--fg-1); }
-.debt-locked-value > span[aria-hidden] { filter: blur(6px); user-select: none; }
+.cost-money-locked { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--fg-3); }
+.cost-money-blur { filter: blur(5px); color: var(--fg-0); font-weight: 500; user-select: none; }
+@media (max-width: 860px) {
+  .cost-row > .cost-money-locked { justify-content: flex-start; }
+}
 .debt-locked-cta {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding: 12px 20px 14px; border-top: 1px dashed var(--line-2);

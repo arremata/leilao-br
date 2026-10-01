@@ -152,12 +152,14 @@ para disputar e, num slider, o total e a sobra para cada lance simulado. Condom�
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
 
-A dívida de condomínio (só quando há condomínio) e o IPTU atrasado aparecem na
-conta como linhas fechadas, com cadeado e o valor desfocado. O Argos ainda não
-tem esses valores: a consulta das dívidas vai ser liberada à parte, e o botão
-“Ver as dívidas” fica marcado como “em breve”. Essas linhas não entram no total
-até a chave, e o total diz isso; até a consulta existir, a tela orienta a
-confirmar no condomínio e na prefeitura antes do lance.
+Eventuais dívidas de condomínio (só quando há condomínio) e de IPTU atrasado
+aparecem na conta como as demais linhas, mas com o valor desfocado e um cadeado
+no lugar do número. O Argos ainda não sabe se essas dívidas existem nem quanto
+são, e a tela diz que pode não haver nenhum valor em aberto. A consulta vai ser
+liberada à parte, e o botão “Ver as dívidas” fica marcado como “em breve”. Essas
+linhas não entram no total até a chave, que avisa “Sem eventuais dívidas de
+condomínio e IPTU”; até a consulta existir, a tela orienta a confirmar no
+condomínio e na prefeitura antes do lance.
 
 Quando a Caixa informa que o imóvel aceita financiamento, e só nesse caso, a
 página mostra uma linha com a parcela estimada perto dos valores e, na conta, o
