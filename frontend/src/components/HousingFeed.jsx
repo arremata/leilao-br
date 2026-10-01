@@ -34,15 +34,15 @@ function ListingFactFilters({ filters, onChange }) {
     <div className="housing-field">
       <span>Tem alguém morando?</span>
       <div className="housing-filter-segments" role="group" aria-label="Tem alguém morando?">
+        {/* Sem opção neutra: nada marcado mostra todos; tocar de novo desmarca. */}
         {[
-          ['any', 'Tanto faz'],
           ['vacant', 'Desocupado'],
           ['occupied', 'Ocupado'],
         ].map(([value, label]) => <button
           type="button"
           key={value}
           aria-pressed={filters.occupancy === value}
-          onClick={() => onChange('occupancy', value)}
+          onClick={() => onChange('occupancy', filters.occupancy === value ? 'any' : value)}
         >{label}</button>)}
       </div>
     </div>

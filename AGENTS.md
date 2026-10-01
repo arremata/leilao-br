@@ -215,8 +215,8 @@ The full platform will include:
 ## Changelog
 
 - **2026-10-01** — A lista de imóveis ganhou filtros pelo que a Caixa informa
-  na ficha: "Tem alguém morando?" (tanto faz, desocupado, ocupado), "Aceita
-  FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,
+  na ficha: "Tem alguém morando?" (desocupado ou ocupado; nada marcado mostra
+  todos e tocar de novo desmarca), "Aceita FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,
   `financiamento`), aparecem como selos removíveis acima da lista e saem com
   "Limpar". Só passam imóveis em que a Caixa afirma a condição: "não
   informado" nunca conta como desocupado ou aceito. Lógica em

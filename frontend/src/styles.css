@@ -3080,4 +3080,5 @@ a { color: inherit; text-decoration: none; }
 /* Filtros pela ficha da Caixa: ocupação, FGTS e financiamento */
 .housing-fact-filters { display: grid; gap: 12px; margin-top: 12px; }
 .housing-fact-filters .housing-field { gap: 8px; }
+.housing-fact-filters .housing-filter-segments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .housing-fact-filters .feed-switch { width: 100%; }
