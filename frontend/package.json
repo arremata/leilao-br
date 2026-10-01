@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:prod": "../dev-prod.sh",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-dictionary.mjs",
     "lint": "eslint .",
     "test": "node --test src/*.test.js",
     "preview": "vite preview"

@@ -214,6 +214,16 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Publicou o dicionário do leilão para o buscador. `/dicionario`
+  e `/dicionario/{termo}` abrem sem login e sem esperar a sessão. Depois do
+  `vite build`, `frontend/scripts/prerender-dictionary.mjs` grava o HTML de cada
+  página com título, descrição, canônico em `www.argosleiloes.com.br`, dados
+  estruturados (`DefinedTermSet`/`DefinedTerm`) e o texto dos verbetes, além de
+  `sitemap.xml` e `robots.txt`. A página de um verbete só é indexada quando tem
+  texto além da definição curta (`detail` em `frontend/src/content/glossary.js`);
+  as demais ficam `noindex, follow` e fora do sitemap. Os textos ficam em
+  `glossary.js` para revisão editorial.
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da

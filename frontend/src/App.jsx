@@ -8,11 +8,13 @@ import { housingProfileForApi, housingProfileFromUser, isCompleteHousingProfile 
 import {
   accountDestination,
   housingPreferencesFlow,
+  isPublicPath,
   postSetupDestination,
   shouldShowHousingOnboarding,
   shouldUseAccountScreen,
 } from './housingEntry';
 import PropertyRoute from './components/PropertyRoute';
+import Dictionary, { DictionaryTerm } from './components/Dictionary';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
 import NotFound from './components/NotFound';
@@ -217,7 +219,8 @@ function App() {
     }
   }, [isAuthed]);
 
-  if (!authReady && !isPreview) {
+  // O dicionário é aberto a quem chega pelo buscador: não espera a sessão.
+  if (!authReady && !isPreview && !isPublicPath(location.pathname)) {
     return <main className="auth-session-loading" role="status">
       <span className="logo" aria-hidden="true" />
       <p>Verificando seu acesso…</p>
@@ -241,6 +244,8 @@ function App() {
               afterSetupDestination={afterSetupDestination}
               allowExplore={isPreview}
             />} />
+        <Route path="/dicionario" element={<Dictionary />} />
+        <Route path="/dicionario/:termo" element={<DictionaryTerm />} />
         <Route element={<AccountGate account={effectiveAccount} allowPublic={isPreview} requireProfile={!isPreview} profileComplete={profileComplete} />}>
           <Route path="/" element={
             <HousingEntry
@@ -310,6 +315,7 @@ function TopBar({ watchCount, account }) {
             Salvos {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
+          <NavLink to="/dicionario" className={({ isActive }) => (isActive ? 'active' : '')}>Dicionário</NavLink>
         </nav>
         <div className="housing-account">
           {account ? (

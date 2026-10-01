@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   accountDestination,
   housingPreferencesFlow,
+  isPublicPath,
   postSetupDestination,
   shouldShowHousingOnboarding,
   shouldUseAccountScreen,
@@ -75,4 +76,12 @@ test('account return destinations stay inside the app and avoid setup loops', ()
   assert.equal(accountDestination('/entrar'), '/');
   assert.equal(postSetupDestination('/perfil'), '/');
   assert.equal(postSetupDestination('/preferencias?x=1'), '/');
+});
+
+test('the dictionary opens without an account', () => {
+  assert.equal(isPublicPath('/dicionario'), true);
+  assert.equal(isPublicPath('/dicionario/itbi'), true);
+  assert.equal(isPublicPath('/dicionarios'), false);
+  assert.equal(shouldUseAccountScreen({ pathname: '/dicionario', isPreview: false, account: null }), false);
+  assert.equal(shouldUseAccountScreen({ pathname: '/dicionario/itbi', isPreview: false, account: null }), false);
 });
