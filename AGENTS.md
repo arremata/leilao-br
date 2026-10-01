@@ -214,6 +214,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Voltar de um imóvel devolve a pessoa ao mesmo ponto da
+  lista. `ScrollBehavior` passou a guardar a posição de cada entrada do
+  histórico (também na `sessionStorage` da guia) e a reaplicá-la enquanto a
+  lista cresce, até chegar ao ponto ou a pessoa rolar; a restauração do
+  navegador rodava antes de a lista existir e caía no topo. O "← Imóveis" da
+  página do imóvel volta no histórico quando a pessoa veio de uma lista nesta
+  guia (mesma busca, mesma posição) e mostra "Salvos" ou "Vistos" quando veio
+  dessas telas; aberto direto ou em guia nova, continua levando à lista.
+
 - **2026-10-01** — Adotou a logo oficial: casa branca com um ponto, sobre o roxo
   da marca (`#7C3AED`, o mesmo `--accent`). `frontend/public/brand/` guarda o
   original (`argos-logo.png`, 1080×1080, também usado como `og:image`) e o
