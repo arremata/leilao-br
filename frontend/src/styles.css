@@ -3050,3 +3050,33 @@ a { color: inherit; text-decoration: none; }
   .dictionary-entry { grid-template-columns: 1fr; gap: 4px; }
   .dictionary-cta { flex-direction: column; align-items: flex-start; }
 }
+
+/* Quem chega pelo buscador: o que é o Argos e o caminho para os imóveis */
+.dictionary-intro {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 28px; padding: 12px 14px;
+  border: 1px solid var(--line-1); border-radius: 12px; background: var(--bg-1);
+}
+.dictionary-intro p { flex: 1; margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg-1); }
+.dictionary-intro b { color: var(--fg-0); }
+.dictionary-intro .logo { width: 28px; height: 28px; flex: none; }
+.dictionary-intro .btn { flex-shrink: 0; }
+.dictionary-term-cta {
+  display: inline-block; margin-top: 20px;
+  font-size: 14px; font-weight: 600; color: var(--accent-strong);
+  text-decoration: underline; text-underline-offset: 4px;
+}
+.dictionary-sticky { display: none; }
+
+@media (max-width: 640px) {
+  .dictionary-intro .btn { display: none; }
+  .dictionary-page { padding-bottom: 104px; }
+  .dictionary-sticky {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg-1); border-top: 1px solid var(--line-1);
+    box-shadow: 0 -6px 20px rgba(17, 24, 39, 0.06);
+  }
+  .dictionary-sticky span { font-size: 12.5px; font-weight: 600; color: var(--fg-0); }
+}

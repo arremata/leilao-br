@@ -38,6 +38,12 @@ const CTA = '<aside class="dictionary-cta"><p><b>Veja estes termos num imóvel d
   + 'No Argos, cada imóvel da Caixa mostra a rodada, a ocupação e quanto você paga até receber a chave.</p>'
   + '<a class="btn primary" href="/">Ver os imóveis</a></aside>';
 
+const INTRO = '<aside class="dictionary-intro"><span class="logo" aria-hidden="true"></span>'
+  + '<p><b>Argos</b> reúne os imóveis da Caixa em leilão e venda direta, com a conta de quanto você paga até receber a chave.</p>'
+  + '<a class="btn primary sm" href="/">Ver os imóveis</a></aside>';
+const STICKY = '<div class="dictionary-sticky"><span>Imóveis da Caixa com a conta completa</span>'
+  + '<a class="btn primary sm" href="/">Ver os imóveis</a></div>';
+
 function hubBody() {
   const groups = glossaryByGroup();
   const index = groups.map(group => `<a href="#${group.id}">${escapeHtml(group.title)}</a>`).join('');
@@ -48,10 +54,10 @@ function hubBody() {
     )).join('');
     return `<section id="${group.id}" class="dictionary-group"><h2 class="h2">${escapeHtml(group.title)}</h2><dl>${entries}</dl></section>`;
   }).join('');
-  return '<main class="page dictionary-page"><header class="dictionary-head">'
+  return `<main class="page dictionary-page">${INTRO}<header class="dictionary-head">`
     + '<h1 class="h1">Dicionário do leilão de imóveis</h1>'
     + '<p>As palavras que aparecem nos leilões e na venda direta da Caixa, explicadas sem juridiquês.</p>'
-    + `</header><nav class="dictionary-index" aria-label="Assuntos">${index}</nav>${sections}${CTA}${NOTE}</main>`;
+    + `</header><nav class="dictionary-index" aria-label="Assuntos">${index}</nav>${sections}${CTA}${NOTE}${STICKY}</main>`;
 }
 
 function termBody(key) {
@@ -60,13 +66,14 @@ function termBody(key) {
   const detail = entry.detail.map(paragraph => `<p>${escapeHtml(paragraph)}</p>`).join('');
   const related = relatedEntries(key)
     .map(item => `<li><a href="${item.path}">${escapeHtml(item.term)}</a></li>`).join('');
-  return '<main class="page dictionary-page dictionary-term-page">'
+  return `<main class="page dictionary-page dictionary-term-page">${INTRO}`
     + `<nav class="dictionary-crumbs" aria-label="Você está em"><a href="${DICTIONARY_PATH}">Dicionário</a>`
     + `<span aria-hidden="true">›</span><a href="${DICTIONARY_PATH}#${entry.group}">${escapeHtml(group)}</a></nav>`
-    + `<article><h1 class="h1">${escapeHtml(entry.term)}</h1><p class="dictionary-term-lead">${escapeHtml(entry.body)}</p>${detail}</article>`
+    + `<article><h1 class="h1">${escapeHtml(entry.term)}</h1><p class="dictionary-term-lead">${escapeHtml(entry.body)}</p>${detail}`
+    + '<a class="dictionary-term-cta" href="/">Ver imóveis da Caixa à venda agora →</a></article>'
     + (related ? `<section class="dictionary-related"><h2 class="h2">Outros termos de ${escapeHtml(group.toLowerCase())}</h2><ul>${related}</ul>`
       + `<a class="dictionary-all" href="${DICTIONARY_PATH}">Ver o dicionário completo</a></section>` : '')
-    + `${CTA}${NOTE}</main>`;
+    + `${CTA}${NOTE}${STICKY}</main>`;
 }
 
 function renderPage(shell, key) {

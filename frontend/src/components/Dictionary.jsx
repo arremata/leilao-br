@@ -60,6 +60,34 @@ function DictionaryNote() {
   );
 }
 
+/**
+ * Quem chega pelo buscador cai direto no dicionário, sem saber o que é o Argos.
+ * A faixa do topo diz em uma linha e leva aos imóveis; no celular, uma barra
+ * fixa mantém o caminho à vista. Não é redirecionamento automático: o buscador
+ * deixaria de mostrar a página.
+ */
+function ArgosIntro() {
+  return (
+    <aside className="dictionary-intro">
+      <span className="logo" aria-hidden="true" />
+      <p>
+        <b>Argos</b> reúne os imóveis da Caixa em leilão e venda direta, com a conta
+        de quanto você paga até receber a chave.
+      </p>
+      <Link className="btn primary sm" to="/">Ver os imóveis</Link>
+    </aside>
+  );
+}
+
+function StickyCatalogBar() {
+  return (
+    <div className="dictionary-sticky">
+      <span>Imóveis da Caixa com a conta completa</span>
+      <Link className="btn primary sm" to="/">Ver os imóveis</Link>
+    </div>
+  );
+}
+
 function CatalogInvite() {
   return (
     <aside className="dictionary-cta">
@@ -99,6 +127,7 @@ export default function Dictionary() {
 
   return (
     <main className="page dictionary-page">
+      <ArgosIntro />
       <header className="dictionary-head">
         <h1 className="h1">Dicionário do leilão de imóveis</h1>
         <p>
@@ -146,6 +175,7 @@ export default function Dictionary() {
 
       <CatalogInvite />
       <DictionaryNote />
+      <StickyCatalogBar />
     </main>
   );
 }
@@ -165,6 +195,7 @@ function DictionaryTermPage({ termKey }) {
 
   return (
     <main className="page dictionary-page dictionary-term-page">
+      <ArgosIntro />
       <nav className="dictionary-crumbs" aria-label="Você está em">
         <Link to={DICTIONARY_PATH}>Dicionário</Link>
         <span aria-hidden="true">›</span>
@@ -174,6 +205,7 @@ function DictionaryTermPage({ termKey }) {
         <h1 className="h1">{entry.term}</h1>
         <p className="dictionary-term-lead">{entry.body}</p>
         {entry.detail.map(paragraph => <p key={paragraph}>{paragraph}</p>)}
+        <Link className="dictionary-term-cta" to="/">Ver imóveis da Caixa à venda agora →</Link>
       </article>
 
       {related.length > 0 && (
@@ -190,6 +222,7 @@ function DictionaryTermPage({ termKey }) {
 
       <CatalogInvite />
       <DictionaryNote />
+      <StickyCatalogBar />
     </main>
   );
 }
