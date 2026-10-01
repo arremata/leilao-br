@@ -1,4 +1,4 @@
-const CACHE_NAME = 'argos-v2';
+const CACHE_NAME = 'argos-v3';
 const APP_SHELL = [
   '/',
   '/offline.html',
@@ -6,7 +6,9 @@ const APP_SHELL = [
   '/favicon.svg',
   '/pwa-icon.svg',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/brand/argos-mark.svg'
 ];
 
 self.addEventListener('install', (event) => {
