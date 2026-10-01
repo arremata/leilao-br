@@ -214,6 +214,18 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-09-30** — Added a plain-language glossary. Key terms on the property
+  card and page (sale types, rounds, occupancy, FGTS, financing, initial and
+  appraisal values, and the cost lines) get a dotted underline and a short
+  explanation on hover, keyboard focus or tap; inside a card link the tap
+  explains instead of navigating. All 58 entries, grouped by topic and
+  searchable, live on the new `/dicionario` page (behind login like the rest of
+  the platform). Copy is centralized in `frontend/src/content/glossary.js` for
+  editorial review. The fourth property tab became “Consultoria”, locked and
+  marked “em breve”: a blurred, inert preview of the guided help and property
+  chat behind a short notice that the bid decision is the buyer's and the
+  auction result is not guaranteed. No plan or price is shown (PD-015).
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da

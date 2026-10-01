@@ -5,6 +5,7 @@ import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
 import { imageSourceForAttempt } from '../imageFallback';
 import { auctionSchedule, formatDayTime, saleTagLabel } from '../auctionRounds';
 import { listingBadges } from '../listingFacts';
+import { Term } from './Term';
 
 // ============================================================
 // Countdown timer
@@ -141,8 +142,8 @@ export function ListingBadges({ p, size }) {
   return (
     <ul className={`listing-badges${size === 'lg' ? ' listing-badges--lg' : ''}`} aria-label="Situação e formas de pagamento">
       {listingBadges(p).map(badge => (
-        <li key={badge.key} className={`listing-badge listing-badge--${badge.tone}`} title={badge.title}>
-          {badge.label}
+        <li key={badge.key} className={`listing-badge listing-badge--${badge.tone}`}>
+          <Term>{badge.label}</Term>
         </li>
       ))}
     </ul>
@@ -188,7 +189,7 @@ export function RoundStrip({ schedule, compact }) {
           : '';
         return (
           <div key={round.round} className={`round-step is-${round.state}`}>
-            <span className="round-step-title">{round.round}ª rodada</span>
+            <span className="round-step-title"><Term>{`${round.round}ª rodada`}</Term></span>
             <span className="round-step-state">{ROUND_STATE_LABEL[round.state]}</span>
             <span
               className={`round-step-price${longPrices ? ' is-long' : ''}`}
@@ -225,9 +226,9 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
         {/* Rodada + contagem, no canto: "2ª rodada · 2d 18:51:13" */}
         <div className="property-card-clock">
           {schedule.current ? (
-            <span className="property-card-clock-round">{schedule.current.round}ª rodada</span>
+            <span className="property-card-clock-round"><Term>{`${schedule.current.round}ª rodada`}</Term></span>
           ) : schedule.isOpenTender && !schedule.ended ? (
-            <span className="property-card-clock-round">Rodada única</span>
+            <span className="property-card-clock-round"><Term>Rodada única</Term></span>
           ) : null}
           <Countdown
             until={schedule.headline.until}
@@ -258,7 +259,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
       <div className="property-card-body">
         {/* Tags */}
         <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="tag">{saleTagLabel(p, schedule, { compact: true })}</span>
+          <span className="tag"><Term>{saleTagLabel(p, schedule, { compact: true })}</Term></span>
           <span className="tag">{p.type}</span>
         </div>
 
@@ -288,7 +289,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
           <div style={{ marginBottom: 16 }}>
             <div className="row between baseline">
               <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                {isDirectSale ? 'preço de venda' : 'valor inicial'}
+                {isDirectSale ? 'preço de venda' : <Term>valor inicial</Term>}
               </span>
               <span className="num-md" style={{ color: 'var(--fg-0)' }}>
                 R$ {fmtBRL(p.minBid)}
@@ -296,7 +297,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
             </div>
             {schedule.isOpenTender && (
               <p className="single-round-note">
-                <b>Rodada única.</b> Não tem 2ª rodada com preço menor.
+                <b><Term k="rodada_unica">Rodada única.</Term></b> Não tem 2ª rodada com preço menor.
               </p>
             )}
           </div>
@@ -306,7 +307,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
             nada para quem nunca comprou um imóvel. */}
         <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 'auto' }}>
           <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
+            <span className="uppy" style={{ color: 'var(--fg-3)' }}><Term>Valor de avaliação</Term></span>
             <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
               R$ {fmtBRL(p.appraisal)}
             </div>
@@ -318,7 +319,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
           </div>
           <div className="property-card-metric-end" style={{ textAlign: 'right' }}>
             <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-              Imóveis parecidos
+              <Term>Imóveis parecidos</Term>
             </span>
             {hasMarketAnalysis ? <>
               <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
@@ -384,8 +385,8 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
         </div>
         <div className="property-row-badges">
           {badges.map(badge => (
-            <span key={badge.key} className={`listing-badge listing-badge--${badge.tone}`} title={badge.title}>
-              {badge.label}
+            <span key={badge.key} className={`listing-badge listing-badge--${badge.tone}`}>
+              <Term>{badge.label}</Term>
             </span>
           ))}
         </div>

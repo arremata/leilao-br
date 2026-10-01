@@ -37,13 +37,13 @@ test('searches cannot skip required preference setup', () => {
 });
 
 test('every production platform route uses the account screen before login', () => {
-  for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos', '/perfil']) {
+  for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos', '/dicionario', '/perfil']) {
     assert.equal(shouldUseAccountScreen({ pathname, isPreview: false, account: null, hasSearch: true }), true);
   }
 });
 
 test('preview keeps the public catalog while protecting account-only pages', () => {
-  for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos']) {
+  for (const pathname of ['/', '/imovel/923', '/salvos', '/vistos', '/dicionario']) {
     assert.equal(shouldUseAccountScreen({ pathname, isPreview: true, account: null }), false);
   }
   assert.equal(shouldUseAccountScreen({ pathname: '/perfil', isPreview: true, account: null }), true);

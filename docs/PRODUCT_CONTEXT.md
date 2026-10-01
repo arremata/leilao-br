@@ -170,6 +170,14 @@ desocupado, a desocupação entra na conta como zero; ocupado ou sem informaçã
 mantém a reserva sugerida de R$ 5.000. A pessoa pode ajustar o valor em qualquer
 caso.
 
+Os termos mais importantes para decidir (tipo de venda, rodadas, ocupação,
+FGTS, financiamento, valor inicial, avaliação e as linhas de custo) aparecem
+sublinhados com pontinhos e explicam o que querem dizer ao passar o mouse ou
+tocar. O dicionário completo, por assunto e com busca, fica na página
+“Dicionário”. A aba “Consultoria” da página do imóvel aparece fechada, como
+“em breve”: ainda não há atendimento nem chat disponível, e o aviso diz que a
+decisão do lance é da pessoa e que o resultado do leilão não é garantido.
+
 O ITBI faz parte do total até a chave em todo município brasileiro. Quando a
 alíquota municipal foi revisada, a conta usa essa referência e identifica a
 prefeitura. Enquanto ela ainda não foi cadastrada, o produto reserva 3% do valor

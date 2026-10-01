@@ -6,6 +6,8 @@ import { fmtBRL, mapsQuery } from '../utils';
 import { auctionSchedule, saleTagLabel } from '../auctionRounds';
 import { occupancyStatus } from '../listingFacts';
 import { budgetPlan } from '../bidBudget';
+import { Term } from './Term';
+import ConsultoriaTab from './ConsultoriaTab';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
@@ -777,7 +779,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         {/* Key facts panel */}
         <div className="card" style={{ padding: 22 }}>
           <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <span className="tag accent">{saleTagLabel(p, schedule)}</span>
+            <span className="tag accent"><Term>{saleTagLabel(p, schedule)}</Term></span>
             <span className="tag">{p.type}</span>
           </div>
 
@@ -863,7 +865,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
           { v: 'market', l: 'Preço na região', ix: '02' },
           { v: 'edital', l: isDirectSale ? 'Documentos' : 'Regras deste leilão', ix: '03' },
-          { v: 'legal', l: 'Pendências do imóvel', ix: '04', comingSoon: true },
+          { v: 'legal', l: 'Consultoria', ix: '04', comingSoon: true, locked: true },
         ].map(t => (
           <button
             key={t.v}
@@ -880,6 +882,12 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
             }}
           >
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t.ix}</span>
+            {t.locked && (
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            )}
             <span>{t.l}</span>
             {t.comingSoon && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
           </button>
@@ -899,7 +907,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               canAnalyze={p.canAnalyze === true}
             />
           ))}
-        {tab === 'legal' && <LegalComingSoon />}
+        {tab === 'legal' && <ConsultoriaTab p={p} total={plan.minTotal} locked />}
         {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} onReadToEnd={markRulesRead} />}
       </div>
     </div>
@@ -992,7 +1000,7 @@ function AppraisalFact({ p }) {
   const current = Number(p.minBid) || 0;
   return (
     <div className="appraisal-fact">
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
+      <span className="uppy" style={{ color: 'var(--fg-3)' }}><Term>Valor de avaliação</Term></span>
       {appraisal > 0 ? (
         <>
           <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
@@ -1036,9 +1044,14 @@ function PricingGrid({ p }) {
         <span className="uppy" style={{ color: 'var(--fg-3)' }}>
           {isDirectSale
             ? 'Preço de venda'
-            : isOpenTender
-              ? 'Valor inicial · rodada única'
-              : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
+            : <>
+                <Term k="valor_inicial">Valor inicial</Term>
+                {isOpenTender
+                  ? <> · <Term k="rodada_unica">rodada única</Term></>
+                  : isSfiAuction
+                    ? <> · <Term k={sfiPricing.current.round === 2 ? 'segunda_rodada' : 'primeira_rodada'}>{`${sfiPricing.current.round}ª rodada`}</Term></>
+                    : null}
+              </>}
         </span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
         {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > currentBidPrice && (
@@ -1053,7 +1066,9 @@ function PricingGrid({ p }) {
       {isSfiAuction && (
         <div>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-            {sfiPricing.upcoming ? 'Se não vender · 2ª rodada' : '1ª rodada encerrada'}
+            {sfiPricing.upcoming
+              ? <>Se não vender · <Term k="segunda_rodada">2ª rodada</Term></>
+              : <><Term k="primeira_rodada">1ª rodada</Term> encerrada</>}
           </span>
           {hasOtherRound ? (
             <>
@@ -1586,7 +1601,7 @@ function CostBreakdown({ p, sim }) {
             alignItems: 'baseline', borderTop: '2px solid var(--line-2)',
           }}>
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>Total até a chave</span>
+            <span style={{ fontSize: 15, fontWeight: 600 }}><Term>Total até a chave</Term></span>
             <span></span>
             <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: 0 }}>R$ {fmtBRL(dynamicTotal)}</span>
           </div>
@@ -1944,7 +1959,7 @@ function ScenarioMoneyField({
   return (
     <div className="scenario-money-field">
       <label>
-        <span className="uppy">{label}</span>
+        <span className="uppy"><Term>{label}</Term></span>
         <div className="scenario-money-input">
           <span>R$</span>
           <MoneyMaskInput
@@ -2013,7 +2028,7 @@ function CostRow({ l, v, hint, pct, custom, onDelete }) {
       }}>?</button>
       <div>
         <div className="row gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{l}</div>
+          <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}><Term>{l}</Term></div>
           {custom && <span className="tag" style={{ padding: '2px 5px', fontSize: 8.5, color: 'var(--accent-strong)' }}>extra</span>}
           {custom && onDelete && (
             <button type="button" className="cost-inline-action danger" onClick={onDelete} aria-label={`Excluir ${l}`}>remover</button>
@@ -2149,23 +2164,6 @@ function CustomCostForm({ onAdd }) {
 // O nome evita "análise jurídica" e "parecer": o que o produto faz é leitura de
 // documento e organização de informação. Esta aba é o destino do trabalho de
 // ingestão com citação verificável que está em andamento.
-function LegalComingSoon() {
-  return (
-    <div className="card" style={{ minHeight: 360, display: 'grid', placeItems: 'center', padding: 32, textAlign: 'center' }}>
-      <div style={{ maxWidth: 460 }}>
-        <span className="tag accent" style={{ display: 'inline-block', marginBottom: 16 }}>em breve</span>
-        <h3 className="h1" style={{ marginBottom: 12 }}>Pendências do imóvel</h3>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--fg-2)' }}>
-          Estamos organizando, em um lugar só, o que os documentos oficiais dizem
-          sobre dívidas, processos e restrições deste imóvel — sempre com o trecho
-          do documento à vista. Enquanto isso, o que já sabemos está na aba de
-          documentos.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================
 // PAINEL LATERAL — O QUE FAZER AGORA
 // ============================================================

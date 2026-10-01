@@ -13,6 +13,7 @@ import {
   shouldUseAccountScreen,
 } from './housingEntry';
 import PropertyRoute from './components/PropertyRoute';
+import Dictionary from './components/Dictionary';
 import Watchlist from './components/Watchlist';
 import History from './components/History';
 import NotFound from './components/NotFound';
@@ -265,6 +266,7 @@ function App() {
           <Route path="/salvos" element={
             <Watchlist watched={watched} toggleWatch={toggleWatch} properties={properties} />
           } />
+          <Route path="/dicionario" element={<Dictionary />} />
           <Route path="/vistos" element={
             <History history={history} clearHistory={clearHistory} properties={properties} />
           } />
@@ -310,6 +312,7 @@ function TopBar({ watchCount, account }) {
             Salvos {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
+          <NavLink to="/dicionario" className={({ isActive }) => (isActive ? 'active' : '')}>Dicionário</NavLink>
         </nav>
         <div className="housing-account">
           {account ? (

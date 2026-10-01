@@ -2989,3 +2989,159 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 520px) {
   .appraisal-fact { text-align: left; }
 }
+
+/* ---------- Glossário: termo sublinhado + balão ---------- */
+.term {
+  cursor: help;
+  text-decoration: underline dotted currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 3px;
+}
+.term:hover { text-decoration-color: currentColor; }
+.term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.term-tip {
+  position: fixed;
+  z-index: 1000;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #1F2937;
+  color: #F9FAFB;
+  box-shadow: 0 10px 30px rgba(17,24,39,.25);
+  font-family: var(--f-sans);
+  font-size: 12.5px; line-height: 1.45;
+  text-transform: none; letter-spacing: normal; font-weight: 400;
+  pointer-events: none;
+  animation: term-tip-in .12s ease-out;
+}
+.term-tip.is-above { transform: translateY(-100%); }
+.term-tip strong { font-size: 12px; font-weight: 650; color: #C4B5FD; }
+@keyframes term-tip-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- Aba Consultoria ---------- */
+.consult-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.3fr);
+  gap: 20px;
+  align-items: start;
+}
+.consult-intro { padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+.consult-intro .tag { align-self: flex-start; }
+.consult-intro p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--fg-2); }
+.consult-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 14px; }
+.consult-steps li {
+  display: grid; gap: 2px;
+  padding-left: 16px;
+  border-left: 2px solid var(--accent-soft);
+}
+.consult-steps b { font-size: 13.5px; color: var(--fg-0); }
+.consult-steps span { font-size: 12.5px; color: var(--fg-2); }
+
+.consult-chat { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.consult-chat-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid var(--line-1);
+}
+.consult-chat-head strong { display: block; font-size: 13.5px; }
+.consult-chat-head span { font-size: 11.5px; color: var(--fg-2); }
+.consult-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px;
+}
+.consult-chat-body {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 18px; min-height: 180px; max-height: 420px; overflow-y: auto;
+  background: var(--bg-0);
+}
+.consult-pair { display: flex; flex-direction: column; gap: 8px; }
+.consult-msg {
+  max-width: 85%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 13px; line-height: 1.5;
+  animation: term-tip-in .15s ease-out;
+}
+.consult-msg.is-bot { align-self: flex-start; background: var(--bg-1); border: 1px solid var(--line-1); border-bottom-left-radius: 4px; color: var(--fg-1); }
+.consult-msg.is-user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
+.consult-quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 14px 18px 4px; }
+.consult-chip {
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--accent); color: var(--accent-strong); background: var(--bg-1);
+  font-size: 12.5px;
+}
+.consult-chip:hover:not(:disabled) { background: var(--accent-soft); }
+.consult-chip:disabled { border-color: var(--line-1); color: var(--fg-3); cursor: default; }
+.consult-compose { display: flex; gap: 8px; padding: 12px 18px 6px; }
+.consult-compose input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 12px;
+  border: 1px solid var(--line-1); border-radius: 8px; background: var(--bg-2); color: var(--fg-3);
+}
+.consult-soon { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 18px 16px; font-size: 11.5px; color: var(--fg-2); }
+
+@media (max-width: 860px) {
+  .consult-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------- Dicionário do leilão ---------- */
+.dictionary-page { max-width: 880px; margin: 0 auto; padding: 32px 24px 80px; }
+.dictionary-head p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--fg-2); max-width: 640px; }
+.dictionary-search {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 20px; height: 46px; padding: 0 14px;
+  border: 1px solid var(--line-2); border-radius: 10px; background: var(--bg-1);
+  color: var(--fg-3);
+}
+.dictionary-search:focus-within { border-color: var(--accent); }
+.dictionary-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: var(--fg-0); }
+.dictionary-count { font-size: 12.5px; color: var(--fg-2); }
+.dictionary-index { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 8px; }
+.dictionary-index a {
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-strong); font-size: 12.5px;
+}
+.dictionary-group { margin-top: 32px; scroll-margin-top: 120px; }
+.dictionary-group dl { margin: 12px 0 0; display: grid; gap: 1px; background: var(--line-1); border: 1px solid var(--line-1); border-radius: 12px; overflow: hidden; }
+.dictionary-entry { display: grid; grid-template-columns: minmax(160px, 220px) 1fr; gap: 16px; padding: 14px 18px; background: var(--bg-1); }
+.dictionary-entry dt { font-weight: 600; font-size: 13.5px; color: var(--fg-0); }
+.dictionary-entry dd { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--fg-1); }
+.dictionary-note { margin-top: 32px; font-size: 12px; color: var(--fg-2); }
+@media (max-width: 640px) {
+  .dictionary-entry { grid-template-columns: 1fr; gap: 4px; }
+}
+.consult-dictionary-link { margin-top: 6px; font-size: 13px; color: var(--accent-strong); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Consultoria fechada: prévia desfocada + aviso */
+.consult-locked { position: relative; }
+.consult-locked-preview {
+  filter: blur(3px) saturate(.8);
+  opacity: .55;
+  pointer-events: none;
+  user-select: none;
+}
+.consult-locked-card {
+  position: absolute; left: 50%; top: 56px; transform: translateX(-50%);
+  width: min(440px, calc(100% - 32px));
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 28px 28px 24px;
+  text-align: center;
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(17,24,39,.14);
+}
+.consult-locked-card p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--fg-2); }
+.consult-locked-card .consult-locked-note { font-size: 12.5px; color: var(--fg-3); }
+.consult-lock {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-strong);
+}
+.consult-disclaimer {
+  font-size: 11.5px !important;
+  line-height: 1.5;
+  color: var(--fg-3) !important;
+}
+
