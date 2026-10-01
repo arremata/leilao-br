@@ -2859,6 +2859,9 @@ a { color: inherit; text-decoration: none; }
 .round-step.is-ended .round-step-title,
 .round-step.is-ended .round-step-state { color: var(--fg-3); }
 .round-step.is-ended .round-step-state::before { content: "✓ "; }
+/* Contagem dentro do quadro da rodada: mesmo tamanho da linha de situação. */
+.round-step-state .countdown { font-size: 10.5px; gap: 5px; }
+.round-step-state .countdown .dot { width: 5px; height: 5px; }
 
 .auction-headline-note {
   margin-top: 6px;
