@@ -214,6 +214,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Voltar de um imóvel devolve a pessoa ao mesmo ponto da
+  lista. `ScrollBehavior` passou a guardar a posição de cada entrada do
+  histórico (também na `sessionStorage` da guia) e a reaplicá-la enquanto a
+  lista cresce, até chegar ao ponto ou a pessoa rolar; a restauração do
+  navegador rodava antes de a lista existir e caía no topo. O "← Imóveis" da
+  página do imóvel volta no histórico quando a pessoa veio de uma lista nesta
+  guia (mesma busca, mesma posição) e mostra "Salvos" ou "Vistos" quando veio
+  dessas telas; aberto direto ou em guia nova, continua levando à lista.
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da
