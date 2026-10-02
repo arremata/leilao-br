@@ -221,6 +221,7 @@ The full platform will include:
   avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
   As condições de referência ficam datadas e a tela deixa claro que a conta é
   uma estimativa e não representa aprovação de crédito.
+
 - **2026-10-01** — A lista de imóveis ganhou filtros pelo que a Caixa informa
   na ficha: "Tem alguém morando?" (desocupado ou ocupado; nada marcado mostra
   todos e tocar de novo desmarca), "Aceita FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,
