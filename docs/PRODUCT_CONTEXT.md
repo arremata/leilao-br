@@ -139,8 +139,11 @@ Quatro áreas numeradas e um guia lateral:
    localização no mapa.
 3. **Regras deste leilão / Documentos:** dados oficiais, documentos, datas,
    preços, pagamento e responsabilidades quando publicados.
-4. **Pendências do imóvel:** permanece como “Em breve”. O produto não entrega
-   parecer jurídico nem classificação automática de risco legal.
+4. **Consultoria:** aparece fechada, com cadeado e “em breve”: uma prévia
+   desfocada do acompanhamento e do chat sobre o imóvel, atrás do aviso de que a
+   decisão do lance é da pessoa e que o resultado do leilão não é garantido.
+   Ainda não há atendimento nem chat disponível, nem plano ou preço. O produto
+   não entrega parecer jurídico nem classificação automática de risco legal.
 
 **O que fazer agora** acompanha a página como painel lateral sem numeração.
 Organiza as etapas antes e depois da compra, mostra o percentual concluído e usa
@@ -156,6 +159,15 @@ dentro; a tela mostra até onde o lance pode ir, a margem acima do valor inicial
 para disputar e, num slider, o total e a sobra para cada lance simulado. Condomínio aparece no custo mensal somente para apartamentos ou imóveis
 explicitamente descritos como parte de um condomínio; nos demais casos, a conta
 mensal mostra apenas IPTU.
+
+Eventuais dívidas de condomínio (só quando há condomínio) e de IPTU atrasado
+aparecem na conta como as demais linhas, mas com o valor desfocado e um cadeado
+no lugar do número. O Argos ainda não sabe se essas dívidas existem nem quanto
+são, e a tela diz que pode não haver nenhum valor em aberto. A consulta vai ser
+liberada à parte, e o botão “Ver as dívidas” fica marcado como “em breve”. Essas
+linhas não entram no total até a chave, que avisa “Sem eventuais dívidas de
+condomínio e IPTU”; até a consulta existir, a tela orienta a confirmar no
+condomínio e na prefeitura antes do lance.
 
 Em Leilão SFI, o valor inicial e a data em destaque pertencem sempre à rodada
 vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
