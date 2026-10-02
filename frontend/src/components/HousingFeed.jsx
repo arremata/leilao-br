@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Feed, { CatalogSidebarFilters } from './Feed';
+import Feed, { CatalogSidebarFilters, FilterSwitch } from './Feed';
 import CityAutocomplete from './CityAutocomplete';
 import CurrencyInput from './CurrencyInput';
 import SearchableAutocomplete from './SearchableAutocomplete';
@@ -13,11 +13,57 @@ import {
 } from '../housingProfile';
 import { normalizeSearchOption } from '../searchableOptions';
 import { readCatalogBudget, saveCatalogBudget } from '../housingFilterStorage';
+import {
+  activeListingFilterCount,
+  filterByListingFacts,
+  listingFilterParamKeys,
+  listingFiltersFromSearchParams,
+  listingSearchParamsWithFilter,
+  occupancyFilterLabels,
+} from '../listingFilters';
 
 function FilterChip({ children, onRemove }) {
   return <button className="housing-filter-chip" type="button" onClick={onRemove} title={`Remover filtro: ${children}`}>
     <span>{children}</span><b aria-hidden="true">×</b>
   </button>;
+}
+
+/** Quem mora lá, FGTS e financiamento: o que pesa na decisão de quem vai morar. */
+function ListingFactFilters({ filters, onChange }) {
+  return <div className="housing-fact-filters">
+    <div className="housing-field">
+      <span>Tem alguém morando?</span>
+      <div className="housing-filter-segments" role="group" aria-label="Tem alguém morando?">
+        {/* Sem opção neutra: nada marcado mostra todos; tocar de novo desmarca. */}
+        {[
+          ['vacant', 'Desocupado'],
+          ['occupied', 'Ocupado'],
+        ].map(([value, label]) => <button
+          type="button"
+          key={value}
+          aria-pressed={filters.occupancy === value}
+          onClick={() => onChange('occupancy', filters.occupancy === value ? 'any' : value)}
+        >{label}</button>)}
+      </div>
+    </div>
+
+    <div className="housing-field">
+      <span>Como você vai pagar</span>
+      <FilterSwitch
+        checked={filters.fgts}
+        onChange={value => onChange('fgts', value)}
+        label="Aceita FGTS"
+        title="Só imóveis em que a Caixa permite usar o FGTS."
+      />
+      <FilterSwitch
+        checked={filters.financing}
+        onChange={value => onChange('financing', value)}
+        label="Aceita financiamento"
+        title="Só imóveis em que a Caixa permite financiar a compra."
+      />
+      <small>Só entram imóveis em que a Caixa informa isso na ficha.</small>
+    </div>
+  </div>;
 }
 
 function HousingCatalogFilters({ cities, properties, filters, onChange }) {
@@ -79,12 +125,17 @@ export default function HousingFeed({ cities, ...feedProps }) {
     ...requested,
     budget: hasBudgetParam ? requested.budget : rememberedBudget,
   };
-  const visibleProperties = filterHousingProperties(feedProps.properties, current);
+  const listingFilters = listingFiltersFromSearchParams(params);
+  const visibleProperties = filterByListingFacts(
+    filterHousingProperties(feedProps.properties, current),
+    listingFilters,
+  );
   const activeHousingFilterCount =
     (current.city ? 1 : 0)
     + (current.neighborhood ? 1 : 0)
     + (current.propertyType !== 'Todos' ? 1 : 0)
-    + (Number(current.budget) > 0 ? 1 : 0);
+    + (Number(current.budget) > 0 ? 1 : 0)
+    + activeListingFilterCount(listingFilters);
 
   useEffect(() => {
     if (initialBudgetRestored.current) return;
@@ -107,6 +158,11 @@ export default function HousingFeed({ cities, ...feedProps }) {
     );
   }
 
+  function setListingFilter(key, value) {
+    const latestParams = new URLSearchParams(window.location.search);
+    setParams(listingSearchParamsWithFilter(latestParams, key, value));
+  }
+
   function clearRememberedBudget() {
     saveCatalogBudget('');
     setRememberedBudget('');
@@ -117,6 +173,7 @@ export default function HousingFeed({ cities, ...feedProps }) {
     setParams(previous => {
       const next = new URLSearchParams(previous);
       Object.values(housingFilterParamKeys).forEach(key => next.delete(key));
+      Object.values(listingFilterParamKeys).forEach(key => next.delete(key));
       next.delete('busca');
       next.delete('q');
       next.delete('pagina');
@@ -137,9 +194,12 @@ export default function HousingFeed({ cities, ...feedProps }) {
           properties={feedProps.properties}
           hideHousingDuplicates
           onClearAdditionalFilters={clearRememberedBudget}
-          additionalFilters={<HousingCatalogFilters cities={cities} properties={feedProps.properties} filters={current} onChange={setHousingFilter} />}
+          additionalFilters={<>
+            <HousingCatalogFilters cities={cities} properties={feedProps.properties} filters={current} onChange={setHousingFilter} />
+            <ListingFactFilters filters={listingFilters} onChange={setListingFilter} />
+          </>}
           additionalFilterCount={activeHousingFilterCount}
-          additionalClearPatch={{ cidade: 'Todas', bairro: '', tipo: 'Todos', orcamento: '' }}
+          additionalClearPatch={{ cidade: 'Todas', bairro: '', tipo: 'Todos', orcamento: '', ocupacao: '', fgts: '', financiamento: '' }}
         />
       </aside>}
       <section className="housing-feed-main">
@@ -148,6 +208,9 @@ export default function HousingFeed({ cities, ...feedProps }) {
           {current.neighborhood && <FilterChip onRemove={() => setHousingFilter('neighborhood', '')}>{current.neighborhood}</FilterChip>}
           {current.propertyType !== 'Todos' && <FilterChip onRemove={() => setHousingFilter('propertyType', 'Todos')}>{current.propertyType}</FilterChip>}
           {Number(current.budget) > 0 && <FilterChip onRemove={() => setHousingFilter('budget', '')}>{housingBudgetLabel(current.budget)}</FilterChip>}
+          {listingFilters.occupancy !== 'any' && <FilterChip onRemove={() => setListingFilter('occupancy', 'any')}>{occupancyFilterLabels[listingFilters.occupancy]}</FilterChip>}
+          {listingFilters.fgts && <FilterChip onRemove={() => setListingFilter('fgts', false)}>Aceita FGTS</FilterChip>}
+          {listingFilters.financing && <FilterChip onRemove={() => setListingFilter('financing', false)}>Aceita financiamento</FilterChip>}
           <button className="housing-clear-filters" type="button" onClick={clearHousingFilters}>Limpar estes filtros</button>
         </div>}
         {Number(current.budget) > 0 && <div className="housing-budget-note"><b>Faixa aplicada ao valor inicial do imóvel.</b><p>Taxas, ocupação, reforma e condições de pagamento continuam detalhadas em cada imóvel.</p></div>}

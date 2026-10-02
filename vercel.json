@@ -54,6 +54,18 @@
       ]
     }
   },
+  "redirects": [
+    {
+      "source": "/dicionario",
+      "destination": "https://www.argosleiloes.com.br/dicionario",
+      "permanent": true
+    },
+    {
+      "source": "/dicionario/:termo([a-z0-9-]+)",
+      "destination": "https://www.argosleiloes.com.br/dicionario/:termo",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

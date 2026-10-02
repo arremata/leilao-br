@@ -221,6 +221,38 @@ The full platform will include:
   `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
   virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
 
+- **2026-10-01** — A lista de imóveis ganhou filtros pelo que a Caixa informa
+  na ficha: "Tem alguém morando?" (desocupado ou ocupado; nada marcado mostra
+  todos e tocar de novo desmarca), "Aceita FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,
+  `financiamento`), aparecem como selos removíveis acima da lista e saem com
+  "Limpar". Só passam imóveis em que a Caixa afirma a condição: "não
+  informado" nunca conta como desocupado ou aceito. Lógica em
+  `frontend/src/listingFilters.js`.
+
+- **2026-10-01** — Voltar de um imóvel devolve a pessoa ao mesmo ponto da
+  lista. `ScrollBehavior` passou a guardar a posição de cada entrada do
+  histórico (também na `sessionStorage` da guia) e a reaplicá-la enquanto a
+  lista cresce, até chegar ao ponto ou a pessoa rolar; a restauração do
+  navegador rodava antes de a lista existir e caía no topo. O "← Imóveis" da
+  página do imóvel volta no histórico quando a pessoa veio de uma lista nesta
+  guia (mesma busca, mesma posição) e mostra "Salvos" ou "Vistos" quando veio
+  dessas telas; aberto direto ou em guia nova, continua levando à lista.
+
+- **2026-10-01** — Adotou a logo oficial: casa branca com um ponto, sobre o roxo
+  da marca (`#7C3AED`, o mesmo `--accent`). `frontend/public/brand/` guarda o
+  original (`argos-logo.png`, 1080×1080, também usado como `og:image`) e o
+  símbolo em SVG (`argos-mark.svg`). O selo `.logo` do menu, do login e da tela
+  de carregamento usa o símbolo; favicon, ícones do app instalado (192, 512,
+  maskable) e o ícone da tela inicial do iPhone foram refeitos a partir dele. O
+  favicon anterior ainda era o do Vite. O cache do service worker passou para
+  `argos-v3` para trocar os ícones de quem já instalou.
+
+- **2026-10-01** — Ligou a plataforma ao dicionário público do site
+  institucional. O menu abre `www.argosleiloes.com.br/dicionario`, enquanto
+  acessos antigos a `/dicionario` e aos verbetes no domínio do app redirecionam
+  permanentemente para a fonte única no `www`; o app não mantém uma segunda
+  cópia do conteúdo nem outro sitemap.
+
 - **2026-10-01** — Corrigiu os comparáveis do ImovelWeb em "Preço na região".
   O portal passou a usar `/propriedades/` nos links, e o filtro antigo
   (`a[href*="imovel"]`) descartava todos os cards como sem link; os seletores
