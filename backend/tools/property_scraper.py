@@ -802,11 +802,17 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
         except Exception:
             pass
 
-        cards = page.locator(
-            '[data-qa="posting PROPERTY"], div.postingCard, '
-            'div[class*="PostingCard"], div[class*="posting-card"]'
-        )
+        # The class-based fallbacks also match nested sub-divs of a card, so a
+        # page of 30 listings reported 150 "cards", most of them fragments
+        # carrying only a price. Prefer the semantic attribute and fall back
+        # only when the markup does not expose it at all.
+        cards = page.locator('[data-qa="posting PROPERTY"]')
         count = await cards.count()
+        if count == 0:
+            cards = page.locator(
+                'div.postingCard, div[class*="PostingCard"], div[class*="posting-card"]'
+            )
+            count = await cards.count()
         logger.info(f"ImovelWeb scraper: found {count} cards")
         results = []
         for i in range(min(count, MAX_COMPS_PER_SITE * 2)):
@@ -821,9 +827,18 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
                 expected_city = _slug(_clean_city(metadata.city))
                 if expected_city and expected_city not in _slug(text):
                     continue
-                link = card.locator('a[href*="imovel"]')
-                href = await link.first.get_attribute("href") if await link.count() else ""
-                href = href or ""
+                # ImovelWeb moved listing URLs from /imovel... to /propriedades/...,
+                # so the old href filter matched nothing and every card was
+                # dropped as untraceable. The card also carries the canonical
+                # path in data-to-posting, which survives markup churn better
+                # than any anchor selector.
+                href = await card.get_attribute("data-to-posting") or ""
+                if not href:
+                    link = card.locator('a[href*="/propriedades/"], a[href*="imovel"]')
+                    href = (await link.first.get_attribute("href") if await link.count() else "") or ""
+                # Tracking parameters make identical listings look distinct and
+                # leak our search id into the stored comparable URL.
+                href = href.split("?")[0]
                 # A challenge shell or malformed card can expose only the portal
                 # homepage. It is not a traceable comparable listing.
                 if not href or href in ("/", "https://www.imovelweb.com.br"):
