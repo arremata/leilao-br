@@ -5,7 +5,8 @@ import { backLabel } from '../usePropertyLink';
 import { Countdown, ListingBadges, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, mapsQuery } from '../utils';
 import { auctionSchedule, saleTagLabel } from '../auctionRounds';
-import { occupancyStatus } from '../listingFacts';
+import { occupancyStatus, paymentFacts } from '../listingFacts';
+import { CAIXA_SBPE, simulateFinancing } from '../financing';
 import { budgetPlan } from '../bidBudget';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
@@ -841,6 +842,15 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           {/* Pricing labels follow the official sale modality. */}
           <PricingGrid p={p} />
 
+          <InstallmentTeaser p={p} onSimulate={() => {
+            setTab('cost');
+            // Depois que a aba de custos renderiza, leva até o simulador.
+            setTimeout(() => {
+              const card = document.querySelector('.financing-card');
+              if (card) window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+            }, 50);
+          }} />
+
           <div className="divider" style={{ margin: '16px 0 4px' }}></div>
 
           <Collapsible title="Descrição do imóvel">
@@ -1021,6 +1031,30 @@ function AppraisalFact({ p }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Destaque no topo: quanto fica a parcela financiando, com as condições de
+ * referência da Caixa (entrada mínima, 35 anos, SAC). Só aparece quando a
+ * Caixa aceita financiamento neste imóvel.
+ */
+function InstallmentTeaser({ p, onSimulate }) {
+  const { financing } = paymentFacts(p);
+  if (financing !== true || !(Number(p.minBid) > 0)) return null;
+  const sim = simulateFinancing({
+    price: p.minBid,
+    appraisal: p.appraisal,
+    months: CAIXA_SBPE.maxMonths,
+    annualRate: CAIXA_SBPE.annualRate,
+    system: 'SAC',
+  });
+  return (
+    <p className="installment-teaser">
+      Aceita financiamento: parcela a partir de <strong>R$ {fmtBRL(sim.firstWithFee)}</strong> com
+      R$ {fmtBRL(sim.down)} de entrada.
+      {' '}<button type="button" className="installment-teaser-link" onClick={onSimulate}>Simular →</button>
+    </p>
   );
 }
 
@@ -1619,6 +1653,9 @@ function CostBreakdown({ p, sim }) {
         </div>
       </div>
 
+      {/* ── E se você financiar? ── */}
+      <FinancingSimulator p={p} offer={offer} costs={plan.costs} />
+
       {/* ── Quanto custa por mês morar aqui ── */}
       <div className="card" style={{ padding: 24 }}>
         <h3 className="h2">Quanto custa por mês morar aqui</h3>
@@ -1956,6 +1993,203 @@ function BudgetPlanner({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "E se você financiar?": entrada, parcela, renda e dinheiro no dia, no modelo
+ * do financiamento da Caixa. Tudo já vem preenchido com o lance simulado, os
+ * custos da conta acima e as condições de referência da Caixa; a pessoa só
+ * ajusta o que quiser.
+ */
+function FinancingSimulator({ p, offer, costs }) {
+  const { fgts: acceptsFgts, financing: acceptsFinancing } = paymentFacts(p);
+  const [system, setSystem] = useState('SAC');
+  const [down, setDown] = useState(null);
+  const [fgts, setFgts] = useState(0);
+  const [years, setYears] = useState(CAIXA_SBPE.maxMonths / 12);
+  const [ratePct, setRatePct] = useState(CAIXA_SBPE.annualRate * 100);
+  const [income, setIncome] = useState(null);
+
+  // Só simula quando a Caixa diz que este imóvel aceita financiamento. Sem a
+  // informação, não dá para a pessoa contar com isso; se não aceita, o selo
+  // "Só à vista" já diz tudo.
+  if (acceptsFinancing !== true) {
+    if (acceptsFinancing === false) return null;
+    return (
+      <p className="financing-unknown">
+        A Caixa não informou se este imóvel aceita financiamento. Confirme no edital antes de contar com isso.
+      </p>
+    );
+  }
+
+  const sim = simulateFinancing({
+    price: offer,
+    appraisal: p.appraisal,
+    costs,
+    downPayment: down,
+    fgts: acceptsFgts === false ? 0 : fgts,
+    months: years * 12,
+    annualRate: ratePct / 100,
+    system,
+    income,
+  });
+  const downPct = sim.price > 0 ? (sim.down / sim.price) * 100 : 0;
+  const downMinPct = sim.price > 0 ? (sim.minDown / sim.price) * 100 : 0;
+  const fmtPct = (value) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const fmtRate = (rate) => (rate * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <div className="card financing-card">
+      <div className="financing-head">
+        <div>
+          <h3 className="h2">E se você financiar?</h3>
+          <p className="financing-lead">
+            Simulação no modelo do financiamento da Caixa, com o lance de R$ {fmtBRL(sim.price)} e os
+            custos da conta acima. Mude o que quiser.
+          </p>
+        </div>
+        <div className="financing-system" role="group" aria-label="Sistema de amortização">
+          {['SAC', 'PRICE'].map(option => (
+            <button
+              key={option}
+              type="button"
+              className={system === option ? 'is-active' : ''}
+              onClick={() => { setSystem(option); setDown(null); }}
+            >
+              {option === 'SAC' ? 'SAC · parcela cai' : 'PRICE · parcela fixa'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="financing-accepted">
+        <span className="tag good">Aceita financiamento</span>
+        A Caixa informa que este imóvel pode ser financiado. Só por isso a simulação aparece aqui.
+      </p>
+      {sim.aboveSfhCeiling && (
+        <p className="financing-warning">Acima de R$ {fmtBRL(CAIXA_SBPE.sfhCeiling)} o imóvel sai das regras do SFH: juros e condições podem ser outros.</p>
+      )}
+
+      <div className="financing-grid">
+        <div className="financing-controls">
+          <label className="financing-field">
+            <span className="uppy">Entrada · {fmtPct(downPct)}%</span>
+            <div className="financing-money">
+              <span>R$</span>
+              <MoneyMaskInput value={sim.down} onCommit={setDown} onReset={() => setDown(null)} ariaLabel="Valor da entrada" />
+            </div>
+            <input
+              type="range"
+              className="slider"
+              min={Math.ceil(downMinPct)}
+              max={100}
+              value={Math.round(downPct)}
+              onChange={(event) => setDown(Math.round(sim.price * Number(event.target.value) / 100))}
+              style={{ '--fill': `${Math.max(0, (downPct - downMinPct) / (100 - downMinPct || 1) * 100)}%` }}
+              aria-label="Entrada em porcentagem"
+            />
+            <small>Mínimo de {fmtPct(downMinPct)}% (R$ {fmtBRL(sim.minDown)}): a Caixa financia até {Math.round(CAIXA_SBPE.maxQuota[system] * 100)}% no {system}.</small>
+          </label>
+
+          {acceptsFgts !== false && (
+            <label className="financing-field">
+              <span className="uppy">Quanto do FGTS vai na entrada</span>
+              <div className="financing-money">
+                <span>R$</span>
+                <MoneyMaskInput value={fgts} onCommit={setFgts} onReset={() => setFgts(0)} ariaLabel="FGTS usado na entrada" />
+              </div>
+              <small>{acceptsFgts ? 'A Caixa aceita FGTS neste imóvel.' : 'A Caixa não informou se aceita FGTS.'} Só vale até o valor da entrada.</small>
+            </label>
+          )}
+
+          <label className="financing-field">
+            <span className="uppy">Prazo · {years} anos ({years * 12} parcelas)</span>
+            <input
+              type="range"
+              className="slider"
+              min={CAIXA_SBPE.minMonths / 12}
+              max={CAIXA_SBPE.maxMonths / 12}
+              value={years}
+              onChange={(event) => setYears(Number(event.target.value))}
+              style={{ '--fill': `${(years - 5) / 30 * 100}%` }}
+              aria-label="Prazo em anos"
+            />
+          </label>
+
+          <div className="financing-row">
+            <label className="financing-field">
+              <span className="uppy">Juros ao ano</span>
+              <div className="financing-money">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={ratePct}
+                  onChange={(event) => setRatePct(Math.max(0, Number(event.target.value) || 0))}
+                  aria-label="Juros ao ano em porcentagem"
+                />
+                <span>% + TR</span>
+              </div>
+              <small>Caixa: a partir de {fmtRate(CAIXA_SBPE.annualRate)}% com relacionamento, {fmtRate(CAIXA_SBPE.annualRateNoRelationship)}% sem.</small>
+            </label>
+            <label className="financing-field">
+              <span className="uppy">Renda da família por mês</span>
+              <div className="financing-money">
+                <span>R$</span>
+                <MoneyMaskInput value={income} onCommit={setIncome} onReset={() => setIncome(null)} ariaLabel="Renda bruta familiar por mês" />
+              </div>
+              <small>Opcional. Para ver se a parcela cabe na renda.</small>
+            </label>
+          </div>
+        </div>
+
+        <div className="financing-results">
+          <div className="financing-result financing-result--main">
+            <span className="uppy">{system === 'SAC' ? '1ª parcela' : 'Parcela'}</span>
+            <strong>R$ {fmtBRL(sim.firstWithFee)}</strong>
+            <small>
+              {system === 'SAC'
+                ? `Cai todo mês até cerca de R$ ${fmtBRL(sim.last + CAIXA_SBPE.adminFee)} na última.`
+                : `Fixa nas ${years * 12} parcelas, antes da TR.`}
+            </small>
+          </div>
+          <div className="financing-result">
+            <span className="uppy">Renda mínima para aprovar</span>
+            <strong>R$ {fmtBRL(sim.minIncome)}</strong>
+            <small>A parcela pode ser até {Math.round(CAIXA_SBPE.maxIncomeShare * 100)}% da renda bruta da família.</small>
+            {sim.incomeShare != null && (
+              <span className={`financing-fit ${sim.incomeFits ? 'is-ok' : 'is-bad'}`}>
+                {sim.incomeFits
+                  ? `Cabe: a parcela usa ${fmtPct(sim.incomeShare * 100)}% da sua renda.`
+                  : `Não cabe: a parcela usaria ${fmtPct(sim.incomeShare * 100)}% da sua renda.`}
+              </span>
+            )}
+          </div>
+          <div className="financing-result">
+            <span className="uppy">Dinheiro seu até a chave</span>
+            <strong>R$ {fmtBRL(sim.cashAtPurchase)}</strong>
+            <small>
+              Entrada R$ {fmtBRL(sim.down)}{sim.fgtsUsed > 0 ? ` − FGTS R$ ${fmtBRL(sim.fgtsUsed)}` : ''} + custos R$ {fmtBRL(costs)}.
+              Os custos não entram no financiamento.
+            </small>
+          </div>
+          <div className="financing-result">
+            <span className="uppy">Valor financiado</span>
+            <strong>R$ {fmtBRL(sim.principal)}</strong>
+            <small>Juros no período todo: cerca de R$ {fmtBRL(sim.totalInterest)}.</small>
+          </div>
+        </div>
+      </div>
+
+      <p className="financing-note">
+        Estimativa com as condições de referência da Caixa em {CAIXA_SBPE.updatedAt}. A parcela inclui
+        a tarifa de cerca de R$ {CAIXA_SBPE.adminFee}; não inclui a TR (hoje perto de
+        {' '}{fmtRate(CAIXA_SBPE.monthlyTr)}% ao mês) nem os seguros obrigatórios, que variam com a
+        sua idade e o imóvel. O imóvel aceitar financiamento não garante que o seu crédito seja aprovado:
+        a aprovação e as condições finais dependem da análise da Caixa.
+      </p>
     </div>
   );
 }

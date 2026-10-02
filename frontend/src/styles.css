@@ -2990,6 +2990,59 @@ a { color: inherit; text-decoration: none; }
 }
 .round-step-drop.is-up { color: var(--bad); }
 .appraisal-fact-gap.is-above { color: var(--warn); }
+/* ---------- E se você financiar? ---------- */
+.financing-card { padding: 24px; margin-bottom: 20px; }
+.financing-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.financing-lead { margin: 6px 0 0; font-size: 13px; color: var(--fg-2); max-width: 620px; line-height: 1.5; }
+.financing-system { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--bg-2); }
+.financing-system button { padding: 7px 12px; border-radius: 8px; font-size: 12.5px; color: var(--fg-2); }
+.financing-system button.is-active { background: var(--bg-1); color: var(--accent-strong); font-weight: 600; box-shadow: 0 1px 3px rgba(17,24,39,.08); }
+.financing-warning { margin: 14px 0 0; padding: 9px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 12.5px; }
+.financing-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); gap: 24px; margin-top: 20px; }
+.financing-controls { display: grid; gap: 18px; align-content: start; }
+.financing-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.financing-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.financing-field .uppy { color: var(--fg-2); }
+.financing-field small { font-size: 11.5px; color: var(--fg-2); line-height: 1.45; }
+.financing-field .slider { margin-top: 6px; }
+.financing-money {
+  display: flex; align-items: center; gap: 6px;
+  height: 40px; padding: 0 12px;
+  border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg-1);
+  font-family: var(--f-mono); color: var(--fg-2);
+}
+.financing-money:focus-within { border-color: var(--accent); }
+.financing-money input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--fg-0); }
+.financing-money span:last-child:not(:first-child) { font-size: 12px; white-space: nowrap; }
+.financing-results { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
+.financing-result {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px; border-radius: 12px;
+  border: 1px solid var(--line-1); background: var(--bg-1);
+}
+.financing-result .uppy { color: var(--fg-2); }
+.financing-result strong { font-family: var(--f-mono); font-feature-settings: 'tnum'; font-size: 19px; font-weight: 650; color: var(--fg-0); }
+.financing-result small { font-size: 11.5px; color: var(--fg-2); line-height: 1.45; }
+.financing-result--main { grid-column: 1 / -1; background: var(--accent-soft); border-color: transparent; }
+.financing-result--main strong { font-size: 26px; color: var(--accent-strong); }
+.financing-result:last-child { grid-column: 1 / -1; }
+.financing-fit { margin-top: 4px; font-size: 12px; font-weight: 600; }
+.financing-fit.is-ok { color: #15803D; }
+.financing-fit.is-bad { color: var(--bad); }
+.financing-note { margin: 18px 0 0; font-size: 11.5px; color: var(--fg-2); line-height: 1.5; }
+.financing-accepted { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; font-size: 12.5px; color: var(--fg-2); }
+.financing-unknown { margin: 0 0 20px; padding: 10px 14px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+@media (max-width: 860px) {
+  .financing-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .financing-results, .financing-row { grid-template-columns: 1fr; }
+}
+/* Parcela estimada no topo da página do imóvel */
+.installment-teaser { margin: 14px 0 0; font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+.installment-teaser strong { color: var(--fg-0); font-weight: 650; }
+.installment-teaser-link { padding: 0; font: inherit; font-weight: 600; color: var(--accent-strong); background: none; border: 0; cursor: pointer; }
+.installment-teaser-link:hover { text-decoration: underline; }
 
 /* Filtros pela ficha da Caixa: ocupação, FGTS e financiamento */
 .housing-fact-filters { display: grid; gap: 12px; margin-top: 12px; }

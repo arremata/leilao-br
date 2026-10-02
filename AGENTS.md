@@ -214,6 +214,14 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Simulador de financiamento na página do imóvel, só quando a
+  Caixa informa que o imóvel aceita financiamento (PD-021): uma linha com a
+  parcela estimada perto dos valores e, na conta, “E se você financiar?” no
+  modelo do SBPE (cota de 80% SAC / 70% PRICE sobre o menor entre lance e
+  avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
+  As condições de referência ficam datadas e a tela deixa claro que a conta é
+  uma estimativa e não representa aprovação de crédito.
+
 - **2026-10-01** — A lista de imóveis ganhou filtros pelo que a Caixa informa
   na ficha: "Tem alguém morando?" (desocupado ou ocupado; nada marcado mostra
   todos e tocar de novo desmarca), "Aceita FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,
