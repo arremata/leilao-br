@@ -246,6 +246,15 @@ The full platform will include:
   permanentemente para a fonte única no `www`; o app não mantém uma segunda
   cópia do conteúdo nem outro sitemap.
 
+- **2026-10-01** — Corrigiu os comparáveis do ImovelWeb em "Preço na região".
+  O portal passou a usar `/propriedades/` nos links, e o filtro antigo
+  (`a[href*="imovel"]`) descartava todos os cards como sem link; os seletores
+  por classe ainda contavam pedaços do mesmo card como cards (150 para 30
+  anúncios). O scraper agora usa `[data-qa="posting PROPERTY"]`, lê o caminho
+  em `data-to-posting` e remove parâmetros de rastreio da URL guardada. As
+  referências ainda calculadas com a versão anterior serão refeitas uma vez,
+  em lotes, pela rotina já agendada, atualizando também as análises afetadas.
+
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
   `unknown`), `acceptsFgts` e `acceptsFinancing`, extraídos da ficha oficial da
