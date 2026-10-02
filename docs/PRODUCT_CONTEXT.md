@@ -58,6 +58,14 @@ O endereço oficial de produção é `https://www.argosleiloes.com.br`. Acessar
 `https://argosleiloes.com.br` leva permanentemente ao endereço com `www`. Ambos
 usam HTTPS, e a Vercel renova os certificados automaticamente.
 
+### Dicionário
+
+O dicionário do leilão é conteúdo público do site institucional, em
+`https://www.argosleiloes.com.br/dicionario`. Explica, sem juridiquês, as
+palavras dos leilões e da venda direta da Caixa, por assunto e com busca. O menu
+da plataforma leva para esse endereço; nenhuma cópia do conteúdo fica dentro do
+app autenticado.
+
 ### Endereços
 
 Cada imóvel tem uma URL própria — `/imovel/{id}` — que abre direto, sobrevive ao

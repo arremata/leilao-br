@@ -147,16 +147,12 @@ a { color: inherit; text-decoration: none; }
   font-size: 18px;
   letter-spacing: -0.03em;
 }
-.brand .logo {
-  width: 22px; height: 22px;
-  background: var(--fg-0);
-  position: relative;
-  border-radius: 3px;
-}
-.brand .logo::before {
-  content: ""; position: absolute;
-  inset: 4px; background: var(--accent); border-radius: 1px;
-  transform: rotate(45deg) scale(0.7);
+/* Selo do Argos: a casa branca sobre o roxo da marca. */
+.logo {
+  display: inline-block; flex: none;
+  width: 24px; height: 24px;
+  border-radius: 7px;
+  background: var(--accent) url('/brand/argos-mark.svg') center / 86% no-repeat;
 }
 .nav { display: flex; gap: 4px; }
 .nav a {
@@ -3040,10 +3036,16 @@ a { color: inherit; text-decoration: none; }
   .financing-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
-.financing-results, .financing-row { grid-template-columns: 1fr; }
+  .financing-results, .financing-row { grid-template-columns: 1fr; }
 }
 /* Parcela estimada no topo da página do imóvel */
 .installment-teaser { margin: 14px 0 0; font-size: 13px; color: var(--fg-2); line-height: 1.5; }
 .installment-teaser strong { color: var(--fg-0); font-weight: 650; }
 .installment-teaser-link { padding: 0; font: inherit; font-weight: 600; color: var(--accent-strong); background: none; border: 0; cursor: pointer; }
 .installment-teaser-link:hover { text-decoration: underline; }
+
+/* Filtros pela ficha da Caixa: ocupação, FGTS e financiamento */
+.housing-fact-filters { display: grid; gap: 12px; margin-top: 12px; }
+.housing-fact-filters .housing-field { gap: 8px; }
+.housing-fact-filters .housing-filter-segments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.housing-fact-filters .feed-switch { width: 100%; }

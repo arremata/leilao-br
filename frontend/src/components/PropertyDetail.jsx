@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { backLabel } from '../usePropertyLink';
 import { Countdown, ListingBadges, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, mapsQuery } from '../utils';
 import { auctionSchedule, saleTagLabel } from '../auctionRounds';
@@ -124,6 +125,16 @@ function formatAuctionEvent(date, price) {
 }
 
 export default function PropertyDetail({ property, watched, toggleWatch }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Veio de uma lista nesta guia: voltar no histórico devolve a mesma busca na
+  // mesma posição. Aberto direto ou em guia nova, o link leva à lista.
+  const cameFrom = typeof location.state?.from === 'string' ? location.state.from : null;
+  const goBack = (event) => {
+    if (!cameFrom || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    navigate(-1);
+  };
   const isRemoved = property?.status === 'removed';
   // Abre na primeira pergunta que a pessoa faz: quanto vou pagar no total.
   const [tab, setTab] = useState('cost');
@@ -650,12 +661,13 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       {/* ===== Breadcrumb + actions ===== */}
       <div className="row between detail-top" style={{ marginBottom: 18 }}>
         <Link
-          to="/"
+          to={cameFrom || '/'}
+          onClick={goBack}
           className="row gap-2"
           style={{ color: 'var(--fg-2)', fontSize: 12.5 }}
         >
           <span className="mono">←</span>
-          <span>Imóveis</span>
+          <span>{backLabel(cameFrom)}</span>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>/</span>
           <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
         </Link>
