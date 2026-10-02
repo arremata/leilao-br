@@ -161,16 +161,6 @@ linhas não entram no total até a chave, que avisa “Sem eventuais dívidas de
 condomínio e IPTU”; até a consulta existir, a tela orienta a confirmar no
 condomínio e na prefeitura antes do lance.
 
-Quando a Caixa informa que o imóvel aceita financiamento, e só nesse caso, a
-página mostra uma linha com a parcela estimada perto dos valores e, na conta, o
-simulador “E se você financiar?” no modelo do SBPE da Caixa: entrada mínima pela
-cota (80% no SAC, 70% no PRICE, sobre o menor entre lance e avaliação), FGTS na
-entrada, prazo, juros, renda mínima para a parcela caber em 30% da renda e o
-dinheiro próprio até a chave, com os custos fora do financiamento. Se a Caixa
-diz que não aceita, nada aparece além do selo “Só à vista”; se não informou, só
-um aviso para confirmar no edital. A simulação é estimativa: não inclui TR nem
-seguros, e o imóvel aceitar financiamento não garante a aprovação do crédito.
-
 Em Leilão SFI, o valor inicial e a data em destaque pertencem sempre à rodada
 vigente. Quando a segunda rodada já é a atual, a primeira aparece somente como
 encerrada; a interface não mistura o rótulo de uma rodada com os dados da outra.

@@ -214,13 +214,8 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-10-01** — Simulador de financiamento na página do imóvel, só quando a
-  Caixa informa que o imóvel aceita financiamento (PD-018): uma linha com a
-  parcela estimada perto dos valores e, na conta, “E se você financiar?” no
-  modelo do SBPE (cota de 80% SAC / 70% PRICE sobre o menor entre lance e
-  avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
-  As condições de referência ficam com data em `frontend/src/financing.js`. Na
-  conta, eventuais dívidas de condomínio e IPTU aparecem como as demais linhas,
+- **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
+  como as demais linhas,
   com o valor desfocado e um cadeado no lugar dele, fora do total e com o aviso
   de que pode não haver dívida, à espera da consulta paga (PD-019;
   `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
