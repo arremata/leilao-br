@@ -1038,14 +1038,11 @@ function InstallmentTeaser({ p, onSimulate }) {
     system: 'SAC',
   });
   return (
-    <div className="installment-teaser">
-      <div>
-        <span className="uppy">Financiando pela Caixa</span>
-        <strong>1ª parcela de cerca de R$ {fmtBRL(sim.firstWithFee)}</strong>
-        <small>Entrada de R$ {fmtBRL(sim.down)} e {CAIXA_SBPE.maxMonths} parcelas que caem todo mês.</small>
-      </div>
-      <button type="button" className="btn sm" onClick={onSimulate}>Simular</button>
-    </div>
+    <p className="installment-teaser">
+      Aceita financiamento: parcela a partir de <strong>R$ {fmtBRL(sim.firstWithFee)}</strong> com
+      R$ {fmtBRL(sim.down)} de entrada.
+      {' '}<button type="button" className="installment-teaser-link" onClick={onSimulate}>Simular →</button>
+    </p>
   );
 }
 

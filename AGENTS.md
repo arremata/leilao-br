@@ -214,6 +214,14 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-01** — Simulador de financiamento na página do imóvel, só quando a
+  Caixa informa que o imóvel aceita financiamento (PD-020): uma linha com a
+  parcela estimada perto dos valores e, na conta, “E se você financiar?” no
+  modelo do SBPE (cota de 80% SAC / 70% PRICE sobre o menor entre lance e
+  avaliação, FGTS, prazo, juros, renda mínima a 30% e dinheiro até a chave).
+  As condições de referência ficam datadas e a tela deixa claro que a conta é
+  uma estimativa e não representa aprovação de crédito.
+
 - **2026-10-01** — Corrigiu os comparáveis do ImovelWeb em "Preço na região".
   O portal passou a usar `/propriedades/` nos links, e o filtro antigo
   (`a[href*="imovel"]`) descartava todos os cards como sem link; os seletores

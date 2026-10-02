@@ -3040,15 +3040,10 @@ a { color: inherit; text-decoration: none; }
   .financing-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
-  .financing-results, .financing-row { grid-template-columns: 1fr; }
+.financing-results, .financing-row { grid-template-columns: 1fr; }
 }
 /* Parcela estimada no topo da página do imóvel */
-.installment-teaser {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 16px; padding: 12px 14px;
-  border-radius: 12px; background: var(--accent-soft);
-}
-.installment-teaser > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.installment-teaser .uppy { color: var(--accent-strong); }
-.installment-teaser strong { font-size: 15px; color: var(--fg-0); }
-.installment-teaser small { font-size: 11.5px; color: var(--fg-2); }
+.installment-teaser { margin: 14px 0 0; font-size: 13px; color: var(--fg-2); line-height: 1.5; }
+.installment-teaser strong { color: var(--fg-0); font-weight: 650; }
+.installment-teaser-link { padding: 0; font: inherit; font-weight: 600; color: var(--accent-strong); background: none; border: 0; cursor: pointer; }
+.installment-teaser-link:hover { text-decoration: underline; }
