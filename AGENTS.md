@@ -214,12 +214,13 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-10-02** — Corrigiu a execução do ImovelWeb no coletor agendado de
-  preços da região. O navegador agora se identifica com a mesma versão do
-  Chromium instalada no runner, aguarda os cards reais e reconhece a tela de
-  bloqueio do portal. Se a fonte bloquear a coleta, a referência anterior é
-  preservada e o job falha de forma visível em vez de gravar um retrato
-  incompleto. As referências `v4` serão refeitas uma vez como `v5`.
+- **2026-10-02** — Impediu que o bloqueio do ImovelWeb passe por uma coleta
+  vazia no job agendado de preços da região. O navegador agora se identifica
+  com a mesma versão do Chromium instalada no runner, aguarda os cards reais e
+  reconhece a tela de desafio do portal. Se a fonte bloquear a coleta, a
+  referência anterior é preservada e o job falha de forma visível em vez de
+  gravar um retrato incompleto. As referências `v4` serão refeitas uma vez como
+  `v5` quando a coleta estiver disponível.
 
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora

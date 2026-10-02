@@ -253,14 +253,12 @@ def _chromium_user_agent(browser_version: str) -> str:
     )
 
 
-async def _launch_stealth_browser(
-    *, channel: str | None = None,
-) -> tuple[Playwright, Browser, Page]:
+async def _launch_stealth_browser() -> tuple[Playwright, Browser, Page]:
     """Launch Chromium and retain the Playwright owner for clean shutdown."""
     pw = await async_playwright().start()
     browser = None
     try:
-        browser = await pw.chromium.launch(headless=True, channel=channel)
+        browser = await pw.chromium.launch(headless=True)
         context = await browser.new_context(
             user_agent=_chromium_user_agent(browser.version),
             viewport={"width": 1920, "height": 1080},
