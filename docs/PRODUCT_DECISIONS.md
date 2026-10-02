@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 30 de setembro de 2026.
+Última atualização: 1 de outubro de 2026.
 
 ## Como manter este registro
 
@@ -320,7 +320,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   informado, a tela mostra o total até a chave com o valor inicial. Venda direta
   mostra apenas se cabe e quanto sobra, sem simular lance.
 
-### PD-019 — Dívidas de condomínio e IPTU como consulta à parte
+### PD-021 — Dívidas de condomínio e IPTU como consulta à parte
 
 - **Data:** 1 de outubro de 2026
 - **Estado:** Ativa

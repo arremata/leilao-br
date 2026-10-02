@@ -217,7 +217,7 @@ The full platform will include:
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora
   do total e com o aviso
-  de que pode não haver dívida, à espera da consulta paga (PD-019;
+  de que pode não haver dívida, à espera da consulta paga (PD-021;
   `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
   virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
 
