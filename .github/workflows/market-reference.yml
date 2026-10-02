@@ -51,7 +51,12 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
       - run: python -m playwright install --with-deps chromium
+      - name: Probe ImovelWeb without database writes
+        if: ${{ github.event.inputs.property_id == 'imovelweb-probe' }}
+        working-directory: backend
+        run: python -m tools.imovelweb_probe
       - name: Refresh missing or stale references
+        if: ${{ github.event.inputs.property_id != 'imovelweb-probe' }}
         working-directory: backend
         run: |
           args=(
@@ -64,12 +69,12 @@ jobs:
           fi
           python -m enrichment.market_reference "${args[@]}"
       - name: Materialize shared property analyses
-        if: ${{ always() }}
+        if: ${{ always() && github.event.inputs.property_id != 'imovelweb-probe' }}
         working-directory: backend
         run: >-
           python -m enrichment.materialize
           --ufs "${{ github.event.inputs.ufs || '' }}"
       - name: Report catalog coverage
-        if: ${{ always() }}
+        if: ${{ always() && github.event.inputs.property_id != 'imovelweb-probe' }}
         working-directory: backend
         run: python -m enrichment.coverage_report --ufs "${{ github.event.inputs.ufs || '' }}"
