@@ -101,7 +101,7 @@ async def test_worker_refreshes_fresh_legacy_snapshot_once(monkeypatch):
         session.add(RegionalMarketPrice(
             uf="PR", city="Curitiba", neighborhood="",
             property_type="Apartamento", price_per_m2=5_000, sample_size=3,
-            source="listing_median", computed_at=now,
+            source="listing_median_confidence_v3", computed_at=now,
         ))
         session.add(MarketReferenceJob(
             uf="PR", city="Curitiba", neighborhood="",
