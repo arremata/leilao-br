@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from graph.state import PropertyMetadata, ComparableProperty
 from tools.property_scraper import (
+    ComparableSourceBlockedError,
+    _chromium_user_agent,
     _extract_street,
     _filter_to_subject_radius,
     _parse_beds_from_text,
@@ -52,6 +54,14 @@ def test_extract_street_simple():
 
 def test_extract_street_empty():
     assert _extract_street("") == ""
+
+
+def test_browser_identity_matches_installed_chromium_major():
+    user_agent = _chromium_user_agent("147.0.7727.15")
+
+    assert "Chrome/147.0.0.0" in user_agent
+    assert "Linux x86_64" in user_agent
+    assert "Chrome/125" not in user_agent
 
 
 def test_price_parser_stops_before_concatenated_area():
@@ -128,11 +138,23 @@ class _FakeCard:
 
 
 class _FakePage:
-    def __init__(self, selectors):
+    def __init__(self, selectors, *, title="Resultados", content="", url="https://www.imovelweb.com.br/busca"):
         self.selectors = selectors
+        self._title = title
+        self._content = content
+        self.url = url
 
     async def goto(self, *args, **kwargs):
         return None
+
+    async def wait_for_selector(self, *args, **kwargs):
+        return None
+
+    async def title(self):
+        return self._title
+
+    async def content(self):
+        return self._content
 
     def locator(self, selector):
         return _FakeLocator(self.selectors.get(selector, []))
@@ -174,6 +196,18 @@ async def test_imovelweb_falls_back_to_propriedades_anchor():
         result = await scrape_imovelweb(page, _make_metadata())
 
     assert [item.url for item in result] == ["https://www.imovelweb.com.br/propriedades/casa-moema-3001.html"]
+
+
+@pytest.mark.asyncio
+async def test_imovelweb_reports_cloudflare_challenge_instead_of_empty_results():
+    page = _FakePage(
+        {},
+        title="Just a moment...",
+        content='<script src="/cdn-cgi/challenge-platform/h/b/orchestrate"></script>',
+    )
+
+    with pytest.raises(ComparableSourceBlockedError, match="anti-bot challenge"):
+        await scrape_imovelweb(page, _make_metadata())
 
 
 def test_comparable_validation_rejects_portal_homepage():
@@ -317,6 +351,31 @@ async def test_scrape_comparables_falls_through_when_first_fails():
         result = await scrape_comparables(_make_metadata())
 
     assert len(result) == 1  # duplicate URLs are collapsed
+
+
+@pytest.mark.asyncio
+async def test_scrape_comparables_propagates_blocked_source_and_closes_browser():
+    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
+         patch(
+             "tools.property_scraper.scrape_imovelweb",
+             new_callable=AsyncMock,
+             side_effect=ComparableSourceBlockedError("blocked"),
+         ), \
+         patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
+         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_browser = AsyncMock()
+        mock_page = AsyncMock()
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
+
+        with pytest.raises(ComparableSourceBlockedError, match="blocked"):
+            await scrape_comparables(_make_metadata())
+
+    mock_browser.close.assert_awaited_once()
+    mock_playwright.stop.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,13 @@ import re
 from urllib.parse import urlparse
 
 from loguru import logger
-from playwright.async_api import async_playwright, Browser, Page, Playwright
+from playwright.async_api import (
+    async_playwright,
+    Browser,
+    Page,
+    Playwright,
+    TimeoutError as PlaywrightTimeoutError,
+)
 from playwright_stealth import Stealth
 
 from graph.market_confidence import (
@@ -224,10 +230,27 @@ def build_imovelweb_url(metadata: PropertyMetadata, location_override: str = "")
 # Stealth browser setup
 # ---------------------------------------------------------------------------
 
-STEALTH_USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-)
+IMOVELWEB_CARD_SELECTOR = '[data-qa="posting PROPERTY"]'
+IMOVELWEB_CARD_WAIT_MS = 12_000
+
+
+class ComparableSourceBlockedError(RuntimeError):
+    """A required listing source returned an anti-bot page, not search results."""
+
+
+def _chromium_user_agent(browser_version: str) -> str:
+    """Match the declared Chrome major to Playwright's installed Chromium.
+
+    A stale macOS/Chrome 125 identity on a Linux Chromium 147 runner caused
+    Cloudflare to serve a challenge shell to every ImovelWeb search.
+    """
+    match = re.match(r"(\d+)", browser_version or "")
+    major = match.group(1) if match else "140"
+    return (
+        "Mozilla/5.0 (X11; Linux x86_64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        f"Chrome/{major}.0.0.0 Safari/537.36"
+    )
 
 
 async def _launch_stealth_browser() -> tuple[Playwright, Browser, Page]:
@@ -237,8 +260,10 @@ async def _launch_stealth_browser() -> tuple[Playwright, Browser, Page]:
     try:
         browser = await pw.chromium.launch(headless=True)
         context = await browser.new_context(
-            user_agent=STEALTH_USER_AGENT,
+            user_agent=_chromium_user_agent(browser.version),
             viewport={"width": 1920, "height": 1080},
+            locale="pt-BR",
+            timezone_id="America/Sao_Paulo",
         )
         page = await context.new_page()
         await Stealth().apply_stealth_async(page)
@@ -794,7 +819,17 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
         return []
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
-        await asyncio.sleep(4)
+        try:
+            await page.wait_for_selector(
+                IMOVELWEB_CARD_SELECTOR,
+                state="attached",
+                timeout=IMOVELWEB_CARD_WAIT_MS,
+            )
+        except PlaywrightTimeoutError:
+            # A legitimate empty result and a challenge shell both have no
+            # cards. Inspect the loaded document below before deciding which
+            # state this is.
+            pass
         try:
             cookie_btn = page.locator('button:has-text("Aceitar"), button:has-text("Entendi")')
             if await cookie_btn.count() > 0:
@@ -806,13 +841,26 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
         # page of 30 listings reported 150 "cards", most of them fragments
         # carrying only a price. Prefer the semantic attribute and fall back
         # only when the markup does not expose it at all.
-        cards = page.locator('[data-qa="posting PROPERTY"]')
+        cards = page.locator(IMOVELWEB_CARD_SELECTOR)
         count = await cards.count()
         if count == 0:
             cards = page.locator(
                 'div.postingCard, div[class*="PostingCard"], div[class*="posting-card"]'
             )
             count = await cards.count()
+        if count == 0:
+            title = (await page.title()).strip()
+            content = (await page.content()).casefold()
+            final_url = page.url.casefold()
+            challenge_markers = (
+                "just a moment", "um momento", "enable javascript and cookies",
+                "verifying you are human", "challenge-platform", "cf-chl-",
+            )
+            challenge_evidence = " ".join((title.casefold(), final_url, content))
+            if any(marker in challenge_evidence for marker in challenge_markers):
+                raise ComparableSourceBlockedError(
+                    f"ImovelWeb blocked the browser with an anti-bot challenge (title={title!r})"
+                )
         logger.info(f"ImovelWeb scraper: found {count} cards")
         results = []
         for i in range(min(count, MAX_COMPS_PER_SITE * 2)):
@@ -872,6 +920,8 @@ async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_over
             except Exception as exc:
                 logger.debug(f"ImovelWeb scraper: error parsing card {i}: {exc}")
         return results
+    except ComparableSourceBlockedError:
+        raise
     except Exception as exc:
         logger.warning(f"ImovelWeb scraper: failed for {url}: {exc}")
         return []
@@ -916,6 +966,9 @@ async def scrape_comparables(
         async def _run_scraper(name, scraper, loc) -> list[ComparableProperty]:
             try:
                 comps = await scraper(page, metadata, location_override=loc)
+            except ComparableSourceBlockedError:
+                logger.error("Property scraper: {} is blocked; preserving the previous snapshot", name)
+                raise
             except Exception as e:
                 logger.debug(f"Property scraper: {name} failed: {e}")
                 return []
