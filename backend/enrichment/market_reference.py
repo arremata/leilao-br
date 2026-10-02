@@ -28,7 +28,7 @@ from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
 
 
-MARKET_REFERENCE_SOURCE = "listing_median_confidence_v3"
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v4"
 
 
 def _now() -> datetime:

@@ -15,6 +15,7 @@ from tools.property_scraper import (
     build_chavesnamao_url,
     build_imovelweb_url,
     scrape_comparables,
+    scrape_imovelweb,
 )
 
 
@@ -93,6 +94,86 @@ async def test_radius_filter_keeps_only_five_nearby_comparables():
     assert len(result) == 5
     assert all(item.distance_km <= 2 for item in result)
     assert all(item.address != "Rua Distante" for item in result)
+
+
+class _FakeLocator:
+    def __init__(self, items):
+        self.items = items
+
+    async def count(self):
+        return len(self.items)
+
+    def nth(self, index):
+        return self.items[index]
+
+    @property
+    def first(self):
+        return self.items[0]
+
+
+class _FakeCard:
+    def __init__(self, text, attrs=None, children=None):
+        self.text = text
+        self.attrs = attrs or {}
+        self.children = children or {}
+
+    async def text_content(self):
+        return self.text
+
+    async def get_attribute(self, name):
+        return self.attrs.get(name)
+
+    def locator(self, selector):
+        return _FakeLocator(self.children.get(selector, []))
+
+
+class _FakePage:
+    def __init__(self, selectors):
+        self.selectors = selectors
+
+    async def goto(self, *args, **kwargs):
+        return None
+
+    def locator(self, selector):
+        return _FakeLocator(self.selectors.get(selector, []))
+
+
+IMOVELWEB_CARD_TEXT = "R$ 500.000 80 m² tot. 2 quartos Rua das Flores, Moema, Sao Paulo"
+
+
+@pytest.mark.asyncio
+async def test_imovelweb_reads_real_cards_and_new_listing_path():
+    card = _FakeCard(
+        IMOVELWEB_CARD_TEXT,
+        attrs={"data-to-posting": "/propriedades/apartamento-moema-2999.html?n_src=Listado&n_pg=1"},
+    )
+    fragment = _FakeCard("R$ 500.000")
+    page = _FakePage({
+        '[data-qa="posting PROPERTY"]': [card],
+        # Os seletores por classe também pegam pedaços do mesmo card.
+        'div.postingCard, div[class*="PostingCard"], div[class*="posting-card"]': [card, fragment, fragment],
+    })
+
+    with patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock):
+        result = await scrape_imovelweb(page, _make_metadata())
+
+    assert len(result) == 1
+    assert result[0].url == "https://www.imovelweb.com.br/propriedades/apartamento-moema-2999.html"
+    assert result[0].price == 500_000
+
+
+@pytest.mark.asyncio
+async def test_imovelweb_falls_back_to_propriedades_anchor():
+    link = _FakeCard("", attrs={"href": "/propriedades/casa-moema-3001.html"})
+    card = _FakeCard(IMOVELWEB_CARD_TEXT, children={
+        'a[href*="/propriedades/"], a[href*="imovel"]': [link],
+    })
+    page = _FakePage({'[data-qa="posting PROPERTY"]': [card]})
+
+    with patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock):
+        result = await scrape_imovelweb(page, _make_metadata())
+
+    assert [item.url for item in result] == ["https://www.imovelweb.com.br/propriedades/casa-moema-3001.html"]
 
 
 def test_comparable_validation_rejects_portal_homepage():

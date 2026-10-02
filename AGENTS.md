@@ -215,11 +215,20 @@ The full platform will include:
 ## Changelog
 
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
-  como as demais linhas,
-  com o valor desfocado e um cadeado no lugar dele, fora do total e com o aviso
+  como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora
+  do total e com o aviso
   de que pode não haver dívida, à espera da consulta paga (PD-019;
   `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
   virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
+
+- **2026-10-01** — Corrigiu os comparáveis do ImovelWeb em "Preço na região".
+  O portal passou a usar `/propriedades/` nos links, e o filtro antigo
+  (`a[href*="imovel"]`) descartava todos os cards como sem link; os seletores
+  por classe ainda contavam pedaços do mesmo card como cards (150 para 30
+  anúncios). O scraper agora usa `[data-qa="posting PROPERTY"]`, lê o caminho
+  em `data-to-posting` e remove parâmetros de rastreio da URL guardada. As
+  referências ainda calculadas com a versão anterior serão refeitas uma vez,
+  em lotes, pela rotina já agendada, atualizando também as análises afetadas.
 
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/
