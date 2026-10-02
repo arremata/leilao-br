@@ -10,7 +10,7 @@ from tools.property_scraper import _launch_stealth_browser, scrape_imovelweb
 
 
 async def _probe() -> None:
-    playwright, browser, page = await _launch_stealth_browser()
+    playwright, browser, page = await _launch_stealth_browser(channel="chrome")
     try:
         metadata = PropertyMetadata(
             city="Sao Paulo",
