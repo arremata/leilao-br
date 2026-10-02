@@ -677,7 +677,7 @@ function Empty() {
 // Switch iOS-style para filtros binários no rail.
 // O knob se move horizontalmente e muda de cor quando ligado. Marcar com
 // role="switch" comunica o estado binário para leitores de tela.
-function FilterSwitch({ checked, onChange, label, helper, title }) {
+export function FilterSwitch({ checked, onChange, label, helper, title }) {
   return (
     <button
       type="button"

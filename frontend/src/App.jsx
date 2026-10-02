@@ -310,6 +310,7 @@ function TopBar({ watchCount, account }) {
             Salvos {watchCount > 0 && <span className="mono" style={{ color: 'var(--accent)', marginLeft: 4 }}>{watchCount}</span>}
           </NavLink>
           <NavLink to="/vistos" className={({ isActive }) => (isActive ? 'active' : '')}>Vistos</NavLink>
+          <a href="https://www.argosleiloes.com.br/dicionario">Dicionário</a>
         </nav>
         <div className="housing-account">
           {account ? (

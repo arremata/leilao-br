@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 30 de setembro de 2026.
+Última atualização: 1º de outubro de 2026.
 
 ## Como manter este registro
 
@@ -18,6 +18,24 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - Mudanças apenas técnicas continuam somente no changelog de `AGENTS.md`.
 
 ## Decisões ativas de produto
+
+### PD-020 — Manter conteúdo público fora do app autenticado
+
+- **Data:** 1º de outubro de 2026
+- **Estado:** Ativa
+- **Decisão:** o dicionário pertence ao site institucional público em
+  `www.argosleiloes.com.br/dicionario`; a plataforma em
+  `app.argosleiloes.com.br` permanece fechada para quem não entrou e apenas
+  aponta para essa fonte pública.
+- **Motivo:** aquisição por busca e uso do produto cumprem papéis diferentes.
+  O dicionário precisa ser encontrado e lido sem conta, enquanto abrir uma
+  exceção dentro do app mistura a promessa pública com a navegação da
+  plataforma.
+- **Consequências:** existe uma única cópia editorial e indexável do dicionário.
+  O menu do app leva ao site público, e endereços antigos do dicionário no
+  domínio do app redirecionam permanentemente para o mesmo caminho no `www`.
+  Outros conteúdos de aquisição devem seguir o mesmo princípio, salvo uma nova
+  decisão de produto.
 
 ### PD-019 — Separar lance registrado de valor inicial
 
