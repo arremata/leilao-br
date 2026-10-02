@@ -240,15 +240,11 @@ The full platform will include:
   favicon anterior ainda era o do Vite. O cache do service worker passou para
   `argos-v3` para trocar os ícones de quem já instalou.
 
-- **2026-10-01** — Publicou o dicionário do leilão para o buscador. `/dicionario`
-  e `/dicionario/{termo}` abrem sem login e sem esperar a sessão. Depois do
-  `vite build`, `frontend/scripts/prerender-dictionary.mjs` grava o HTML de cada
-  página com título, descrição, canônico em `www.argosleiloes.com.br`, dados
-  estruturados (`DefinedTermSet`/`DefinedTerm`) e o texto dos verbetes, além de
-  `sitemap.xml` e `robots.txt`. A página de um verbete só é indexada quando tem
-  texto além da definição curta (`detail` em `frontend/src/content/glossary.js`);
-  as demais ficam `noindex, follow` e fora do sitemap. Os textos ficam em
-  `glossary.js` para revisão editorial.
+- **2026-10-01** — Ligou a plataforma ao dicionário público do site
+  institucional. O menu abre `www.argosleiloes.com.br/dicionario`, enquanto
+  acessos antigos a `/dicionario` e aos verbetes no domínio do app redirecionam
+  permanentemente para a fonte única no `www`; o app não mantém uma segunda
+  cópia do conteúdo nem outro sitemap.
 
 - **2026-09-30** — Tornou visível em cada imóvel quem mora lá, FGTS e a rodada
   do leilão. Os catálogos passaram a expor `occupancy` (`occupied`/`vacant`/

@@ -9,14 +9,8 @@ export function shouldShowHousingOnboarding({
   return !account || !isCompleteHousingProfile(profile);
 }
 
-/** Telas abertas sem conta, para quem chega pelo buscador. */
-export function isPublicPath(pathname) {
-  return pathname === '/dicionario' || pathname.startsWith('/dicionario/');
-}
-
 export function shouldUseAccountScreen({ pathname, isPreview, account }) {
   if (pathname === '/entrar' || pathname === '/preferencias') return true;
-  if (isPublicPath(pathname)) return false;
   if (!account && (!isPreview || pathname === '/perfil')) return true;
   return false;
 }

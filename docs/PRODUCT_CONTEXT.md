@@ -60,12 +60,11 @@ usam HTTPS, e a Vercel renova os certificados automaticamente.
 
 ### Dicionário
 
-O dicionário do leilão (`/dicionario`) é a única parte aberta sem conta. Explica,
-sem juridiquês, as palavras dos leilões e da venda direta da Caixa, por assunto e
-com busca. Cada palavra tem endereço próprio (`/dicionario/itbi`, por exemplo)
-com os outros termos do mesmo assunto e um convite para ver os imóveis. O texto
-chega pronto ao buscador; a página de uma palavra entra na busca quando ganha uma
-explicação mais longa que a definição curta.
+O dicionário do leilão é conteúdo público do site institucional, em
+`https://www.argosleiloes.com.br/dicionario`. Explica, sem juridiquês, as
+palavras dos leilões e da venda direta da Caixa, por assunto e com busca. O menu
+da plataforma leva para esse endereço; nenhuma cópia do conteúdo fica dentro do
+app autenticado.
 
 ### Endereços
 
