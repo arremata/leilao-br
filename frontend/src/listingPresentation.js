@@ -8,10 +8,10 @@ export function listingTitle(property) {
 }
 
 export function listingLocation(property) {
-  const city = property.city?.trim().toLocaleLowerCase('pt-BR')
+  const formatPlace = value => value?.trim().toLocaleLowerCase('pt-BR')
     .replace(/(^|[\s-])\p{L}/gu, word => word.toLocaleUpperCase('pt-BR'))
     .replace(/\b(?:De|Da|Do|Das|Dos|E)\b/g, word => word.toLocaleLowerCase('pt-BR'));
-  return [city, property.uf?.trim().toLocaleUpperCase('pt-BR')].filter(Boolean).join(' · ') || 'Cidade não informada';
+  return [formatPlace(property.neighborhood), formatPlace(property.city), property.uf?.trim().toLocaleUpperCase('pt-BR')].filter(Boolean).join(' · ') || 'Cidade não informada';
 }
 
 export function listingPrice(property, schedule) {

@@ -9,8 +9,9 @@ const property = {
   firstAuctionAt: '2026-10-08T10:00:00-03:00', secondAuctionAt: '2026-10-15T10:00:00-03:00', minBid: 230000,
 };
 
-test('listing location shows only city and state, never street or neighborhood', () => {
-  assert.equal(listingLocation({ ...property, city: ' SÃO JOSÉ DOS PINHAIS ', uf: 'pr', neighborhood: 'Queimada' }), 'São José dos Pinhais · PR');
+test('listing location shows neighborhood, city and state without the street address', () => {
+  assert.equal(listingLocation({ ...property, city: ' SÃO JOSÉ DOS PINHAIS ', uf: 'pr', neighborhood: ' QUEIMADA ' }), 'Queimada · São José dos Pinhais · PR');
+  assert.equal(listingLocation({ ...property, city: 'CURITIBA', uf: 'PR', neighborhood: ' ' }), 'Curitiba · PR');
   assert.equal(listingLocation(property), 'Cidade não informada');
 });
 

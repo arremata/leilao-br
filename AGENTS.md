@@ -214,6 +214,10 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Acrescentou o bairro à localização resumida dos cards e da
+  lista, junto de cidade e estado. Bairro não informado é omitido, sem separador
+  vazio; rua e número continuam somente na página do imóvel.
+
 - **2026-10-06** — Incluiu cidade e estado na identificação dos cards e da lista.
   Os cards passaram a apresentar os dois preços maiores na mesma coluna, sem
   destaque duplicado; avaliação igual a uma rodada é indicada sem repetir o

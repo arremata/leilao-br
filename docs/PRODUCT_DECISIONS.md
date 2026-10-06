@@ -23,7 +23,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 - **Data:** 6 de outubro de 2026
 - **Estado:** Ativa; interface em validação antes da publicação
-- **Decisão:** identificar imóveis por tipo e área, cidade e estado na listagem, deixando o
+- **Decisão:** identificar imóveis por tipo e área, bairro, cidade e estado na listagem, deixando o
   endereço completo e os comparáveis para a página do imóvel. Mostrar o preço
   de cada rodada uma única vez em linhas com data e situação, identificando a
   vigente. Quando a avaliação coincide com uma rodada, indicar a equivalência

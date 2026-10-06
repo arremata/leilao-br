@@ -9,7 +9,7 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 ## Em validação — lista de imóveis simplificada
 
 Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
-com cidade e estado como localização e o endereço completo reservado à página
+com bairro, cidade e estado como localização e o endereço completo reservado à página
 do imóvel. Vistos mantém a identificação por tipo e área. Nos cards com duas
 rodadas, os preços aparecem uma única vez, em linhas alinhadas com situação e
 data; a rodada vigente é identificada. Quando a avaliação coincide com uma
