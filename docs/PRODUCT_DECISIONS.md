@@ -19,6 +19,21 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
+### PD-022 — Simplificar a identificação e as rodadas na lista
+
+- **Data:** 6 de outubro de 2026
+- **Estado:** Ativa; interface em validação antes da publicação
+- **Decisão:** identificar imóveis por tipo e área na listagem, deixando o
+  endereço completo e os comparáveis para a página do imóvel. Mostrar o preço
+  vigente em destaque e as rodadas em linhas com data, preço e situação.
+  Comparar o preço da segunda rodada ao da primeira em reais e porcentagem,
+  identificando também aumentos, sem usar a avaliação como base dessa diferença.
+- **Motivo:** facilitar a leitura e a comparação em telas pequenas, seguindo
+  o padrão visual da LP.
+- **Consequências:** uma rodada futura permanece condicional; preço ou data
+  não publicados não viram zero. A apresentação não restringe o acesso aos
+  dados oficiais nem altera as regras financeiras do imóvel.
+
 ### PD-020 — Manter conteúdo público fora do app autenticado
 
 - **Data:** 1º de outubro de 2026

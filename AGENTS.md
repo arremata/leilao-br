@@ -214,6 +214,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Simplificou a listagem para revisão local: identificação por
+  tipo e área, endereço completo somente ao abrir o imóvel, preço vigente em
+  destaque e rodadas em linhas com data, preço e diferença para a primeira.
+  Removeu os comparáveis e a contagem repetida dos cards, preservando o conteúdo
+  completo na página do imóvel. Aplicou o padrão visual da LP aos cards, à lista
+  e ao botão de salvar, com adaptação para telas pequenas.
+
 - **2026-10-01** — Documentou a rodada de validação visual pela preview do PR,
   com a versão atual da plataforma como referência e o padrão Client-First da
   LP como ponto de partida para os futuros ajustes de interface.

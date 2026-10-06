@@ -4,7 +4,18 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 29 de setembro de 2026.
+Última atualização: 6 de outubro de 2026.
+
+## Em validação — lista de imóveis simplificada
+
+Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
+com o endereço completo reservado à página do imóvel. Vistos segue a mesma
+regra de identificação. O preço em destaque pertence à rodada vigente; as duas
+rodadas aparecem em linhas com situação, data e preço. A diferença em reais e
+porcentagem compara a segunda rodada à primeira, sem confundir essa comparação
+com o valor de avaliação. Uma segunda rodada mais cara é apresentada como aumento.
+Os comparáveis ficam na página do imóvel. Esta versão está em revisão local,
+ainda sem publicação em produção.
 
 ## Como usar no Claude
 

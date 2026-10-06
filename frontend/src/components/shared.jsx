@@ -5,6 +5,7 @@ import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
 import { imageSourceForAttempt } from '../imageFallback';
 import { auctionSchedule, formatDayTime, saleTagLabel } from '../auctionRounds';
 import { listingBadges } from '../listingFacts';
+import { listingTitle, listingPrice, listingMoney, roundDifference } from '../listingPresentation';
 
 // Cadeado das partes fechadas (consultoria, consulta de dívidas).
 export function LockIcon({ size = 16, strokeWidth = 2 }) {
@@ -90,7 +91,7 @@ export function PropertyImage({ src, alt = '', style }) {
   );
 }
 
-export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', children, style }) {
+export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', children, style, showLabel = true }) {
   return (
     <div
       className="ph"
@@ -116,7 +117,7 @@ export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', child
         />
       ) : null}
       {children}
-      <div className="ph-label">{label}</div>
+      {showLabel && <div className="ph-label">{label}</div>}
     </div>
   );
 }
@@ -126,7 +127,7 @@ export function Photo({ label = 'FOTO IMÓVEL', photoUrl, ratio = '16/10', child
 // ============================================================
 export function Specs({ area, beds, baths, parking, floor, dense }) {
   const items = [
-    area > 0 && { v: area, l: 'm²', symbol: '⌗' },
+    area > 0 && { v: Number(area).toLocaleString('pt-BR', { maximumFractionDigits: 2 }), l: 'm²', symbol: '⌗' },
     beds > 0 && { v: beds, l: beds === 1 ? 'dorm' : 'dorms', symbol: '◐' },
     baths > 0 && { v: baths, l: baths === 1 ? 'banho' : 'banhos', symbol: '◑' },
     parking > 0 && { v: parking, l: parking === 1 ? 'vaga' : 'vagas', symbol: '⌑' },
@@ -159,307 +160,102 @@ export function ListingBadges({ p, size }) {
   );
 }
 
-const ROUND_STATE_LABEL = {
-  ended: 'encerrada',
-  current: 'agora',
-  upcoming: 'se não vender',
-};
+const ROUND_STATE_LABEL = { ended: 'Encerrada', current: 'Vigente', upcoming: 'Se não vender' };
 
-// ============================================================
-// As duas rodadas de um Leilão SFI, lado a lado
-// ============================================================
-/** "R$ 134 mil", "R$ 1,2 mi": cabe numa linha do quadro da rodada. */
-function shortBRL(value) {
-  if (value >= 1_000_000) {
-    return `R$ ${(value / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
-  }
-  if (value >= 1_000) return `R$ ${Math.round(value / 1_000).toLocaleString('pt-BR')} mil`;
-  return `R$ ${fmtBRL(value)}`;
+function RoundDifference({ difference }) {
+  if (!difference) return null;
+  return (
+    <span className={`property_card-difference is-${difference.tone}`}>
+      {difference.amount === 0 ? 'Mesmo preço da 1ª rodada' : <>
+        {difference.percentage} · {listingMoney(Math.abs(difference.amount))} a {difference.amount < 0 ? 'menos' : 'mais'}
+      </>}
+      {difference.amount !== 0 && <span className="property_card-comparison"> em relação à 1ª rodada</span>}
+    </span>
+  );
 }
 
-export function RoundStrip({ schedule, compact }) {
+export function RoundStrip({ schedule }) {
   if (schedule.kind !== 'rounds') return null;
-  const [first, second] = schedule.rounds;
-  // No Leilão SFI o mínimo da 2ª rodada é a dívida com as despesas. Quase
-  // sempre fica abaixo da 1ª, mas não sempre: quando a dívida passa do valor
-  // do imóvel, a 2ª rodada é MAIS cara, e o quadro tem de dizer isso.
-  const diff = first.price && second.price ? second.price - first.price : 0;
-  // Os dois quadros têm sempre as mesmas cinco linhas; a do rodapé fica
-  // reservada mesmo vazia, para os dois terem a mesma altura e alinhamento.
-  // Sem centavos: o quadro é estreito e o valor exato está na página.
-  const priceLabel = (price) => (price ? `R$ ${Math.round(price).toLocaleString('pt-BR')}` : 'a publicar');
-  // Se um preço é longo, os dois usam a letra menor: o par segue um padrão só.
-  const longPrices = schedule.rounds.some(round => priceLabel(round.price).length > 11);
+  const difference = roundDifference(schedule);
   return (
-    <div className={`round-strip${compact ? ' round-strip--compact' : ''}`}>
-      {schedule.rounds.map(round => {
-        const price = priceLabel(round.price);
-        const footer = round.round === 2 && diff !== 0 && round.state !== 'ended'
-          ? `${shortBRL(Math.abs(diff))} a ${diff < 0 ? 'menos' : 'mais'}`
-          : '';
-        return (
-          <div key={round.round} className={`round-step is-${round.state}`}>
-            <span className="round-step-title">{round.round}ª rodada</span>
-            <span className="round-step-state">
-              {/* Na rodada que está valendo, quanto falta — como na foto do card. */}
-              {round.state === 'current'
-                ? <Countdown until={round.at} compact />
-                : ROUND_STATE_LABEL[round.state]}
-            </span>
-            <span
-              className={`round-step-price${longPrices ? ' is-long' : ''}`}
-              title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}
-            >
-              {price}
-            </span>
-            <span className="round-step-date">{formatDayTime(round.at) || 'data a publicar'}</span>
-            <span
-              className={`round-step-drop${round.round === 2 && diff > 0 ? ' is-up' : ''}`}
-              aria-hidden={!footer}
-            >
-              {footer || ' '}
-            </span>
+    <div className="property_card-rounds" aria-label="Datas e preços das rodadas">
+      {schedule.rounds.map(round => (
+        <div key={round.round} className={`property_card-round is-${round.state}`}>
+          <div className="property_card-round-info">
+            <span className="property_card-round-label">{round.round}ª rodada <span className="property_card-state">· {ROUND_STATE_LABEL[round.state]}</span></span>
+            <span className="property_card-date">{formatDayTime(round.at) || 'Data a publicar'}</span>
           </div>
-        );
-      })}
+          <strong className="property_card-round-price" title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}>{listingMoney(round.price)}</strong>
+          {round.round === 2 && <RoundDifference difference={difference} />}
+        </div>
+      ))}
     </div>
   );
 }
 
-// ============================================================
-// Property card — DENSE, lots of information
-// ============================================================
+function SaveProperty({ p, watched, onToggleWatch, overlay = false }) {
+  const label = watched ? 'Remover dos salvos' : 'Salvar este imóvel';
+  return (
+    <button
+      className={`property_card-save${overlay ? ' is-overlay' : ''}${watched ? ' is-saved' : ''}`}
+      onClick={e => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
+      aria-label={label} aria-pressed={!!watched} title={label}
+    >
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill={watched ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+        <path d="m12 3 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9Z" />
+      </svg>
+    </button>
+  );
+}
+
 export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
-  const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
-  const isDirectSale = /venda direta/i.test(p.modalidade || '');
   const schedule = auctionSchedule(p);
+  const price = listingPrice(p, schedule);
+  const title = listingTitle(p);
   const link = usePropertyLink(p.id);
   return (
-    <Link
-      {...link}
-      className="card hov fade-in property-card"
-      style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}
-    >
-      {/* Photo with overlays */}
-      <div style={{ position: 'relative' }}>
-        <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
-        {/* Rodada + contagem, no canto: "2ª rodada · 2d 18:51:13" */}
+    <Link {...link} className="card fade-in property-card is-hoverable" style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}>
+      <div className="property_card-photo">
+        <Photo label={title} photoUrl={p.photoUrl} ratio="16/10" showLabel={false} />
         <div className="property-card-clock">
-          {schedule.current ? (
-            <span className="property-card-clock-round">{schedule.current.round}ª rodada</span>
-          ) : schedule.isOpenTender && !schedule.ended ? (
-            <span className="property-card-clock-round">Rodada única</span>
-          ) : null}
-          <Countdown
-            until={schedule.headline.until}
-            compact
-            dark
-            endedLabel={schedule.headline.short || 'Encerrado'}
-          />
+          {schedule.current && <span className="property-card-clock-round">{schedule.current.round}ª rodada</span>}
+          {schedule.isOpenTender && !schedule.ended && <span className="property-card-clock-round">Rodada única</span>}
+          <Countdown until={schedule.headline.until} compact dark endedLabel={schedule.headline.short || 'Encerrado'} />
         </div>
-        {/* Watch button bottom-right */}
-        <button
-          onClick={(e) => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
-          style={{
-            position: 'absolute', bottom: 12, right: 12,
-            width: 32, height: 32, borderRadius: 8,
-            background: 'rgba(255,255,255,0.78)',
-            border: '1px solid rgba(255,255,255,0.6)',
-            color: watched ? 'var(--accent)' : 'var(--fg-2)',
-            backdropFilter: 'blur(8px)',
-            fontSize: 14,
-          }}
-          title={watched ? 'Remover dos salvos' : 'Salvar este imóvel'}
-        >
-          {watched ? '★' : '☆'}
-        </button>
+        <SaveProperty p={p} watched={watched} onToggleWatch={onToggleWatch} overlay />
       </div>
-
-      {/* Body */}
       <div className="property-card-body">
-        {/* Tags */}
-        <div className="row gap-2 wrap" style={{ marginBottom: 10 }}>
-          <span className="tag">{saleTagLabel(p, schedule, { compact: true })}</span>
-          <span className="tag">{p.type}</span>
-        </div>
-
-        {/* Title + address */}
-        <h3 className="h3" style={{ marginBottom: 2 }}>
-          {p.title}
-        </h3>
-        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--fg-2)' }}>
-          {p.address} · {p.neighborhood}, {p.city}
-        </p>
-
-        {/* Specs */}
-        <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} dense />
-
-        {/* Quem mora lá e como dá para pagar */}
+        <div className="property_card-tags"><span className="tag">{saleTagLabel(p, schedule, { compact: true })}</span><span className="tag">{p.type || 'Imóvel'}</span></div>
+        <h3 className="property_card-title">{title}</h3>
+        <div className="property_card-specs"><Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} /></div>
         <ListingBadges p={p} />
-
-        <div className="divider" style={{ margin: '16px 0' }}></div>
-
-        {/* Leilão SFI: as duas rodadas, com a que está valendo em destaque.
-            Demais modalidades: o preço de partida numa linha. */}
-        {schedule.kind === 'rounds' ? (
-          <div style={{ marginBottom: 16 }}>
-            <RoundStrip schedule={schedule} compact />
-          </div>
-        ) : (
-          <div style={{ marginBottom: 16 }}>
-            <div className="row between baseline">
-              <span className="uppy" style={{ color: 'var(--fg-2)' }}>
-                {isDirectSale ? 'preço de venda' : 'valor inicial'}
-              </span>
-              <span className="num-md" style={{ color: 'var(--fg-0)' }}>
-                R$ {fmtBRL(p.minBid)}
-              </span>
-            </div>
-            {schedule.isOpenTender && (
-              <p className="single-round-note">
-                <b>Rodada única.</b> Não tem 2ª rodada com preço menor.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Economia em reais, nunca em porcentagem: "38% de deságio" não diz
-            nada para quem nunca comprou um imóvel. */}
-        <div className="property-card-metrics" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 'auto' }}>
-          <div>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
-            <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
-              R$ {fmtBRL(p.appraisal)}
-            </div>
-            {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
-              <div style={{ fontSize: 11.5, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', marginTop: 4, fontWeight: 500 }}>
-                R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
-              </div>
-            )}
-          </div>
-          <div className="property-card-metric-end" style={{ textAlign: 'right' }}>
-            <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-              Imóveis parecidos
-            </span>
-            {hasMarketAnalysis ? <>
-              <div className="num-md" style={{ marginTop: 3, color: 'var(--fg-0)' }}>
-                R$ {fmtBRL(p.market)}
-              </div>
-              <div style={{
-                fontSize: 11.5, marginTop: 4, fontWeight: 500,
-                color: p.market > p.minBid ? 'var(--good)' : 'var(--bad)',
-              }}>
-                {p.market > p.minBid
-                  ? `R$ ${fmtBRL(p.market - p.minBid)} mais barato`
-                  : `R$ ${fmtBRL(p.minBid - p.market)} mais caro`}
-              </div>
-            </> : (
-              <div style={{ marginTop: 5, fontSize: 12, color: 'var(--fg-2)' }}>ainda não calculado</div>
-            )}
-          </div>
+        <div className="property_card-pricing">
+          <span className="property_card-price-label">{schedule.ended ? 'Último valor inicial' : /venda direta/i.test(p.modalidade || '') ? 'Preço de venda' : schedule.current ? `Valor inicial · ${schedule.current.round}ª rodada` : 'Valor inicial'}</span>
+          <strong className="property_card-price" title={price ? `R$ ${fmtBRL(price)}` : undefined}>{listingMoney(price)}</strong>
+          {schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} /> : schedule.headline.until > 0 && <div className="property_card-single-date">{schedule.isOpenTender ? 'Rodada única' : 'Data'} · {formatDayTime(schedule.headline.until)}</div>}
+          <div className="property_card-appraisal"><span>Valor de avaliação</span><strong title={p.appraisal ? `R$ ${fmtBRL(p.appraisal)}` : undefined}>{listingMoney(p.appraisal)}</strong></div>
         </div>
       </div>
     </Link>
   );
 }
 
-// ============================================================
-// Property row (table-like dense)
-// ============================================================
 export function PropertyRow({ p, watched, onToggleWatch }) {
-  const hasMarketAnalysis = Number.isFinite(p.market) && Number.isFinite(p.discount);
-  const isDirectSale = /venda direta/i.test(p.modalidade || '');
   const schedule = auctionSchedule(p);
-  const badges = listingBadges(p);
+  const price = listingPrice(p, schedule);
   const link = usePropertyLink(p.id);
   return (
-    <Link
-      {...link}
-      className="property-row"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
-        gap: 14,
-        padding: '16px 20px',
-        alignItems: 'center',
-        borderTop: '1px solid var(--line-1)',
-        cursor: 'pointer',
-        transition: 'background .15s',
-      }}
-      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-2)'}
-      onMouseLeave={e => e.currentTarget.style.background = ''}
-    >
-      <div style={{
-        width: 56, height: 42, borderRadius: 8, overflow: 'hidden',
-        background: '#ECEEF1',
-        backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
-      }}>
-        <PropertyImage src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    <Link {...link} className="property-row property_listing-row">
+      <div className="property_listing-photo"><PropertyImage src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+      <div className="property_listing-summary">
+        <h3>{listingTitle(p)}</h3>
+        <div className="property_card-date">{saleTagLabel(p, schedule)}</div>
+        <ListingBadges p={p} />
       </div>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-0)', lineHeight: 1.25 }}>
-          {p.title}
-        </div>
-        <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {p.neighborhood}, {p.city} · {p.area} m² · {p.beds} dorm · {saleTagLabel(p, schedule)}
-        </div>
-        <div className="property-row-badges">
-          {badges.map(badge => (
-            <span key={badge.key} className={`listing-badge listing-badge--${badge.tone}`} title={badge.title}>
-              {badge.label}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div>
-        <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.minBid)}</div>
-        <div style={{ fontSize: 11, color: 'var(--fg-2)' }}>
-          {isDirectSale ? 'preço de venda' : 'valor inicial'}
-        </div>
-      </div>
-      <div>
-        <div className="num-sm" style={{ color: 'var(--fg-1)' }}>R$ {fmtBRL(p.appraisal)}</div>
-        {p.appraisal > 0 && p.minBid > 0 && p.appraisal !== p.minBid && (
-          <div style={{ fontSize: 11, color: p.appraisal > p.minBid ? 'var(--good)' : 'var(--warn)', fontWeight: 500 }}>
-            R$ {fmtBRL(Math.abs(p.appraisal - p.minBid))} {p.appraisal > p.minBid ? 'abaixo' : 'acima'}
-          </div>
-        )}
-      </div>
-      <div>
-        {hasMarketAnalysis ? <>
-          <div className="num-sm" style={{ color: 'var(--fg-0)' }}>R$ {fmtBRL(p.market)}</div>
-          <div style={{
-            fontSize: 11, fontWeight: 500,
-            color: p.market > p.minBid ? 'var(--good)' : 'var(--bad)',
-          }}>
-            {p.market > p.minBid
-              ? `R$ ${fmtBRL(p.market - p.minBid)} mais barato`
-              : `R$ ${fmtBRL(p.minBid - p.market)} mais caro`}
-          </div>
-        </> : <div style={{ fontSize: 11.5, color: 'var(--fg-2)' }}>ainda não calculado</div>}
-      </div>
-      <div>
-        <Countdown
-          until={schedule.headline.until}
-          compact
-          endedLabel={schedule.headline.short || 'Encerrado'}
-        />
-        {schedule.current && (
-          <div style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-            {schedule.current.round}ª rodada
-          </div>
-        )}
-      </div>
-      <button
-        onClick={(e) => { stopLinkNavigation(e); onToggleWatch?.(p.id); }}
-        style={{
-          width: 28, height: 28, borderRadius: 6,
-          color: watched ? 'var(--accent)' : 'var(--fg-3)',
-          fontSize: 14,
-        }}
-      >
-        {watched ? '★' : '☆'}
-      </button>
+      <div><strong className="property_listing-price">{listingMoney(price)}</strong><div className="property_card-date">{schedule.current ? `${schedule.current.round}ª rodada vigente` : 'Valor inicial'}</div></div>
+      <div><strong>{listingMoney(p.appraisal)}</strong><div className="property_card-date">Avaliação</div></div>
+      <div>{schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} /> : <span className="property_card-date">{formatDayTime(schedule.headline.until) || 'Sem data'}</span>}</div>
+      <SaveProperty p={p} watched={watched} onToggleWatch={onToggleWatch} />
     </Link>
   );
 }
