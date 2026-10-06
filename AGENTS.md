@@ -214,6 +214,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — O catálogo passou a abrir com leilões e compra direta juntos.
+  O tipo de venda virou um filtro de três opções (Todos, Leilões, Compra
+  direta), com Todos como padrão e fora do endereço; `aba=leiloes` e
+  `aba=direta` continuam valendo para links antigos. Na relevância, os dois
+  tipos são intercalados mantendo a ordem própria de cada um, porque a compra
+  direta não tem data e cairia sempre depois de todos os leilões. Rodada e
+  modalidade só somem no filtro Compra direta; a coluna de data da lista se
+  chama “prazo” quando os dois tipos estão juntos (PD-022).
+
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora
   do total e com o aviso

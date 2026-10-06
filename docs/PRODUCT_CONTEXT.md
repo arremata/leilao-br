@@ -108,8 +108,8 @@ no HTML do servidor, o que ainda não é feito.
   de venda, localização, tipo de imóvel, orçamento, disponibilidade, modalidade,
   rodada e desconto não têm uma seção separada de “preferências”, botão de
   aplicar nem ações de salvar ou restaurar perfil. A barra usa a rolagem normal
-  da página, sem área interna rolável. Compra direta não mostra opções próprias
-  de leilão.
+  da página, sem área interna rolável. Com o filtro Compra direta, rodada e
+  modalidade de leilão saem da barra.
 - A lista não oferece uma segunda busca livre por endereço, bairro e cidade. A
   localização é escolhida pelos autocompletes da lateral; acima dos resultados
   ficam apenas o total encontrado, a ordenação e o modo de visualização.
@@ -118,13 +118,17 @@ no HTML do servidor, o que ainda não é feito.
   somente o valor inicial do imóvel. Taxas, reforma, eventual desocupação e
   outras despesas continuam explicadas em cada imóvel; nenhuma das duas escolhas
   garante custo final nem aprovação de financiamento.
-- Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
-  opostas: um tem disputa e data, o outro é primeiro a chegar.
+- Abre com **Leilões** e **Compra direta** juntos. O tipo de venda é um filtro
+  (Todos, Leilões ou Compra direta) que a pessoa escolhe depois; cada card diz
+  de que tipo é, porque são produtos com lógicas opostas: um tem disputa e
+  data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis. Se
   uma foto externa estiver temporariamente indisponível, a interface mantém uma
   área neutra identificada em vez de mostrar o ícone de imagem quebrada.
 - A ordenação padrão é relevância: data mais próxima primeiro, depois quanto do
-  imóvel realmente conhecemos. Desconto continua disponível, mas não é o padrão.
+  imóvel realmente conhecemos. Com os dois tipos juntos, leilões e compras
+  diretas aparecem intercalados desde o topo. Desconto continua disponível, mas
+  não é o padrão.
 - Diferenças de preço aparecem em reais, não em porcentagem.
 
 ### Página do imóvel
