@@ -9,15 +9,13 @@ from tools.property_scraper import (
     BRIGHT_DATA_API_URL,
     BrightDataWebUnlocker,
     ComparableSourceBlockedError,
-    _chromium_user_agent,
+    _canonical_listing_url,
     _extract_street,
     _filter_to_subject_radius,
     _parse_beds_from_text,
     _parse_property_type,
     _parse_price_from_text,
     _is_usable_comparable,
-    build_zap_url,
-    build_vivareal_url,
     build_quintoandar_url,
     build_chavesnamao_url,
     build_imovelweb_url,
@@ -65,14 +63,6 @@ def test_extract_street_simple():
 
 def test_extract_street_empty():
     assert _extract_street("") == ""
-
-
-def test_browser_identity_matches_installed_chromium_major():
-    user_agent = _chromium_user_agent("147.0.7727.15")
-
-    assert "Chrome/147.0.0.0" in user_agent
-    assert "Linux x86_64" in user_agent
-    assert "Chrome/125" not in user_agent
 
 
 def test_bright_data_configuration_is_required(monkeypatch):
@@ -138,6 +128,13 @@ async def test_bright_data_error_does_not_expose_api_key():
             )
 
     assert "super-secret" not in str(captured.value)
+
+
+def test_listing_url_is_canonicalized_before_deduplication():
+    assert _canonical_listing_url(
+        "https://www.quintoandar.com.br",
+        "/imovel/123?search_id=secret#card",
+    ) == "https://www.quintoandar.com.br/imovel/123"
 
 
 def test_price_parser_stops_before_concatenated_area():
@@ -309,31 +306,6 @@ def test_comparable_validation_accepts_traceable_listing():
 # ---------------------------------------------------------------------------
 
 
-def test_build_zap_url():
-    meta = _make_metadata()
-    url = build_zap_url(meta)
-    assert "zapimoveis.com.br" in url
-    assert "venda" in url
-    assert "sao-paulo" in url
-    assert "moema" in url
-
-
-def test_build_zap_url_with_street_override():
-    meta = _make_metadata()
-    url = build_zap_url(meta, location_override="Rua das Flores")
-    assert "zapimoveis.com.br" in url
-    assert "rua-das-flores" in url
-
-
-def test_build_vivareal_url():
-    meta = _make_metadata()
-    url = build_vivareal_url(meta)
-    assert "vivareal.com.br" in url
-    assert "venda" in url
-    assert "sao-paulo" in url
-    assert "moema" in url
-
-
 def test_build_quintoandar_url():
     meta = _make_metadata()
     url = build_quintoandar_url(meta)
@@ -357,7 +329,7 @@ def test_build_imovelweb_url():
 
 def test_build_url_handles_missing_neighborhood():
     meta = _make_metadata(neighborhood="")
-    for builder in [build_zap_url, build_vivareal_url, build_quintoandar_url, build_chavesnamao_url, build_imovelweb_url]:
+    for builder in [build_quintoandar_url, build_chavesnamao_url, build_imovelweb_url]:
         url = builder(meta)
         assert url  # Should still produce a valid URL
 
@@ -381,7 +353,7 @@ async def test_scrape_comparables_calls_only_the_three_managed_sources():
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[comp, comp, comp]) as mock_chaves, \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]) as mock_iw, \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
-         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
@@ -406,14 +378,14 @@ async def test_scrape_comparables_falls_through_when_first_fails():
         price=800000.0,
         area_m2=70.0,
         price_per_m2=11428.0,
-        source="QuintoAndar",
-        url="https://quintoandar.com.br/imovel/2",
+        source="ImovelWeb",
+        url="https://www.imovelweb.com.br/propriedades/2.html",
     )
     with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[comp, comp, comp]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
-         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
@@ -436,7 +408,7 @@ async def test_scrape_comparables_propagates_blocked_source_and_closes_browser()
              side_effect=ComparableSourceBlockedError("blocked"),
          ), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
-         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_browser = AsyncMock()
         mock_page = AsyncMock()
@@ -456,7 +428,7 @@ async def test_scrape_comparables_returns_empty_when_all_fail():
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
-         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()
@@ -478,7 +450,7 @@ async def test_scrape_comparables_merges_partial_results():
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[comp1]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
-         patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_playwright.stop = AsyncMock()
         mock_browser = AsyncMock()

@@ -39,8 +39,8 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
             lat=-25.4284, lng=-49.2733,
         )
         for index, (price, source) in enumerate([
-            (200_000, "ZAP Imóveis"),
-            (250_000, "Viva Real"),
+            (200_000, "QuintoAndar"),
+            (250_000, "Chaves na Mão"),
             (300_000, "ImovelWeb"),
         ])
     ]
@@ -65,7 +65,7 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         assert reference.neighborhood == ""
         assert reference.sample_size == 3
         assert {item.source for item in snapshot} == {
-            "ZAP Imóveis", "Viva Real", "ImovelWeb",
+            "QuintoAndar", "Chaves na Mão", "ImovelWeb",
         }
 
 

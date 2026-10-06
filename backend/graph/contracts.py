@@ -89,7 +89,7 @@ class ComparableSale(BaseModel):
     beds: int | None
     price_per_m2: float
     sale_price: float
-    source: str  # e.g. "ZAP Imóveis", "Viva Real"
+    source: str  # e.g. "QuintoAndar", "ImovelWeb"
     url: str  # link to the comparable property listing
 
 
