@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import re
 from urllib.parse import urlparse
 
+import httpx
 from loguru import logger
 from playwright.async_api import (
     async_playwright,
@@ -232,10 +234,118 @@ def build_imovelweb_url(metadata: PropertyMetadata, location_override: str = "")
 
 IMOVELWEB_CARD_SELECTOR = '[data-qa="posting PROPERTY"]'
 IMOVELWEB_CARD_WAIT_MS = 12_000
+BRIGHT_DATA_API_URL = "https://api.brightdata.com/request"
+BRIGHT_DATA_SOURCE_NAMES = frozenset({
+    "QuintoAndar",
+    "Chaves na Mão",
+    "ImovelWeb",
+})
 
 
 class ComparableSourceBlockedError(RuntimeError):
     """A required listing source returned an anti-bot page, not search results."""
+
+
+class BrightDataWebUnlocker:
+    """Fetch rendered listing HTML through the managed Web Unlocker API."""
+
+    def __init__(
+        self,
+        api_key: str,
+        zone: str,
+        *,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._zone = zone
+        self._client = client or httpx.AsyncClient(
+            timeout=httpx.Timeout(120.0, connect=20.0),
+            follow_redirects=True,
+        )
+        self._owns_client = client is None
+
+    @classmethod
+    def from_env(cls) -> BrightDataWebUnlocker:
+        api_key = os.getenv("BRIGHT_DATA_API_KEY", "").strip()
+        zone = os.getenv("BRIGHT_DATA_WEB_UNLOCKER_ZONE", "").strip()
+        missing = [
+            name for name, value in (
+                ("BRIGHT_DATA_API_KEY", api_key),
+                ("BRIGHT_DATA_WEB_UNLOCKER_ZONE", zone),
+            ) if not value
+        ]
+        if missing:
+            raise RuntimeError(
+                "Missing Bright Data configuration: " + ", ".join(missing)
+            )
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", zone):
+            raise RuntimeError("Invalid Bright Data Web Unlocker zone name")
+        return cls(api_key, zone)
+
+    async def __aenter__(self) -> BrightDataWebUnlocker:
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        if self._owns_client:
+            await self._client.aclose()
+
+    async def fetch_html(self, source: str, url: str) -> str:
+        if source not in BRIGHT_DATA_SOURCE_NAMES:
+            raise ValueError(f"Bright Data source is not allowed: {source}")
+        expected_domain = _SOURCE_DOMAINS[source]
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme != "https"
+            or not hostname
+            or not (hostname == expected_domain or hostname.endswith(f".{expected_domain}"))
+        ):
+            raise ValueError(f"Unexpected {source} target domain")
+
+        try:
+            response = await self._client.post(
+                BRIGHT_DATA_API_URL,
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "zone": self._zone,
+                    "url": url,
+                    "format": "raw",
+                    "country": "br",
+                    "render": True,
+                },
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise ComparableSourceBlockedError(
+                f"{source} could not be loaded through Bright Data ({type(exc).__name__})"
+            ) from exc
+        html = response.text
+        if not html.strip():
+            raise ComparableSourceBlockedError(
+                f"{source} returned an empty Bright Data response"
+            )
+        return html
+
+
+async def _navigate_listing_source(
+    page: Page,
+    source: str,
+    url: str,
+    unlocker: BrightDataWebUnlocker | None,
+) -> None:
+    """Load unlocked HTML into local Playwright, which is used only as a parser."""
+    if unlocker is None:
+        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+        return
+    html = await unlocker.fetch_html(source, url)
+    await page.set_content(
+        html,
+        wait_until="domcontentloaded",
+        timeout=PAGE_TIMEOUT_MS,
+    )
 
 
 def _chromium_user_agent(browser_version: str) -> str:
@@ -623,7 +733,13 @@ async def scrape_vivareal(page: Page, metadata: PropertyMetadata, location_overr
         return []
 
 
-async def scrape_quintoandar(page: Page, metadata: PropertyMetadata, location_override: str = "") -> list[ComparableProperty]:
+async def scrape_quintoandar(
+    page: Page,
+    metadata: PropertyMetadata,
+    location_override: str = "",
+    *,
+    unlocker: BrightDataWebUnlocker | None = None,
+) -> list[ComparableProperty]:
     """Scrape comparable properties from QuintoAndar.
 
     Cards use FindHouseCard wrapper divs with Cozy__ prefixed classes.
@@ -632,8 +748,9 @@ async def scrape_quintoandar(page: Page, metadata: PropertyMetadata, location_ov
     url = build_quintoandar_url(metadata, location_override=location_override)
     logger.info(f"QuintoAndar scraper: navigating to {url}")
     try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
-        await asyncio.sleep(4)
+        await _navigate_listing_source(page, "QuintoAndar", url, unlocker)
+        if unlocker is None:
+            await asyncio.sleep(4)
 
         # Accept cookies popup if present — use a short timeout to avoid blocking
         try:
@@ -708,12 +825,20 @@ async def scrape_quintoandar(page: Page, metadata: PropertyMetadata, location_ov
                 continue
 
         return results
+    except ComparableSourceBlockedError:
+        raise
     except Exception as e:
         logger.warning(f"QuintoAndar scraper: failed for {url}: {e}")
         return []
 
 
-async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_override: str = "") -> list[ComparableProperty]:
+async def scrape_chavesnamao(
+    page: Page,
+    metadata: PropertyMetadata,
+    location_override: str = "",
+    *,
+    unlocker: BrightDataWebUnlocker | None = None,
+) -> list[ComparableProperty]:
     """Scrape comparable properties from Chaves na Mão.
 
     URL format: /imoveis/{city}-{state}/ (e.g. /imoveis/curitiba-pr/)
@@ -725,8 +850,9 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
     try:
         # Advertising pages keep analytics/ad requests open indefinitely, so
         # networkidle is flaky even after all listing cards are rendered.
-        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
-        await asyncio.sleep(4)
+        await _navigate_listing_source(page, "Chaves na Mão", url, unlocker)
+        if unlocker is None:
+            await asyncio.sleep(4)
 
         # Accept cookies popup if present
         try:
@@ -806,30 +932,39 @@ async def scrape_chavesnamao(page: Page, metadata: PropertyMetadata, location_ov
                 continue
 
         return results
+    except ComparableSourceBlockedError:
+        raise
     except Exception as e:
         logger.warning(f"Chaves na Mão scraper: failed for {url}: {e}")
         return []
 
 
-async def scrape_imovelweb(page: Page, metadata: PropertyMetadata, location_override: str = "") -> list[ComparableProperty]:
+async def scrape_imovelweb(
+    page: Page,
+    metadata: PropertyMetadata,
+    location_override: str = "",
+    *,
+    unlocker: BrightDataWebUnlocker | None = None,
+) -> list[ComparableProperty]:
     """Scrape sale cards from ImovelWeb's regional result page."""
     url = build_imovelweb_url(metadata, location_override=location_override)
     logger.info(f"ImovelWeb scraper: navigating to {url}")
     if not url:
         return []
     try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
-        try:
-            await page.wait_for_selector(
-                IMOVELWEB_CARD_SELECTOR,
-                state="attached",
-                timeout=IMOVELWEB_CARD_WAIT_MS,
-            )
-        except PlaywrightTimeoutError:
-            # A legitimate empty result and a challenge shell both have no
-            # cards. Inspect the loaded document below before deciding which
-            # state this is.
-            pass
+        await _navigate_listing_source(page, "ImovelWeb", url, unlocker)
+        if unlocker is None:
+            try:
+                await page.wait_for_selector(
+                    IMOVELWEB_CARD_SELECTOR,
+                    state="attached",
+                    timeout=IMOVELWEB_CARD_WAIT_MS,
+                )
+            except PlaywrightTimeoutError:
+                # A legitimate empty result and a challenge shell both have no
+                # cards. Inspect the loaded document below before deciding which
+                # state this is.
+                pass
         try:
             cookie_btn = page.locator('button:has-text("Aceitar"), button:has-text("Entendi")')
             if await cookie_btn.count() > 0:
@@ -938,7 +1073,7 @@ async def scrape_comparables(
     metadata: PropertyMetadata,
     geocoder=None,
 ) -> list[ComparableProperty]:
-    """Collect from all five listing platforms and deduplicate the snapshot.
+    """Collect from the three managed listing sources and deduplicate the snapshot.
 
     Searches by street first (more precise comps), then falls back to
     neighborhood if street search yields too few results.
@@ -946,74 +1081,81 @@ async def scrape_comparables(
     Manages the complete Playwright lifecycle: launches one browser, reuses
     the page across scrapers, and stops the driver after closing the browser.
     """
-    playwright, browser, page = await _launch_stealth_browser()
-    try:
-        all_comps: list[ComparableProperty] = []
+    async with BrightDataWebUnlocker.from_env() as unlocker:
+        playwright, browser, page = await _launch_stealth_browser()
+        try:
+            all_comps: list[ComparableProperty] = []
 
-        # Determine search location: prefer street, fallback to neighborhood
-        street = _extract_street(metadata.address) if metadata.address else ""
-        location = street or metadata.neighborhood
-        logger.info(f"Property scraper: searching by location '{location}' (street='{street}', neighborhood='{metadata.neighborhood}')")
+            # Determine search location: prefer street, fallback to neighborhood
+            street = _extract_street(metadata.address) if metadata.address else ""
+            location = street or metadata.neighborhood
+            logger.info(f"Property scraper: searching by location '{location}' (street='{street}', neighborhood='{metadata.neighborhood}')")
 
-        scrapers = [
-            ("Viva Real", scrape_vivareal),
-            ("QuintoAndar", scrape_quintoandar),
-            ("ZAP Imóveis", scrape_zap),
-            ("Chaves na Mão", scrape_chavesnamao),
-            ("ImovelWeb", scrape_imovelweb),
-        ]
+            scrapers = [
+                ("QuintoAndar", scrape_quintoandar),
+                ("Chaves na Mão", scrape_chavesnamao),
+                ("ImovelWeb", scrape_imovelweb),
+            ]
 
-        async def _run_scraper(name, scraper, loc) -> list[ComparableProperty]:
-            try:
-                comps = await scraper(page, metadata, location_override=loc)
-            except ComparableSourceBlockedError:
-                logger.error("Property scraper: {} is blocked; preserving the previous snapshot", name)
-                raise
-            except Exception as e:
-                logger.debug(f"Property scraper: {name} failed: {e}")
-                return []
-            # Search URLs are already scoped by UF/city/location. Card address
-            # text is often only a street or neighborhood, so filtering again
-            # by the city name creates false negatives.
-            valid = [comp for comp in comps if _is_usable_comparable(comp)]
-            if len(valid) != len(comps):
-                logger.warning(
-                    "Property scraper: {} rejected {} incomplete/invalid cards",
-                    name, len(comps) - len(valid),
-                )
-            logger.info(f"Property scraper: {name} returned {len(valid)} valid comps (location='{loc}')")
-            return valid
+            async def _run_scraper(name, scraper, loc) -> list[ComparableProperty]:
+                try:
+                    comps = await scraper(
+                        page,
+                        metadata,
+                        location_override=loc,
+                        unlocker=unlocker,
+                    )
+                except ComparableSourceBlockedError:
+                    logger.error(
+                        "Property scraper: {} is unavailable; preserving the previous snapshot",
+                        name,
+                    )
+                    raise
+                except Exception as e:
+                    logger.debug(f"Property scraper: {name} failed: {e}")
+                    return []
+                # Search URLs are already scoped by UF/city/location. Card address
+                # text is often only a street or neighborhood, so filtering again
+                # by the city name creates false negatives.
+                valid = [comp for comp in comps if _is_usable_comparable(comp)]
+                if len(valid) != len(comps):
+                    logger.warning(
+                        "Property scraper: {} rejected {} incomplete/invalid cards",
+                        name, len(comps) - len(valid),
+                    )
+                logger.info(f"Property scraper: {name} returned {len(valid)} valid comps (location='{loc}')")
+                return valid
 
-        for name, scraper in scrapers:
-            all_comps.extend(await _run_scraper(name, scraper, location))
-            await asyncio.sleep(random.uniform(1.0, 3.0))
-
-        # If street search didn't yield enough, retry with neighborhood
-        if len(all_comps) < MIN_COMPS and street and metadata.neighborhood and street != metadata.neighborhood:
-            logger.info(f"Property scraper: street search yielded {len(all_comps)} comps, retrying with neighborhood '{metadata.neighborhood}'")
             for name, scraper in scrapers:
-                all_comps.extend(await _run_scraper(name, scraper, metadata.neighborhood))
+                all_comps.extend(await _run_scraper(name, scraper, location))
                 await asyncio.sleep(random.uniform(1.0, 3.0))
 
-        deduplicated: list[ComparableProperty] = []
-        seen_urls: set[str] = set()
-        seen_fingerprints: set[tuple[str, int, int]] = set()
-        for comp in all_comps:
-            url_key = comp.url.strip()
-            fingerprint = (
-                _slug(comp.address), round(comp.price), round(comp.area_m2),
-            )
-            if url_key in seen_urls or fingerprint in seen_fingerprints:
-                continue
-            seen_urls.add(url_key)
-            seen_fingerprints.add(fingerprint)
-            deduplicated.append(comp)
-        return await _filter_to_subject_radius(metadata, deduplicated, geocoder)
-    finally:
-        try:
-            await browser.close()
+            # If street search didn't yield enough, retry with neighborhood
+            if len(all_comps) < MIN_COMPS and street and metadata.neighborhood and street != metadata.neighborhood:
+                logger.info(f"Property scraper: street search yielded {len(all_comps)} comps, retrying with neighborhood '{metadata.neighborhood}'")
+                for name, scraper in scrapers:
+                    all_comps.extend(await _run_scraper(name, scraper, metadata.neighborhood))
+                    await asyncio.sleep(random.uniform(1.0, 3.0))
+
+            deduplicated: list[ComparableProperty] = []
+            seen_urls: set[str] = set()
+            seen_fingerprints: set[tuple[str, int, int]] = set()
+            for comp in all_comps:
+                url_key = comp.url.strip()
+                fingerprint = (
+                    _slug(comp.address), round(comp.price), round(comp.area_m2),
+                )
+                if url_key in seen_urls or fingerprint in seen_fingerprints:
+                    continue
+                seen_urls.add(url_key)
+                seen_fingerprints.add(fingerprint)
+                deduplicated.append(comp)
+            return await _filter_to_subject_radius(metadata, deduplicated, geocoder)
         finally:
-            # browser.close() does not stop the Playwright transport. Leaving
-            # it alive until asyncio.run() exits produces misleading
-            # "Event loop is closed" errors in otherwise-green Actions runs.
-            await playwright.stop()
+            try:
+                await browser.close()
+            finally:
+                # browser.close() does not stop the Playwright transport. Leaving
+                # it alive until asyncio.run() exits produces misleading
+                # "Event loop is closed" errors in otherwise-green Actions runs.
+                await playwright.stop()

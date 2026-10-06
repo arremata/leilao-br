@@ -1,8 +1,13 @@
+import json
+
+import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from graph.state import PropertyMetadata, ComparableProperty
 from tools.property_scraper import (
+    BRIGHT_DATA_API_URL,
+    BrightDataWebUnlocker,
     ComparableSourceBlockedError,
     _chromium_user_agent,
     _extract_street,
@@ -19,6 +24,12 @@ from tools.property_scraper import (
     scrape_comparables,
     scrape_imovelweb,
 )
+
+
+@pytest.fixture(autouse=True)
+def _bright_data_config(monkeypatch):
+    monkeypatch.setenv("BRIGHT_DATA_API_KEY", "test-api-key")
+    monkeypatch.setenv("BRIGHT_DATA_WEB_UNLOCKER_ZONE", "test-zone")
 
 
 def _make_metadata(**overrides):
@@ -62,6 +73,71 @@ def test_browser_identity_matches_installed_chromium_major():
     assert "Chrome/147.0.0.0" in user_agent
     assert "Linux x86_64" in user_agent
     assert "Chrome/125" not in user_agent
+
+
+def test_bright_data_configuration_is_required(monkeypatch):
+    monkeypatch.delenv("BRIGHT_DATA_API_KEY")
+
+    with pytest.raises(RuntimeError, match="BRIGHT_DATA_API_KEY"):
+        BrightDataWebUnlocker.from_env()
+
+
+@pytest.mark.asyncio
+async def test_bright_data_fetch_is_rendered_in_brazil_without_leaking_key():
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers["Authorization"]
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(200, text="<html><body>anuncios</body></html>")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        unlocker = BrightDataWebUnlocker("super-secret", "argos_market_sources", client=client)
+        html = await unlocker.fetch_html(
+            "ImovelWeb",
+            "https://www.imovelweb.com.br/imoveis-venda-curitiba-pr.html",
+        )
+
+    assert html.endswith("</html>")
+    assert captured == {
+        "url": BRIGHT_DATA_API_URL,
+        "authorization": "Bearer super-secret",
+        "payload": {
+            "zone": "argos_market_sources",
+            "url": "https://www.imovelweb.com.br/imoveis-venda-curitiba-pr.html",
+            "format": "raw",
+            "country": "br",
+            "render": True,
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_bright_data_rejects_an_unexpected_target_without_spending_request():
+    handler = MagicMock()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        unlocker = BrightDataWebUnlocker("super-secret", "argos_market_sources", client=client)
+        with pytest.raises(ValueError, match="Unexpected ImovelWeb target domain"):
+            await unlocker.fetch_html("ImovelWeb", "https://example.com/listings")
+
+    handler.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bright_data_error_does_not_expose_api_key():
+    def handler(request):
+        return httpx.Response(403, text="forbidden")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        unlocker = BrightDataWebUnlocker("super-secret", "argos_market_sources", client=client)
+        with pytest.raises(ComparableSourceBlockedError) as captured:
+            await unlocker.fetch_html(
+                "QuintoAndar",
+                "https://www.quintoandar.com.br/comprar/imovel/curitiba-pr-brasil/",
+            )
+
+    assert "super-secret" not in str(captured.value)
 
 
 def test_price_parser_stops_before_concatenated_area():
@@ -292,21 +368,19 @@ def test_build_url_handles_missing_neighborhood():
 
 
 @pytest.mark.asyncio
-async def test_scrape_comparables_calls_all_five_sources():
+async def test_scrape_comparables_calls_only_the_three_managed_sources():
     comp = ComparableProperty(
         address="Rua A, 45, São Paulo",
         price=960000.0,
         area_m2=80.0,
         price_per_m2=12000.0,
-        source="Viva Real",
-        url="https://vivareal.com.br/imovel/1",
+        source="Chaves na Mão",
+        url="https://www.chavesnamao.com.br/imovel/1",
     )
-    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[comp, comp, comp]), \
-         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[comp, comp, comp]) as mock_chaves, \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]) as mock_iw, \
-        patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
+         patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
         mock_playwright = AsyncMock()
         mock_playwright.stop = AsyncMock()
@@ -318,6 +392,7 @@ async def test_scrape_comparables_calls_all_five_sources():
         result = await scrape_comparables(_make_metadata())
 
     assert len(result) == 1  # duplicate URLs are collapsed
+    mock_chaves.assert_called_once()
     mock_iw.assert_called_once()
     mock_browser.close.assert_awaited_once()
     mock_playwright.stop.assert_awaited_once()
@@ -334,11 +409,9 @@ async def test_scrape_comparables_falls_through_when_first_fails():
         source="QuintoAndar",
         url="https://quintoandar.com.br/imovel/2",
     )
-    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[comp, comp, comp]), \
-         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[comp, comp, comp]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
         mock_playwright = AsyncMock()
@@ -355,9 +428,7 @@ async def test_scrape_comparables_falls_through_when_first_fails():
 
 @pytest.mark.asyncio
 async def test_scrape_comparables_propagates_blocked_source_and_closes_browser():
-    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch(
              "tools.property_scraper.scrape_imovelweb",
@@ -381,9 +452,7 @@ async def test_scrape_comparables_propagates_blocked_source_and_closes_browser()
 @pytest.mark.asyncio
 async def test_scrape_comparables_returns_empty_when_all_fail():
     """If all scrapers return empty (both street and neighborhood), dispatcher returns empty list."""
-    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
@@ -403,12 +472,10 @@ async def test_scrape_comparables_returns_empty_when_all_fail():
 @pytest.mark.asyncio
 async def test_scrape_comparables_merges_partial_results():
     """If two scrapers return 1-2 comps each, they should be merged."""
-    comp1 = ComparableProperty(address="Rua A, São Paulo", price=500000.0, area_m2=50.0, price_per_m2=10000.0, source="Viva Real", url="https://www.vivareal.com.br/imovel/1")
+    comp1 = ComparableProperty(address="Rua A, São Paulo", price=500000.0, area_m2=50.0, price_per_m2=10000.0, source="Chaves na Mão", url="https://www.chavesnamao.com.br/imovel/1")
     comp2 = ComparableProperty(address="Rua B, São Paulo", price=600000.0, area_m2=60.0, price_per_m2=10000.0, source="QuintoAndar", url="https://www.quintoandar.com.br/imovel/2")
-    with patch("tools.property_scraper.scrape_vivareal", new_callable=AsyncMock, return_value=[comp1]), \
-         patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[comp2]), \
-         patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
-         patch("tools.property_scraper.scrape_zap", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[comp2]), \
+         patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[comp1]), \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
          patch("tools.property_scraper._launch_stealth_browser") as mock_launch:
@@ -421,5 +488,5 @@ async def test_scrape_comparables_merges_partial_results():
 
         result = await scrape_comparables(_make_metadata())
 
-    # Street search yields 2 comps; neighborhood fallback adds more from ZAP
+    # Street search yields 2 comps; neighborhood fallback repeats and deduplicates them.
     assert len(result) >= 2
