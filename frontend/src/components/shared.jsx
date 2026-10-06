@@ -185,7 +185,7 @@ export function RoundStrip({ schedule }) {
             <span className="property_card-round-label">{round.round}ª rodada <span className="property_card-state">· {ROUND_STATE_LABEL[round.state]}</span></span>
             <span className="property_card-date">{formatDayTime(round.at) || 'Data a publicar'}</span>
           </div>
-          <strong className="property_card-round-price" title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}>{listingMoney(round.price)}</strong>
+          {round.state !== 'current' && <strong className="property_card-round-price" title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}>{listingMoney(round.price)}</strong>}
           {round.round === 2 && <RoundDifference difference={difference} />}
         </div>
       ))}

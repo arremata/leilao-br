@@ -11,7 +11,8 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
 com o endereço completo reservado à página do imóvel. Vistos segue a mesma
 regra de identificação. O preço em destaque pertence à rodada vigente; as duas
-rodadas aparecem em linhas com situação, data e preço. A diferença em reais e
+rodadas aparecem em linhas com situação e data; o preço vigente aparece uma
+única vez, em destaque, e a outra rodada mantém seu preço. A diferença em reais e
 porcentagem compara a segunda rodada à primeira, sem confundir essa comparação
 com o valor de avaliação. Uma segunda rodada mais cara é apresentada como aumento.
 Os comparáveis ficam na página do imóvel. Esta versão está em revisão local,

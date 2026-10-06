@@ -214,6 +214,10 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Removeu a repetição do preço vigente na linha da rodada,
+  nos cards e na lista. O destaque mantém esse valor; as linhas preservam as
+  datas, as situações e o preço da outra rodada para comparação.
+
 - **2026-10-06** — Simplificou a listagem para revisão local: identificação por
   tipo e área, endereço completo somente ao abrir o imóvel, preço vigente em
   destaque e rodadas em linhas com data, preço e diferença para a primeira.

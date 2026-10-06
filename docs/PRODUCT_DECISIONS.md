@@ -25,7 +25,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Estado:** Ativa; interface em validação antes da publicação
 - **Decisão:** identificar imóveis por tipo e área na listagem, deixando o
   endereço completo e os comparáveis para a página do imóvel. Mostrar o preço
-  vigente em destaque e as rodadas em linhas com data, preço e situação.
+  vigente uma única vez, em destaque, e as rodadas em linhas com data e situação,
+  mantendo o preço da outra rodada para comparação.
   Comparar o preço da segunda rodada ao da primeira em reais e porcentagem,
   identificando também aumentos, sem usar a avaliação como base dessa diferença.
 - **Motivo:** facilitar a leitura e a comparação em telas pequenas, seguindo

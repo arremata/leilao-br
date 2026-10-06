@@ -20,6 +20,7 @@
 .property_card-rounds { display: grid; gap: 12px; }
 .property_card-round { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; }
 .property_card-round-info { display: flex; flex-direction: column; }
+.property_card-round.is-current .property_card-round-info { grid-column: 1 / -1; }
 .property_card-round-label { font-size: 13px; font-weight: 600; line-height: 1.5; }
 .property_card-state { font-weight: 400; }
 .property_card-round.is-current .property_card-round-label { color: var(--accent-strong); }
