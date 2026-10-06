@@ -8,6 +8,7 @@ import { auctionSchedule, saleTagLabel } from '../auctionRounds';
 import { occupancyStatus } from '../listingFacts';
 import { budgetPlan } from '../bidBudget';
 import ConsultoriaTab from './ConsultoriaTab';
+import { Term } from './Term';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
@@ -790,7 +791,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         {/* Key facts panel */}
         <div className="card" style={{ padding: 22 }}>
           <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <span className="tag accent">{saleTagLabel(p, schedule)}</span>
+            <Term className="tag accent">{saleTagLabel(p, schedule)}</Term>
             <span className="tag">{p.type}</span>
           </div>
 
@@ -1006,7 +1007,7 @@ function AppraisalFact({ p }) {
   const current = Number(p.minBid) || 0;
   return (
     <div className="appraisal-fact">
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
+      <span className="uppy" style={{ color: 'var(--fg-3)' }}><Term>Valor de avaliação</Term></span>
       {appraisal > 0 ? (
         <>
           <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
@@ -1054,8 +1055,8 @@ function PricingGrid({ p }) {
           {isDirectSale
             ? 'Preço de venda'
             : isOpenTender
-              ? 'Valor inicial · rodada única'
-              : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
+              ? <><Term>Valor inicial</Term> · <Term k="rodada_unica">rodada única</Term></>
+              : <><Term>Valor inicial</Term>{isSfiAuction && <> · <Term>{`${sfiPricing.current.round}ª rodada`}</Term></>}</>}
         </span>
         <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
         {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > 0
@@ -1071,7 +1072,9 @@ function PricingGrid({ p }) {
       {isSfiAuction && (
         <div>
           <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-            {sfiPricing.upcoming ? 'Se não vender · 2ª rodada' : '1ª rodada encerrada'}
+            {sfiPricing.upcoming
+              ? <>Se não vender · <Term>2ª rodada</Term></>
+              : <><Term>1ª rodada</Term> encerrada</>}
           </span>
           {hasOtherRound ? (
             <>
@@ -1612,7 +1615,7 @@ function CostBreakdown({ p, sim }) {
           }}>
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
             <span>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>Total até a chave</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}><Term>Total até a chave</Term></span>
               <small className="cost-total-note">Sem eventuais dívidas de condomínio e IPTU.</small>
             </span>
             <span></span>
