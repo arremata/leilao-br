@@ -6,6 +6,16 @@ import { imageSourceForAttempt } from '../imageFallback';
 import { auctionSchedule, formatDayTime, saleTagLabel } from '../auctionRounds';
 import { listingBadges } from '../listingFacts';
 
+// Cadeado das partes fechadas (consultoria, consulta de dívidas).
+export function LockIcon({ size = 16, strokeWidth = 2 }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
 // ============================================================
 // Countdown timer
 // ============================================================

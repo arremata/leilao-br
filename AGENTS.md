@@ -218,6 +218,13 @@ The full platform will include:
   com a versão atual da plataforma como referência e o padrão Client-First da
   LP como ponto de partida para os futuros ajustes de interface.
 
+- **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
+  como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora
+  do total e com o aviso
+  de que pode não haver dívida, à espera da consulta paga (PD-021;
+  `LockedDebtRows` recebe `onUnlock` quando o pagamento existir). A quarta aba
+  virou “Consultoria”, fechada e “em breve”, com a prévia desfocada do chat.
+
 - **2026-10-01** — A lista de imóveis ganhou filtros pelo que a Caixa informa
   na ficha: "Tem alguém morando?" (desocupado ou ocupado; nada marcado mostra
   todos e tocar de novo desmarca), "Aceita FGTS" e "Aceita financiamento". Ficam na URL (`ocupacao`, `fgts`,

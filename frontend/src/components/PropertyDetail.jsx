@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { backLabel } from '../usePropertyLink';
-import { Countdown, ListingBadges, Photo, PropertyImage, Specs } from './shared';
+import { Countdown, ListingBadges, LockIcon, Photo, PropertyImage, Specs } from './shared';
 import { fmtBRL, mapsQuery } from '../utils';
 import { auctionSchedule, saleTagLabel } from '../auctionRounds';
 import { occupancyStatus } from '../listingFacts';
 import { budgetPlan } from '../bidBudget';
+import ConsultoriaTab from './ConsultoriaTab';
 import { analyzeCatalogItem } from '../api';
 import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
@@ -875,7 +876,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
           { v: 'market', l: 'Preço na região', ix: '02' },
           { v: 'edital', l: isDirectSale ? 'Documentos' : 'Regras deste leilão', ix: '03' },
-          { v: 'legal', l: 'Pendências do imóvel', ix: '04', comingSoon: true },
+          { v: 'legal', l: 'Consultoria', ix: '04', comingSoon: true, locked: true },
         ].map(t => (
           <button
             key={t.v}
@@ -892,6 +893,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
             }}
           >
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t.ix}</span>
+            {t.locked && <LockIcon size={12} strokeWidth={2.2} />}
             <span>{t.l}</span>
             {t.comingSoon && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
           </button>
@@ -911,7 +913,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               canAnalyze={p.canAnalyze === true}
             />
           ))}
-        {tab === 'legal' && <LegalComingSoon />}
+        {tab === 'legal' && <ConsultoriaTab p={p} total={plan.minTotal} locked />}
         {tab === 'edital' && <Edital p={p} auctionUrl={auctionUrl} onReadToEnd={markRulesRead} />}
       </div>
     </div>
@@ -1602,13 +1604,17 @@ function CostBreakdown({ p, sim }) {
               onDelete={r.custom ? () => removeCustomCost(r.id) : null}
             />
           ))}
+          <LockedDebtRows hasCondominium={hasCondominium} />
           <div className="cost-row" style={{
             display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
             padding: '20px 20px', background: 'var(--bg-2)',
             alignItems: 'baseline', borderTop: '2px solid var(--line-2)',
           }}>
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>Total até a chave</span>
+            <span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Total até a chave</span>
+              <small className="cost-total-note">Sem eventuais dívidas de condomínio e IPTU.</small>
+            </span>
             <span></span>
             <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: 0 }}>R$ {fmtBRL(dynamicTotal)}</span>
           </div>
@@ -2003,7 +2009,53 @@ function RenovationMoneyEditor({ value, adjusted, disabled, onCommit }) {
   );
 }
 
-function CostRow({ l, v, hint, pct, custom, onDelete }) {
+/**
+ * Eventuais dívidas atrasadas do imóvel (condomínio e IPTU). Pesam muito na
+ * decisão, mas o Argos ainda não sabe se existem nem quanto são: a consulta vai
+ * ser paga à parte. Por enquanto as linhas aparecem fechadas, com o valor
+ * desfocado e fora do total, sempre dizendo que pode não haver dívida.
+ *
+ * Paywall: quando a consulta existir, passe `onUnlock` (abre o pagamento). Sem
+ * ele, o botão fica desativado como "em breve".
+ */
+const LOCKED_DEBTS = [
+  {
+    id: 'overdue_condo',
+    label: 'Dívida de condomínio',
+    hint: 'Se houver, quanto o imóvel deve de condomínio até hoje. Pode não haver nenhum valor em aberto. Quem paga essa dívida está nas regras da venda.',
+    condominiumOnly: true,
+  },
+  {
+    id: 'overdue_iptu',
+    label: 'IPTU atrasado',
+    hint: 'Se houver, quanto o imóvel deve de IPTU à prefeitura. Pode não haver nenhum valor em aberto. Quem paga essa dívida está nas regras da venda.',
+  },
+];
+
+function LockedDebtRows({ hasCondominium, onUnlock }) {
+  const debts = LOCKED_DEBTS.filter(debt => hasCondominium || !debt.condominiumOnly);
+  return (
+    <div className="debt-locked" aria-label="Dívidas do imóvel, ainda bloqueadas">
+      {debts.map(debt => (
+        <CostRow key={debt.id} l={debt.label} v={0} pct={0} hint={debt.hint} locked />
+      ))}
+      <div className="debt-locked-cta">
+        <p>
+          <strong>Este imóvel tem dívidas?</strong> Pode não haver nenhum valor em aberto. A
+          consulta, liberada à parte, mostra se há dívida de{hasCondominium ? ' condomínio e' : ''} IPTU
+          e quanto. Até lá, confirme{hasCondominium ? ' no condomínio e' : ''} na prefeitura antes do lance.
+        </p>
+        <button type="button" className="btn sm" onClick={onUnlock} disabled={!onUnlock}>
+          <LockIcon size={13} />
+          Ver as dívidas
+          {!onUnlock && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -2057,10 +2109,18 @@ function CostRow({ l, v, hint, pct, custom, onDelete }) {
           </div>
         )}
       </div>
-      <span className="mono cost-money-value" style={{
-        minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
-        fontWeight: 500, letterSpacing: '-0.02em',
-      }}>R$ {fmtBRL(v)}</span>
+      {locked ? (
+        <span className="mono cost-money-value cost-money-locked">
+          <LockIcon size={13} />
+          <span aria-hidden="true" className="cost-money-blur">R$ 0.000,00</span>
+          <span className="sr-only">Valor bloqueado</span>
+        </span>
+      ) : (
+        <span className="mono cost-money-value" style={{
+          minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
+          fontWeight: 500, letterSpacing: '-0.02em',
+        }}>R$ {fmtBRL(v)}</span>
+      )}
     </div>
   );
 }
@@ -2162,29 +2222,6 @@ function CustomCostForm({ onAdd }) {
         <button type="submit" className="btn sm primary" disabled={!valid}>Adicionar</button>
       </div>
     </form>
-  );
-}
-
-// ============================================================
-// TAB 4 — PENDÊNCIAS DO IMÓVEL (em breve)
-// ============================================================
-// O nome evita "análise jurídica" e "parecer": o que o produto faz é leitura de
-// documento e organização de informação. Esta aba é o destino do trabalho de
-// ingestão com citação verificável que está em andamento.
-function LegalComingSoon() {
-  return (
-    <div className="card" style={{ minHeight: 360, display: 'grid', placeItems: 'center', padding: 32, textAlign: 'center' }}>
-      <div style={{ maxWidth: 460 }}>
-        <span className="tag accent" style={{ display: 'inline-block', marginBottom: 16 }}>em breve</span>
-        <h3 className="h1" style={{ marginBottom: 12 }}>Pendências do imóvel</h3>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--fg-2)' }}>
-          Estamos organizando, em um lugar só, o que os documentos oficiais dizem
-          sobre dívidas, processos e restrições deste imóvel — sempre com o trecho
-          do documento à vista. Enquanto isso, o que já sabemos está na aba de
-          documentos.
-        </p>
-      </div>
-    </div>
   );
 }
 
