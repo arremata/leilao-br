@@ -5,7 +5,7 @@ import { usePropertyLink, stopLinkNavigation } from '../usePropertyLink';
 import { imageSourceForAttempt } from '../imageFallback';
 import { auctionSchedule, formatDayTime, saleTagLabel } from '../auctionRounds';
 import { listingBadges } from '../listingFacts';
-import { listingTitle, listingPrice, listingMoney, roundDifference } from '../listingPresentation';
+import { listingTitle, listingLocation, listingPrice, listingMoney, roundDifference } from '../listingPresentation';
 
 // Cadeado das partes fechadas (consultoria, consulta de dívidas).
 export function LockIcon({ size = 16, strokeWidth = 2 }) {
@@ -174,7 +174,7 @@ function RoundDifference({ difference }) {
   );
 }
 
-export function RoundStrip({ schedule }) {
+export function RoundStrip({ schedule, hideCurrentPrice = false }) {
   if (schedule.kind !== 'rounds') return null;
   const difference = roundDifference(schedule);
   return (
@@ -185,10 +185,10 @@ export function RoundStrip({ schedule }) {
             <span className="property_card-round-label">{round.round}ª rodada <span className="property_card-state">· {ROUND_STATE_LABEL[round.state]}</span></span>
             <span className="property_card-date">{formatDayTime(round.at) || 'Data a publicar'}</span>
           </div>
-          {round.state !== 'current' && <strong className="property_card-round-price" title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}>{listingMoney(round.price)}</strong>}
-          {round.round === 2 && <RoundDifference difference={difference} />}
+          {(!hideCurrentPrice || round.state !== 'current') && <strong className="property_card-round-price" title={round.price ? `R$ ${fmtBRL(round.price)}` : undefined}>{listingMoney(round.price)}</strong>}
         </div>
       ))}
+      <div className="property_card-difference-slot"><RoundDifference difference={difference} /></div>
     </div>
   );
 }
@@ -212,6 +212,7 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
   const schedule = auctionSchedule(p);
   const price = listingPrice(p, schedule);
   const title = listingTitle(p);
+  const appraisalRound = schedule.rounds?.find(round => round.price > 0 && round.price === p.appraisal);
   const link = usePropertyLink(p.id);
   return (
     <Link {...link} className="card fade-in property-card is-hoverable" style={{ transitionDelay: `${Math.min(staggerIndex * 80, 400)}ms` }}>
@@ -227,13 +228,16 @@ export function PropertyCard({ p, watched, onToggleWatch, staggerIndex = 0 }) {
       <div className="property-card-body">
         <div className="property_card-tags"><span className="tag">{saleTagLabel(p, schedule, { compact: true })}</span><span className="tag">{p.type || 'Imóvel'}</span></div>
         <h3 className="property_card-title">{title}</h3>
+        <p className="property_card-location">{listingLocation(p)}</p>
         <div className="property_card-specs"><Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} /></div>
         <ListingBadges p={p} />
         <div className="property_card-pricing">
-          <span className="property_card-price-label">{schedule.ended ? 'Último valor inicial' : /venda direta/i.test(p.modalidade || '') ? 'Preço de venda' : schedule.current ? `Valor inicial · ${schedule.current.round}ª rodada` : 'Valor inicial'}</span>
-          <strong className="property_card-price" title={price ? `R$ ${fmtBRL(price)}` : undefined}>{listingMoney(price)}</strong>
-          {schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} /> : schedule.headline.until > 0 && <div className="property_card-single-date">{schedule.isOpenTender ? 'Rodada única' : 'Data'} · {formatDayTime(schedule.headline.until)}</div>}
-          <div className="property_card-appraisal"><span>Valor de avaliação</span><strong title={p.appraisal ? `R$ ${fmtBRL(p.appraisal)}` : undefined}>{listingMoney(p.appraisal)}</strong></div>
+          {schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} /> : <div className="property_card-single-price">
+            <span className="property_card-price-label">{schedule.ended ? 'Último valor inicial' : /venda direta/i.test(p.modalidade || '') ? 'Preço de venda' : 'Valor inicial'}</span>
+            <strong className="property_card-price" title={price ? `R$ ${fmtBRL(price)}` : undefined}>{listingMoney(price)}</strong>
+            {schedule.headline.until > 0 && <div className="property_card-single-date">{schedule.isOpenTender ? 'Rodada única' : 'Data'} · {formatDayTime(schedule.headline.until)}</div>}
+          </div>}
+          <div className="property_card-appraisal"><span>Valor de avaliação</span><strong title={p.appraisal ? `R$ ${fmtBRL(p.appraisal)}` : undefined}>{appraisalRound ? `Igual à ${appraisalRound.round}ª rodada` : listingMoney(p.appraisal)}</strong></div>
         </div>
       </div>
     </Link>
@@ -249,12 +253,13 @@ export function PropertyRow({ p, watched, onToggleWatch }) {
       <div className="property_listing-photo"><PropertyImage src={p.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
       <div className="property_listing-summary">
         <h3>{listingTitle(p)}</h3>
+        <div className="property_card-date">{listingLocation(p)}</div>
         <div className="property_card-date">{saleTagLabel(p, schedule)}</div>
         <ListingBadges p={p} />
       </div>
       <div><strong className="property_listing-price">{listingMoney(price)}</strong><div className="property_card-date">{schedule.current ? `${schedule.current.round}ª rodada vigente` : 'Valor inicial'}</div></div>
       <div><strong>{listingMoney(p.appraisal)}</strong><div className="property_card-date">Avaliação</div></div>
-      <div>{schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} /> : <span className="property_card-date">{formatDayTime(schedule.headline.until) || 'Sem data'}</span>}</div>
+      <div>{schedule.kind === 'rounds' ? <RoundStrip schedule={schedule} hideCurrentPrice /> : <span className="property_card-date">{formatDayTime(schedule.headline.until) || 'Sem data'}</span>}</div>
       <SaveProperty p={p} watched={watched} onToggleWatch={onToggleWatch} />
     </Link>
   );

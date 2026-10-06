@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { auctionSchedule } from './auctionRounds.js';
-import { listingTitle, listingPrice, roundDifference, listingMoney } from './listingPresentation.js';
+import { listingTitle, listingLocation, listingPrice, roundDifference, listingMoney } from './listingPresentation.js';
 
 const property = {
   type: 'Apartamento', area: 46.97, title: 'Apartamento, RUA ANTONIO KUSS', address: 'RUA ANTONIO KUSS, 260',
   modalidade: 'Leilão SFI', firstAuctionPrice: 230000, secondAuctionPrice: 138000,
   firstAuctionAt: '2026-10-08T10:00:00-03:00', secondAuctionAt: '2026-10-15T10:00:00-03:00', minBid: 230000,
 };
+
+test('listing location shows only city and state, never street or neighborhood', () => {
+  assert.equal(listingLocation({ ...property, city: ' SÃO JOSÉ DOS PINHAIS ', uf: 'pr', neighborhood: 'Queimada' }), 'São José dos Pinhais · PR');
+  assert.equal(listingLocation(property), 'Cidade não informada');
+});
 
 test('listing title never falls back to an address-bearing source title', () => {
   assert.equal(listingTitle(property), 'Apartamento de 46,97 m²');

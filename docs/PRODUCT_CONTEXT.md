@@ -9,10 +9,13 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 ## Em validação — lista de imóveis simplificada
 
 Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
-com o endereço completo reservado à página do imóvel. Vistos segue a mesma
-regra de identificação. O preço em destaque pertence à rodada vigente; as duas
-rodadas aparecem em linhas com situação e data; o preço vigente aparece uma
-única vez, em destaque, e a outra rodada mantém seu preço. A diferença em reais e
+com cidade e estado como localização e o endereço completo reservado à página
+do imóvel. Vistos mantém a identificação por tipo e área. Nos cards com duas
+rodadas, os preços aparecem uma única vez, em linhas alinhadas com situação e
+data; a rodada vigente é identificada. Quando a avaliação coincide com uma
+rodada, o rodapé indica essa equivalência sem repetir o número. Os blocos dos
+cards se alinham entre si mesmo quando títulos, cidades ou selos têm mais linhas.
+A diferença em reais e
 porcentagem compara a segunda rodada à primeira, sem confundir essa comparação
 com o valor de avaliação. Uma segunda rodada mais cara é apresentada como aumento.
 Os comparáveis ficam na página do imóvel. Esta versão está em revisão local,

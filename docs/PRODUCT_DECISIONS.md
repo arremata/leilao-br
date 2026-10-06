@@ -23,10 +23,11 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 - **Data:** 6 de outubro de 2026
 - **Estado:** Ativa; interface em validação antes da publicação
-- **Decisão:** identificar imóveis por tipo e área na listagem, deixando o
+- **Decisão:** identificar imóveis por tipo e área, cidade e estado na listagem, deixando o
   endereço completo e os comparáveis para a página do imóvel. Mostrar o preço
-  vigente uma única vez, em destaque, e as rodadas em linhas com data e situação,
-  mantendo o preço da outra rodada para comparação.
+  de cada rodada uma única vez em linhas com data e situação, identificando a
+  vigente. Quando a avaliação coincide com uma rodada, indicar a equivalência
+  sem repetir o número. Manter os blocos dos cards alinhados entre si.
   Comparar o preço da segunda rodada ao da primeira em reais e porcentagem,
   identificando também aumentos, sem usar a avaliação como base dessa diferença.
 - **Motivo:** facilitar a leitura e a comparação em telas pequenas, seguindo

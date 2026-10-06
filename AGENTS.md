@@ -214,6 +214,12 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Incluiu cidade e estado na identificação dos cards e da lista.
+  Os cards passaram a apresentar os dois preços maiores na mesma coluna, sem
+  destaque duplicado; avaliação igual a uma rodada é indicada sem repetir o
+  valor. Os blocos internos compartilham o alinhamento da grade, inclusive com
+  títulos, cidades e selos de alturas diferentes.
+
 - **2026-10-06** — Removeu a repetição do preço vigente na linha da rodada,
   nos cards e na lista. O destaque mantém esse valor; as linhas preservam as
   datas, as situações e o preço da outra rodada para comparação.
