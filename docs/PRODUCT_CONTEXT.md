@@ -12,7 +12,8 @@ O topo do imóvel está em validação com uma única superfície, foto menor e
 controles compactos de Descrição/Características junto das informações. Apenas
 o conteúdo solicitado se expande na largura do painel. A avaliação mostra seu
 preço, inclusive quando igual ao de uma rodada. Menu usa pill; hover de ações
-roxas/selecionadas usa borda branca, e controles brancos recebem borda roxa.
+roxas/selecionadas usa traço branco interno com borda roxa externa preservada,
+e controles brancos recebem borda roxa.
 
 A primeira aba do imóvel também está em validação com dimensões em REM, textos
 maiores e ações pill. Hover indica disponibilidade por borda, enquanto seleção

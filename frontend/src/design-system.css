@@ -43,6 +43,7 @@
   --ui-shadow-sm: 0 .0625rem .1875rem rgb(0 0 0 / .04);
   --ui-shadow-brand: 0 .25rem 1.125rem rgb(124 58 237 / .2);
   --ui-shadow-hover: 0 .5rem 1.5rem rgb(124 58 237 / .3);
+  --ui-selected-hover-ring: inset 0 0 0 var(--ui-border-sm) var(--ui-white);
 }
 .ui-button {
   display: inline-flex; align-items: center; justify-content: center;
@@ -168,8 +169,8 @@
  .app-shell .btn.primary:not(:disabled):hover { background: var(--ui-brand); color: var(--ui-white); }
  .app-shell .btn.ghost:not(:disabled):hover { background: transparent; }
  .topbar .nav a:hover { background: transparent; color: var(--ui-text); border-color: var(--ui-brand); }
- .topbar .nav a.active:hover { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-white); }
- .ui-button:not(.is-secondary):not(.is-inverse):not(.is-text):hover:not(:disabled), .ui-button.is-selected:hover:not(:disabled), .app-shell .btn.primary:hover:not(:disabled) { border-color: var(--ui-white); }
+ .topbar .nav a.active:hover { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-brand); box-shadow: var(--ui-selected-hover-ring); }
+ .ui-button:not(.is-secondary):not(.is-inverse):not(.is-text):hover:not(:disabled), .ui-button.is-selected:hover:not(:disabled), .app-shell .btn.primary:hover:not(:disabled) { border-color: var(--ui-brand); box-shadow: var(--ui-selected-hover-ring); }
 }
 @media (max-width: 40rem) {
  .property_summary-extra { padding: var(--ui-space-md); }

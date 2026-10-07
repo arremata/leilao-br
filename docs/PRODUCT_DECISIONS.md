@@ -33,7 +33,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   Na plataforma, hover usa borda fina e preserva o fundo normal; seleção tem um
   estado persistente distinto. Essa escolha posterior prevalece sobre o hover
   preenchido da referência da LP.
-  Controles selecionados têm fundo roxo; seu hover usa borda branca. A avaliação
+  Controles selecionados têm fundo roxo; seu hover usa traço branco interno,
+  preservando o contorno roxo externo. A avaliação
   na página do imóvel mostra o preço explícito, mesmo se coincidir com uma rodada;
   a equivalência sem repetição continua como escolha dos cards da listagem.
   A densidade de filtros e tabelas exige adaptação, preservando legibilidade e

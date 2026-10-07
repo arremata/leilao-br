@@ -518,5 +518,5 @@
 @media (hover: hover) and (pointer: fine) {
  .property_costs .ui-button:hover:not(:disabled), .property_costs .cost-row > button:hover, .property_costs .cost-inline-action:hover, .property_costs .scenario-money-meta button:hover, .property_costs .bid-slider-scale button:hover { border-color: var(--ui-brand); box-shadow: none; }
  .property_costs .ui-button.is-secondary:hover:not(:disabled) { background: var(--ui-white); color: var(--ui-text); }
- .property_costs .ui-button.is-selected:hover:not(:disabled), .property_costs .ui-button:not(.is-secondary):hover:not(:disabled) { border-color: var(--ui-white); background: var(--ui-brand); color: var(--ui-white); }
+ .property_costs .ui-button.is-selected:hover:not(:disabled), .property_costs .ui-button:not(.is-secondary):hover:not(:disabled) { border-color: var(--ui-brand); box-shadow: var(--ui-selected-hover-ring); background: var(--ui-brand); color: var(--ui-white); }
 }
