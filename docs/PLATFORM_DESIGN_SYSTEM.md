@@ -37,11 +37,11 @@ plataforma, altere o token no `:root` do `design-system.css`.
 | `--ui-gap-tight` | selos, chips, linhas de um título | xs (.5rem) | xs |
 | `--ui-gap-inline` | botões lado a lado | sm (.75rem) | sm |
 | `--ui-gap-stack` | itens de um grupo | md (1rem) | md |
-| `--ui-gap-group` | grupos dentro de um card | lg (1.5rem) | md |
-| `--ui-gap-section` | blocos da página (card → abas) | xl (2rem) | lg |
+| `--ui-gap-group` | grupos dentro de um card | md (1rem) | md |
+| `--ui-gap-section` | blocos da página (card → abas) | lg (1.5rem) | lg |
 | `--ui-pad-page` | margem lateral da página | lg | md |
 | `--ui-pad-card` | interior de cards e painéis | lg | md |
-| `--ui-pad-tile` | interior de blocos dentro de um card | md / lg | md |
+| `--ui-pad-tile` | interior de blocos dentro de um card | sm / md | md |
 | `--ui-pad-button` | lateral dos botões | md | md |
 
 Os valores de celular são aplicados uma única vez, numa media query de
@@ -52,8 +52,10 @@ Ajustes finos usam a escala base (`--ui-space-3xs` a `--ui-space-3xl`).
 
 - `ui-button`: principal, roxo. Um por bloco.
 - `is-secondary`: branco com borda neutra. `is-text`: link de ação.
+- `is-xs is-quiet`: link secundário pequeno (2rem, sem borda), para ações
+  de apoio como documentos; no hover só ganha fundo suave.
 - Na mesma tela, todos os botões usam a mesma altura. Na página do imóvel o
-  padrão é `is-sm` (2.5rem, texto .875rem): ações do topo, documentos e abas.
+  padrão é `is-sm` (2.5rem, texto .875rem): ações do topo e abas.
 - Ícone SVG de 1rem dentro do botão.
 
 ## Cores e estados
