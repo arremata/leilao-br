@@ -57,10 +57,11 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
     </div>
     <div className="property_round-price-row">
       <strong className="property_round-price" title={round.price > 0 ? `R$ ${fmtBRL(Number(round.price))}` : undefined}>{summaryMoney(round.price)}</strong>
-      {gap?.tone === 'less' && <span className="property_round-discount" aria-hidden="true">−{gap.percent}%</span>}
+      {gap?.tone === 'less' && <span className="property_round-discount" title={`${gap.percent}% abaixo da avaliação`} aria-label={`${gap.percent}% abaixo da avaliação`}>−{gap.percent}%</span>}
     </div>
     <div className="property_round-notes">
-      <AppraisalGap gap={gap} />
+      {/* With a discount, the badge next to the price already says it. */}
+      {gap?.tone !== 'less' && <AppraisalGap gap={gap} />}
       {round.round === 2 && <FirstRoundComparison difference={model.difference} />}
       {showClock && (isDirectSale && !p.endsAt
         ? <span>Sem prazo divulgado</span>
