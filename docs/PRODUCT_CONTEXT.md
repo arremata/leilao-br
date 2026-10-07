@@ -78,8 +78,10 @@ usam HTTPS, e a Vercel renova os certificados automaticamente.
 O dicionário do leilão é conteúdo público do site institucional, em
 `https://www.argosleiloes.com.br/dicionario`. Explica, sem juridiquês, as
 palavras dos leilões e da venda direta da Caixa, por assunto e com busca. O menu
-da plataforma leva para esse endereço; nenhuma cópia do conteúdo fica dentro do
-app autenticado.
+da plataforma leva para esse endereço. Nos cards e na página do imóvel, os
+principais termos abrem uma explicação curta e o link para o verbete público;
+essa prévia pode ser desligada na conta. As frases são sincronizadas da mesma
+fonte editorial, sem criar um segundo dicionário mantido dentro do app.
 
 ### Endereços
 

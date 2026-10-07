@@ -215,6 +215,19 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — As principais palavras do leilão ganharam explicação nos
+  cards e na página do imóvel: tipo de venda, rodadas, valor inicial, valor de
+  avaliação, imóveis parecidos, total até a chave, ocupação, FGTS e
+  financiamento. Nada marca a palavra em repouso; ao passar o mouse ela muda de
+  cor e abre um cartão com o termo, a frase do dicionário e o link para o
+  verbete no `www`. No celular, o toque explica e não abre o imóvel. As linhas
+  de custo ficaram de fora porque já têm o "?" próprio. O texto vem do
+  dicionário da landing (fonte única), copiado por
+  `frontend/scripts/sync-glossary.mjs` para
+  `frontend/src/content/glossary.generated.js`. O perfil ganhou a seção
+  "Explicações das palavras do leilão", com exemplo para testar e a chave para
+  desligar; a escolha fica neste aparelho (`argos_glossary` no `localStorage`).
+
 - **2026-10-06** — Acrescentou o bairro à localização resumida dos cards e da
   lista, junto de cidade e estado. Bairro não informado é omitido, sem separador
   vazio; rua e número continuam somente na página do imóvel.
