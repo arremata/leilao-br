@@ -16,7 +16,7 @@ on:
       limit:
         description: Maximum regions to refresh
         required: true
-        default: "30"
+        default: "10"
       property_id:
         description: Optional representative property ID for a targeted refresh
         required: false
@@ -62,7 +62,7 @@ jobs:
         run: |
           args=(
             --ufs "${{ github.event.inputs.ufs || '' }}"
-            --limit "${{ github.event.inputs.limit || '30' }}"
+            --limit "${{ github.event.inputs.limit || '10' }}"
             --max-age-days 90
           )
           if [[ "$PROPERTY_ID" =~ ^[0-9]+$ ]]; then
