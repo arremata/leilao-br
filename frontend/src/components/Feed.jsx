@@ -480,12 +480,10 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         </div>
       ) : (
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
-          {/* Sete colunas de cabeçalho para as sete células que PropertyRow
-              renderiza. Antes havia uma coluna "risco" sem dado embaixo, o que
-              deslocava todas as colunas seguintes. */}
+          {/* Cabeçalho alinhado às seis células da lista. */}
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
+            gridTemplateColumns: '60px 1.4fr 1fr 1fr 1.5fr 44px',
             gap: 14,
             padding: '10px 18px',
             background: 'var(--bg-2)',
@@ -499,8 +497,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
             <span>imóvel</span>
             <span>valor inicial</span>
             <span>avaliação</span>
-            <span>imóveis parecidos</span>
-            <span>{{ direct: 'disponível', auction: 'leilão em' }[kind] ?? 'prazo'}</span>
+            <span>{{ direct: 'disponível', auction: 'rodadas e datas' }[kind] ?? 'prazo'}</span>
             <span></span>
           </div>
           {paginated.map(p => (

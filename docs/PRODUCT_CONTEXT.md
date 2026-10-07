@@ -6,6 +6,21 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 Última atualização: 6 de outubro de 2026.
 
+## Em validação — lista de imóveis simplificada
+
+Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
+com bairro, cidade e estado como localização e o endereço completo reservado à página
+do imóvel. Vistos mantém a identificação por tipo e área. Nos cards com duas
+rodadas, os preços aparecem uma única vez, em linhas alinhadas com situação e
+data; a rodada vigente é identificada. Quando a avaliação coincide com uma
+rodada, o rodapé indica essa equivalência sem repetir o número. Os blocos dos
+cards se alinham entre si mesmo quando títulos, cidades ou selos têm mais linhas.
+A diferença em reais e
+porcentagem compara a segunda rodada à primeira, sem confundir essa comparação
+com o valor de avaliação. Uma segunda rodada mais cara é apresentada como aumento.
+Os comparáveis ficam na página do imóvel. Esta versão está em revisão local,
+ainda sem publicação em produção.
+
 ## Como usar no Claude
 
 No projeto “Argos — Produto” do Claude:

@@ -215,6 +215,31 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Acrescentou o bairro à localização resumida dos cards e da
+  lista, junto de cidade e estado. Bairro não informado é omitido, sem separador
+  vazio; rua e número continuam somente na página do imóvel.
+
+- **2026-10-06** — Incluiu cidade e estado na identificação dos cards e da lista.
+  Os cards passaram a apresentar os dois preços maiores na mesma coluna, sem
+  destaque duplicado; avaliação igual a uma rodada é indicada sem repetir o
+  valor. Os blocos internos compartilham o alinhamento da grade, inclusive com
+  títulos, cidades e selos de alturas diferentes.
+
+- **2026-10-06** — Removeu a repetição do preço vigente na linha da rodada,
+  nos cards e na lista. O destaque mantém esse valor; as linhas preservam as
+  datas, as situações e o preço da outra rodada para comparação.
+
+- **2026-10-06** — Simplificou a listagem para revisão local: identificação por
+  tipo e área, endereço completo somente ao abrir o imóvel, preço vigente em
+  destaque e rodadas em linhas com data, preço e diferença para a primeira.
+  Removeu os comparáveis e a contagem repetida dos cards, preservando o conteúdo
+  completo na página do imóvel. Aplicou o padrão visual da LP aos cards, à lista
+  e ao botão de salvar, com adaptação para telas pequenas.
+
+- **2026-10-01** — Documentou a rodada de validação visual pela preview do PR,
+  com a versão atual da plataforma como referência e o padrão Client-First da
+  LP como ponto de partida para os futuros ajustes de interface.
+
 - **2026-10-06** — Corrigiu as falhas observadas na primeira atualização com
   Bright Data. Os três portais agora recebem somente bairro/cidade, nunca uma
   rua disfarçada de bairro; uma fonte bloqueada não descarta comparáveis válidos
