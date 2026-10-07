@@ -5,37 +5,50 @@ from __future__ import annotations
 import argparse
 import json
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from db.base import get_engine, init_db, make_session_factory
-from db.models import Enrichment, MarketReferenceJob, Property
-from enrichment.market_coverage import is_eligible_market_property, resolve_market_reference
+from db.base import get_engine, make_session_factory
+from db.models import MarketReferenceJob, Property
+from enrichment.materialize import analysis_is_current, load_analysis_state
+from enrichment.market_coverage import normalize_text
 
 
 def build_report(session_factory, ufs: list[str]) -> dict:
     with session_factory() as session:
-        stmt = select(Property).where(Property.status == "active")
-        if ufs:
-            stmt = stmt.where(Property.uf.in_(ufs))
-        properties = [prop for prop in session.execute(stmt).scalars() if is_eligible_market_property(prop)]
-        enriched_ids = set(session.execute(select(Enrichment.property_id)).scalars())
-        with_reference = sum(resolve_market_reference(session, prop) is not None for prop in properties)
-        analyzed = sum(prop.id in enriched_ids for prop in properties)
-        # Keep the operational queue summary on the same active-catalog scope
-        # as the property coverage above. Historical jobs remain persisted for
-        # auditability, but they are neither executed nor reported as current
-        # work once their representative property becomes inactive.
-        job_stmt = select(MarketReferenceJob).join(
+        scoped_ufs = ufs or list(session.execute(select(Property.uf).where(
+            Property.status == "active",
+            Property.uf.is_not(None),
+        ).distinct()).scalars())
+        state = load_analysis_state(
+            session, scoped_ufs, include_comparables=False,
+        )
+        analyzed = 0
+        for prop, reference in state["candidates"]:
+            expense_reference = state["expense_references"].get((
+                (prop.uf or "").upper(), normalize_text(prop.city),
+            ))
+            if analysis_is_current(
+                state["enrichments"].get(prop.id),
+                reference,
+                state["event_times"].get(prop.id),
+                expense_reference,
+            ):
+                analyzed += 1
+
+        job_stmt = select(
+            MarketReferenceJob.status,
+            func.count(MarketReferenceJob.id),
+        ).join(
             Property,
             MarketReferenceJob.representative_property_id == Property.id,
-        ).where(Property.status == "active")
-        if ufs:
-            job_stmt = job_stmt.where(MarketReferenceJob.uf.in_(ufs))
-        jobs = session.execute(job_stmt).scalars().all()
-    statuses = {}
-    for job in jobs:
-        statuses[job.status] = statuses.get(job.status, 0) + 1
-    total = len(properties)
+        ).where(
+            Property.status == "active",
+            MarketReferenceJob.uf.in_(scoped_ufs),
+        ).group_by(MarketReferenceJob.status)
+        statuses = dict(session.execute(job_stmt).all())
+
+    total = state["eligible_count"]
+    with_reference = len(state["candidates"])
     return {
         "eligible_properties": total,
         "properties_with_reference": with_reference,
@@ -52,7 +65,6 @@ def main(argv=None):
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args(argv)
     engine = get_engine()
-    init_db(engine)
     factory = make_session_factory(engine)
     ufs = [value.strip().upper() for value in args.ufs.split(",") if value.strip()]
     report = build_report(factory, ufs)

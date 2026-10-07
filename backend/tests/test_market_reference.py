@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -19,6 +20,12 @@ class _FakeGeocoder:
         return -25.4284, -49.2733
 
 
+@pytest.fixture(autouse=True)
+def _bright_data_config(monkeypatch):
+    monkeypatch.setenv("BRIGHT_DATA_API_KEY", "test-api-key")
+    monkeypatch.setenv("BRIGHT_DATA_WEB_UNLOCKER_ZONE", "test-zone")
+
+
 @pytest.mark.parametrize(("summary", "expected"), [
     ({"selected": 0, "updated": 0, "empty": 0, "failed": 0}, 0),
     ({"selected": 18, "updated": 9, "empty": 6, "failed": 3}, 0),
@@ -36,7 +43,13 @@ def test_scheduled_workflow_uses_a_safe_default_batch_size():
     ).read_text()
 
     assert 'default: "10"' in workflow
-    assert "github.event.inputs.limit || '10'" in workflow
+    assert "MARKET_LIMIT: ${{ github.event.inputs.limit || '10' }}" in workflow
+    assert "MARKET_FORCE: ${{ github.event.inputs.force || 'false' }}" in workflow
+    assert 'default: false' in workflow
+    assert 'timeout --signal=TERM --kill-after=30s 42m' in workflow
+    assert "playwright install" not in workflow
+    assert '--ufs "${{' not in workflow
+    assert "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09" in workflow
 
 
 @pytest.mark.asyncio
@@ -327,3 +340,134 @@ def test_reconcile_deduplicates_shared_neighborhood_jobs():
             neighborhood="Costeira",
         ).all()
         assert len(neighborhood_jobs) == 1
+
+
+class _StubCollector:
+    def metrics_summary(self):
+        return {}
+
+
+def test_claim_lease_prevents_duplicate_work_and_recovers_when_stale():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(Property(
+            source="caixa", source_id="lease-1", uf="PR", city="Curitiba",
+            neighborhood="Centro", property_type="Apartamento",
+            address="Rua A", area_m2=50, preco=100_000, status="active",
+        ))
+        session.commit()
+    market_reference.reconcile_coverage(factory, ["PR"])
+
+    first = market_reference._claim_jobs(factory, ["PR"], 1, 90, None)
+    second = market_reference._claim_jobs(factory, ["PR"], 1, 90, None)
+
+    assert len(first) == 1
+    assert second == []
+
+    with factory() as session:
+        job = session.query(MarketReferenceJob).one()
+        job.updated_at = datetime.now(timezone.utc) - market_reference.LEASE_TIMEOUT - timedelta(seconds=1)
+        session.commit()
+
+    recovered = market_reference._claim_jobs(factory, ["PR"], 1, 90, None)
+    assert len(recovered) == 1
+    assert recovered[0].claimed_at > first[0].claimed_at
+
+
+@pytest.mark.asyncio
+async def test_worker_bounds_parallel_jobs(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        for index in range(4):
+            session.add(Property(
+                source="caixa", source_id=f"parallel-{index}", uf="PR",
+                city=f"Cidade {index}", neighborhood="Centro",
+                property_type="Apartamento", address=f"Rua {index}",
+                area_m2=50, preco=100_000, status="active",
+            ))
+        session.commit()
+
+    active = 0
+    max_active = 0
+
+    async def fake_scrape(metadata, **kwargs):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        try:
+            await asyncio.sleep(0.02)
+            return [ComparableProperty(
+                address=f"Rua comparável {metadata.city}",
+                property_type="Apartamento", price=250_000,
+                area_m2=50, price_per_m2=5_000, source="Portal",
+                url=f"https://portal/{metadata.city}",
+                lat=-25.4284, lng=-49.2733,
+            )]
+        finally:
+            active -= 1
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=4, geocoder=_FakeGeocoder(), concurrency=2,
+        collector=_StubCollector(),
+    )
+
+    assert summary["updated"] == 4
+    assert len(summary["updated_reference_ids"]) == 4
+    assert max_active == 2
+
+
+@pytest.mark.asyncio
+async def test_forced_refresh_processes_fresh_jobs_only_once(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    now = datetime.now(timezone.utc)
+    with factory() as session:
+        for index in range(3):
+            prop = Property(
+                source="caixa", source_id=f"forced-{index}", uf="PR",
+                city=f"Cidade {index}", neighborhood="",
+                property_type="Apartamento", address=f"Rua {index}",
+                area_m2=50, preco=100_000, status="active",
+            )
+            session.add(prop)
+            session.flush()
+            session.add(RegionalMarketPrice(
+                uf="PR", city=prop.city, neighborhood="",
+                property_type="Apartamento", price_per_m2=4_000,
+                sample_size=1, source=market_reference.MARKET_REFERENCE_SOURCE,
+                computed_at=now,
+            ))
+            session.add(MarketReferenceJob(
+                uf="PR", city=prop.city, neighborhood="",
+                property_type="Apartamento", representative_property_id=prop.id,
+                status="successful", next_attempt_at=now + timedelta(days=90),
+            ))
+        session.commit()
+
+    calls = []
+
+    async def fake_scrape(metadata, **kwargs):
+        calls.append(metadata.city)
+        return [ComparableProperty(
+            address=f"Rua comparável {metadata.city}",
+            property_type="Apartamento", price=250_000,
+            area_m2=50, price_per_m2=5_000, source="Portal",
+            url=f"https://portal/{metadata.city}",
+            lat=-25.4284, lng=-49.2733,
+        )]
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=4, geocoder=_FakeGeocoder(), concurrency=2,
+        collector=_StubCollector(), force=True,
+    )
+
+    assert summary["selected"] == 3
+    assert summary["updated"] == 3
+    assert sorted(calls) == ["Cidade 0", "Cidade 1", "Cidade 2"]
