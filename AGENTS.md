@@ -248,7 +248,9 @@ The full platform will include:
   regras em `docs/PLATFORM_DESIGN_SYSTEM.md` e checagem `npm run lint:design`.
   Botões, selos e abas em pill; hover por borda e seleção persistente; todos os
   botões da página do imóvel com a mesma altura (2.5rem); primeira aba do
-  imóvel migrada para REM.
+  imóvel migrada para REM. Espaçamentos vêm de tokens por função
+  (`--ui-gap-*`, `--ui-pad-*`), com o ritmo do celular definido uma vez no
+  `:root`; o `lint:design` bloqueia espaçamento escrito à mão.
 
 - **2026-10-06** — As principais palavras do leilão ganharam explicação nos
   cards e na página do imóvel: tipo de venda, rodadas, valor inicial, valor de
