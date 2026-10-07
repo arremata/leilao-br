@@ -38,7 +38,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   na página do imóvel mostra o preço explícito, mesmo se coincidir com uma rodada;
   a equivalência sem repetição continua como escolha dos cards da listagem.
   A densidade de filtros e tabelas exige adaptação, preservando legibilidade e
-  funcionamento. O diagnóstico não representa uma migração já publicada.
+  funcionamento. As regras ficam em `docs/PLATFORM_DESIGN_SYSTEM.md`.
 
 ### PD-023 — Simplificar a identificação e as rodadas na lista
 

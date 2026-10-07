@@ -6,38 +6,17 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 Última atualização: 6 de outubro de 2026.
 
-## Padrão visual — migração pendente
+## Padrão visual
 
-O topo do imóvel está em validação como um bloco compacto: foto ao lado do
-tipo, endereço com bairro/cidade/UF, selos de situação, avaliação da Caixa e
-um quadro por rodada, com a vigente destacada, prazo e economia da 2ª sobre a
-1ª. Os documentos oficiais fecham o mesmo quadro; as abas da análise vêm logo
-abaixo como ação principal, e "Ver leilão na Caixa"/"Salvar" ficam discretos
-ao lado do caminho de volta. Descrição e características não aparecem no topo.
-Botões da página usam uma altura única (2.5rem). Menu usa pill; hover de ações
-roxas/selecionadas usa traço branco interno com borda roxa externa preservada,
-e controles brancos recebem borda roxa.
+A plataforma segue a linguagem Client First da LP (fontes, tamanhos, botões,
+cores e interação), descrita em `docs/PLATFORM_DESIGN_SYSTEM.md`. A página do
+imóvel já está no padrão; as demais telas migram aos poucos.
 
-A primeira aba do imóvel também está em validação com dimensões em REM, textos
-maiores e ações pill. Hover indica disponibilidade por borda, enquanto seleção
-tem estado persistente próprio. As abas quebram linhas no desktop, rolam lateralmente no celular e
-aceitam navegação por setas do teclado. Explicações
-de custos abrem por clique, não ao passar o mouse.
-
-Primeira etapa em validação: a página do imóvel ganhou painel e ações no padrão
-da LP, com medidas em REM e tamanhos nomeados. Tipo/área identificam o título;
-o endereço completo permanece no detalhe. Rodadas têm preços e datas alinhados,
-com comparação da segunda para a primeira em reais e percentual; avaliação igual
-a uma rodada é indicada sem repetir o valor. Descrição e características abrem
-por controles acessíveis. As demais áreas ainda aguardam migração.
-
-A plataforma deve seguir a linguagem Client First da LP em fontes, tamanhos,
-botões, campos e interação. A vistoria de 6 de outubro conferiu 34 estados de
-tela e identificou que o alinhamento ainda é parcial: os cards recentes estão
-mais próximos do padrão, enquanto outras telas mantêm textos pequenos e
-controles antigos. A vistoria não alterou a interface. O diagnóstico está em
-`docs/AUDITORIA_CLIENT_FIRST_PLATAFORMA.md`; a proposta de contrato para orientar
-as próximas alterações está em `docs/PLATFORM_DESIGN_SYSTEM.md`.
+O topo do imóvel é um bloco compacto: foto ao lado do tipo, endereço com
+bairro/cidade/UF, selos de situação, avaliação da Caixa e um quadro por rodada,
+com a vigente destacada, prazo e economia da 2ª sobre a 1ª. Os documentos
+oficiais fecham o mesmo quadro; as abas da análise vêm logo abaixo como ação
+principal, e "Ver leilão na Caixa"/"Salvar" ficam discretos no topo.
 
 ## Em validação — lista de imóveis simplificada
 

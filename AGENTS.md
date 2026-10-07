@@ -235,56 +235,21 @@ The full platform will include:
 
 ## Changelog
 
-- **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco mais
-  compacto: foto à esquerda e, à direita, tipo, endereço em uma linha com
-  bairro, cidade e UF, e selos de área, quartos, ocupação e FGTS. A avaliação
-  da Caixa vem antes de dois quadros de rodada; a vigente é destacada com data
-  e prazo, e a outra mostra a diferença para a avaliação e a economia sobre a
-  1ª. Os documentos oficiais ficam no fim do mesmo quadro e as abas da análise
-  logo abaixo dele, como ação principal. “Ver leilão na Caixa” e “Salvar”
-  passaram a links discretos ao lado do caminho de volta. Descrição e
-  características saíram do topo. Todos os botões da página usam a mesma
-  altura (2.5rem). Nenhum preço, link ou regra mudou.
+- **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco
+  compacto: foto ao lado do tipo, endereço com bairro/cidade/UF, selos de
+  situação, avaliação da Caixa e um quadro por rodada, com a vigente destacada,
+  prazo e economia da 2ª sobre a 1ª. Documentos oficiais ficam no mesmo quadro;
+  as abas da análise vêm logo abaixo como ação principal, e “Ver leilão na
+  Caixa”/“Salvar” ficam discretos no topo. Descrição e características saíram
+  do topo. Nenhum preço, link ou regra mudou.
 
-- **2026-10-06** — Corrigiu o hover branco para ficar dentro do preenchimento
-  roxo, usando traço interno em REM e preservando a borda roxa externa. O mesmo
-  token vale para ações preenchidas, controles selecionados e menu ativo.
+- **2026-10-06** — Adotou o padrão visual Client First da LP como contrato da
+  plataforma: tokens em REM e classes em `frontend/src/design-system.css`,
+  regras em `docs/PLATFORM_DESIGN_SYSTEM.md` e checagem `npm run lint:design`.
+  Botões, selos e abas em pill; hover por borda e seleção persistente; todos os
+  botões da página do imóvel com a mesma altura (2.5rem); primeira aba do
+  imóvel migrada para REM.
 
-- **2026-10-06** — Compactou o resumo do imóvel em uma superfície única com foto
-  menor e dois controles curtos de Descrição/Características junto dos preços.
-  O conteúdo solicitado abre na largura do painel, sem duas faixas extensas
-  permanentes. A avaliação voltou a mostrar o preço mesmo quando igual a uma
-  rodada. Menu passou a usar pill; hover de ação roxa/selecionada usa borda branca,
-  enquanto controle branco/não selecionado usa borda roxa.
-
-- **2026-10-06** — Separou hover por borda de seleção persistente na plataforma;
-  padronizou Entrar/Criar conta em pill e as ações legadas com classe de botão.
-  Descrição e características passaram à largura completa abaixo da foto e dos
-  preços, evitando a coluna vazia criada ao expandir detalhes. As quatro abas
-  passaram a quebrar linhas sem rolagem interna, com estado selecionado, hover e
-  navegação por setas. Migrou a primeira aba para REM, textos legíveis, campos e
-  ações padronizados; explicações de custos abrem por clique, sem saltar no hover.
-
-- **2026-10-06** — Implementou o painel da página do imóvel com tokens em REM e
-  tamanhos nomeados, ações e selos pill, superfícies com raio comum, título por
-  tipo/área e endereço completo próprio. Preços e datas compartilham linhas de
-  grade; diferença em reais/percentual aparece fora das colunas e avaliação igual
-  a uma rodada é identificada sem repetir o preço. Retirou a miniatura redundante
-  sem ação e o pulso contínuo do painel. Incluiu verificação do contrato visual,
-  seis testes de apresentação de rodadas e validação desktop/mobile e fonte ampliada.
-
-- **2026-10-06** — Especificou os valores do contrato visual e os comparou aos
-  estilos efetivos da plataforma. Detalhou as falhas do painel da página do
-  imóvel: ações e selos sem pill, raios divergentes, endereço repetido, textos
-  pequenos e datas desalinhadas por desconto condicional. Tornou o contrato
-  obrigatório para novas interfaces e definiu esse painel como próxima etapa.
-
-- **2026-10-06** — Concluiu a vistoria visual da plataforma contra o Client First
-  da LP, com 34 estados medidos, capturas e inventário de estilos. Documentou
-  diferenças de tipografia, controles, contraste e movimento, com uma proposta
-  de contrato e ordem de migração. Conta e questionário foram inspecionados com
-  dados fictícios locais, sem gravações em produção. Nenhuma interface foi
-  alterada nesta entrega de diagnóstico.
 - **2026-10-06** — As principais palavras do leilão ganharam explicação nos
   cards e na página do imóvel: tipo de venda, rodadas, valor inicial, valor de
   avaliação, imóveis parecidos, total até a chave, ocupação, FGTS e
