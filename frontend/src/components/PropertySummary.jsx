@@ -50,9 +50,7 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
   const showClock = isCurrent || (!model.isSfi && round.state === 'ended');
   const gap = round.appraisalGap;
   const dateLabel = roundDateLabel(round.date) || (isDirectSale ? '' : 'Data não informada');
-  // A next round that costs less is the opportunity: it gets the positive accent.
-  const isSaving = round.state === 'upcoming' && (gap?.tone === 'less' || (round.round === 2 && model.difference < 0));
-  return <article className={`property_round is-${round.state}${isSaving ? ' is-saving' : ''}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
+  return <article className={`property_round is-${round.state}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
     <div className="property_round-top">
       <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
       {dateLabel && <span className="property_round-date">{dateLabel}</span>}
@@ -130,7 +128,7 @@ export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, 
       {documents.length > 0 && <div className="property_summary-documents">
         <h2 className="property_summary-documents-title">Documentos</h2>
         <div className="property_summary-documents-links">
-          {documents.map(doc => <a key={doc.label} className="ui-button is-sm is-secondary" href={doc.href} target="_blank" rel="noopener noreferrer" download={doc.download || undefined}>
+          {documents.map(doc => <a key={doc.label} className="ui-button is-xs is-quiet" href={doc.href} target="_blank" rel="noopener noreferrer" download={doc.download || undefined}>
             <ActionIcon kind={doc.download ? 'download' : 'external'} />{doc.label}
           </a>)}
         </div>
