@@ -248,7 +248,9 @@ ação equivalente à modalidade.
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
 - Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
-  Uma falha temporária nessas fontes preserva a última referência saudável em
+  A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
+  um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
+  comparável utilizável retorna, a última referência saudável é preservada em
   vez de publicar uma estimativa baseada em uma coleta vazia.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação

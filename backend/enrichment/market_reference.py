@@ -28,7 +28,7 @@ from ingestion.geocode import NominatimClient
 from tools.property_scraper import scrape_comparables
 
 
-MARKET_REFERENCE_SOURCE = "listing_median_confidence_v6"
+MARKET_REFERENCE_SOURCE = "listing_median_confidence_v7"
 
 
 def _now() -> datetime:
@@ -196,7 +196,13 @@ async def refresh_references(
         # inputs (type, bedrooms and coordinates), so treating them as fresh
         # would leave every rematerialized analysis artificially low until the
         # normal 90-day expiry.
-        stmt = select(MarketReferenceJob).where(MarketReferenceJob.uf.in_(ufs))
+        stmt = select(MarketReferenceJob).join(
+            Property,
+            MarketReferenceJob.representative_property_id == Property.id,
+        ).where(
+            MarketReferenceJob.uf.in_(ufs),
+            Property.status == "active",
+        )
         if property_id is not None:
             stmt = stmt.where(MarketReferenceJob.representative_property_id == property_id)
         jobs = session.execute(stmt.order_by(

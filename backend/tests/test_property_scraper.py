@@ -10,7 +10,6 @@ from tools.property_scraper import (
     BrightDataWebUnlocker,
     ComparableSourceBlockedError,
     _canonical_listing_url,
-    _extract_street,
     _filter_to_subject_radius,
     _parse_beds_from_text,
     _parse_property_type,
@@ -42,27 +41,6 @@ def _make_metadata(**overrides):
     )
     defaults.update(overrides)
     return PropertyMetadata(**defaults)
-
-
-# ---------------------------------------------------------------------------
-# Street extraction tests
-# ---------------------------------------------------------------------------
-
-
-def test_extract_street_from_full_address():
-    assert _extract_street("Rua das Flores, 123, Centro, Sao Paulo - SP") == "Rua das Flores"
-
-
-def test_extract_street_with_avenue():
-    assert _extract_street("Av. Paulista, 1000, Bela Vista, Sao Paulo - SP") == "Av. Paulista"
-
-
-def test_extract_street_simple():
-    assert _extract_street("Rua A, 45") == "Rua A"
-
-
-def test_extract_street_empty():
-    assert _extract_street("") == ""
 
 
 def test_bright_data_configuration_is_required(monkeypatch):
@@ -349,7 +327,7 @@ async def test_scrape_comparables_calls_only_the_three_managed_sources():
         source="Chaves na Mão",
         url="https://www.chavesnamao.com.br/imovel/1",
     )
-    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]) as mock_quintoandar, \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[comp, comp, comp]) as mock_chaves, \
          patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]) as mock_iw, \
          patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
@@ -364,6 +342,9 @@ async def test_scrape_comparables_calls_only_the_three_managed_sources():
         result = await scrape_comparables(_make_metadata())
 
     assert len(result) == 1  # duplicate URLs are collapsed
+    assert mock_quintoandar.call_args.kwargs["location_override"] == "Moema"
+    assert mock_chaves.call_args.kwargs["location_override"] == "Moema"
+    assert mock_iw.call_args.kwargs["location_override"] == "Moema"
     mock_chaves.assert_called_once()
     mock_iw.assert_called_once()
     mock_browser.close.assert_awaited_once()
@@ -399,7 +380,7 @@ async def test_scrape_comparables_falls_through_when_first_fails():
 
 
 @pytest.mark.asyncio
-async def test_scrape_comparables_propagates_blocked_source_and_closes_browser():
+async def test_scrape_comparables_preserves_snapshot_when_no_source_is_usable():
     with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[]), \
          patch("tools.property_scraper.scrape_chavesnamao", new_callable=AsyncMock, return_value=[]), \
          patch(
@@ -414,9 +395,37 @@ async def test_scrape_comparables_propagates_blocked_source_and_closes_browser()
         mock_page = AsyncMock()
         mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
 
-        with pytest.raises(ComparableSourceBlockedError, match="blocked"):
+        with pytest.raises(ComparableSourceBlockedError, match="No usable comparables"):
             await scrape_comparables(_make_metadata())
 
+    mock_browser.close.assert_awaited_once()
+    mock_playwright.stop.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_scrape_comparables_uses_healthy_sources_when_one_is_blocked():
+    comp = ComparableProperty(
+        address="Rua B, São Paulo", price=600_000, area_m2=60,
+        price_per_m2=10_000, source="QuintoAndar",
+        url="https://www.quintoandar.com.br/imovel/2",
+    )
+    with patch("tools.property_scraper.scrape_quintoandar", new_callable=AsyncMock, return_value=[comp]), \
+         patch(
+             "tools.property_scraper.scrape_chavesnamao",
+             new_callable=AsyncMock,
+             side_effect=ComparableSourceBlockedError("challenge"),
+         ), \
+         patch("tools.property_scraper.scrape_imovelweb", new_callable=AsyncMock, return_value=[]), \
+         patch("tools.property_scraper.asyncio.sleep", new_callable=AsyncMock), \
+         patch("tools.property_scraper._launch_parser_browser") as mock_launch:
+        mock_playwright = AsyncMock()
+        mock_browser = AsyncMock()
+        mock_page = AsyncMock()
+        mock_launch.return_value = (mock_playwright, mock_browser, mock_page)
+
+        result = await scrape_comparables(_make_metadata())
+
+    assert result == [comp]
     mock_browser.close.assert_awaited_once()
     mock_playwright.stop.assert_awaited_once()
 
@@ -460,5 +469,4 @@ async def test_scrape_comparables_merges_partial_results():
 
         result = await scrape_comparables(_make_metadata())
 
-    # Street search yields 2 comps; neighborhood fallback repeats and deduplicates them.
-    assert len(result) >= 2
+    assert len(result) == 2
