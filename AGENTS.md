@@ -220,9 +220,10 @@ The full platform will include:
   rua disfarçada de bairro; uma fonte bloqueada não descarta comparáveis válidos
   devolvidos pelas outras, mas a referência anterior continua preservada quando
   nenhuma evidência utilizável retorna. A fila passou a excluir também jobs
-  legados cujo imóvel representante não está mais ativo. A versão `v7` refaz
-  gradualmente os snapshots `v6` afetados, com até metade das requisições por
-  região.
+  legados cujo imóvel representante não está mais ativo, e o relatório de
+  cobertura deixou de misturar esses jobs históricos com o trabalho atual. A
+  versão `v7` refaz gradualmente os snapshots `v6` afetados, com até metade das
+  requisições por região.
 
 - **2026-10-06** — O catálogo passou a abrir com leilões e compra direta juntos.
   O tipo de venda virou um filtro de três opções (Todos, Leilões, Compra

@@ -21,7 +21,14 @@ def build_report(session_factory, ufs: list[str]) -> dict:
         enriched_ids = set(session.execute(select(Enrichment.property_id)).scalars())
         with_reference = sum(resolve_market_reference(session, prop) is not None for prop in properties)
         analyzed = sum(prop.id in enriched_ids for prop in properties)
-        job_stmt = select(MarketReferenceJob)
+        # Keep the operational queue summary on the same active-catalog scope
+        # as the property coverage above. Historical jobs remain persisted for
+        # auditability, but they are neither executed nor reported as current
+        # work once their representative property becomes inactive.
+        job_stmt = select(MarketReferenceJob).join(
+            Property,
+            MarketReferenceJob.representative_property_id == Property.id,
+        ).where(Property.status == "active")
         if ufs:
             job_stmt = job_stmt.where(MarketReferenceJob.uf.in_(ufs))
         jobs = session.execute(job_stmt).scalars().all()
