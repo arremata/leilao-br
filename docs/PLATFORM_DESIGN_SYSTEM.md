@@ -26,6 +26,28 @@ movimento.
 Raios: `--ui-radius-md` .75rem (blocos internos), `--ui-radius-card` 1rem
 (cards e painéis), `--ui-radius-pill` (botões, selos). Borda .0625rem.
 
+## Espaçamento por função
+
+Componentes usam só estes tokens; nenhum `padding`, `margin` ou `gap` com
+valor escrito à mão (o `lint:design` bloqueia). Para mudar o respiro da
+plataforma, altere o token no `:root` do `design-system.css`.
+
+| Token | Uso | Desktop | Celular |
+| --- | --- | --- | --- |
+| `--ui-gap-tight` | selos, chips, linhas de um título | xs (.5rem) | xs |
+| `--ui-gap-inline` | botões lado a lado | sm (.75rem) | sm |
+| `--ui-gap-stack` | itens de um grupo | md (1rem) | md |
+| `--ui-gap-group` | grupos dentro de um card | lg (1.5rem) | md |
+| `--ui-gap-section` | blocos da página (card → abas) | xl (2rem) | lg |
+| `--ui-pad-page` | margem lateral da página | lg | md |
+| `--ui-pad-card` | interior de cards e painéis | lg | md |
+| `--ui-pad-tile` | interior de blocos dentro de um card | md / lg | md |
+| `--ui-pad-button` | lateral dos botões | md | md |
+
+Os valores de celular são aplicados uma única vez, numa media query de
+40rem no `:root`; os componentes não repetem espaçamento por tamanho de tela.
+Ajustes finos usam a escala base (`--ui-space-3xs` a `--ui-space-3xl`).
+
 ## Botões
 
 - `ui-button`: principal, roxo. Um por bloco.
