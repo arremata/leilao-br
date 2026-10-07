@@ -15,6 +15,8 @@ Run `npm run lint:design` alongside frontend lint/build.
 The user's later platform choice overrides the LP filled hover: use a thin
 brand border on hover, preserving the normal background/text. Persistent
 selection must have its own accessible state and must not be imitated by hover.
+Filled brand actions and selected controls use a thin white hover border;
+unselected white controls use a thin brand hover border. Navigation links are pill.
 Do not copy legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
 are migration work, not approved alternatives. Review each changed component
 at desktop/mobile sizes, including alignment of conditional content.
@@ -230,6 +232,13 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-10-06** — Compactou o resumo do imóvel em uma superfície única com foto
+  menor e dois controles curtos de Descrição/Características junto dos preços.
+  O conteúdo solicitado abre na largura do painel, sem duas faixas extensas
+  permanentes. A avaliação voltou a mostrar o preço mesmo quando igual a uma
+  rodada. Menu passou a usar pill; hover de ação roxa/selecionada usa borda branca,
+  enquanto controle branco/não selecionado usa borda roxa.
 
 - **2026-10-06** — Separou hover por borda de seleção persistente na plataforma;
   padronizou Entrar/Criar conta em pill e as ações legadas com classe de botão.

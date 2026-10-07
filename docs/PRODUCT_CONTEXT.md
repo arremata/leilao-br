@@ -8,6 +8,12 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 ## Padrão visual — migração pendente
 
+O topo do imóvel está em validação com uma única superfície, foto menor e
+controles compactos de Descrição/Características junto das informações. Apenas
+o conteúdo solicitado se expande na largura do painel. A avaliação mostra seu
+preço, inclusive quando igual ao de uma rodada. Menu usa pill; hover de ações
+roxas/selecionadas usa borda branca, e controles brancos recebem borda roxa.
+
 A primeira aba do imóvel também está em validação com dimensões em REM, textos
 maiores e ações pill. Hover indica disponibilidade por borda, enquanto seleção
 tem estado persistente próprio. As abas quebram linhas sem rolagem interna e

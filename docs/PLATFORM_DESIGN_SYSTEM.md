@@ -82,8 +82,9 @@ Seleções em cartões, controles segmentados e controles de tabelas devem mante
 - **Inversa:** fundo branco, texto roxo e borda branca de 1 px, para fundos escuros.
 - **Link de ação:** texto roxo e fundo/borda transparentes; sem caixa de altura fixa no CSS da LP. Hover escurece e revela sublinhado.
 - Principal, secundária e inversa compartilham feedback de borda no hover,
-  mantendo a aparência normal. Abas selecionadas usam fundo roxo suave e borda
-  roxa; hover não deve simular seleção.
+  mantendo a aparência normal. Controles selecionados usam fundo roxo e texto
+  branco. No hover de uma ação roxa ou selecionada, a borda fina fica branca;
+  em controles brancos não selecionados, fica roxa. Hover não altera seleção.
 - Foco em ações: contorno de 2 px e afastamento de 3 px; desabilitado: opacidade 0,5 e sem transformação. O contorno de foco é diferente da borda normal de 1 px.
 
 ## Espaçamento e estrutura

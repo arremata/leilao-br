@@ -70,11 +70,11 @@
 .property_detail-breadcrumb { color: var(--ui-text-muted); font-size: var(--ui-text-sm); min-width: 0; flex-wrap: wrap; }
 .property_detail .detail-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs); overflow: visible; padding: 0; }
 .property_detail .detail-actions .ui-button { width: auto; flex: none; }
-.property_summary { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--ui-space-lg); align-items: start; margin-bottom: var(--ui-space-lg); color: var(--ui-text); }
+.property_summary { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.5fr); gap: var(--ui-space-lg); align-items: start; margin-bottom: var(--ui-space-lg); padding: var(--ui-space-lg); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-lg); background: var(--ui-white); color: var(--ui-text); }
 .property_summary-gallery { position: relative; overflow: hidden; border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-lg); }
 .property_summary-gallery .ph { background: var(--ui-soft); }
 .property_summary-photo-label { position: absolute; top: var(--ui-space-md); left: var(--ui-space-md); background: var(--ui-white); }
-.property_summary-panel { min-width: 0; padding: var(--ui-space-lg); background: var(--ui-white); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-sm); }
+.property_summary-panel { min-width: 0; }
 .property_summary-tags { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs); margin-bottom: var(--ui-space-md); }
 .property_summary h1 { margin: 0 0 var(--ui-space-xs); font: 800 var(--ui-text-3xl)/1.2 var(--f-display); letter-spacing: -.025em; overflow-wrap: anywhere; }
 .property_summary-address { margin: 0 0 var(--ui-space-md); font-size: var(--ui-text-md); line-height: 1.55; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
@@ -120,7 +120,7 @@
 @media (max-width: 64rem) { .property_summary { grid-template-columns: minmax(0,1fr); } }
 @media (max-width: 40rem) {
   .property_detail { padding-inline: var(--ui-space-md); }
-  .property_summary-panel { padding: var(--ui-space-md); }
+  .property_summary { padding: var(--ui-space-md); }
   .property_summary .official-bid-status { flex-direction: column; }
   .property_summary h1 { font-size: var(--ui-text-2xl); }
   .property_summary-prices { column-gap: var(--ui-space-md); }
@@ -143,16 +143,36 @@
 .property_summary-extra .property_summary-details:first-child { margin-top: 0; }
 .property_detail .property_tabs { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs); overflow: visible; margin-bottom: var(--ui-space-lg); border: 0; padding: 0; }
 .property_tabs .property_tab { min-height: var(--ui-control-md); white-space: normal; font-size: var(--ui-text-sm); }
-.property_tabs .property_tab.is-selected { background: var(--ui-brand-soft); border-color: var(--ui-brand); color: var(--ui-brand-hover); box-shadow: none; }
+.property_tabs .property_tab.is-selected { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-white); box-shadow: none; }
+.property_tab.is-selected .property_tab-number { color: var(--ui-white); }
 .property_tab-number { font: 600 var(--ui-text-xs)/1 var(--f-sans); color: var(--ui-text-muted); }
 .property_tabs .ui-tag { font-size: var(--ui-text-xs); padding: var(--ui-space-2xs) var(--ui-space-xs); }
 .property_tab svg { width: var(--ui-space-md); height: var(--ui-space-md); }
+.topbar .nav a { border-radius: var(--ui-radius-pill); border: var(--ui-border-sm) solid transparent; padding: var(--ui-space-xs) var(--ui-space-sm); font-size: var(--ui-text-sm); }
+.topbar .nav a.active { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-brand); }
+.property_summary-more { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs); padding-top: var(--ui-space-md); }
+.property_summary-tags { margin-bottom: var(--ui-space-sm); }
+.property_summary-address, .property_summary-specs { margin-bottom: var(--ui-space-sm); }
+.property_summary .listing-badges { margin-bottom: var(--ui-space-md); }
+.property_summary-deadline, .property_summary-prices, .property_summary-appraisal { padding-block: var(--ui-space-xs); }
+.property_summary-difference { margin-bottom: var(--ui-space-sm); }
+.ui-button.is-selected { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-brand); }
+.property_summary-expanded { grid-column: 1 / -1; border-top: var(--ui-border-sm) solid var(--ui-border); padding-top: var(--ui-space-md); font-size: var(--ui-text-lg); line-height: 1.6; }
+.property_summary-expanded[hidden] { display: none; }
+.property_summary-expanded p { margin: 0; color: var(--ui-text-secondary); }
+.property_summary-expanded dl { margin: 0; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--ui-space-xs) var(--ui-space-lg); }
+.property_summary-expanded dl > div { display: flex; justify-content: space-between; gap: var(--ui-space-md); border-bottom: var(--ui-border-sm) solid var(--ui-border); padding: var(--ui-space-xs) 0; font-size: var(--ui-text-sm); }
+.property_summary-expanded dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 @media (hover: hover) and (pointer: fine) {
  .app-shell .btn:not(:disabled):hover { border-color: var(--ui-brand); box-shadow: none; transform: none; background: var(--ui-white); color: var(--ui-text); }
  .app-shell .btn.primary:not(:disabled):hover { background: var(--ui-brand); color: var(--ui-white); }
  .app-shell .btn.ghost:not(:disabled):hover { background: transparent; }
+ .topbar .nav a:hover { background: transparent; color: var(--ui-text); border-color: var(--ui-brand); }
+ .topbar .nav a.active:hover { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-white); }
+ .ui-button:not(.is-secondary):not(.is-inverse):not(.is-text):hover:not(:disabled), .ui-button.is-selected:hover:not(:disabled), .app-shell .btn.primary:hover:not(:disabled) { border-color: var(--ui-white); }
 }
 @media (max-width: 40rem) {
  .property_summary-extra { padding: var(--ui-space-md); }
  .property_tabs .property_tab { flex: 1 1 calc(50% - var(--ui-space-xs)); padding: var(--ui-space-xs); }
+ .property_summary-expanded dl { grid-template-columns: minmax(0,1fr); }
 }
