@@ -20,7 +20,8 @@ export function LockIcon({ size = 16, strokeWidth = 2 }) {
 // ============================================================
 // Countdown timer
 // ============================================================
-export function Countdown({ until, compact, dark, endedLabel = 'Encerrado' }) {
+// `words` writes the remaining time as a sentence: "Encerra em 1d 11h 48min".
+export function Countdown({ until, compact, dark, words, endedLabel = 'Encerrado' }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -56,7 +57,9 @@ export function Countdown({ until, compact, dark, endedLabel = 'Encerrado' }) {
   return (
     <span className="countdown" style={{ color: urgent ? 'var(--bad)' : (dark ? 'var(--fg-0)' : 'var(--fg-1)') }}>
       <span className="dot" style={{ background: urgent ? 'var(--bad)' : 'var(--accent)' }}></span>
-      {compact ? (
+      {words ? (
+        <span>{words} {d > 0 ? `${d}d ` : ''}{d > 0 || h > 0 ? `${h}h ` : ''}{m}min{d === 0 && h === 0 ? ` ${s}s` : ''}</span>
+      ) : compact ? (
         <span>{d > 0 ? `${d}d ` : ''}{pad(h)}:{pad(m)}:{pad(s)}</span>
       ) : (
         <span>

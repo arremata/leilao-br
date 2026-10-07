@@ -94,16 +94,6 @@ function mergeEnrichment(card, enrichment) {
   return merged;
 }
 
-/** Formato curto usado dentro do card do imóvel: "14 de set. · 10:00". */
-function formatAuctionDayTime(value) {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return String(value);
-  const dia = parsed.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', timeZone: SAO_PAULO });
-  const hora = parsed.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: SAO_PAULO });
-  return `${dia} · ${hora}`;
-}
-
 /** Formato longo, com ano, para o registro oficial na aba de documentos. */
 function formatAuctionDate(value) {
   if (!value) return '';
@@ -672,72 +662,33 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           <span>{listingTitle(p)}</span>
         </Link>
         <div className="row gap-2 detail-actions">
-          {auctionUrl && (
-            <a
-              /* Num imóvel que saiu do catálogo, esta deixa de ser a ação
-                 principal: seria convidar a pessoa a dar lance no que não
-                 existe mais. O link fica, para ela poder conferir. */
-              className={`ui-button is-sm${isRemoved ? ' is-secondary' : ''}`}
-              href={auctionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {isRemoved
-                ? 'Conferir na Caixa'
-                : isDirectSale ? 'Ver na Caixa' : 'Ver o leilão na Caixa'}
-              <ActionIcon />
-            </a>
-          )}
-          {editalUrl && (
-            <a
-              className="ui-button is-sm is-secondary"
-              href={editalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-            >
-              Baixar as regras <ActionIcon kind="download" />
-            </a>
-          )}
-          {matriculaUrl && (
-            <a
-              className="ui-button is-sm is-secondary"
-              href={matriculaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-            >
-              Baixar a certidão do imóvel <ActionIcon kind="download" />
-            </a>
-          )}
-          {saleRulesUrl && (
-            <a
-              className="ui-button is-sm is-secondary"
-              href={saleRulesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Regras da venda <ActionIcon />
-            </a>
-          )}
-          <button className="ui-button is-sm is-secondary" aria-pressed={isWatched} onClick={() => toggleWatch?.(p.id)}>
-            <ActionIcon kind="star" filled={isWatched} />
-            {isWatched ? 'Salvo' : 'Salvar'}
-          </button>
           {!isEnriched && p.canAnalyze && (
             <button
-              className="ui-button is-sm"
+              className="ui-button is-sm is-secondary"
               onClick={handleAnalyze}
               disabled={analyzing}
             >
               {analyzing ? 'Buscando…' : 'Buscar preço na região'}
             </button>
           )}
+          {auctionUrl && (
+            /* Link de saída, não a ação principal: a página existe para a
+               pessoa usar as análises abaixo antes de ir à Caixa. */
+            <a className="ui-button is-sm is-secondary" href={auctionUrl} target="_blank" rel="noopener noreferrer">
+              {isRemoved ? 'Conferir na Caixa' : isDirectSale ? 'Ver na Caixa' : 'Ver leilão na Caixa'}
+              <ActionIcon />
+            </a>
+          )}
+          <button className={`ui-button is-sm is-secondary property_detail-save${isWatched ? ' is-saved' : ''}`} aria-pressed={isWatched} onClick={() => toggleWatch?.(p.id)}>
+            <ActionIcon kind="star" filled={isWatched} />
+            {isWatched ? 'Salvo' : 'Salvar'}
+          </button>
         </div>
       </div>
 
       <PropertySummary p={p} schedule={schedule} isDirectSale={isDirectSale}
-        formatDate={formatAuctionDayTime} bidNotice={<OfficialBidNotice p={p} />} />
+        bidNotice={<OfficialBidNotice p={p} />}
+        editalUrl={editalUrl} matriculaUrl={matriculaUrl} saleRulesUrl={saleRulesUrl} />
 
       {isEnriched && <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />}
 

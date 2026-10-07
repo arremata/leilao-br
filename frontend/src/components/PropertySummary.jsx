@@ -1,8 +1,6 @@
-import { useId, useState } from 'react';
 import { Countdown, ListingBadges, Photo } from './shared';
-import { listingTitle } from '../listingPresentation';
-import { propertySummaryModel } from '../propertySummaryModel';
-import { saleTagLabel } from '../auctionRounds';
+import { listingLocation, listingStreet } from '../listingPresentation';
+import { propertySummaryModel, roundDateLabel, summaryMoney } from '../propertySummaryModel';
 import { fmtBRL } from '../utils';
 
 export function ActionIcon({ kind = 'external', filled = false }) {
@@ -12,51 +10,115 @@ export function ActionIcon({ kind = 'external', filled = false }) {
     plus: <path d="M12 5v14M5 12h14" />,
     back: <path d="m10 5-7 7 7 7M3 12h18" />,
     star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" />,
+    pin: <><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></>,
   };
   return <svg viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>;
 }
 
-export default function PropertySummary({ p, schedule, isDirectSale, formatDate, bidNotice }) {
-  const [expanded, setExpanded] = useState(null);
-  const extraId = useId();
-  const { isSfi, rounds, first, difference } = propertySummaryModel(p, schedule, isDirectSale);
-  const specs = [p.area > 0 && `${Number(p.area).toLocaleString('pt-BR')} m²`, p.beds > 0 && `${p.beds} ${p.beds === 1 ? 'dormitório' : 'dormitórios'}`, p.baths > 0 && `${p.baths} ${p.baths === 1 ? 'banheiro' : 'banheiros'}`, p.parking > 0 && `${p.parking} ${p.parking === 1 ? 'vaga' : 'vagas'}`, p.floor && `Andar ${p.floor}`].filter(Boolean);
+const ROUND_STATE = { current: 'atual', upcoming: 'se não vender', ended: 'encerrada' };
+
+function roundBadge(round, isDirectSale, isSfi) {
+  if (isDirectSale) return 'Compra direta';
+  if (!isSfi) return round.state === 'ended' ? 'Rodada única · encerrada' : 'Rodada única · atual';
+  return `${round.round}ª rodada · ${ROUND_STATE[round.state]}`;
+}
+
+function AppraisalGap({ gap }) {
+  if (!gap) return null;
+  if (gap.tone === 'equal') return <span className="property_round-gap">Sem desconto · igual à avaliação</span>;
+  return <span className={`property_round-gap is-${gap.tone}`}>{gap.percent}% {gap.tone === 'less' ? 'abaixo' : 'acima'} da avaliação</span>;
+}
+
+/** Comparação da 2ª com a 1ª rodada, no quadro da 2ª. */
+function FirstRoundComparison({ difference }) {
+  if (difference === null || difference === 0) return null;
+  return difference < 0
+    ? <span className="property_round-saving">Economia de {summaryMoney(-difference)} sobre a 1ª rodada</span>
+    : <span className="property_round-saving is-more">{summaryMoney(difference)} a mais que a 1ª rodada. Na 2ª rodada, o mínimo é a dívida com as despesas e pode superar o valor da 1ª.</span>;
+}
+
+function RoundCard({ round, model, schedule, isDirectSale, p }) {
+  const isCurrent = round.state === 'current';
+  const showClock = isCurrent || (!model.isSfi && round.state === 'ended');
+  const gap = round.appraisalGap;
+  return <article className={`property_round is-${round.state}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
+    <span className="property_round-badge">{roundBadge(round, isDirectSale, model.isSfi)}</span>
+    <div className="property_round-price-row">
+      <strong className="property_round-price" title={round.price > 0 ? `R$ ${fmtBRL(Number(round.price))}` : undefined}>{summaryMoney(round.price)}</strong>
+      {gap?.tone === 'less' && <span className="property_round-discount" aria-hidden="true">−{gap.percent}%</span>}
+    </div>
+    <div className="property_round-notes">
+      <AppraisalGap gap={gap} />
+      {round.round === 2 && <FirstRoundComparison difference={model.difference} />}
+    </div>
+    <div className="property_round-meta">
+      <span>{roundDateLabel(round.date) || (isDirectSale ? 'Sujeito à disponibilidade na Caixa' : 'Data não informada')}</span>
+      {showClock && (isDirectSale && !p.endsAt
+        ? <span>Sem prazo divulgado</span>
+        : <Countdown until={schedule.headline.until} words="Encerra em" dark endedLabel={schedule.headline.short || 'Encerrado'} />)}
+    </div>
+  </article>;
+}
+
+export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, editalUrl, matriculaUrl, saleRulesUrl }) {
+  const model = propertySummaryModel(p, schedule, isDirectSale);
+  const photos = [...new Set([p.photoUrl, ...(Array.isArray(p.photoUrls) ? p.photoUrls : [])].filter(url => typeof url === 'string' && url.trim()))].slice(0, 5);
+  const location = listingLocation(p);
+  const street = listingStreet(p.address);
+  const specs = [
+    p.area > 0 && `${Number(p.area).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²`,
+    p.beds > 0 && `${p.beds} ${Number(p.beds) === 1 ? 'quarto' : 'quartos'}`,
+    p.baths > 0 && `${p.baths} ${Number(p.baths) === 1 ? 'banheiro' : 'banheiros'}`,
+    p.parking > 0 && `${p.parking} ${Number(p.parking) === 1 ? 'vaga' : 'vagas'}`,
+    p.floor && `Andar ${p.floor}`,
+  ].filter(Boolean);
+  const saleType = p.modalidade || p.auctionType;
+  const documents = [
+    editalUrl && { href: editalUrl, label: 'Baixar as regras', download: true },
+    matriculaUrl && { href: matriculaUrl, label: 'Baixar a certidão do imóvel', download: true },
+    saleRulesUrl && { href: saleRulesUrl, label: 'Regras da venda', download: false },
+  ].filter(Boolean);
   return <section className="property_summary" aria-labelledby="property-summary-title">
-    <div className="property_summary-gallery">
-      <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="4/3" showLabel={false} />
-      <span className="ui-tag property_summary-photo-label">Fachada</span>
+    <div className={`property_summary-gallery${photos.length > 1 ? ' is-multiple' : ''}`} style={photos.length > 1 ? { gridTemplateRows: `repeat(${photos.length - 1},minmax(0,1fr))` } : undefined} aria-label="Fotos do imóvel">
+      {(photos.length ? photos : [null]).map((url, index) => <div className={`property_summary-photo${index === 0 ? ' is-main' : ''}`} key={url || 'missing'}>
+        <Photo label={index === 0 ? (p.photoLabel || 'Foto principal do imóvel') : `Foto ${index + 1} do imóvel`} photoUrl={url} ratio="auto" showLabel={false} style={{ height: '100%' }} />
+      </div>)}
     </div>
+
     <div className="property_summary-panel">
-      <div className="property_summary-tags"><span className="ui-tag is-brand">{saleTagLabel(p, schedule)}</span><span className="ui-tag">{p.type}</span></div>
-      <h1 id="property-summary-title">{listingTitle(p)}</h1>
-      <p className="property_summary-address">{[p.address, p.neighborhood, p.city].filter(Boolean).join(' · ')}</p>
-      <ul className="property_summary-specs" aria-label="Características principais">{specs.map(spec => <li key={spec}>{spec}</li>)}</ul>
-      <ListingBadges p={p} size="lg" />
-      <div className="property_summary-deadline">
-        <span className="property_summary-label">{isDirectSale ? 'Disponibilidade' : schedule.headline.label}</span>
-        {isDirectSale && !p.endsAt ? <span>Sem prazo divulgado</span> : <Countdown until={schedule.headline.until} dark endedLabel={schedule.headline.short || 'Encerrado'} />}
+      <header className="property_summary-header">
+        {saleType && <span className="property_summary-eyebrow">{saleType}</span>}
+        <h1 id="property-summary-title">{p.type || 'Imóvel'}</h1>
+        <p className="property_summary-address">
+          <ActionIcon kind="pin" />
+          <span>{[street, location !== 'Cidade não informada' && location].filter(Boolean).join(' · ') || 'Endereço não informado'}</span>
+        </p>
+        <ul className="property_summary-chips" aria-label="Características e situação">
+          {specs.map(spec => <li key={spec} className="property_summary-chip">{spec}</li>)}
+          <li className="property_summary-chip-group"><ListingBadges p={p} size="lg" /></li>
+        </ul>
+      </header>
+
+      <div className="property_summary-pricing">
+        <p className="property_summary-appraisal">
+          Avaliação Caixa: <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
+        </p>
+        <div className={`property_summary-rounds${model.rounds.length === 1 ? ' is-single' : ''}`} aria-label="Preços e datas das rodadas">
+          {model.rounds.map(round => <RoundCard key={round.label} round={round} model={model} schedule={schedule} isDirectSale={isDirectSale} p={p} />)}
+        </div>
+        {model.isSfi && !model.current && schedule.headline?.label && (
+          <p className="property_summary-status">{schedule.headline.label}{schedule.headline.note ? ` · ${schedule.headline.note}` : ''}</p>
+        )}
+        {bidNotice}
       </div>
-      {bidNotice}
-      <div className="property_summary-prices" aria-label="Datas e preços das rodadas">
-        {rounds.map(round => <div className="property_summary-round" key={round.label}>
-          <span className="property_summary-label">{round.label}</span>
-          <strong className="property_summary-price">{round.price > 0 ? `R$ ${fmtBRL(round.price)}` : 'A publicar'}</strong>
-          <span className="property_summary-date">{formatDate(round.date) || 'Data não informada'}</span>
-        </div>)}
-      </div>
-      {isSfi && difference !== null && <p className={`property_summary-difference ${difference > 0 ? 'is-more' : 'is-less'}`}>
-        {difference === 0 ? 'Mesmo preço nas duas rodadas.' : <>{difference > 0 ? '+' : '−'}{(Math.abs(difference) / first * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% · R$ {fmtBRL(Math.abs(difference))} a {difference > 0 ? 'mais' : 'menos'} na 2ª rodada em relação à 1ª.</>}
-        {difference > 0 && ' Na 2ª rodada, o mínimo é a dívida com as despesas e pode superar o valor da 1ª.'}
-      </p>}
-      <div className="property_summary-appraisal"><span>Valor de avaliação</span><strong>{p.appraisal > 0 ? `R$ ${fmtBRL(p.appraisal)}` : 'Não informado pela Caixa'}</strong></div>
-      <div className="property_summary-more">
-        <button className={`ui-button is-sm is-secondary${expanded === 'description' ? ' is-selected' : ''}`} aria-expanded={expanded === 'description'} aria-controls={extraId} onClick={() => setExpanded(expanded === 'description' ? null : 'description')}>Descrição <span aria-hidden="true">{expanded === 'description' ? '−' : '+'}</span></button>
-        <button className={`ui-button is-sm is-secondary${expanded === 'features' ? ' is-selected' : ''}`} aria-expanded={expanded === 'features'} aria-controls={extraId} onClick={() => setExpanded(expanded === 'features' ? null : 'features')}>Características <span aria-hidden="true">{expanded === 'features' ? '−' : '+'}</span></button>
-      </div>
-    </div>
-    <div id={extraId} hidden={!expanded} className="property_summary-expanded" role="region" aria-label={expanded === 'description' ? 'Descrição do imóvel' : 'Características'}>
-      {expanded === 'description' && <p>{p.viability?.description || 'Descrição não disponível.'}</p>}
-      {expanded === 'features' && (p.viability?.features ? <dl>{Object.entries(p.viability.features).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}</dl> : <p>Dados não disponíveis.</p>)}
+      {documents.length > 0 && <div className="property_summary-documents">
+        <h2 className="property_summary-documents-title">Documentos</h2>
+        <div className="property_summary-documents-links">
+          {documents.map(doc => <a key={doc.label} className="ui-button is-sm is-secondary" href={doc.href} target="_blank" rel="noopener noreferrer" download={doc.download || undefined}>
+            <ActionIcon kind={doc.download ? 'download' : 'external'} />{doc.label}
+          </a>)}
+        </div>
+      </div>}
     </div>
   </section>;
 }

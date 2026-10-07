@@ -234,6 +234,17 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco mais
+  compacto: foto à esquerda e, à direita, tipo, endereço em uma linha com
+  bairro, cidade e UF, e selos de área, quartos, ocupação e FGTS. A avaliação
+  da Caixa vem antes de dois quadros de rodada; a vigente é destacada com data
+  e prazo, e a outra mostra a diferença para a avaliação e a economia sobre a
+  1ª. Os documentos oficiais ficam no fim do mesmo quadro e as abas da análise
+  logo abaixo dele, como ação principal. “Ver leilão na Caixa” e “Salvar”
+  passaram a links discretos ao lado do caminho de volta. Descrição e
+  características saíram do topo. Todos os botões da página usam a mesma
+  altura (2.5rem). Nenhum preço, link ou regra mudou.
+
 - **2026-10-06** — Corrigiu o hover branco para ficar dentro do preenchimento
   roxo, usando traço interno em REM e preservando a borda roxa externa. O mesmo
   token vale para ações preenchidas, controles selecionados e menu ativo.
