@@ -235,6 +235,12 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-07** — Tornou backfills completos de referências retomáveis sem
+  cobrar novamente regiões já concluídas: uma execução forçada pode selecionar
+  apenas jobs não tentados desde o início da campanha. Runs forçadas também
+  rematerializam todas as análises desatualizadas, inclusive quando uma coleta
+  anterior atingiu o timeout depois de já persistir referências parciais.
+
 - **2026-10-07** — Otimizou a atualização das referências de mercado sem mudar
   as regras de preço: QuintoAndar, ImovelWeb e Chaves na Mão passam a ser
   consultados em paralelo controlado, o HTML renderizado pela Bright Data é
