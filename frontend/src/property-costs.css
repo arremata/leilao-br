@@ -7,7 +7,7 @@
 
 /* ---------- Surfaces and rhythm ---------- */
 .property_costs .card { padding: var(--ui-pad-card); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-card); background: var(--ui-white); box-shadow: none; }
-.property_costs > .card + .card { margin-top: var(--ui-gap-section); }
+.property_costs .card + .card { margin-top: var(--ui-gap-section); }
 .property_costs .simulator-card > * + * { margin-top: var(--ui-gap-section); }
 .property_costs .simulator-card > .automatic-cost-tags { margin-top: var(--ui-gap-tight); }
 .property_costs .cost-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ui-gap-stack); padding-bottom: var(--ui-gap-group); border-bottom: var(--ui-border-sm) solid var(--ui-border); }
