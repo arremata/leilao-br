@@ -226,6 +226,7 @@ def _claim_jobs(
     property_id: int | None,
     force: bool = False,
     excluded_job_ids: set[int] | None = None,
+    attempted_before: datetime | None = None,
 ) -> list[ClaimedMarketJob]:
     """Claim due jobs atomically; PostgreSQL workers skip each other's rows."""
     now = _now()
@@ -274,6 +275,11 @@ def _claim_jobs(
         )
         if excluded_job_ids:
             stmt = stmt.where(MarketReferenceJob.id.notin_(excluded_job_ids))
+        if attempted_before is not None:
+            stmt = stmt.where(or_(
+                MarketReferenceJob.last_attempted_at.is_(None),
+                MarketReferenceJob.last_attempted_at < attempted_before,
+            ))
         if property_id is not None:
             stmt = stmt.where(
                 MarketReferenceJob.representative_property_id == property_id,
@@ -419,6 +425,7 @@ async def refresh_references(
     concurrency: int = DEFAULT_CONCURRENCY,
     collector: MarketReferenceCollector | None = None,
     force: bool = False,
+    attempted_before: datetime | None = None,
 ) -> dict:
     started = time.monotonic()
     coverage = reconcile_coverage(session_factory, ufs)
@@ -473,6 +480,7 @@ async def refresh_references(
                 property_id,
                 force=force,
                 excluded_job_ids=claimed_job_ids,
+                attempted_before=attempted_before,
             )
             if not claims:
                 break
@@ -512,6 +520,11 @@ def main(argv=None):
         action="store_true",
         help="Refresh selected jobs even when their normal retry date is in the future",
     )
+    parser.add_argument(
+        "--attempted-before",
+        default="",
+        help="With --force, resume a backfill using jobs not attempted since this ISO timestamp",
+    )
     parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
     parser.add_argument("--result-file", default="")
     args = parser.parse_args(argv)
@@ -521,6 +534,19 @@ def main(argv=None):
         parser.error("--max-age-days must be greater than zero")
     if not 1 <= args.concurrency <= 4:
         parser.error("--concurrency must be between 1 and 4")
+    if args.attempted_before and not args.force:
+        parser.error("--attempted-before requires --force")
+    attempted_before = None
+    if args.attempted_before:
+        try:
+            attempted_before = datetime.fromisoformat(
+                args.attempted_before.replace("Z", "+00:00"),
+            )
+            if attempted_before.tzinfo is None:
+                raise ValueError
+            attempted_before = attempted_before.astimezone(timezone.utc)
+        except ValueError:
+            parser.error("--attempted-before must be an ISO-8601 timestamp with timezone")
     engine = get_engine()
     factory = make_session_factory(engine)
     ufs = [value.strip().upper() for value in args.ufs.split(",") if value.strip()]
@@ -539,6 +565,7 @@ def main(argv=None):
         args.property_id,
         concurrency=args.concurrency,
         force=args.force,
+        attempted_before=attempted_before,
     ))
     if args.result_file:
         Path(args.result_file).write_text(

@@ -45,6 +45,8 @@ def test_scheduled_workflow_uses_a_safe_default_batch_size():
     assert 'default: "10"' in workflow
     assert "MARKET_LIMIT: ${{ github.event.inputs.limit || '10' }}" in workflow
     assert "MARKET_FORCE: ${{ github.event.inputs.force || 'false' }}" in workflow
+    assert "MARKET_ATTEMPTED_BEFORE:" in workflow
+    assert "Forced refresh: materializing every stale analysis in scope." in workflow
     assert 'default: false' in workflow
     assert 'timeout --signal=TERM --kill-after=30s 42m' in workflow
     assert "playwright install" not in workflow
@@ -471,3 +473,59 @@ async def test_forced_refresh_processes_fresh_jobs_only_once(monkeypatch):
     assert summary["selected"] == 3
     assert summary["updated"] == 3
     assert sorted(calls) == ["Cidade 0", "Cidade 1", "Cidade 2"]
+
+
+@pytest.mark.asyncio
+async def test_forced_resume_skips_jobs_attempted_since_cutoff(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    with factory() as session:
+        for index, attempted_at in enumerate((
+            cutoff - timedelta(minutes=1),
+            cutoff + timedelta(minutes=1),
+        )):
+            prop = Property(
+                source="caixa", source_id=f"resume-{index}", uf="PR",
+                city=f"Cidade {index}", neighborhood="",
+                property_type="Apartamento", address=f"Rua {index}",
+                area_m2=50, preco=100_000, status="active",
+            )
+            session.add(prop)
+            session.flush()
+            session.add(RegionalMarketPrice(
+                uf="PR", city=prop.city, neighborhood="",
+                property_type="Apartamento", price_per_m2=4_000,
+                sample_size=1, source=market_reference.MARKET_REFERENCE_SOURCE,
+                computed_at=attempted_at,
+            ))
+            session.add(MarketReferenceJob(
+                uf="PR", city=prop.city, neighborhood="",
+                property_type="Apartamento", representative_property_id=prop.id,
+                status="successful", last_attempted_at=attempted_at,
+                next_attempt_at=attempted_at + timedelta(days=90),
+            ))
+        session.commit()
+
+    calls = []
+
+    async def fake_scrape(metadata, **kwargs):
+        calls.append(metadata.city)
+        return [ComparableProperty(
+            address=f"Rua comparável {metadata.city}",
+            property_type="Apartamento", price=250_000,
+            area_m2=50, price_per_m2=5_000, source="Portal",
+            url=f"https://portal/{metadata.city}",
+            lat=-25.4284, lng=-49.2733,
+        )]
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fake_scrape)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+        collector=_StubCollector(), force=True, attempted_before=cutoff,
+    )
+
+    assert summary["selected"] == 1
+    assert summary["updated"] == 1
+    assert calls == ["Cidade 0"]
