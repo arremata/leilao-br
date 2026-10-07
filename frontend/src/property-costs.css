@@ -1,520 +1,196 @@
-/* Cost-tab migration: dimensions in REM, scoped to preserve other tabs. */
-.property_costs .slider { -webkit-appearance: none; appearance: none;
-  width: 100%; height: 0.25rem;
-  background: var(--bg-3);
-  border-radius: 62.4375rem;
-  outline: none; }
-.property_costs .slider::-webkit-slider-thumb { -webkit-appearance: none;
-  width: 1.125rem; height: 1.125rem;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 0.1875rem solid var(--bg-1);
-  cursor: pointer;
-  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,0.15); }
-.property_costs .slider::-moz-range-thumb { width: 1.125rem; height: 1.125rem;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 0.1875rem solid var(--bg-1);
-  cursor: pointer;
-  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,0.15); }
-.property_costs .cost-money-value,
-.property_costs .cost-total-value { max-width: 100%;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums; }
-.property_costs .cost-money-value { font-size: clamp(0.75rem, 1.15vw, 0.9375rem) !important; }
-.property_costs .cost-total-value { font-size: clamp(1.0625rem, 2vw, 1.625rem) !important; }
-.property_costs .cost-inline-action { color: var(--accent-strong);
-  font-size: 0.8125rem; }
-.property_costs .cost-inline-action.danger { color: var(--bad); }
-.property_costs .simulator-card { padding: var(--ui-pad-card) !important;
-  border-radius: 0.875rem;
-  box-shadow: 0 0.0625rem 0.125rem rgba(17,24,39,.04), 0 0.25rem 1rem rgba(17,24,39,.03); }
-.property_costs .simulator-reset-btn { border-radius: 0.375rem;
-  font-family: var(--f-mono);
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--fg-2); }
-.property_costs .scenario-cost-panel { margin-bottom: var(--ui-gap-group);
-  padding: var(--ui-pad-card);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.75rem;
-  background: var(--bg-2); }
-.property_costs .scenario-cost-panel-head { display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ui-space-md);
-  margin-bottom: var(--ui-space-lg); }
-.property_costs .scenario-cost-panel-head .uppy { color: var(--fg-1); }
-.property_costs .scenario-cost-panel-head p { margin: var(--ui-space-2xs) 0 0;
-  color: var(--fg-2);
-  font-size: 0.8125rem; }
-.property_costs .scenario-cost-grid { display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ui-space-md);
-  margin-bottom: var(--ui-space-md); }
-.property_costs .scenario-cost-grid.without-condominium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.property_costs .scenario-cost-pair { display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-md);
-  margin-bottom: var(--ui-space-md); }
-.property_costs .scenario-money-field--reno { display: flex;
-  flex-direction: column;
-  gap: 0; }
-.property_costs .scenario-money-field { min-width: 0;
-  padding: var(--ui-space-md) var(--ui-space-md);
-  background: var(--bg-1);
-  border-radius: 0.75rem;
-  border: 0.0625rem solid var(--line-1);
-  box-shadow: 0 0.0625rem 0.125rem rgba(17,24,39,.03); }
-.property_costs .scenario-money-field > label > .uppy { display: block;
-  margin-bottom: var(--ui-space-xs);
-  color: var(--fg-2);
-  letter-spacing: .06em; }
-.property_costs .scenario-money-input { display: flex;
-  align-items: center;
-  height: 2.5rem;
-  padding: 0 var(--ui-space-sm);
-  border: 0.0625rem solid var(--line-2);
-  border-radius: 0.5rem;
-  background: var(--bg-1);
-  color: var(--fg-2);
-  font-family: var(--f-mono);
-  transition: border-color .15s, box-shadow .15s; }
-.property_costs .scenario-money-input:focus-within { border-color: var(--accent);
-  box-shadow: 0 0 0 0.1875rem color-mix(in oklch, var(--accent) 25%, transparent); }
-.property_costs .scenario-money-input input { width: 100%;
-  min-width: 0;
-  padding: 0 var(--ui-space-xs);
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--fg-0);
-  font-family: var(--f-mono);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  font-feature-settings: 'tnum'; }
-.property_costs .scenario-money-suffix { flex: 0 0 auto;
-  color: var(--fg-3);
-  font-size: 0.8125rem; }
-.property_costs .scenario-money-meta { display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ui-space-xs);
-  min-height: 1.0625rem;
-  margin-top: var(--ui-space-xs);
-  color: var(--fg-3);
-  font-size: 0.8125rem; }
-.property_costs .scenario-money-meta button { flex: 0 0 auto;
-  color: var(--accent-strong);
-  font-size: 0.8125rem; }
-.property_costs .scenario-cost-panel > p { padding-top: var(--ui-space-md);
-  border-top: 0.0625rem dashed var(--line-1);
-  font-size: 0.8125rem !important;
-  line-height: 1.55;
-  color: var(--fg-2) !important; }
-.property_costs .scenario-cost-panel > p .mono { font-feature-settings: 'tnum'; }
-.property_costs .automatic-cost-tags { display: flex;
-  flex-wrap: wrap;
-  gap: var(--ui-space-xs);
-  margin-top: var(--ui-space-sm); }
-.property_costs .automatic-cost-tags span { padding: var(--ui-space-2xs) var(--ui-space-xs);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 62.4375rem;
-  background: var(--bg-1);
-  color: var(--fg-2);
-  font-family: var(--f-mono);
-  font-size: 0.8125rem;
-  white-space: nowrap; }
-.property_costs .slider { -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 0.25rem;
-  background:
-    linear-gradient(var(--accent), var(--accent)) 0/var(--fill, 0%) 100% no-repeat,
-    var(--bg-3);
-  border-radius: 62.4375rem;
-  outline: none;
-  cursor: pointer;
-  margin: var(--ui-space-sm) 0 0; }
-.property_costs .slider::-webkit-slider-thumb { -webkit-appearance: none;
-  width: 1rem; height: 1rem;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 0.1875rem solid var(--bg-1);
-  cursor: pointer;
-  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,.18);
-  transition: transform .1s, box-shadow .15s; }
-.property_costs .slider::-webkit-slider-thumb:active { transform: scale(1.05); }
-.property_costs .slider::-moz-range-thumb { width: 1rem; height: 1rem;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 0.1875rem solid var(--bg-1);
-  cursor: pointer;
-  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,.18);
-  transition: transform .1s, box-shadow .15s; }
-.property_costs .renovation-money-editor { display: inline-flex;
-  align-items: center;
-  gap: var(--ui-space-xs);
-  min-height: 2.25rem;
-  padding: 0 var(--ui-space-xs) 0 var(--ui-space-sm);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.5rem;
-  background: var(--bg-1);
-  color: var(--accent-strong);
-  font-family: var(--f-mono);
-  transition: border-color .15s, box-shadow .15s; }
-.property_costs .renovation-money-editor:focus-within { border-color: var(--accent);
-  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
-.property_costs .renovation-money-editor input { width: 5.875rem;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  appearance: textfield;
-  background: transparent;
-  color: var(--accent-strong);
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  text-align: right; }
-.property_costs .renovation-money-editor input::-webkit-inner-spin-button,
-.property_costs .renovation-money-editor input::-webkit-outer-spin-button { margin: 0;
-  appearance: none; }
-.property_costs .renovation-money-editor input:disabled { cursor: not-allowed;
-  opacity: .55; }
-.property_costs .renovation-money-status { padding: var(--ui-space-2xs) var(--ui-space-xs);
-  border-radius: 62.4375rem;
-  background: var(--accent-soft);
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: .04em; }
-.property_costs .scenario-extra-costs { margin-top: var(--ui-space-lg);
-  padding-top: var(--ui-space-lg);
-  border-top: 0.0625rem dashed var(--line-2); }
-.property_costs .scenario-extra-costs-head { display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ui-space-md);
-  margin-bottom: var(--ui-space-sm); }
-.property_costs .scenario-extra-costs-head .uppy { color: var(--fg-1); }
-.property_costs .scenario-extra-costs-head p { margin: var(--ui-space-2xs) 0 0;
-  color: var(--fg-2);
-  font-size: 0.8125rem; }
-.property_costs .scenario-extra-costs-head > .mono { color: var(--fg-3);
-  font-size: 0.8125rem; }
-.property_costs .scenario-extra-costs-grid { display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14.375rem, 1fr));
-  gap: var(--ui-space-sm); }
-.property_costs .scenario-extra-cost-item { display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 4.5rem;
-  gap: var(--ui-space-sm);
-  padding: var(--ui-space-sm) var(--ui-space-md);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.625rem;
-  background: var(--bg-1); }
-.property_costs .scenario-extra-cost-item span,
-.property_costs .scenario-extra-cost-item strong { display: block; }
-.property_costs .scenario-extra-cost-item span { overflow-wrap: anywhere;
-  color: var(--fg-1);
-  font-size: 0.8125rem; }
-.property_costs .scenario-extra-cost-item strong { margin-top: var(--ui-space-2xs);
-  color: var(--fg-0);
-  font-family: var(--f-mono);
-  font-size: 0.8125rem;
-  font-weight: 600; }
-.property_costs .scenario-extra-cost-item > button { display: grid;
-  flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--fg-3);
-  font-size: 1.125rem; }
-.property_costs .custom-cost-trigger { display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--ui-space-sm);
-  min-height: 4.5rem;
-  padding: var(--ui-space-sm) var(--ui-space-md);
-  border: 0.0625rem dashed var(--accent);
-  border-radius: 0.625rem;
-  background: var(--bg-1);
-  color: var(--accent-strong);
-  text-align: left;
-  transition: background .15s; }
-.property_costs .custom-cost-plus { display: grid;
-  flex: 0 0 auto;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.5625rem;
-  background: var(--accent-soft);
-  font-size: 1.125rem; }
-.property_costs .custom-cost-trigger strong,
-.property_costs .custom-cost-trigger small { display: block; }
-.property_costs .custom-cost-trigger strong { font-size: 0.8125rem;
-  font-weight: 600; }
-.property_costs .custom-cost-trigger small { margin-top: var(--ui-space-2xs);
-  color: var(--fg-3);
-  font-size: 0.8125rem; }
-.property_costs .custom-cost-form { display: grid;
-  grid-template-columns: minmax(13.75rem, 1fr) minmax(11.25rem, 15rem) auto;
-  grid-column: 1 / -1;
-  gap: var(--ui-space-sm);
-  align-items: end;
-  padding: var(--ui-space-md);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.625rem;
-  background: var(--bg-1); }
-.property_costs .custom-cost-suggestions { grid-column: 1 / -1; }
-.property_costs .custom-cost-suggestions > .uppy { display: block;
-  margin-bottom: var(--ui-space-xs);
-  color: var(--fg-3); }
-.property_costs .custom-cost-suggestions button { padding: var(--ui-space-xs) var(--ui-space-xs);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 62.4375rem;
-  background: var(--bg-2);
-  color: var(--fg-2);
-  font-size: 0.8125rem; }
-.property_costs .custom-cost-form label > .uppy { display: block;
-  margin-bottom: var(--ui-space-xs);
-  color: var(--fg-3); }
-.property_costs .custom-cost-form label > input,
-.property_costs .custom-cost-money { width: 100%;
-  height: 2.5rem;
-  padding: 0 var(--ui-space-sm);
-  border: 0.0625rem solid var(--line-2);
-  border-radius: 0.5rem;
-  outline: 0;
-  background: var(--bg-1); }
-.property_costs .custom-cost-form label > input:focus,
-.property_costs .custom-cost-money:focus-within { border-color: var(--accent);
-  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
-.property_costs .custom-cost-money { display: flex;
-  align-items: center;
-  gap: var(--ui-space-xs);
-  color: var(--fg-2); }
-.property_costs .custom-cost-money input { width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font-family: var(--f-mono); }
-@media (max-width: 68.75rem) and (min-width: 35.0625rem) {
-.property_costs .cost-row,
-.property_costs .cost-head { grid-template-columns: 1.25rem minmax(9.375rem, 1fr) 5.625rem minmax(10.625rem, 13.75rem) !important;
-    gap: var(--ui-space-sm) !important; }
-}
-@media (max-width: 53.75rem) {
-.property_costs .cost-row { grid-template-columns: 1.25rem minmax(0, 1fr) !important; }
-.property_costs .cost-row > :nth-child(3) { display: none; }
-.property_costs .cost-row > :nth-child(4) { grid-column: 2;
-    text-align: left !important; }
-.property_costs .cost-head { display: none !important; }
-.property_costs .custom-cost-form { grid-template-columns: 1fr;
-    align-items: stretch; }
-.property_costs .custom-cost-actions { justify-content: flex-end; }
-.property_costs .cost-section-header { flex-direction: column;
-    align-items: flex-start !important;
-    gap: var(--ui-space-sm); }
-.property_costs .cost-section-header > .row { width: 100%;
-    justify-content: flex-end; }
-.property_costs .scenario-cost-grid,
-.property_costs .scenario-cost-grid.without-condominium,
-.property_costs .scenario-cost-pair { grid-template-columns: 1fr; }
-.property_costs .scenario-cost-panel-head { flex-direction: column;
-    gap: var(--ui-space-xs); }
-.property_costs .scenario-extra-costs-head { flex-direction: column;
-    gap: var(--ui-space-xs); }
-}
-.property_costs .buyer-offer { max-width: 20rem; }
-.property_costs .buyer-offer-field > .uppy { display: block;
-  margin-bottom: var(--ui-space-xs);
-  color: var(--fg-3); }
-.property_costs .buyer-offer-input { display: flex;
-  align-items: center;
-  gap: var(--ui-space-xs);
-  min-height: 3.25rem;
-  padding: 0 var(--ui-space-md);
-  border: 0.0625rem solid var(--line-2);
-  border-radius: 0.625rem;
-  background: var(--bg-1);
-  color: var(--fg-2);
-  font-family: var(--f-mono);
-  transition: border-color .15s, box-shadow .15s; }
-.property_costs .buyer-offer-input:focus-within { border-color: var(--accent);
-  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
-.property_costs .buyer-offer-input input { width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  appearance: textfield;
-  background: transparent;
-  color: var(--fg-0);
-  font: inherit;
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.02em; }
-.property_costs .buyer-offer-input input::-webkit-inner-spin-button,
-.property_costs .buyer-offer-input input::-webkit-outer-spin-button { margin: 0;
-  appearance: none; }
-.property_costs .buyer-offer-meta { display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ui-space-xs);
-  margin-top: var(--ui-space-xs);
-  color: var(--fg-2);
-  font-size: 0.8125rem; }
-.property_costs .buyer-offer-meta button { color: var(--accent-strong);
-  font-size: 0.8125rem;
-  text-decoration: underline; }
-.property_costs .monthly-total { display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--ui-space-md) var(--ui-space-md);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.625rem;
-  background: var(--bg-2); }
-.property_costs .monthly-total > .uppy { color: var(--fg-3); }
-.property_costs .monthly-total strong { margin: var(--ui-space-xs) 0 var(--ui-space-2xs);
-  color: var(--fg-0);
-  font-family: var(--f-mono);
-  font-size: 1.375rem;
-  font-weight: 650;
-  letter-spacing: -0.02em; }
-.property_costs .monthly-total > span:last-child { color: var(--fg-2);
-  font-size: 0.8125rem; }
-.property_costs .monthly-total strong.unknown { color: var(--fg-2);
-  font-family: var(--f-sans);
-  font-size: 1rem;
-  font-weight: 600; }
-.property_costs .budget-planner { display: grid;
-  gap: var(--ui-space-lg); }
-.property_costs .budget-planner-top { display: grid;
-  grid-template-columns: minmax(16.25rem, 22.5rem) 1fr;
-  gap: var(--ui-space-lg);
-  align-items: stretch; }
+/* "Quanto você vai pagar" — Client First: tokens only, scoped to the cost tab. */
+
+/* Legacy colour names used inside the tab resolve to the design system. */
+.property_costs { --fg-0: var(--ui-text); --fg-1: var(--ui-text-secondary); --fg-2: var(--ui-text-muted); --fg-3: var(--ui-text-muted); --line-1: var(--ui-border); --line-2: var(--ui-border); --bg-2: var(--ui-soft); --accent: var(--ui-brand); --accent-strong: var(--ui-brand-hover); --good: var(--ui-success); color: var(--ui-text); font-size: var(--ui-text-sm); }
+.property_costs .mono { font-family: var(--f-sans); font-variant-numeric: tabular-nums; }
+.property_costs .uppy { display: block; font: 600 var(--ui-text-xs)/1.4 var(--f-sans); letter-spacing: normal; text-transform: none; color: var(--ui-text-secondary); }
+
+/* ---------- Surfaces and rhythm ---------- */
+.property_costs .card { padding: var(--ui-pad-card); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-card); background: var(--ui-white); box-shadow: none; }
+.property_costs .card + .card { margin-top: var(--ui-gap-section); }
+.property_costs .simulator-card > * + * { margin-top: var(--ui-gap-section); }
+.property_costs .simulator-card > .automatic-cost-tags { margin-top: var(--ui-gap-stack); }
+.property_costs .cost-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ui-gap-stack); padding-bottom: var(--ui-gap-group); border-bottom: var(--ui-border-sm) solid var(--ui-border); }
+.property_costs .cost-title { margin: 0; font: 750 var(--ui-text-2xl)/1.25 var(--f-display); letter-spacing: -.02em; color: var(--ui-text); }
+.property_costs .cost-lead { max-width: 36rem; margin: var(--ui-space-2xs) 0 0; font-size: var(--ui-text-sm); line-height: 1.5; color: var(--ui-text-muted); }
+.property_costs .cost-footnote { margin: var(--ui-gap-stack) 0 0; font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-muted); }
+.property_costs .cost-empty { padding: var(--ui-space-2xl) var(--ui-pad-card); text-align: center; color: var(--ui-text-muted); }
+
+/* ---------- Money fields: one look everywhere ---------- */
+.property_costs .buyer-offer-input,
+.property_costs .bid-simulator-value,
+.property_costs .scenario-money-input,
+.property_costs .renovation-money-editor,
+.property_costs .custom-cost-money,
+.property_costs .custom-cost-form label > input { display: flex; align-items: center; gap: var(--ui-space-xs); min-height: var(--ui-control-sm); padding: 0 var(--ui-space-sm); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-white); color: var(--ui-text-muted); font: 500 var(--ui-text-sm)/1.2 var(--f-sans); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.property_costs .buyer-offer-input:focus-within,
+.property_costs .bid-simulator-value:focus-within,
+.property_costs .scenario-money-input:focus-within,
+.property_costs .renovation-money-editor:focus-within,
+.property_costs .custom-cost-money:focus-within,
+.property_costs .custom-cost-form label > input:focus { border-color: var(--ui-brand); box-shadow: 0 0 0 .1875rem var(--ui-brand-soft); outline: 0; }
+.property_costs .buyer-offer-input input,
+.property_costs .bid-simulator-value input,
+.property_costs .scenario-money-input input,
+.property_costs .renovation-money-editor input,
+.property_costs .custom-cost-money input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; appearance: textfield; color: var(--ui-text); font: 600 var(--ui-text-md)/1.2 var(--f-sans); font-variant-numeric: tabular-nums; }
+.property_costs input::-webkit-inner-spin-button,
+.property_costs input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+.property_costs input:disabled { cursor: not-allowed; opacity: .55; }
+/* The budget is the first question of the tab: one step larger. */
+.property_costs .buyer-offer-input { min-height: var(--ui-control-md); padding-inline: var(--ui-space-md); }
+.property_costs .buyer-offer-input input { font-size: var(--ui-text-xl); }
+.property_costs .scenario-money-suffix { flex: none; font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+
+/* ---------- Sliders ---------- */
+.property_costs .slider { display: block; width: 100%; height: .375rem; margin: var(--ui-space-sm) 0 0; border-radius: var(--ui-radius-pill); outline: none; cursor: pointer; -webkit-appearance: none; appearance: none; background: linear-gradient(var(--ui-brand), var(--ui-brand)) 0 / var(--fill, 0%) 100% no-repeat, var(--ui-border); }
+.property_costs .slider::-webkit-slider-thumb { width: 1.125rem; height: 1.125rem; border: .1875rem solid var(--ui-white); border-radius: var(--ui-radius-pill); background: var(--ui-brand); box-shadow: var(--ui-shadow-sm); cursor: pointer; -webkit-appearance: none; }
+.property_costs .slider::-moz-range-thumb { width: 1.125rem; height: 1.125rem; border: .1875rem solid var(--ui-white); border-radius: var(--ui-radius-pill); background: var(--ui-brand); box-shadow: var(--ui-shadow-sm); cursor: pointer; }
+.property_costs .slider:focus-visible { outline: var(--ui-border-md) solid var(--ui-brand); outline-offset: .25rem; }
+
+/* ---------- Budget, verdict and bid ---------- */
+.property_costs .budget-planner { display: grid; gap: var(--ui-gap-group); }
+.property_costs .budget-planner-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--ui-gap-group); align-items: stretch; }
 .property_costs .budget-field { display: flex; flex-direction: column; gap: var(--ui-space-xs); }
-.property_costs .budget-field > .uppy { color: var(--fg-2); }
-.property_costs .budget-field-hint { font-size: 0.8125rem; color: var(--fg-2); line-height: 1.45; }
-.property_costs .budget-verdict { display: flex; flex-direction: column; justify-content: center; gap: var(--ui-space-2xs);
-  padding: var(--ui-space-md) var(--ui-space-lg);
-  border-radius: 0.75rem;
-  border: 0.0625rem solid var(--line-1);
-  background: var(--bg-2); }
-.property_costs .budget-verdict .uppy { color: var(--fg-2); }
-.property_costs .budget-verdict strong { font-family: var(--f-mono); font-feature-settings: 'tnum';
-  font-size: 1.625rem; font-weight: 650; letter-spacing: -0.02em;
-  color: var(--fg-0); }
-.property_costs .budget-verdict p { margin: 0; font-size: 0.8125rem; color: var(--fg-1); line-height: 1.45; }
-.property_costs .budget-verdict.is-fit { background: var(--good-soft); border-color: transparent; }
-.property_costs .budget-verdict.is-fit strong,
-.property_costs .budget-verdict.is-fit b { color: var(--ui-success); }
-.property_costs .budget-verdict.is-short { background: var(--bad-soft); border-color: transparent; }
-.property_costs .budget-verdict.is-short strong { color: var(--bad); }
-.property_costs .bid-simulator { padding: var(--ui-space-md) var(--ui-space-lg) var(--ui-space-md);
-  border: 0.0625rem solid var(--line-1);
-  border-radius: 0.75rem;
-  background: var(--bg-1); }
-.property_costs .bid-simulator-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); flex-wrap: wrap; }
-.property_costs .bid-simulator-head .uppy { color: var(--fg-2); }
-.property_costs .bid-simulator-value { display: inline-flex; align-items: center; gap: var(--ui-space-xs);
-  padding: var(--ui-space-xs) var(--ui-space-sm);
-  border: 0.0625rem solid var(--line-2); border-radius: 0.5rem;
-  font-family: var(--f-mono); color: var(--fg-2); }
-.property_costs .bid-simulator-value:focus-within { border-color: var(--accent); }
-.property_costs .bid-simulator-value input { width: 8.125rem; border: 0; outline: 0; background: transparent;
-  font: inherit; font-size: 1rem; font-weight: 600; color: var(--fg-0); text-align: right; }
+.property_costs .budget-field-hint { font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-muted); }
+.property_costs .budget-verdict { display: flex; flex-direction: column; justify-content: center; gap: var(--ui-space-2xs); padding: var(--ui-pad-tile); border-radius: var(--ui-radius-md); background: var(--ui-soft); }
+.property_costs .budget-verdict strong { font: 750 var(--ui-text-price-sm)/1.2 var(--f-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ui-text); }
+.property_costs .budget-verdict p { margin: 0; font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-secondary); }
+.property_costs .budget-verdict.is-fit { background: var(--ui-success-soft); }
+.property_costs .budget-verdict.is-fit strong, .property_costs .budget-verdict.is-fit b { color: var(--ui-success); }
+.property_costs .budget-verdict.is-short { background: #FDECEE; }
+.property_costs .budget-verdict.is-short strong { color: var(--ui-error); }
+.property_costs .bid-simulator { padding: var(--ui-pad-tile); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.property_costs .bid-simulator-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-gap-inline); }
+.property_costs .bid-simulator-value input { width: 8rem; text-align: right; }
 .property_costs .bid-slider-wrap { position: relative; padding-top: var(--ui-space-lg); }
-.property_costs .bid-slider { margin-top: 0; height: 0.375rem; }
-.property_costs .bid-slider.is-over { background:
-    linear-gradient(var(--bad), var(--bad)) 0/var(--fill, 0%) 100% no-repeat,
-    var(--bg-3); }
-.property_costs .bid-slider.is-over::-webkit-slider-thumb { background: var(--bad); }
-.property_costs .bid-slider.is-over::-moz-range-thumb { background: var(--bad); }
-.property_costs .bid-slider-limit { position: absolute; top: 0.75rem; bottom: -0.375rem;
-  width: 0.125rem; margin-left: -var(--ui-space-2xs);
-  background: var(--good);
-  pointer-events: none; }
-.property_costs .bid-slider-limit > span { position: absolute; top: -0.875rem; left: 50%; transform: translateX(-50%);
-  font-size: 0.8125rem; font-weight: 600; color: var(--ui-success); white-space: nowrap; }
-.property_costs .bid-slider-scale { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-xs);
-  margin-top: var(--ui-space-sm); font-size: 0.8125rem; color: var(--fg-2); }
-.property_costs .bid-slider-scale button { color: var(--accent-strong); font-size: 0.8125rem; text-decoration: underline; }
-.property_costs .budget-bar { display: flex; height: 0.75rem; overflow: hidden;
-  border-radius: 62.4375rem; background: var(--bg-3); }
-.property_costs .budget-bar-seg { height: 100%; min-width: 0.125rem; transition: width .2s ease; }
-.property_costs .budget-bar-seg--bid { background: var(--accent); }
+.property_costs .bid-slider { margin-top: 0; }
+.property_costs .bid-slider.is-over { background: linear-gradient(var(--ui-error), var(--ui-error)) 0 / var(--fill, 0%) 100% no-repeat, var(--ui-border); }
+.property_costs .bid-slider.is-over::-webkit-slider-thumb { background: var(--ui-error); }
+.property_costs .bid-slider.is-over::-moz-range-thumb { background: var(--ui-error); }
+.property_costs .bid-slider-limit { position: absolute; top: .75rem; bottom: -.375rem; width: .125rem; transform: translateX(-50%); background: var(--ui-success); pointer-events: none; }
+.property_costs .bid-slider-limit > span { position: absolute; top: -.875rem; left: 50%; transform: translateX(-50%); font-size: var(--ui-text-xs); font-weight: 600; color: var(--ui-success); white-space: nowrap; }
+.property_costs .bid-slider-scale { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-xs); margin-top: var(--ui-space-sm); font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .budget-bar { display: flex; height: .625rem; overflow: hidden; border-radius: var(--ui-radius-pill); background: var(--ui-soft); }
+.property_costs .budget-bar-seg { height: 100%; min-width: .125rem; transition: width 200ms ease; }
+.property_costs .budget-bar-seg--bid { background: var(--ui-brand); }
 .property_costs .budget-bar-seg--costs { background: var(--ui-chart-costs); }
 .property_costs .budget-bar-seg--left { background: var(--ui-chart-left); }
-.property_costs .budget-bar-legend { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs) var(--ui-space-lg); margin-top: var(--ui-space-sm);
-  font-size: 0.8125rem; color: var(--fg-2); }
-.property_costs .budget-bar-legend b { color: var(--fg-0); font-family: var(--f-mono); font-weight: 600; }
+.property_costs .budget-bar-legend { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs) var(--ui-gap-group); margin-top: var(--ui-space-sm); font-size: var(--ui-text-xs); color: var(--ui-text-secondary); }
+.property_costs .budget-bar-legend b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ui-text); }
 .property_costs .budget-bar-key { display: inline-flex; align-items: center; gap: var(--ui-space-xs); }
-.property_costs .budget-bar-key::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; }
-.property_costs .budget-bar-key--bid::before { background: var(--accent); }
+.property_costs .budget-bar-key::before { content: ""; width: .5rem; height: .5rem; border-radius: var(--ui-radius-pill); }
+.property_costs .budget-bar-key--bid::before { background: var(--ui-brand); }
 .property_costs .budget-bar-key--costs::before { background: var(--ui-chart-costs); }
 .property_costs .budget-bar-key--left::before { background: var(--ui-chart-left); }
 .property_costs .budget-bar-total { margin-left: auto; }
-.property_costs .budget-bar-total b { color: var(--accent-strong); }
-.property_costs .budget-bar-over { flex-basis: 100%; color: var(--bad); font-weight: 600; }
-@media (max-width: 45rem) {
-.property_costs .budget-planner-top { grid-template-columns: 1fr; }
-.property_costs .budget-bar-total { margin-left: 0; }
-.property_costs .bid-simulator { padding: var(--ui-space-md); }
-}
-.property_costs .cost-money-locked { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-xs); color: var(--fg-3); }
-.property_costs .cost-money-blur { filter: blur(0.3125rem); color: var(--fg-0); font-weight: 500; user-select: none; }
-@media (max-width: 53.75rem) {
-.property_costs .cost-row > .cost-money-locked { justify-content: flex-start; }
-}
-.property_costs .debt-locked-cta { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); flex-wrap: wrap;
-  padding: var(--ui-space-sm) var(--ui-space-lg) var(--ui-space-md); border-top: 0.0625rem dashed var(--line-2);
-  background: color-mix(in oklch, var(--accent) 5%, var(--bg-1)); }
-.property_costs .debt-locked-cta p { margin: 0; max-width: 32.5rem; font-size: 0.8125rem; line-height: 1.5; color: var(--fg-2); }
-.property_costs .debt-locked-cta strong { color: var(--fg-0); }
-.property_costs .debt-locked-cta .btn { display: inline-flex; align-items: center; gap: var(--ui-space-xs); }
-.property_costs .debt-locked-cta .btn[disabled] { opacity: .65; cursor: not-allowed; }
-.property_costs .cost-total-note { display: block; margin-top: var(--ui-space-2xs); font-size: 0.8125rem; font-weight: 400; color: var(--fg-2); }
+.property_costs .budget-bar-total b { color: var(--ui-brand-hover); }
+.property_costs .budget-bar-over { flex-basis: 100%; font-weight: 600; color: var(--ui-error); }
 
-/* Shared roles override legacy detail presentation. */
-.property_costs { --fg-0: var(--ui-text); --fg-1: var(--ui-text-secondary); --fg-2: var(--ui-text-muted); --fg-3: var(--ui-text-muted); --line-1: var(--ui-border); --line-2: var(--ui-border); --bg-2: var(--ui-soft); --good: var(--ui-success); font-size: var(--ui-text-lg); }
-.property_costs .card { border-radius: var(--ui-radius-lg); border-width: var(--ui-border-sm); }
-.property_costs .uppy { font-family: var(--f-sans); font-size: var(--ui-text-xs); text-transform: none; letter-spacing: normal; font-weight: 600; }
-.property_costs .h2 { font-size: var(--ui-text-2xl); line-height: 1.3; }
-.property_costs .budget-verdict, .property_costs .bid-simulator, .property_costs .scenario-money-field, .property_costs .monthly-total, .property_costs .scenario-extra-costs { border-radius: var(--ui-radius-lg); }
-.property_costs .budget-planner-top { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: var(--ui-space-lg); }
-.property_costs .buyer-offer-input, .property_costs .bid-simulator-value, .property_costs .scenario-money-input, .property_costs .custom-cost-money, .property_costs .custom-cost-form input { border-radius: var(--ui-radius-md); }
-.property_costs input:not([type="range"]) { font-size: var(--ui-text-lg); min-height: var(--ui-control-md); }
-.property_costs .tag, .property_costs .automatic-cost-tags > span { border-radius: var(--ui-radius-pill); font-size: var(--ui-text-xs); }
-.property_costs .simulator-card > .row:first-child { gap: var(--ui-space-md); flex-wrap: wrap; }
-.property_costs .cost-row > button { min-width: var(--ui-control-sm); min-height: var(--ui-control-sm); border-radius: var(--ui-radius-pill) !important; color: var(--ui-text-muted) !important; }
-.property_costs .cost-inline-action, .property_costs .scenario-money-meta button, .property_costs .bid-slider-scale button { min-height: var(--ui-control-sm); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-pill); padding: var(--ui-space-2xs) var(--ui-space-sm); font-size: var(--ui-text-xs); text-decoration: none; }
-.property_costs .cost-row, .property_costs .cost-head { grid-template-columns: 2.5rem minmax(0,1fr) 7.5rem minmax(10rem,16.25rem) !important; }
-.property_costs .budget-verdict strong { font-family: var(--f-display); }
+/* ---------- Values that depend on the buyer ---------- */
+.property_costs .scenario-cost-panel { padding-top: var(--ui-gap-section); border-top: var(--ui-border-sm) solid var(--ui-border); }
+.property_costs .scenario-cost-panel-head { margin-bottom: var(--ui-gap-stack); }
+.property_costs .scenario-cost-panel-head .uppy, .property_costs .scenario-extra-costs-head .uppy { font-size: var(--ui-text-md); font-weight: 700; color: var(--ui-text); }
+.property_costs .scenario-cost-panel-head p, .property_costs .scenario-extra-costs-head p { margin: var(--ui-space-2xs) 0 0; font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .scenario-cost-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-gap-stack); }
+.property_costs .scenario-cost-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ui-gap-stack); }
+.property_costs .scenario-cost-grid.without-condominium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.property_costs .scenario-money-field { display: flex; flex-direction: column; min-width: 0; padding: var(--ui-pad-tile); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-white); }
+.property_costs .scenario-money-field > label > .uppy { margin-bottom: var(--ui-space-xs); }
+.property_costs .scenario-money-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-2xs) var(--ui-space-xs); min-height: var(--ui-control-xs); margin-top: var(--ui-space-xs); font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .scenario-money-field--reno .row { gap: var(--ui-gap-inline); align-items: center; }
+.property_costs .renovation-money-editor { max-width: 11rem; color: var(--ui-brand-hover); }
+.property_costs .renovation-money-editor input { text-align: right; color: var(--ui-brand-hover); }
+.property_costs .renovation-money-status { padding: var(--ui-space-3xs) var(--ui-space-xs); border-radius: var(--ui-radius-pill); background: var(--ui-brand-soft); font-size: var(--ui-text-xs); color: var(--ui-brand-hover); }
+.property_costs .scenario-reno-scale { display: flex; justify-content: space-between; gap: var(--ui-space-xs); margin-top: var(--ui-space-xs); font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .scenario-note { margin: var(--ui-space-sm) 0 0; font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-secondary); }
+
+/* Extra costs added by the buyer */
+.property_costs .scenario-extra-costs { margin-top: var(--ui-gap-group); }
+.property_costs .scenario-extra-costs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ui-gap-stack); margin-bottom: var(--ui-space-sm); }
+.property_costs .scenario-extra-costs-count { font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .scenario-extra-costs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--ui-space-sm); }
+.property_costs .scenario-extra-cost-item { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); min-height: var(--ui-control-md); padding: var(--ui-space-xs) var(--ui-space-md); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.property_costs .scenario-extra-cost-item span, .property_costs .scenario-extra-cost-item strong { display: block; }
+.property_costs .scenario-extra-cost-item span { font-size: var(--ui-text-xs); color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+.property_costs .scenario-extra-cost-item strong { font-size: var(--ui-text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.property_costs .scenario-extra-cost-item > button { display: grid; flex: none; place-items: center; width: var(--ui-control-xs); height: var(--ui-control-xs); border-radius: var(--ui-radius-pill); font-size: var(--ui-text-lg); color: var(--ui-text-muted); }
+.property_costs .custom-cost-trigger { width: 100%; min-height: var(--ui-control-md); border: var(--ui-border-sm) dashed var(--ui-brand-line); border-radius: var(--ui-radius-md); background: var(--ui-brand-faint); color: var(--ui-brand-hover); box-shadow: none; }
+.property_costs .custom-cost-form { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto; align-items: end; gap: var(--ui-space-sm); padding: var(--ui-pad-tile); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.property_costs .custom-cost-form label > .uppy, .property_costs .custom-cost-suggestions > .uppy { margin-bottom: var(--ui-space-xs); }
+.property_costs .custom-cost-form label > input { width: 100%; color: var(--ui-text); }
+.property_costs .custom-cost-suggestions { grid-column: 1 / -1; }
+.property_costs .custom-cost-actions { display: flex; gap: var(--ui-space-xs); }
+
+/* ---------- The bill, item by item ---------- */
+.property_costs .cost-table { overflow: hidden; border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.property_costs .cost-head, .property_costs .cost-row { display: grid; grid-template-columns: var(--ui-control-xs) minmax(0, 1fr) 6.5rem minmax(8rem, 11rem); gap: var(--ui-space-sm); align-items: center; padding: var(--ui-space-sm) var(--ui-space-md); }
+.property_costs .cost-head { background: var(--ui-soft); font-size: var(--ui-text-xs); font-weight: 600; color: var(--ui-text-muted); }
+.property_costs .cost-head .is-end { text-align: right; }
+.property_costs .cost-row { border-top: var(--ui-border-sm) solid var(--ui-border); transition: background-color 150ms ease; }
+.property_costs .cost-row.is-open { background: var(--ui-soft); }
+.property_costs .cost-row-help { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-pill); background: var(--ui-white); font-size: var(--ui-text-xs); font-weight: 600; color: var(--ui-text-muted); cursor: pointer; }
+.property_costs .cost-row-help[aria-expanded="true"] { border-color: var(--ui-brand); color: var(--ui-brand-hover); }
+.property_costs .cost-row-help:focus-visible { outline: var(--ui-border-md) solid var(--ui-brand); outline-offset: .125rem; }
+.property_costs .cost-row-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-xs); }
+.property_costs .cost-row-label { font-size: var(--ui-text-sm); color: var(--ui-text); }
+.property_costs .cost-row-hint { max-width: 32rem; margin-top: var(--ui-space-2xs); font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-secondary); }
+.property_costs .cost-row-weight { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-xs); font-size: var(--ui-text-xs); color: var(--ui-text-muted); font-variant-numeric: tabular-nums; }
+.property_costs .cost-row-weight-bar { display: block; width: 2.5rem; height: .25rem; overflow: hidden; border-radius: var(--ui-radius-pill); background: var(--ui-soft); }
+.property_costs .cost-row-weight-bar > span { display: block; height: 100%; background: var(--ui-text-muted); }
+.property_costs .cost-money-value { text-align: right; white-space: nowrap; font-size: var(--ui-text-sm); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ui-text); }
+.property_costs .cost-money-value.is-zero { color: var(--ui-text-muted); }
+.property_costs .cost-inline-action { font-size: var(--ui-text-xs); color: var(--ui-brand-hover); }
+.property_costs .cost-inline-action.danger { color: var(--ui-error); }
+.property_costs .cost-row.is-total { align-items: center; padding-block: var(--ui-space-lg); background: var(--ui-brand-faint); }
+.property_costs .cost-row-sum { font-size: var(--ui-text-sm); color: var(--ui-text-muted); text-align: center; }
+.property_costs .cost-total-label { font-size: var(--ui-text-md); font-weight: 700; color: var(--ui-text); }
+.property_costs .cost-total-note { display: block; margin-top: var(--ui-space-2xs); font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+.property_costs .cost-total-value { grid-column: -2; text-align: right; white-space: nowrap; font: 750 var(--ui-text-2xl)/1.2 var(--f-display); letter-spacing: 0; word-spacing: .125em; font-variant-numeric: tabular-nums; color: var(--ui-brand-hover); }
+
+/* Debts still locked behind the paid lookup */
+.property_costs .cost-money-locked { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-xs); color: var(--ui-text-muted); }
+.property_costs .cost-money-blur { filter: blur(.3125rem); user-select: none; color: var(--ui-text); font-weight: 500; }
+.property_costs .debt-locked-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-gap-stack); padding: var(--ui-space-md); border-top: var(--ui-border-sm) dashed var(--ui-border); background: var(--ui-soft); }
+.property_costs .debt-locked-cta p { max-width: 32rem; margin: 0; font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-secondary); }
+.property_costs .debt-locked-cta strong { color: var(--ui-text); }
+
+/* What the platform adds by itself */
+.property_costs .automatic-cost-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-gap-tight) var(--ui-gap-inline); padding-inline: var(--ui-space-md); }
+.property_costs .automatic-cost-tags span { padding: var(--ui-space-2xs) var(--ui-space-sm); border: 0; border-radius: var(--ui-radius-pill); background: var(--ui-soft); font-family: var(--f-sans); font-size: var(--ui-text-xs); font-weight: 500; color: var(--ui-text-secondary); white-space: nowrap; }
+/* The sum of those items closes the line, aligned with the value column. */
+.property_costs .automatic-cost-tags span:last-child { margin-left: auto; padding-inline: 0; background: none; font-size: var(--ui-text-sm); font-weight: 600; color: var(--ui-text); font-variant-numeric: tabular-nums; }
+
+/* ---------- Monthly cost ---------- */
+.property_costs .cost-monthly .cost-lead { margin-bottom: var(--ui-gap-group); }
+.property_costs .monthly-total { display: flex; flex-direction: column; justify-content: center; gap: var(--ui-space-2xs); padding: var(--ui-pad-tile); border-radius: var(--ui-radius-md); background: var(--ui-soft); }
+.property_costs .monthly-total strong { font: 750 var(--ui-text-xl)/1.25 var(--f-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ui-text); }
+.property_costs .monthly-total strong.unknown { font: 600 var(--ui-text-md)/1.4 var(--f-sans); color: var(--ui-text-secondary); }
+.property_costs .monthly-total > span:last-child { font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
+
 @media (hover: hover) and (pointer: fine) {
+  .property_costs .cost-row-help:hover { border-color: var(--ui-brand); color: var(--ui-brand-hover); }
+  .property_costs .scenario-extra-cost-item > button:hover { background: var(--ui-soft); color: var(--ui-text); }
+  .property_costs .custom-cost-trigger:hover:not(:disabled) { border-color: var(--ui-brand); background: var(--ui-brand-soft); color: var(--ui-brand-hover); box-shadow: none; }
+}
+@media (max-width: 53.75rem) {
+  .property_costs .cost-head { display: none; }
+  .property_costs .cost-row { grid-template-columns: var(--ui-control-xs) minmax(0, 1fr) auto; }
+  .property_costs .cost-row-weight { display: none; }
+  .property_costs .cost-row.is-total > span:nth-child(3) { display: none; }
+  .property_costs .scenario-cost-pair, .property_costs .scenario-cost-grid, .property_costs .scenario-cost-grid.without-condominium { grid-template-columns: minmax(0, 1fr); }
+  .property_costs .custom-cost-form { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .property_costs .custom-cost-actions { justify-content: flex-end; }
+}
+@media (max-width: 45rem) {
+  .property_costs .budget-planner-top { grid-template-columns: minmax(0, 1fr); }
+  .property_costs .budget-bar-total { margin-left: 0; }
+  .property_costs .cost-section-head { flex-direction: column; }
 }
 @media (max-width: 40rem) {
- .property_costs .budget-planner-top { grid-template-columns: minmax(0,1fr); }
- .property_costs .cost-row, .property_costs .cost-head { grid-template-columns: 2.5rem minmax(0,1fr) minmax(0,auto) !important; gap: var(--ui-space-xs) !important; padding: var(--ui-space-sm) !important; }
- .property_costs .cost-row > :nth-child(3), .property_costs .cost-head > :nth-child(3) { display: none; }
- .property_costs .cost-money-value, .property_costs .cost-total-value { font-size: var(--ui-text-sm); }
- .property_costs .simulator-card { padding: var(--ui-pad-card) !important; }
+  .property_costs .cost-row, .property_costs .cost-head { gap: var(--ui-space-xs); padding-inline: var(--ui-space-sm); }
+  .property_costs .cost-total-value { font-size: var(--ui-text-xl); }
 }
-
-.property_costs .ui-button, .property_costs .simulator-reset-btn { border-radius: var(--ui-radius-pill); font: 600 var(--ui-text-sm)/1.2 var(--f-sans); min-height: var(--ui-control-sm); letter-spacing: normal; text-transform: none; }
-.property_costs .ui-button.is-secondary { background: var(--ui-white); color: var(--ui-text); border-color: var(--ui-border); }
-.property_costs .ui-button.is-selected { background: var(--ui-brand); color: var(--ui-white); border-color: var(--ui-brand); }
-.property_costs .custom-cost-trigger { justify-content: center; border-style: solid; }
-@media (hover: hover) and (pointer: fine) {
-}
-
-.property_costs .cost-money-value { font-size: var(--ui-text-sm) !important; }
-@media (hover: hover) and (pointer: fine) {
- .property_costs .ui-button:hover:not(:disabled), .property_costs .cost-row > button:hover, .property_costs .cost-inline-action:hover, .property_costs .scenario-money-meta button:hover, .property_costs .bid-slider-scale button:hover { border-color: var(--ui-brand); box-shadow: none; }
- .property_costs .ui-button.is-secondary:hover:not(:disabled) { background: var(--ui-white); color: var(--ui-text); }
- .property_costs .ui-button.is-selected:hover:not(:disabled), .property_costs .ui-button:not(.is-secondary):hover:not(:disabled) { border-color: var(--ui-brand); box-shadow: var(--ui-selected-hover-ring); background: var(--ui-brand); color: var(--ui-white); }
+@media (prefers-reduced-motion: reduce) {
+  .property_costs .budget-bar-seg, .property_costs .cost-row { transition: none; }
 }
