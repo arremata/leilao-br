@@ -142,22 +142,22 @@
 .property_costs .cost-money-value.is-zero { color: var(--ui-text-muted); }
 .property_costs .cost-inline-action { font-size: var(--ui-text-xs); color: var(--ui-brand-hover); }
 .property_costs .cost-inline-action.danger { color: var(--ui-error); }
-.property_costs .cost-row.is-total { align-items: baseline; padding-block: var(--ui-space-md); background: var(--ui-brand-faint); }
+.property_costs .cost-row.is-total { align-items: center; padding-block: var(--ui-space-lg); background: var(--ui-brand-faint); }
 .property_costs .cost-row-sum { font-size: var(--ui-text-sm); color: var(--ui-text-muted); text-align: center; }
 .property_costs .cost-total-label { font-size: var(--ui-text-md); font-weight: 700; color: var(--ui-text); }
 .property_costs .cost-total-note { display: block; margin-top: var(--ui-space-2xs); font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
-.property_costs .cost-total-value { grid-column: -2; text-align: right; white-space: nowrap; font: 750 var(--ui-text-2xl)/1.2 var(--f-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--ui-brand-hover); }
+.property_costs .cost-total-value { grid-column: -2; text-align: right; white-space: nowrap; font: 750 var(--ui-text-2xl)/1.2 var(--f-display); letter-spacing: 0; word-spacing: .125em; font-variant-numeric: tabular-nums; color: var(--ui-brand-hover); }
 
 /* Debts still locked behind the paid lookup */
 .property_costs .cost-money-locked { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--ui-space-xs); color: var(--ui-text-muted); }
 .property_costs .cost-money-blur { filter: blur(.3125rem); user-select: none; color: var(--ui-text); font-weight: 500; }
-.property_costs .debt-locked-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); padding: var(--ui-space-sm) var(--ui-space-md); border-top: var(--ui-border-sm) dashed var(--ui-border); background: var(--ui-soft); }
+.property_costs .debt-locked-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-gap-stack); padding: var(--ui-space-md); border-top: var(--ui-border-sm) dashed var(--ui-border); background: var(--ui-soft); }
 .property_costs .debt-locked-cta p { max-width: 32rem; margin: 0; font-size: var(--ui-text-xs); line-height: 1.5; color: var(--ui-text-secondary); }
 .property_costs .debt-locked-cta strong { color: var(--ui-text); }
 
 /* What the platform adds by itself */
 .property_costs .automatic-cost-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-gap-tight) var(--ui-gap-inline); padding-inline: var(--ui-space-md); }
-.property_costs .automatic-cost-tags span { padding: var(--ui-space-2xs) var(--ui-space-sm); border-radius: var(--ui-radius-pill); background: var(--ui-soft); font-size: var(--ui-text-xs); font-weight: 500; color: var(--ui-text-secondary); white-space: nowrap; }
+.property_costs .automatic-cost-tags span { padding: var(--ui-space-2xs) var(--ui-space-sm); border: 0; border-radius: var(--ui-radius-pill); background: var(--ui-soft); font-family: var(--f-sans); font-size: var(--ui-text-xs); font-weight: 500; color: var(--ui-text-secondary); white-space: nowrap; }
 /* The sum of those items closes the line, aligned with the value column. */
 .property_costs .automatic-cost-tags span:last-child { margin-left: auto; padding-inline: 0; background: none; font-size: var(--ui-text-sm); font-weight: 600; color: var(--ui-text); font-variant-numeric: tabular-nums; }
 
