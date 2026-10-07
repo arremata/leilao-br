@@ -2,6 +2,7 @@ import { Countdown, ListingBadges, Photo } from './shared';
 import { listingLocation, listingStreet } from '../listingPresentation';
 import { propertySummaryModel, roundDateLabel, summaryMoney } from '../propertySummaryModel';
 import { fmtBRL } from '../utils';
+import { Term } from './Term';
 
 export function ActionIcon({ kind = 'external', filled = false }) {
   const paths = {
@@ -23,6 +24,13 @@ function roundBadge(round, isDirectSale, isSfi) {
   return `${round.round}ª rodada · ${ROUND_STATE[round.state]}`;
 }
 
+/** Mesmo texto de roundBadge, com o nome da rodada explicando o verbete. */
+function RoundBadgeLabel({ round, isDirectSale, isSfi }) {
+  if (isDirectSale) return <Term k="venda_direta">Compra direta</Term>;
+  const state = isSfi ? ROUND_STATE[round.state] : round.state === 'ended' ? 'encerrada' : 'atual';
+  return <><Term k={isSfi ? (round.round === 2 ? 'segunda_rodada' : 'primeira_rodada') : 'rodada_unica'}>{isSfi ? `${round.round}ª rodada` : 'Rodada única'}</Term> · {state}</>;
+}
+
 function AppraisalGap({ gap }) {
   if (!gap) return null;
   if (gap.tone === 'equal') return <span className="property_round-gap">Sem desconto · igual à avaliação</span>;
@@ -42,7 +50,7 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
   const showClock = isCurrent || (!model.isSfi && round.state === 'ended');
   const gap = round.appraisalGap;
   return <article className={`property_round is-${round.state}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
-    <span className="property_round-badge">{roundBadge(round, isDirectSale, model.isSfi)}</span>
+    <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
     <div className="property_round-price-row">
       <strong className="property_round-price" title={round.price > 0 ? `R$ ${fmtBRL(Number(round.price))}` : undefined}>{summaryMoney(round.price)}</strong>
       {gap?.tone === 'less' && <span className="property_round-discount" aria-hidden="true">−{gap.percent}%</span>}
@@ -87,7 +95,7 @@ export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, 
 
     <div className="property_summary-panel">
       <header className="property_summary-header">
-        {saleType && <span className="property_summary-eyebrow">{saleType}</span>}
+        {saleType && <Term className="property_summary-eyebrow">{saleType}</Term>}
         <h1 id="property-summary-title">{p.type || 'Imóvel'}</h1>
         <p className="property_summary-address">
           <ActionIcon kind="pin" />
@@ -101,7 +109,7 @@ export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, 
 
       <div className="property_summary-pricing">
         <p className="property_summary-appraisal">
-          Avaliação Caixa: <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
+          <Term k="valor_avaliacao">Avaliação Caixa</Term>: <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
         </p>
         <div className={`property_summary-rounds${model.rounds.length === 1 ? ' is-single' : ''}`} aria-label="Preços e datas das rodadas">
           {model.rounds.map(round => <RoundCard key={round.label} round={round} model={model} schedule={schedule} isDirectSale={isDirectSale} p={p} />)}

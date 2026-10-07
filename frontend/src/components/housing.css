@@ -141,7 +141,7 @@
 .housing-search .feed-rail-inner--compact .feed-rail-head .uppy,
 .housing-search .feed-rail-inner--compact .feed-rail-section-title,
 .housing-search .feed-filter-field-label{margin:0;color:var(--fg-1);font-family:var(--f-sans);font-size:11px;font-weight:550;letter-spacing:0;text-transform:none}
-.housing-search .kind-tabs--rail{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
+.housing-search .kind-tabs--rail{grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1.3fr);gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
 .housing-search .kind-tabs--rail button{align-items:center;justify-content:center;min-width:0;height:36px;padding:0 5px;border:0;border-radius:7px;background:transparent;font-size:11.5px;text-align:center}
 .housing-search .kind-tabs--rail button strong{white-space:nowrap}
 .housing-search .kind-tabs--rail button.active{border:0;background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}
@@ -272,3 +272,29 @@
 @media(max-width:980px){.account-profile-layout{grid-template-columns:1fr}.account-preferences-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.account-heading>.user-mark{display:grid}}
 @media(max-width:700px){.housing-account>a.account-trigger{display:flex}.account-trigger{padding:3px}.account-trigger>span:not(.user-mark):not(.account-trigger-arrow),.account-trigger>.account-trigger-arrow{display:none}.account-page{padding:28px 16px 60px}.account-heading{margin-bottom:22px}.account-heading h1{font-size:34px}.account-heading p{max-width:270px;font-size:12px}.account-heading>.user-mark{flex-basis:52px;width:52px;height:52px;border-radius:16px}.account-tabs{gap:8px}.account-tabs>a{min-height:62px;padding:11px 12px}.account-tabs small{display:none}.account-tabs em{position:absolute;right:8px;top:7px;padding:3px 5px;font-size:6px}.account-identity,.account-preferences{padding:21px}.account-panel-heading{flex-direction:column}.account-data-status,.account-edit-preferences{align-self:flex-start}.account-preferences-grid{grid-template-columns:1fr}.account-preference-card{flex-direction:row;align-items:center;min-height:0}.account-preference-card>div{flex:1}.account-person{padding:15px}.account-person>.user-mark{flex-basis:52px;width:52px;height:52px;border-radius:16px}.account-subscription{min-height:420px;padding:48px 21px}.account-subscription-art{width:108px;height:108px;border-radius:35px}}
 @media(max-width:420px){.account-tabs>a{gap:8px}.account-tabs>a>.account-icon{width:17px}.account-tabs b{font-size:11px}.account-tabs em{display:none}.account-heading>.user-mark{display:none}.account-heading p{max-width:none}.account-data-status{font-size:8px}}
+
+/* Explicações das palavras do leilão (perfil) */
+.account-glossary{grid-column:1/-1;padding:27px}
+.account-glossary .account-panel-heading p{max-width:620px}
+.account-switch{display:inline-flex;flex:0 0 auto;align-items:center;gap:9px;padding:9px 13px 9px 10px;border:1px solid var(--line-1);border-radius:999px;background:#fff;color:var(--fg-1);font-size:12px;transition:border-color .15s,box-shadow .15s}
+.account-switch:hover{border-color:var(--line-2);box-shadow:0 4px 14px rgba(17,24,39,.06)}
+.account-switch:focus-visible{outline:3px solid #c4b5fd;outline-offset:2px}
+.account-switch b{min-width:70px;text-align:left;font-weight:600}
+.account-switch-track{position:relative;width:34px;height:20px;border-radius:999px;background:var(--line-2);transition:background .15s}
+.account-switch-track>span{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(17,24,39,.25);transition:transform .15s}
+.account-switch[aria-checked=true] .account-switch-track{background:var(--accent)}
+.account-switch[aria-checked=true] .account-switch-track>span{transform:translateX(14px)}
+.account-glossary-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px;margin-top:24px}
+.account-glossary-try,.account-glossary-off{padding:18px;border:1px solid var(--line-1);border-radius:16px}
+.account-glossary-try{background:linear-gradient(180deg,#fff,#faf8ff)}
+.account-glossary-off{background:linear-gradient(180deg,#fff,#fafafa)}
+.account-glossary-label{display:inline-flex;align-items:center;gap:7px;margin-bottom:10px;color:var(--fg-2);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.account-glossary-label .account-icon{color:var(--accent)}
+.account-glossary-try p{margin:0;color:var(--fg-1);font-size:14px;line-height:1.7}
+.account-glossary-try .term{font-weight:600;color:var(--fg-0)}
+.account-glossary-try .term:hover,.account-glossary-try .term.is-open{color:var(--accent)}
+.account-glossary-try b{font-weight:600;color:var(--fg-0)}
+.account-glossary-off ul{display:grid;gap:7px;margin:0;padding:0 0 0 16px;color:var(--fg-2);font-size:11px;line-height:1.6}
+.account-glossary-off a{color:var(--accent);font-weight:600}
+@media(max-width:700px){.account-glossary{padding:21px}.account-glossary .account-panel-heading{flex-direction:column}.account-glossary-grid{grid-template-columns:1fr}}
+.account-glossary-more{display:block;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-1);color:var(--fg-2);font-size:11px;line-height:1.6}

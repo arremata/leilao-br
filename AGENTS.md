@@ -164,7 +164,8 @@ URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scor
 - **Web Scraper** (Playwright with stealth) — scrapes auction listing pages
 - **PDF Downloader** — downloads PDFs from extracted URLs
 - **PDF Parser** (PyMuPDF + pytesseract OCR fallback) — extracts text from edital PDFs
-- **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables
+- **Property Scraper** (Bright Data Web Unlocker + local Playwright parser) —
+  collects comparables from QuintoAndar, ImovelWeb and Chaves na Mão
 
 ## Data Contract
 
@@ -227,8 +228,8 @@ The full platform will include:
 | API | FastAPI | FastAPI |
 | Frontend | React 19 + Vite | React + Mapbox |
 | PDF Parsing | PyMuPDF | PyMuPDF |
-| Market research | Direct listing scrapers | Direct listing scrapers |
-| Web Scraping | Playwright | Playwright + Scrapy |
+| Market research | Managed listing collection | Managed listing collection |
+| Web Scraping | Bright Data + Playwright parser | Bright Data + Playwright parser |
 | Persistence | JSON file | PostgreSQL |
 | Deployment | Local | Docker + AWS/GCP |
 
@@ -284,6 +285,18 @@ The full platform will include:
   de contrato e ordem de migração. Conta e questionário foram inspecionados com
   dados fictícios locais, sem gravações em produção. Nenhuma interface foi
   alterada nesta entrega de diagnóstico.
+- **2026-10-06** — As principais palavras do leilão ganharam explicação nos
+  cards e na página do imóvel: tipo de venda, rodadas, valor inicial, valor de
+  avaliação, imóveis parecidos, total até a chave, ocupação, FGTS e
+  financiamento. Nada marca a palavra em repouso; ao passar o mouse ela muda de
+  cor e abre um cartão com o termo, a frase do dicionário e o link para o
+  verbete no `www`. No celular, o toque explica e não abre o imóvel. As linhas
+  de custo ficaram de fora porque já têm o "?" próprio. O texto vem do
+  dicionário da landing (fonte única), copiado por
+  `frontend/scripts/sync-glossary.mjs` para
+  `frontend/src/content/glossary.generated.js`. O perfil ganhou a seção
+  "Explicações das palavras do leilão", com exemplo para testar e a chave para
+  desligar; a escolha fica neste aparelho (`argos_glossary` no `localStorage`).
 
 - **2026-10-06** — Acrescentou o bairro à localização resumida dos cards e da
   lista, junto de cidade e estado. Bairro não informado é omitido, sem separador
@@ -309,6 +322,35 @@ The full platform will include:
 - **2026-10-01** — Documentou a rodada de validação visual pela preview do PR,
   com a versão atual da plataforma como referência e o padrão Client-First da
   LP como ponto de partida para os futuros ajustes de interface.
+
+- **2026-10-06** — Corrigiu as falhas observadas na primeira atualização com
+  Bright Data. Os três portais agora recebem somente bairro/cidade, nunca uma
+  rua disfarçada de bairro; uma fonte bloqueada não descarta comparáveis válidos
+  devolvidos pelas outras, mas a referência anterior continua preservada quando
+  nenhuma evidência utilizável retorna. A fila passou a excluir também jobs
+  legados cujo imóvel representante não está mais ativo, e o relatório de
+  cobertura deixou de misturar esses jobs históricos com o trabalho atual. A
+  versão `v7` refaz gradualmente os snapshots `v6` afetados, com até metade das
+  requisições por região.
+
+- **2026-10-06** — O catálogo passou a abrir com leilões e compra direta juntos.
+  O tipo de venda virou um filtro de três opções (Todos, Leilões, Compra
+  direta), com Todos como padrão e fora do endereço; `aba=leiloes` e
+  `aba=direta` continuam valendo para links antigos. Na relevância, os dois
+  tipos são intercalados mantendo a ordem própria de cada um, porque a compra
+  direta não tem data e cairia sempre depois de todos os leilões. Rodada e
+  modalidade só somem no filtro Compra direta; a coluna de data da lista se
+  chama “prazo” quando os dois tipos estão juntos (PD-022).
+
+- **2026-10-06** — Migrou a coleta programada de comparáveis para o Web
+  Unlocker gerenciado do Bright Data, limitada a QuintoAndar, ImovelWeb e
+  Chaves na Mão. ZAP e Viva Real saíram do coletor ativo e o projeto continua
+  responsável pelos parsers, validação, deduplicação, raio de 2 km e gravação.
+  A action de referências recebe a chave somente pelo environment `Production`,
+  valida a configuração sem imprimi-la e preserva o retrato anterior se o
+  provedor ficar indisponível. Uma sonda sem acesso ao banco confirmou anúncios
+  válidos nos três portais antes da ativação; referências antigas serão refeitas
+  gradualmente sob a versão inicial `v6` da rotina.
 
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora

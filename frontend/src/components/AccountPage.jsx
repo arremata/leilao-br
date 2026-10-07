@@ -1,5 +1,8 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { emptyHousingProfile, housingBudgetLabel } from '../housingProfile';
+import { setGlossaryEnabled, useGlossaryEnabled } from '../glossaryPreference';
+import { DICTIONARY_URL } from '../glossary';
+import { Term } from './Term';
 import './housing.css';
 
 const profileTypeLabels = {
@@ -17,6 +20,7 @@ function AccountIcon({ name, size = 20 }) {
     wallet: <><path d="M4 6.5h13.5a2.5 2.5 0 0 1 2.5 2.5v9.5H5.5A2.5 2.5 0 0 1 3 16V6a2.5 2.5 0 0 1 2.5-2.5H17" /><path d="M15.5 11.5H20" /><circle cx="15.5" cy="11.5" r=".6" fill="currentColor" stroke="none" /></>,
     cloud: <><path d="M7.5 18.5H17a4 4 0 0 0 .45-7.98A6 6 0 0 0 6 9.5v.22a4.5 4.5 0 0 0 1.5 8.78Z" /><path d="m9.5 14 2 2 4-4" /></>,
     device: <><rect x="5.5" y="2.5" width="13" height="19" rx="2.5" /><path d="M10 18.5h4" /></>,
+    book: <><path d="M4.5 19.5V5a2 2 0 0 1 2-2h12.5v16H6.5a2 2 0 0 0-2 2Z" /><path d="M8.5 7.5h6M8.5 11h4" /></>,
     spark: <><path d="m12 2 1.45 5.05L18.5 8.5l-5.05 1.45L12 15l-1.45-5.05L5.5 8.5l5.05-1.45L12 2Z" /><path d="m18 14 .72 2.28L21 17l-2.28.72L18 20l-.72-2.28L15 17l2.28-.72L18 14Z" /></>,
   };
   return <svg aria-hidden="true" className="account-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
@@ -35,6 +39,69 @@ function PreferenceCard({ icon, label, value, detail }) {
       <small>{detail}</small>
     </div>
   </article>;
+}
+
+// Explicações das palavras do leilão: o que são, um exemplo para testar e o
+// que muda ao desligar. Muita gente não sabe que o recurso existe; por isso a
+// chave fica aqui, explicada, e não solta no menu.
+function GlossarySetting() {
+  const enabled = useGlossaryEnabled();
+  return <section className="account-panel account-glossary" aria-labelledby="account-glossary-title">
+    <div className="account-panel-heading">
+      <div>
+        <span className="account-section-kicker">LEITURA DOS IMÓVEIS</span>
+        <h2 id="account-glossary-title">Explicações das palavras do leilão</h2>
+        <p>
+          Leilão tem muitas palavras próprias. Nos imóveis, as principais trazem uma explicação curta,
+          tirada do Dicionário do leilão. Ela aparece quando você passa o mouse sobre a palavra ou
+          toca nela no celular.
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-labelledby="account-glossary-title"
+        className="account-switch"
+        onClick={() => setGlossaryEnabled(!enabled)}
+      >
+        <span className="account-switch-track" aria-hidden="true"><span /></span>
+        <b>{enabled ? 'Ligadas' : 'Desligadas'}</b>
+      </button>
+    </div>
+
+    <div className="account-glossary-grid">
+      <div className="account-glossary-try">
+        <span className="account-glossary-label"><AccountIcon name="book" size={16} />{enabled ? 'Experimente' : 'Explicações desligadas'}</span>
+        {enabled ? <p>
+          Passe o mouse ou toque em <Term k="valor_avaliacao">valor de avaliação</Term>,{' '}
+          <Term k="segunda_rodada">2ª rodada</Term> ou <Term k="ocupado">ocupado</Term>.
+        </p> : <p>
+          Agora <b>valor de avaliação</b>, <b>2ª rodada</b>, <b>ocupado</b> e as demais palavras
+          aparecem sem explicação. Ligue de novo quando quiser.
+        </p>}
+        <small className="account-glossary-more">
+          São só exemplos. Nos cards e na página de cada imóvel, outras palavras também têm
+          explicação: o tipo de venda (leilão, licitação aberta, venda direta), rodada única,
+          valor inicial, imóveis parecidos, total até a chave, FGTS, financiamento e se o
+          imóvel está ocupado.
+        </small>
+      </div>
+      <div className="account-glossary-off">
+        <span className="account-glossary-label">Ao desligar</span>
+        <ul>
+          <li>As palavras continuam na tela, sem a explicação ao passar o mouse ou tocar.</li>
+          <li>No celular, tocar numa dessas palavras dentro do card abre o imóvel direto.</li>
+          <li>O <a href={DICTIONARY_URL}>Dicionário do leilão</a> continua no menu, com todos os termos.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div className="account-preferences-note">
+      <span aria-hidden="true">i</span>
+      <p>Esta escolha fica salva neste aparelho. Em outro celular ou computador, as explicações começam ligadas.</p>
+    </div>
+  </section>;
 }
 
 export default function AccountPage({ account, profile, serverAccount, onSignOut }) {
@@ -146,6 +213,8 @@ export default function AccountPage({ account, profile, serverAccount, onSignOut
           <p>Você pode mudar essas escolhas quando quiser. Elas não limitam sua conta nem escondem permanentemente outros imóveis.</p>
         </div>
       </section>
+
+      <GlossarySetting />
     </div> : <section className="account-panel account-subscription" aria-labelledby="account-subscription-title">
       <div className="account-subscription-art" aria-hidden="true">
         <span><AccountIcon name="spark" size={34} /></span>
