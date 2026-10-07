@@ -4,7 +4,11 @@ const css = ['design-system.css', 'property-costs.css'].map(file => readFileSync
 const errors = [];
 if (/\b\d*\.?\d+px\b/.test(css)) errors.push('Use REM for dimensions in design-system.css.');
 if (/transition\s*:\s*all\b/.test(css)) errors.push('List transition properties explicitly.');
-if (/animation[^;]*\binfinite\b/.test(css)) errors.push('Continuous animations are not part of the contract.');
+// Continuous motion is reserved for the live indicator (.ui-live), which must
+// also stop for people who ask the system for reduced motion.
+const infiniteRules = [...css.matchAll(/([^{}]+)\{[^{}]*animation[^;{}]*\binfinite\b/g)].map(match => match[1].trim());
+if (infiniteRules.some(selector => !/^\.ui-live\b/.test(selector))) errors.push('Continuous animations are reserved for .ui-live.');
+if (infiniteRules.length && !/prefers-reduced-motion[^{]*\{\s*\.ui-live[^{]*\{[^}]*animation:\s*none/.test(css)) errors.push('.ui-live must stop under prefers-reduced-motion.');
 // Spacing comes only from tokens, so one change in :root reaches every screen.
 const rawSpacing = [...css.matchAll(/^[^-\n][^\n]*?\b((?:padding|margin|gap|row-gap|column-gap)(?:-[a-z]+)?\s*:[^;}]*\d(?:rem|em)\b)/gm)].map(match => match[1].trim());
 if (rawSpacing.length) errors.push(`Use --ui-space-*/--ui-gap-*/--ui-pad-* tokens for spacing:\n  ${rawSpacing.join('\n  ')}`);

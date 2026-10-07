@@ -55,12 +55,20 @@ export function Countdown({ until, compact, dark, words, endedLabel = 'Encerrado
       </span>
     );
   }
+  // The sentence form is a live indicator styled by the design system
+  // (`ui-live`); it only keeps the inline red that flags the last 24 hours.
+  if (words) {
+    return (
+      <span className={`countdown ui-live${urgent ? ' is-urgent' : ''}`}>
+        <span className="dot"></span>
+        <span>{words} {d > 0 ? `${d}d ` : ''}{d > 0 || h > 0 ? `${h}h ` : ''}{m}min{d === 0 && h === 0 ? ` ${s}s` : ''}</span>
+      </span>
+    );
+  }
   return (
     <span className="countdown" style={{ color: urgent ? 'var(--bad)' : (dark ? 'var(--fg-0)' : 'var(--fg-1)') }}>
       <span className="dot" style={{ background: urgent ? 'var(--bad)' : 'var(--accent)' }}></span>
-      {words ? (
-        <span>{words} {d > 0 ? `${d}d ` : ''}{d > 0 || h > 0 ? `${h}h ` : ''}{m}min{d === 0 && h === 0 ? ` ${s}s` : ''}</span>
-      ) : compact ? (
+      {compact ? (
         <span>{d > 0 ? `${d}d ` : ''}{pad(h)}:{pad(m)}:{pad(s)}</span>
       ) : (
         <span>

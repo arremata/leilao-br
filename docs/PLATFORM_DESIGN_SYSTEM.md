@@ -65,7 +65,9 @@ Ajustes finos usam a escala base (`--ui-space-3xs` a `--ui-space-3xl`).
   mudar o fundo. Selecionado tem fundo roxo; seu hover usa
   `--ui-selected-hover-ring` (traço branco interno).
 - Foco: contorno de .125rem a .1875rem de distância. Desabilitado: opacidade .5.
-- Sem animação infinita; respeitar movimento reduzido.
+- Sem animação infinita, com uma exceção: o indicador ao vivo `.ui-live`
+  (ponto pulsante, ex.: "Encerra em…"), que para em `prefers-reduced-motion`.
+  O `lint:design` aceita animação contínua só nele.
 
 ## Tipografia
 
