@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 29 de setembro de 2026.
+Última atualização: 6 de outubro de 2026.
 
 ## Como usar no Claude
 
@@ -243,6 +243,9 @@ ação equivalente à modalidade.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
+- Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
+  Uma falha temporária nessas fontes preserva a última referência saudável em
+  vez de publicar uma estimativa baseada em uma coleta vazia.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.
