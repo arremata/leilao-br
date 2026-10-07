@@ -144,7 +144,8 @@ URL → Discovery → Planner → [Market (parallel), Legal (parallel)] → Scor
 - **Web Scraper** (Playwright with stealth) — scrapes auction listing pages
 - **PDF Downloader** — downloads PDFs from extracted URLs
 - **PDF Parser** (PyMuPDF + pytesseract OCR fallback) — extracts text from edital PDFs
-- **Property Scraper** (Playwright) — scrapes Zap Imoveis for comparables
+- **Property Scraper** (Bright Data Web Unlocker + local Playwright parser) —
+  collects comparables from QuintoAndar, ImovelWeb and Chaves na Mão
 
 ## Data Contract
 
@@ -207,8 +208,8 @@ The full platform will include:
 | API | FastAPI | FastAPI |
 | Frontend | React 19 + Vite | React + Mapbox |
 | PDF Parsing | PyMuPDF | PyMuPDF |
-| Market research | Direct listing scrapers | Direct listing scrapers |
-| Web Scraping | Playwright | Playwright + Scrapy |
+| Market research | Managed listing collection | Managed listing collection |
+| Web Scraping | Bright Data + Playwright parser | Bright Data + Playwright parser |
 | Persistence | JSON file | PostgreSQL |
 | Deployment | Local | Docker + AWS/GCP |
 
@@ -222,6 +223,15 @@ The full platform will include:
   direta não tem data e cairia sempre depois de todos os leilões. Rodada e
   modalidade só somem no filtro Compra direta; a coluna de data da lista se
   chama “prazo” quando os dois tipos estão juntos (PD-022).
+- **2026-10-06** — Migrou a coleta programada de comparáveis para o Web
+  Unlocker gerenciado do Bright Data, limitada a QuintoAndar, ImovelWeb e
+  Chaves na Mão. ZAP e Viva Real saíram do coletor ativo e o projeto continua
+  responsável pelos parsers, validação, deduplicação, raio de 2 km e gravação.
+  A action de referências recebe a chave somente pelo environment `Production`,
+  valida a configuração sem imprimi-la e preserva o retrato anterior se o
+  provedor ficar indisponível. Uma sonda sem acesso ao banco confirmou anúncios
+  válidos nos três portais antes da ativação; referências antigas serão refeitas
+  gradualmente sob a versão `v6` da rotina.
 
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora

@@ -40,6 +40,8 @@ jobs:
     environment: ${{ github.event.inputs.target_environment || 'Production' }}
     env:
       DATABASE_URL: ${{ secrets.INGEST_DATABASE_URL }}
+      BRIGHT_DATA_API_KEY: ${{ secrets.BRIGHT_DATA_API_KEY }}
+      BRIGHT_DATA_WEB_UNLOCKER_ZONE: ${{ vars.BRIGHT_DATA_WEB_UNLOCKER_ZONE }}
       PROPERTY_ID: ${{ github.event.inputs.property_id || '' }}
 
     steps:
@@ -51,6 +53,10 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
       - run: python -m playwright install --with-deps chromium
+      - name: Validate managed market-source configuration
+        run: |
+          test -n "$BRIGHT_DATA_API_KEY"
+          test -n "$BRIGHT_DATA_WEB_UNLOCKER_ZONE"
       - name: Refresh missing or stale references
         working-directory: backend
         run: |
