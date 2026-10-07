@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 1º de outubro de 2026.
+Última atualização: 6 de outubro de 2026.
 
 ## Como manter este registro
 
@@ -19,7 +19,7 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
-### PD-022 — Simplificar a identificação e as rodadas na lista
+### PD-023 — Simplificar a identificação e as rodadas na lista
 
 - **Data:** 6 de outubro de 2026
 - **Estado:** Ativa; interface em validação antes da publicação
@@ -35,6 +35,23 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** uma rodada futura permanece condicional; preço ou data
   não publicados não viram zero. A apresentação não restringe o acesso aos
   dados oficiais nem altera as regras financeiras do imóvel.
+
+### PD-022 — Catálogo abre com leilões e compra direta juntos
+
+- **Data:** 6 de outubro de 2026
+- **Estado:** Ativa
+- **Decisão:** a busca começa mostrando os dois tipos de venda ao mesmo tempo.
+  Leilões e Compra direta continuam disponíveis como filtro, que a pessoa
+  escolhe depois de ver tudo o que existe.
+- **Motivo:** quem procura onde morar quer saber primeiro quais imóveis existem
+  na cidade e no orçamento; abrir só em leilões escondia a compra direta, que
+  muitas vezes é a opção mais simples.
+- **Consequências:** cada card continua dizendo de que tipo é a venda. Na ordem
+  por relevância, os dois tipos aparecem intercalados desde o topo, cada um na
+  sua própria ordem, porque a compra direta não tem data e ficaria sempre
+  depois de todos os leilões. Rodada e modalidade seguem visíveis enquanto há
+  leilões na lista e somem só no filtro Compra direta. Links antigos que já
+  escolhiam um dos tipos continuam abrindo nele.
 
 ### PD-020 — Manter conteúdo público fora do app autenticado
 
@@ -245,6 +262,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
   permanece, mas Venda Online pode entrar em disputa depois de receber
   propostas. Quando isso ocorre, o lance oficial é mostrado sem introduzir
   praça, leiloeiro ou comissão nessa modalidade.
+- **Emendada em 6 de outubro de 2026 por PD-022:** as abas viraram filtro. O
+  catálogo abre com os dois tipos juntos, e cada modalidade mantém seu próprio
+  guia de próximos passos.
 
 ### PD-011 — Cada imóvel tem um endereço próprio
 
