@@ -21,6 +21,11 @@ on:
         description: Optional representative property ID for a targeted refresh
         required: false
         default: ""
+      force:
+        description: Refresh up to the limit even when jobs are not due
+        type: boolean
+        required: true
+        default: false
   schedule:
     # GitHub cron uses UTC. Avoid the top of the hour, where GitHub documents
     # heavier scheduler load and possible delayed or dropped runs.
@@ -45,6 +50,7 @@ jobs:
       MARKET_UFS: ${{ github.event.inputs.ufs || '' }}
       MARKET_LIMIT: ${{ github.event.inputs.limit || '10' }}
       MARKET_PROPERTY_ID: ${{ github.event.inputs.property_id || '' }}
+      MARKET_FORCE: ${{ github.event.inputs.force || 'false' }}
       PYTHONUNBUFFERED: "1"
 
     steps:
@@ -62,6 +68,7 @@ jobs:
           [[ "$MARKET_UFS" =~ ^$|^[A-Za-z]{2}(,[A-Za-z]{2})*$ ]]
           [[ "$MARKET_LIMIT" =~ ^[0-9]+$ ]]
           [[ -z "$MARKET_PROPERTY_ID" || "$MARKET_PROPERTY_ID" =~ ^[0-9]+$ ]]
+          [[ "$MARKET_FORCE" =~ ^(true|false)$ ]]
       - name: Refresh missing or stale references
         working-directory: backend
         run: |
@@ -74,6 +81,9 @@ jobs:
           )
           if [[ -n "$MARKET_PROPERTY_ID" ]]; then
             args+=(--property-id "$MARKET_PROPERTY_ID")
+          fi
+          if [[ "$MARKET_FORCE" == "true" ]]; then
+            args+=(--force)
           fi
           timeout --signal=TERM --kill-after=30s 42m \
             python -m enrichment.market_reference "${args[@]}"

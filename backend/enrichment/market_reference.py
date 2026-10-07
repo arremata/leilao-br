@@ -224,6 +224,8 @@ def _claim_jobs(
     limit: int,
     max_age_days: int,
     property_id: int | None,
+    force: bool = False,
+    excluded_job_ids: set[int] | None = None,
 ) -> list[ClaimedMarketJob]:
     """Claim due jobs atomically; PostgreSQL workers skip each other's rows."""
     now = _now()
@@ -256,6 +258,10 @@ def _claim_jobs(
         ),
     )
     with session_factory() as session:
+        claimable = (
+            or_(MarketReferenceJob.status != "running", stale_lease)
+            if force else due
+        )
         stmt = (
             select(MarketReferenceJob, Property, RegionalMarketPrice)
             .join(Property, MarketReferenceJob.representative_property_id == Property.id)
@@ -263,14 +269,16 @@ def _claim_jobs(
             .where(
                 MarketReferenceJob.uf.in_(ufs),
                 Property.status == "active",
-                due,
+                claimable,
             )
         )
+        if excluded_job_ids:
+            stmt = stmt.where(MarketReferenceJob.id.notin_(excluded_job_ids))
         if property_id is not None:
             stmt = stmt.where(
                 MarketReferenceJob.representative_property_id == property_id,
             )
-        else:
+        elif not force:
             stmt = stmt.where(or_(
                 stale_lease,
                 legacy_snapshot,
@@ -410,6 +418,7 @@ async def refresh_references(
     geocoder=None,
     concurrency: int = DEFAULT_CONCURRENCY,
     collector: MarketReferenceCollector | None = None,
+    force: bool = False,
 ) -> dict:
     started = time.monotonic()
     coverage = reconcile_coverage(session_factory, ufs)
@@ -427,6 +436,7 @@ async def refresh_references(
     owns_geocoder = geocoder is None
     raw_geocoder = None
     batch_geocoder = None
+    claimed_job_ids: set[int] = set()
 
     async def process(claim: ClaimedMarketJob) -> None:
         try:
@@ -456,10 +466,17 @@ async def refresh_references(
         while not limit or remaining > 0:
             batch_limit = concurrency if not limit else min(concurrency, remaining)
             claims = _claim_jobs(
-                session_factory, ufs, batch_limit, max_age_days, property_id,
+                session_factory,
+                ufs,
+                batch_limit,
+                max_age_days,
+                property_id,
+                force=force,
+                excluded_job_ids=claimed_job_ids,
             )
             if not claims:
                 break
+            claimed_job_ids.update(claim.job_id for claim in claims)
             summary["selected"] += len(claims)
             if batch_geocoder is None:
                 raw_geocoder = geocoder or NominatimClient()
@@ -490,6 +507,11 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=10, help="0 means all currently due jobs")
     parser.add_argument("--max-age-days", type=int, default=90)
     parser.add_argument("--property-id", type=int, default=None)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Refresh selected jobs even when their normal retry date is in the future",
+    )
     parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
     parser.add_argument("--result-file", default="")
     args = parser.parse_args(argv)
@@ -516,6 +538,7 @@ def main(argv=None):
         args.max_age_days,
         args.property_id,
         concurrency=args.concurrency,
+        force=args.force,
     ))
     if args.result_file:
         Path(args.result_file).write_text(

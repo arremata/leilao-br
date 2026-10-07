@@ -243,6 +243,8 @@ The full platform will include:
   de fazer consultas por imóvel, somente análises afetadas são refeitas e a
   cobertura conta apenas análises atuais. A Action ganhou dependências mínimas,
   deadlines próprios, inputs validados e métricas por fonte.
+  Execuções manuais também podem forçar um lote pequeno antes da data normal de
+  atualização, sem alterar o agendamento e sem repetir o mesmo job na mesma run.
 
 - **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco
   compacto: foto ao lado do tipo, endereço com bairro/cidade/UF, selos de
