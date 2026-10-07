@@ -1,8 +1,10 @@
 # Padrão visual da plataforma
 
-**Estado:** contrato proposto para orientar a migração; a interface ainda está parcialmente alinhada.
+**Estado:** os parâmetros herdados da LP são obrigatórios para novas interfaces e alterações, por solicitação do usuário. A interface existente ainda está parcialmente alinhada; adaptações específicas de layout permanecem propostas para validação.
 
 Este documento traduz o padrão Client First da home da LP para a plataforma. A escolha de usar a mesma linguagem visual foi solicitada pelo usuário; as medidas específicas de adaptação abaixo são uma proposta operacional e devem ser conferidas na preview.
+
+Valores atuais e diagnóstico específico do painel do imóvel: [PARAMETROS_VISUAIS_E_PAINEL_IMOVEL.md](PARAMETROS_VISUAIS_E_PAINEL_IMOVEL.md).
 
 ## Fonte de referência
 
@@ -21,6 +23,7 @@ LP: `C:/Projetos/GL2/landing-page/DESIGN-SYSTEM.md`, `lp/client-first.css` e `lp
 | Preço das rodadas | Preservar destaque e alinhamento aprovado; 22 px atual, com adaptação de 18 px em telas de até 360 px |
 | Botão padrão | 48 px, fonte 15 px/600, formato arredondado |
 | Botão pequeno / grande | 40 px e 14 px / 52 px e papel tipográfico do padrão |
+| Borda de botão | 1 px em todas as variantes; transparente onde o desenho não exige contorno |
 | Ícone em ação | SVG de 16 px; área acionável pertence ao botão |
 | Campo | Raio 12 px, fundo suave; fonte 15 px desktop e 16 px mobile |
 | Card, painel e modal | Raio 20 px e borda leve |
@@ -39,6 +42,15 @@ Seleções em cartões, controles segmentados e controles de tabelas devem mante
 - Foco visível e coerente; campos com borda roxa e anel de 3 px. Não remover indicação de teclado.
 - Sem animações infinitas. Movimento reduzido elimina deslocamentos; transições devem indicar propriedades explícitas.
 - Botão Google mantém o desenho e as exigências do provedor.
+
+### Variantes de ação
+
+- **Principal:** fundo roxo, texto branco; um principal por bloco.
+- **Secundária:** fundo branco, texto principal e borda neutra de 1 px.
+- **Inversa:** fundo branco, texto roxo e borda branca de 1 px, para fundos escuros.
+- **Link de ação:** texto roxo e fundo/borda transparentes; sem caixa de altura fixa no CSS da LP. Hover escurece e revela sublinhado.
+- Principal, secundária e inversa compartilham hover roxo forte, borda roxa e texto branco. Não criar um hover distinto para cada ação.
+- Foco em ações: contorno de 2 px e afastamento de 3 px; desabilitado: opacidade 0,5 e sem transformação. O contorno de foco é diferente da borda normal de 1 px.
 
 ## Espaçamento e estrutura
 

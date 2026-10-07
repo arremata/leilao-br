@@ -2,6 +2,17 @@
 
 ## Plain-language product delivery
 
+### Required visual contract
+
+All new or changed platform interface must follow
+`docs/PLATFORM_DESIGN_SYSTEM.md`, inheriting the home LP contract at
+`C:/Projetos/GL2/landing-page/DESIGN-SYSTEM.md`. Use pill action buttons with
+999px radius and 40/48/52px height variants, shared typography and color tokens,
+1px action/surface borders, and consistent interaction states. Do not copy
+legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
+are migration work, not approved alternatives. Review each changed component
+at desktop/mobile sizes, including alignment of conditional content.
+
 The people requesting changes may describe only what they want to experience in
 the product. Do not require them to provide technical specifications, file names,
 test commands, or implementation details. Translate their product language into
@@ -213,6 +224,12 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-10-06** — Especificou os valores do contrato visual e os comparou aos
+  estilos efetivos da plataforma. Detalhou as falhas do painel da página do
+  imóvel: ações e selos sem pill, raios divergentes, endereço repetido, textos
+  pequenos e datas desalinhadas por desconto condicional. Tornou o contrato
+  obrigatório para novas interfaces e definiu esse painel como próxima etapa.
 
 - **2026-10-06** — Concluiu a vistoria visual da plataforma contra o Client First
   da LP, com 34 estados medidos, capturas e inventário de estilos. Documentou
