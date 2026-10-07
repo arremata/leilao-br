@@ -49,8 +49,12 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
   const isCurrent = round.state === 'current';
   const showClock = isCurrent || (!model.isSfi && round.state === 'ended');
   const gap = round.appraisalGap;
+  const dateLabel = roundDateLabel(round.date) || (isDirectSale ? '' : 'Data não informada');
   return <article className={`property_round is-${round.state}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
-    <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
+    <div className="property_round-top">
+      <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
+      {dateLabel && <span className="property_round-date">{dateLabel}</span>}
+    </div>
     <div className="property_round-price-row">
       <strong className="property_round-price" title={round.price > 0 ? `R$ ${fmtBRL(Number(round.price))}` : undefined}>{summaryMoney(round.price)}</strong>
       {gap?.tone === 'less' && <span className="property_round-discount" aria-hidden="true">−{gap.percent}%</span>}
@@ -58,12 +62,10 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
     <div className="property_round-notes">
       <AppraisalGap gap={gap} />
       {round.round === 2 && <FirstRoundComparison difference={model.difference} />}
-    </div>
-    <div className="property_round-meta">
-      <span>{roundDateLabel(round.date) || (isDirectSale ? 'Sujeito à disponibilidade na Caixa' : 'Data não informada')}</span>
       {showClock && (isDirectSale && !p.endsAt
         ? <span>Sem prazo divulgado</span>
         : <Countdown until={schedule.headline.until} words="Encerra em" dark endedLabel={schedule.headline.short || 'Encerrado'} />)}
+      {isDirectSale && !dateLabel && <span>Sujeito à disponibilidade na Caixa</span>}
     </div>
   </article>;
 }
@@ -95,22 +97,26 @@ export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, 
 
     <div className="property_summary-panel">
       <header className="property_summary-header">
-        {saleType && <Term className="property_summary-eyebrow">{saleType}</Term>}
-        <h1 id="property-summary-title">{p.type || 'Imóvel'}</h1>
+        <div className="property_summary-title-row">
+          <h1 id="property-summary-title">{p.type || 'Imóvel'}</h1>
+          {saleType && <Term className="ui-tag is-brand">{saleType}</Term>}
+        </div>
         <p className="property_summary-address">
           <ActionIcon kind="pin" />
           <span>{[street, location !== 'Cidade não informada' && location].filter(Boolean).join(' · ') || 'Endereço não informado'}</span>
         </p>
-        <ul className="property_summary-chips" aria-label="Características e situação">
-          {specs.map(spec => <li key={spec} className="property_summary-chip">{spec}</li>)}
-          <li className="property_summary-chip-group"><ListingBadges p={p} size="lg" /></li>
-        </ul>
+        <div className="property_summary-facts-row">
+          <ul className="property_summary-chips" aria-label="Características e situação">
+            {specs.map(spec => <li key={spec} className="property_summary-chip">{spec}</li>)}
+            <li className="property_summary-chip-group"><ListingBadges p={p} size="lg" /></li>
+          </ul>
+          <p className="property_summary-appraisal">
+            <Term k="valor_avaliacao">Avaliação Caixa</Term>: <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
+          </p>
+        </div>
       </header>
 
       <div className="property_summary-pricing">
-        <p className="property_summary-appraisal">
-          <Term k="valor_avaliacao">Avaliação Caixa</Term>: <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
-        </p>
         <div className={`property_summary-rounds${model.rounds.length === 1 ? ' is-single' : ''}`} aria-label="Preços e datas das rodadas">
           {model.rounds.map(round => <RoundCard key={round.label} round={round} model={model} schedule={schedule} isDirectSale={isDirectSale} p={p} />)}
         </div>
