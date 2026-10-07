@@ -130,6 +130,21 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   const isRemoved = property?.status === 'removed';
   // Abre na primeira pergunta que a pessoa faz: quanto vou pagar no total.
   const [tab, setTab] = useState('cost');
+  // Escolher uma aba leva a página até ela: as abas sobem para logo abaixo do
+  // cabeçalho fixo e o conteúdo aparece em seguida.
+  const tabsRef = useRef(null);
+  const openTab = (value) => {
+    setTab(value);
+    const bar = tabsRef.current;
+    if (!bar) return;
+    const header = document.querySelector('.topbar')?.getBoundingClientRect().height || 0;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({
+      top: bar.getBoundingClientRect().top + window.scrollY - header - rem,
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  };
 
   // renoPct: 0 = pronto para morar, 15 = pintura e ajustes, 50 = cozinha e
   // banheiros, 100 = reforma completa.
@@ -694,7 +709,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
       {isEnriched && <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />}
 
       {/* ===== TABS ===== */}
-      <div className="detail-tabs property_tabs" role="tablist" aria-label="Informações do imóvel">
+      <div className="detail-tabs property_tabs" role="tablist" aria-label="Informações do imóvel" ref={tabsRef}>
         {[
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
           { v: 'market', l: 'Preço na região', ix: '02' },
@@ -703,7 +718,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         ].map(t => (
           <button
             key={t.v}
-            onClick={() => setTab(t.v)}
+            onClick={() => openTab(t.v)}
             className={`ui-button is-secondary property_tab${tab === t.v ? ' is-selected' : ''}`}
             role="tab" aria-selected={tab === t.v} aria-controls="property-tab-panel"
             id={`property-tab-${t.v}`} tabIndex={tab === t.v ? 0 : -1}
