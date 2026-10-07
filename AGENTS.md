@@ -248,7 +248,10 @@ The full platform will include:
   regras em `docs/PLATFORM_DESIGN_SYSTEM.md` e checagem `npm run lint:design`.
   Botões, selos e abas em pill; hover por borda e seleção persistente; todos os
   botões da página do imóvel com a mesma altura (2.5rem); primeira aba do
-  imóvel migrada para REM.
+  imóvel migrada para REM. Espaçamentos vêm de tokens por função
+  (`--ui-gap-*`, `--ui-pad-*`), com o ritmo do celular definido uma vez no
+  `:root`; o `lint:design` bloqueia espaçamento escrito à mão.
+
 - **2026-10-06** — Ajustou a rotina programada de referências de mercado à
   latência observada no Bright Data. Cada execução passou de 30 para no máximo
   10 regiões, mantendo margem dentro do limite da Action. Falhas isoladas

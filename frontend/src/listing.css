@@ -48,6 +48,8 @@
   .property-grid > .property-card > .property-card-body { display: grid; grid-template-rows: subgrid; grid-row: span 9; row-gap: 0; }
   .property-grid .property_card-pricing { display: grid; grid-template-rows: subgrid; grid-row: span 4; row-gap: 0; }
   .property-grid .property_card-rounds { display: contents; }
+  /* The shared row grows when a neighbour's badges wrap; badges keep their own size. */
+  .property-grid .listing-badges { align-content: flex-start; align-items: flex-start; }
   .property-grid .property_card-single-price { grid-row: span 3; padding-top: 12px; border-top: 1px solid var(--line-1); }
 }
 .property_card-appraisal { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; border-top: 1px solid var(--line-1); padding-top: 14px; margin-top: 16px; font-size: 13px; color: var(--fg-2); }
