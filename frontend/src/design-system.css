@@ -83,8 +83,8 @@
 .ui-button.is-inverse:focus-visible { outline-color: var(--ui-white); }
 .ui-tag { display: inline-flex; align-items: center; padding: var(--ui-space-xs) var(--ui-space-sm); border-radius: var(--ui-radius-pill); background: var(--ui-soft); color: var(--ui-text-secondary); font: 600 var(--ui-text-xs)/1.2 var(--f-sans); }
 .ui-tag.is-brand { background: var(--ui-brand-soft); color: var(--ui-brand-hover); }
-.property_detail { max-width: 80rem; margin: 0 auto; padding: var(--ui-gap-group) var(--ui-pad-page) var(--ui-space-3xl); }
-.property_detail .property_detail-top { margin-bottom: var(--ui-gap-group); gap: var(--ui-gap-stack); flex-wrap: wrap; }
+.property_detail { max-width: 80rem; margin: 0 auto; padding: var(--ui-gap-stack) var(--ui-pad-page) var(--ui-space-3xl); }
+.property_detail .property_detail-top { margin-bottom: var(--ui-gap-stack); gap: var(--ui-gap-stack); flex-wrap: wrap; }
 .property_detail-breadcrumb { color: var(--ui-text-muted); font-size: var(--ui-text-sm); min-width: 0; flex-wrap: wrap; }
 .property_detail .detail-actions { display: flex; flex-wrap: wrap; gap: var(--ui-gap-inline); overflow: visible; padding: 0; }
 .property_detail .detail-actions .ui-button { width: auto; flex: none; }
@@ -145,7 +145,7 @@
 }
 
 /* Property summary: photo (40%) beside the facts (60%). Price and rounds carry the visual weight. */
-.property_summary { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--ui-gap-section); align-items: stretch; margin-bottom: var(--ui-gap-section); padding: var(--ui-pad-card); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-card); background: var(--ui-white); color: var(--ui-text); }
+.property_summary { display: grid; grid-template-columns: minmax(0, 38fr) minmax(0, 62fr); gap: var(--ui-gap-section); align-items: stretch; margin-bottom: var(--ui-gap-section); padding: var(--ui-pad-card); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-card); background: var(--ui-white); color: var(--ui-text); }
 .property_summary-gallery { position: relative; display: grid; min-height: 20rem; overflow: hidden; border-radius: var(--ui-radius-md); background: var(--ui-soft); }
 .property_summary-gallery .ph { background: var(--ui-soft); }
 .property_summary-photo { min-width: 0; min-height: 0; overflow: hidden; }
@@ -153,11 +153,13 @@
 .property_summary-gallery.is-multiple .is-main { grid-row: 1 / -1; }
 .property_summary-panel { display: flex; flex-direction: column; gap: var(--ui-gap-group); min-width: 0; }
 .property_summary-header { display: grid; gap: var(--ui-gap-tight); }
-.property_summary-eyebrow { font: 700 var(--ui-text-xs)/1.4 var(--f-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--ui-brand-hover); }
+.property_summary-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-gap-tight) var(--ui-gap-inline); }
+.property_summary-title-row .ui-tag { padding: var(--ui-space-2xs) var(--ui-space-xs); letter-spacing: .04em; text-transform: uppercase; }
+.property_summary-facts-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-gap-tight) var(--ui-gap-stack); margin-top: var(--ui-space-2xs); }
 .property_summary h1 { margin: 0; font: 750 var(--ui-text-3xl)/1.15 var(--f-display); letter-spacing: -.03em; overflow-wrap: anywhere; }
 .property_summary-address { display: flex; align-items: flex-start; gap: var(--ui-space-xs); margin: 0; font-size: var(--ui-text-sm); line-height: 1.5; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
 .property_summary-address svg { width: var(--ui-space-md); height: var(--ui-space-md); flex: none; margin-top: var(--ui-space-3xs); color: var(--ui-text-muted); }
-.property_summary-chips { display: flex; flex-wrap: wrap; gap: var(--ui-gap-tight); margin: var(--ui-space-2xs) 0 0; padding: 0; list-style: none; }
+.property_summary-chips { display: flex; flex-wrap: wrap; gap: var(--ui-gap-tight); margin: 0; padding: 0; list-style: none; }
 .property_summary-chip-group, .property_summary-chip-group .listing-badges { display: contents; }
 .property_summary-chip, .property_summary .listing-badge { display: inline-flex; align-items: center; gap: var(--ui-space-xs); min-height: 1.75rem; margin: 0; padding: 0 var(--ui-space-sm); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-pill); background: var(--ui-white); color: var(--ui-text-secondary); font: 600 var(--ui-text-xs)/1.2 var(--f-sans); white-space: nowrap; }
 .property_summary .listing-badge::before { width: .375rem; height: .375rem; }
@@ -166,7 +168,7 @@
 .property_summary .listing-badge--muted { color: var(--ui-text-muted); background: var(--ui-soft); border-color: transparent; }
 .property_summary .listing-badge--neutral { border-style: dashed; color: var(--ui-text-muted); }
 .property_summary-pricing { display: grid; gap: var(--ui-gap-stack); margin-top: auto; }
-.property_summary-appraisal { margin: 0; font-size: var(--ui-text-sm); line-height: 1.5; color: var(--ui-text-muted); }
+.property_summary-appraisal { margin: 0; font-size: var(--ui-text-sm); line-height: 1.5; color: var(--ui-text-muted); white-space: nowrap; }
 .property_summary-appraisal strong { color: var(--ui-text); font-weight: 650; font-variant-numeric: tabular-nums; }
 .property_summary-rounds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-gap-stack); }
 .property_summary-rounds.is-single { grid-template-columns: minmax(0, 1fr); }
@@ -186,7 +188,8 @@
 .property_round-gap.is-more, .property_round-saving.is-more { color: var(--ui-error); }
 .property_round-saving { color: var(--ui-success); font-weight: 600; }
 .property_round-saving.is-more { font-weight: 500; }
-.property_round-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-2xs) var(--ui-space-sm); margin-top: auto; padding-top: var(--ui-gap-inline); font-size: var(--ui-text-xs); line-height: 1.45; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; }
+.property_round-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-2xs) var(--ui-gap-inline); }
+.property_round-date { font-size: var(--ui-text-xs); line-height: 1.45; color: var(--ui-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .property_round .countdown { font: 600 var(--ui-text-xs)/1.45 var(--f-sans); letter-spacing: 0; gap: var(--ui-space-xs); }
 .property_round .countdown .dot { width: .375rem; height: .375rem; animation: none; }
 
