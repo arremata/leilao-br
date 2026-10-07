@@ -7,8 +7,11 @@
 All new or changed platform interface must follow
 `docs/PLATFORM_DESIGN_SYSTEM.md`, inheriting the home LP contract at
 `C:/Projetos/GL2/landing-page/DESIGN-SYSTEM.md`. Use pill action buttons with
-999px radius and 40/48/52px height variants, shared typography and color tokens,
-1px action/surface borders, and consistent interaction states. Do not copy
+`--ui-radius-pill` and `sm`/`md`/`lg` height variants (2.5/3/3.25rem), shared typography and color tokens,
+`.0625rem` action/surface borders, and consistent interaction states. All new
+layout dimensions use REM and named tokens in `frontend/src/design-system.css`;
+do not fix the browser root font size or introduce numeric inline React lengths.
+Run `npm run lint:design` alongside frontend lint/build. Do not copy
 legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
 are migration work, not approved alternatives. Review each changed component
 at desktop/mobile sizes, including alignment of conditional content.
@@ -224,6 +227,14 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-10-06** — Implementou o painel da página do imóvel com tokens em REM e
+  tamanhos nomeados, ações e selos pill, superfícies com raio comum, título por
+  tipo/área e endereço completo próprio. Preços e datas compartilham linhas de
+  grade; diferença em reais/percentual aparece fora das colunas e avaliação igual
+  a uma rodada é identificada sem repetir o preço. Retirou a miniatura redundante
+  sem ação e o pulso contínuo do painel. Incluiu verificação do contrato visual,
+  seis testes de apresentação de rodadas e validação desktop/mobile e fonte ampliada.
 
 - **2026-10-06** — Especificou os valores do contrato visual e os comparou aos
   estilos efetivos da plataforma. Detalhou as falhas do painel da página do

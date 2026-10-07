@@ -28,6 +28,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Motivo:** a pessoa deve reconhecer uma experiência consistente ao passar do
   site institucional para as telas da plataforma.
 - **Consequências:** a padronização abrange catálogo, imóvel, conta e questionário.
+  Novas medidas usam REM e tamanhos nomeados, respeitando a preferência de fonte
+  do navegador. O painel da página do imóvel é a primeira etapa de implementação.
   A densidade de filtros e tabelas exige adaptação, preservando legibilidade e
   funcionamento. O diagnóstico não representa uma migração já publicada.
 

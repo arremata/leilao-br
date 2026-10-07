@@ -8,6 +8,13 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 ## Padrão visual — migração pendente
 
+Primeira etapa em validação: a página do imóvel ganhou painel e ações no padrão
+da LP, com medidas em REM e tamanhos nomeados. Tipo/área identificam o título;
+o endereço completo permanece no detalhe. Rodadas têm preços e datas alinhados,
+com comparação da segunda para a primeira em reais e percentual; avaliação igual
+a uma rodada é indicada sem repetir o valor. Descrição e características abrem
+por controles acessíveis. As demais áreas ainda aguardam migração.
+
 A plataforma deve seguir a linguagem Client First da LP em fontes, tamanhos,
 botões, campos e interação. A vistoria de 6 de outubro conferiu 34 estados de
 tela e identificou que o alinhamento ainda é parcial: os cards recentes estão

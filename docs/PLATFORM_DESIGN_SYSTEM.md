@@ -6,6 +6,35 @@ Este documento traduz o padrão Client First da home da LP para a plataforma. A 
 
 Valores atuais e diagnóstico específico do painel do imóvel: [PARAMETROS_VISUAIS_E_PAINEL_IMOVEL.md](PARAMETROS_VISUAIS_E_PAINEL_IMOVEL.md).
 
+## Medidas em REM e tamanhos nomeados
+
+**Implementado na primeira etapa:** `frontend/src/design-system.css` contém os
+tokens compartilhados; o painel da página do imóvel, sua foto e ações usam esse
+contrato. Os valores em px nas tabelas antigas deste documento são equivalências
+para leitura com fonte-base de 16 px, não unidades para novas declarações.
+Não fixar o tamanho da fonte raiz: REM deve respeitar a preferência do navegador.
+
+| Família | 2xs | xs | sm | md | lg | xl | 2xl |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `--ui-space-*` | .25rem | .5rem | .75rem | 1rem | 1.5rem | 2rem | 3rem |
+| `--ui-text-*` | — | .8125rem | .875rem | .9375rem | 1rem | 1.125rem | 1.5rem |
+| `--ui-control-*` | — | — | 2.5rem | 3rem | 3.25rem | — | — |
+
+Título maior: `--ui-text-3xl: 1.75rem`. Raios: `md: .75rem`,
+`lg: 1.25rem`, `pill: 999rem`. Bordas: `sm: .0625rem`, `md: .125rem`
+(a segunda é usada no foco). Usar nomes por função: `ui-button is-sm`,
+`is-lg`, `is-secondary`, `is-inverse` e `is-text`.
+
+Na barra de ações do imóvel, as ações usam `sm` no desktop e altura `lg` no
+mobile para acomodar duas linhas. Todas têm a mesma altura em cada tamanho de
+tela. Abaixo de 22rem, ficam em uma coluna. SVG, proporções, porcentagens,
+pesos tipográficos e tempos de animação não são medidas em px a converter.
+
+Novas dimensões de interface devem usar REM e preferir os tokens. Não reaproveitar
+medidas inline numéricas de React, que geram px. `npm run lint:design` verifica
+REM, tokens obrigatórios e movimento em `design-system.css`; não certifica os
+arquivos legados, que continuam pendentes de migração.
+
 ## Fonte de referência
 
 LP: `C:/Projetos/GL2/landing-page/DESIGN-SYSTEM.md`, `lp/client-first.css` e `lp/styles.css`. Não usar o blog ou páginas para investidores como uma segunda referência conflitante.

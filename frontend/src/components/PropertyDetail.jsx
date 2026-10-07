@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { backLabel } from '../usePropertyLink';
-import { Countdown, ListingBadges, LockIcon, Photo, PropertyImage, Specs } from './shared';
+import { LockIcon } from './shared';
+import PropertySummary, { ActionIcon } from './PropertySummary';
+import { listingTitle } from '../listingPresentation';
 import { fmtBRL, mapsQuery } from '../utils';
-import { auctionSchedule, saleTagLabel } from '../auctionRounds';
+import { auctionSchedule } from '../auctionRounds';
 import { occupancyStatus } from '../listingFacts';
 import { budgetPlan } from '../bidBudget';
 import ConsultoriaTab from './ConsultoriaTab';
 import { analyzeCatalogItem } from '../api';
-import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 import { useStepProgress } from '../useStepProgress';
@@ -656,20 +657,19 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   };
 
   return (
-    <div className="page detail-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 24px 80px' }}>
+    <div className="page detail-page property_detail">
 
       {/* ===== Breadcrumb + actions ===== */}
-      <div className="row between detail-top" style={{ marginBottom: 18 }}>
+      <div className="row between detail-top property_detail-top">
         <Link
           to={cameFrom || '/'}
           onClick={goBack}
-          className="row gap-2"
-          style={{ color: 'var(--fg-2)', fontSize: 12.5 }}
+          className="row gap-2 property_detail-breadcrumb"
         >
-          <span className="mono">←</span>
+          <ActionIcon kind="back" />
           <span>{backLabel(cameFrom)}</span>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>/</span>
-          <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
+          <span>{listingTitle(p)}</span>
         </Link>
         <div className="row gap-2 detail-actions">
           {auctionUrl && (
@@ -677,7 +677,7 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               /* Num imóvel que saiu do catálogo, esta deixa de ser a ação
                  principal: seria convidar a pessoa a dar lance no que não
                  existe mais. O link fica, para ela poder conferir. */
-              className={`btn sm${isRemoved ? '' : ' primary'}`}
+              className={`ui-button is-sm${isRemoved ? ' is-secondary' : ''}`}
               href={auctionUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -685,50 +685,48 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
               {isRemoved
                 ? 'Conferir na Caixa'
                 : isDirectSale ? 'Ver na Caixa' : 'Ver o leilão na Caixa'}
-              {' '}<span aria-hidden="true">↗</span>
+              <ActionIcon />
             </a>
           )}
           {editalUrl && (
             <a
-              className="btn sm"
+              className="ui-button is-sm is-secondary"
               href={editalUrl}
               target="_blank"
               rel="noopener noreferrer"
               download
             >
-              Baixar as regras <span aria-hidden="true">↓</span>
+              Baixar as regras <ActionIcon kind="download" />
             </a>
           )}
           {matriculaUrl && (
             <a
-              className="btn sm"
+              className="ui-button is-sm is-secondary"
               href={matriculaUrl}
               target="_blank"
               rel="noopener noreferrer"
               download
             >
-              Baixar a certidão do imóvel <span aria-hidden="true">↓</span>
+              Baixar a certidão do imóvel <ActionIcon kind="download" />
             </a>
           )}
           {saleRulesUrl && (
             <a
-              className="btn sm"
+              className="ui-button is-sm is-secondary"
               href={saleRulesUrl}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Regras da venda <span aria-hidden="true">↗</span>
+              Regras da venda <ActionIcon />
             </a>
           )}
-          <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
-            <span style={{ color: isWatched ? 'var(--accent)' : 'var(--fg-2)' }}>
-              {isWatched ? '★' : '☆'}
-            </span>
+          <button className="ui-button is-sm is-secondary" aria-pressed={isWatched} onClick={() => toggleWatch?.(p.id)}>
+            <ActionIcon kind="star" filled={isWatched} />
             {isWatched ? 'Salvo' : 'Salvar'}
           </button>
           {!isEnriched && p.canAnalyze && (
             <button
-              className="btn sm primary"
+              className="ui-button is-sm"
               onClick={handleAnalyze}
               disabled={analyzing}
             >
@@ -738,131 +736,8 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
         </div>
       </div>
 
-      {/* ===== HERO: gallery + key facts ===== */}
-      <div className="detail-hero-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: '1.4fr 1fr',
-        gap: 24,
-        marginBottom: 24,
-      }}>
-        {/* Gallery */}
-        <div>
-          <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--line-1)' }}>
-            <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
-            <div style={{
-              position: 'absolute', top: 14, left: 14,
-              background: 'rgba(255,255,255,0.92)', padding: '6px 10px',
-              borderRadius: 6, fontSize: 11,
-              border: '1px solid var(--line-1)',
-              fontFamily: 'var(--f-mono)',
-            }}>
-              Fachada
-            </div>
-          </div>
-          <div className="row gap-2 thumb-strip" style={{ marginTop: 10 }}>
-            <div style={{
-              width: 80, height: 56,
-              borderRadius: 6,
-              overflow: 'hidden',
-              border: '2px solid var(--accent)',
-              position: 'relative',
-              cursor: 'pointer',
-              background: '#ECEEF1',
-              backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
-            }}>
-              <PropertyImage
-                src={p.photoUrl}
-                alt="Fachada"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <span className="mono" style={{
-                position: 'absolute', bottom: 4, left: 4,
-                fontSize: 9, color: 'var(--fg-2)',
-                background: 'rgba(255,255,255,0.8)',
-                padding: '1px 4px', borderRadius: 3,
-              }}>
-                Fachada
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Key facts panel */}
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <span className="tag accent">{saleTagLabel(p, schedule)}</span>
-            <span className="tag">{p.type}</span>
-          </div>
-
-          <h1 className="h1" style={{ marginBottom: 4 }}>{p.title}</h1>
-          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--fg-2)' }}>
-            {p.address} · {p.neighborhood}, {p.city}
-          </p>
-
-          {/* Specs — only shows fields with real data */}
-          <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} />
-
-          <ListingBadges p={p} size="lg" />
-
-          <div className="divider" style={{ margin: '16px 0' }}></div>
-
-          {/* Countdown: sempre diz de qual rodada é o prazo */}
-          <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)' }}>
-                {isDirectSale ? 'Disponibilidade' : schedule.headline.label}
-              </div>
-              <div style={{ marginTop: 4 }}>
-                {isDirectSale && !p.endsAt
-                  ? <span style={{ color: 'var(--fg-2)', fontSize: 13 }}>Sem prazo divulgado</span>
-                  : <Countdown until={schedule.headline.until} dark endedLabel={schedule.headline.short || 'Encerrado'} />}
-              </div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-                {schedule.headline.until
-                  ? formatAuctionDayTime(schedule.headline.until)
-                  : isDirectSale ? 'Sujeito à disponibilidade na Caixa' : '—'}
-              </div>
-              {!isDirectSale && schedule.headline.note && (
-                <div className="auction-headline-note">{schedule.headline.note}</div>
-              )}
-            </div>
-            {/* Avaliação ao lado do prazo: o quadro de preços abaixo fica só
-                com o que se paga em cada rodada. */}
-            <AppraisalFact p={p} />
-          </div>
-
-          <div className="divider" style={{ margin: '16px 0' }}></div>
-
-          <OfficialBidNotice p={p} />
-
-          {officialBidStatus(p) && (
-            <div className="divider" style={{ margin: '16px 0' }}></div>
-          )}
-
-          {/* Pricing labels follow the official sale modality. */}
-          <PricingGrid p={p} />
-
-          <div className="divider" style={{ margin: '16px 0 4px' }}></div>
-
-          <Collapsible title="Descrição do imóvel">
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}>
-              {p.viability?.description || 'Descrição não disponível.'}
-            </p>
-          </Collapsible>
-
-          <Collapsible title="Características">
-            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-              {p.viability?.features
-                ? Object.entries(p.viability.features).map(([lbl, val]) => (
-                    <Meta key={lbl} lbl={lbl} val={val} />
-                  ))
-                : <span style={{ color: 'var(--fg-2)' }}>Dados não disponíveis</span>
-              }
-            </div>
-          </Collapsible>
-
-        </div>
-      </div>
+      <PropertySummary p={p} schedule={schedule} isDirectSale={isDirectSale}
+        formatDate={formatAuctionDayTime} bidNotice={<OfficialBidNotice p={p} />} />
 
       {isEnriched && <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />}
 
@@ -998,144 +873,6 @@ function OfficialBidNotice({ p }) {
         )}
       </div>
     </section>
-  );
-}
-
-function AppraisalFact({ p }) {
-  const appraisal = Number(p.appraisal) || 0;
-  const current = Number(p.minBid) || 0;
-  return (
-    <div className="appraisal-fact">
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}>Valor de avaliação</span>
-      {appraisal > 0 ? (
-        <>
-          <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
-          {current > 0 && appraisal > current && (
-            <div className="appraisal-fact-gap">R$ {fmtBRL(appraisal - current)} abaixo da avaliação</div>
-          )}
-          {current > 0 && current > appraisal && (
-            <div className="appraisal-fact-gap is-above">Valor inicial R$ {fmtBRL(current - appraisal)} acima da avaliação</div>
-          )}
-        </>
-      ) : (
-        <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fg-3)' }}>
-          A Caixa não informou.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PricingGrid({ p }) {
-  const modality = normalizedCostLabel(p.modalidade);
-  const isDirectSale = modality.includes('venda direta');
-  const isOpenTender = modality.includes('licitacao');
-  const isSfiAuction = modality.includes('leilao sfi');
-  const sfiPricing = sfiAuctionPricing(p);
-  const currentBidPrice = isSfiAuction
-    ? (sfiPricing.current.price || 0)
-    : (p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid);
-  const currentBidDate = isSfiAuction
-    ? sfiPricing.current.date
-    : (p.edital?.firstBidDate || p.firstAuctionAt);
-  const otherRound = sfiPricing.upcoming || sfiPricing.previous;
-  const otherRoundPrice = otherRound?.price || 0;
-  const hasOtherRound = otherRoundPrice > 0;
-  // O edital guarda a data como ISO, não como texto pronto — renderizá-la
-  // direto colocava "2026-09-14T13:00:00+00:00" na tela. formatAuctionDate
-  // converte para o fuso de São Paulo e devolve a própria string quando a fonte
-  // já vem formatada.
-  const currentDateLabel = formatAuctionDayTime(currentBidDate);
-  const otherRoundDateLabel = formatAuctionDayTime(otherRound?.date);
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
-      <div>
-        <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-          {isDirectSale
-            ? 'Preço de venda'
-            : isOpenTender
-              ? 'Valor inicial · rodada única'
-              : `Valor inicial${isSfiAuction ? ` · ${sfiPricing.current.round}ª rodada` : ''}`}
-        </span>
-        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
-        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > 0
-          && sfiPricing.previous.price !== currentBidPrice && (
-          <div style={{ fontSize: 11, color: sfiPricing.previous.price > currentBidPrice ? 'var(--good)' : 'var(--bad)', fontWeight: 500, marginTop: 2 }}>
-            R$ {fmtBRL(Math.abs(sfiPricing.previous.price - currentBidPrice))} {sfiPricing.previous.price > currentBidPrice ? 'a menos' : 'a mais'} que a 1ª rodada
-          </div>
-        )}
-        {currentDateLabel && (
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{currentDateLabel}</div>
-        )}
-      </div>
-      {isSfiAuction && (
-        <div>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-            {sfiPricing.upcoming ? 'Se não vender · 2ª rodada' : '1ª rodada encerrada'}
-          </span>
-          {hasOtherRound ? (
-            <>
-              <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(otherRoundPrice)}</div>
-              {sfiPricing.upcoming && currentBidPrice > otherRoundPrice && (
-                <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
-                  R$ {fmtBRL(currentBidPrice - otherRoundPrice)} a menos
-                </div>
-              )}
-              {sfiPricing.upcoming && otherRoundPrice > currentBidPrice && (
-                <div style={{ fontSize: 11, color: 'var(--bad)', fontWeight: 500, marginTop: 2, lineHeight: 1.45 }}>
-                  R$ {fmtBRL(otherRoundPrice - currentBidPrice)} a mais. Na 2ª rodada, o mínimo é a
-                  dívida com as despesas, e aqui ela passa do valor da 1ª.
-                </div>
-              )}
-              {otherRoundDateLabel && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
-              )}
-            </>
-          ) : (
-            <>
-              <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)' }}>
-                {sfiPricing.upcoming
-                  ? 'O valor da segunda rodada ainda não foi divulgado.'
-                  : 'O valor da primeira rodada não foi publicado.'}
-              </div>
-              {otherRoundDateLabel && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Collapsible({ title, children, last }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ borderBottom: last ? 'none' : '1px solid var(--line-1)' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', padding: '12px 0',
-          color: 'var(--fg-0)',
-          fontSize: 13, fontWeight: 500,
-          textAlign: 'left',
-        }}
-      >
-        <span>{title}</span>
-        <span className="mono" style={{
-          fontSize: 11, color: 'var(--fg-2)',
-          transition: 'transform .2s',
-          transform: open ? 'rotate(180deg)' : 'rotate(0)',
-        }}>▾</span>
-      </button>
-      {open && (
-        <div className="fade-in" style={{ padding: '4px 0 16px' }}>
-          {children}
-        </div>
-      )}
-    </div>
   );
 }
 
