@@ -214,6 +214,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Concluiu a vistoria visual da plataforma contra o Client First
+  da LP, com 34 estados medidos, capturas e inventário de estilos. Documentou
+  diferenças de tipografia, controles, contraste e movimento, com uma proposta
+  de contrato e ordem de migração. Conta e questionário foram inspecionados com
+  dados fictícios locais, sem gravações em produção. Nenhuma interface foi
+  alterada nesta entrega de diagnóstico.
+
 - **2026-10-06** — Acrescentou o bairro à localização resumida dos cards e da
   lista, junto de cidade e estado. Bairro não informado é omitido, sem separador
   vazio; rua e número continuam somente na página do imóvel.

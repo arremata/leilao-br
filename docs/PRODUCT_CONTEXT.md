@@ -6,6 +6,16 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 Última atualização: 6 de outubro de 2026.
 
+## Padrão visual — migração pendente
+
+A plataforma deve seguir a linguagem Client First da LP em fontes, tamanhos,
+botões, campos e interação. A vistoria de 6 de outubro conferiu 34 estados de
+tela e identificou que o alinhamento ainda é parcial: os cards recentes estão
+mais próximos do padrão, enquanto outras telas mantêm textos pequenos e
+controles antigos. A vistoria não alterou a interface. O diagnóstico está em
+`docs/AUDITORIA_CLIENT_FIRST_PLATAFORMA.md`; a proposta de contrato para orientar
+as próximas alterações está em `docs/PLATFORM_DESIGN_SYSTEM.md`.
+
 ## Em validação — lista de imóveis simplificada
 
 Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,

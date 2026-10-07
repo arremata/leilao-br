@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 1º de outubro de 2026.
+Última atualização: 6 de outubro de 2026.
 
 ## Como manter este registro
 
@@ -18,6 +18,18 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - Mudanças apenas técnicas continuam somente no changelog de `AGENTS.md`.
 
 ## Decisões ativas de produto
+
+### PD-023 — Usar a linguagem visual da LP em toda a plataforma
+
+- **Data:** 6 de outubro de 2026
+- **Estado:** Ativa como direção de produto; migração pendente
+- **Decisão:** a plataforma deve compartilhar o padrão Client First da LP para
+  tipografia, botões, campos, cores, tamanhos e interação.
+- **Motivo:** a pessoa deve reconhecer uma experiência consistente ao passar do
+  site institucional para as telas da plataforma.
+- **Consequências:** a padronização abrange catálogo, imóvel, conta e questionário.
+  A densidade de filtros e tabelas exige adaptação, preservando legibilidade e
+  funcionamento. O diagnóstico não representa uma migração já publicada.
 
 ### PD-022 — Simplificar a identificação e as rodadas na lista
 
