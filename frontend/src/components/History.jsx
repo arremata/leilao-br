@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePropertyLink } from '../usePropertyLink';
 import { fmtBRL } from '../utils';
+import { listingTitle } from '../listingPresentation';
 import { fetchCatalogItem } from '../api';
 
 export default function History({ history, clearHistory, properties }) {
@@ -110,7 +111,7 @@ function HistoryRow({ entry, liveProperty, detail, last }) {
 
   const Row = live ? Link : 'div';
   const rowProps = live
-    ? { ...link, 'aria-label': `Abrir ${property.title || property.address || 'imóvel'}` }
+    ? { ...link, 'aria-label': `Abrir ${listingTitle(property)}` }
     : {};
 
   return (
@@ -129,9 +130,9 @@ function HistoryRow({ entry, liveProperty, detail, last }) {
       }}
     >
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.25 }}>{property.title || property.address || 'Imóvel sem título'}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.25 }}>{listingTitle(property)}</div>
         <div style={{ fontSize: 11.5, color: 'var(--fg-2)', marginTop: 2 }}>
-          {[property.neighborhood, property.city, property.type, property.modalidade || property.auctionType].filter(Boolean).join(' · ') || 'Informações não disponíveis'}
+          {[property.type, property.modalidade || property.auctionType].filter(Boolean).join(' · ') || 'Informações não disponíveis'}
         </div>
         <div className="history-mobile-time mono" style={{ fontSize: 10.5, color: 'var(--fg-3)', marginTop: 5 }}>{dateStr} · {timeStr}</div>
       </div>

@@ -2814,62 +2814,12 @@ a { color: inherit; text-decoration: none; }
 .property-row-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .property-row-badges .listing-badge { font-size: 10.5px; padding: 1px 7px; }
 
-.round-strip {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-}
-/* Os dois quadros seguem a mesma grade de cinco linhas. */
-.round-step {
-  min-width: 0;
-  display: grid;
-  grid-template-rows: auto auto auto auto auto;
-  row-gap: 2px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--line-1);
-  background: var(--bg-1);
-}
-.round-step-title { font-size: 11.5px; font-weight: 650; color: var(--fg-1); white-space: nowrap; }
-.round-step-state {
-  justify-self: start;
-  font-size: 10.5px; line-height: 1.5; color: var(--fg-2); white-space: nowrap;
-}
-.round-step-price {
-  margin-top: 4px;
-  font-family: var(--f-mono); font-feature-settings: 'tnum';
-  font-size: 15px; line-height: 22px; font-weight: 600; color: var(--fg-0);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.round-step-price.is-long { font-size: 12.5px; }
-.round-step-date { font-family: var(--f-mono); font-size: 10.5px; color: var(--fg-2); white-space: nowrap; }
-.round-step-drop {
-  margin-top: 2px;
-  font-size: 11px; line-height: 16px; font-weight: 500; color: var(--good);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-.round-step.is-current { border-color: var(--accent); background: var(--accent-soft); }
-.round-step.is-current .round-step-state,
-.round-step.is-current .round-step-title { color: var(--accent-strong); font-weight: 600; }
-.round-step.is-ended { background: var(--bg-2); border-color: var(--bg-2); }
-.round-step.is-ended .round-step-price { color: var(--fg-3); text-decoration: line-through; font-weight: 500; }
-.round-step.is-ended .round-step-title,
-.round-step.is-ended .round-step-state { color: var(--fg-3); }
-.round-step.is-ended .round-step-state::before { content: "✓ "; }
-/* Contagem dentro do quadro da rodada: mesmo tamanho da linha de situação. */
-.round-step-state .countdown { font-size: 10.5px; gap: 5px; }
-.round-step-state .countdown .dot { width: 5px; height: 5px; }
-
 .auction-headline-note {
   margin-top: 6px;
   font-size: 12px; color: var(--fg-1);
 }
 
-@media (max-width: 640px) {
-  .round-step { padding: 9px 10px; }
-  .round-step-price { font-size: 14px; }
-}
-.round-strip--compact .round-step-price { font-size: 14px; }
-.round-strip--compact .round-step-price.is-long { font-size: 12px; }
+
 
 /* ---------- Orçamento total → até onde o lance pode ir ---------- */
 .budget-planner {

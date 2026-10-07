@@ -1,7 +1,14 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PropertyCard, PropertyRow } from './shared';
-import { catalogSaleDetailVisibility } from '../catalogFilters';
+import {
+  catalogSaleDetailVisibility,
+  filterBySaleKind,
+  interleaveBySaleKind,
+  isDirectSaleModality,
+  saleKindFromParam,
+  saleKindToParam,
+} from '../catalogFilters';
 import { getEndsAtMs } from '../utils';
 
 const normalizeLocation = (value) => String(value || '')
@@ -11,15 +18,10 @@ const normalizeLocation = (value) => String(value || '')
 const formatCity = (value) => String(value || '').toLocaleLowerCase('pt-BR')
   .replace(/(^|\s)\S/g, letter => letter.toLocaleUpperCase('pt-BR'));
 
-// Leilão e compra direta são produtos com lógicas opostas: um tem disputa e
-// data, o outro é primeiro a chegar. Misturá-los confunde exatamente quem é
-// leigo, então são abas e não um filtro escondido.
-const isDirectSaleModality = (value) => normalizeLocation(value).includes('VENDA DIRETA');
-
 // Os filtros moram na URL: é isso que faz voltar de um imóvel devolver a mesma
 // lista. Só o que difere do padrão aparece no endereço.
 const DEFAULTS = {
-  aba: 'leiloes', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
+  aba: 'todos', estado: 'Todos', cidade: 'Todas', tipo: 'Todos',
   rodada: 'Todos', modalidade: 'Todos', desconto: '0',
   ordem: 'relevance', vis: 'grid', pagina: '1', encerrados: '0',
 };
@@ -27,7 +29,7 @@ const DEFAULTS = {
 function readParams(searchParams) {
   const get = (key) => searchParams.get(key) ?? DEFAULTS[key];
   return {
-    kind: get('aba') === 'direta' ? 'direct' : 'auction',
+    kind: saleKindFromParam(get('aba')),
     filters: {
       state: get('estado'),
       city: get('cidade'),
@@ -74,10 +76,7 @@ export function CatalogSidebarFilters({
     rodada: next.praca, modalidade: next.modalidade, desconto: String(next.discountMin),
     encerrados: next.showExpired ? '1' : '0',
   });
-  const byKind = useMemo(
-    () => properties.filter(property => isDirectSaleModality(property.modalidade) === (kind === 'direct')),
-    [properties, kind],
-  );
+  const byKind = useMemo(() => filterBySaleKind(properties, kind), [properties, kind]);
   const directCount = useMemo(
     () => properties.filter(property => isDirectSaleModality(property.modalidade)).length,
     [properties],
@@ -132,7 +131,7 @@ export function CatalogSidebarFilters({
 
   function setKind(value) {
     setParams({
-      aba: value === 'direct' ? 'direta' : 'leiloes',
+      aba: saleKindToParam(value),
       modalidade: 'Todos',
       rodada: 'Todos',
     });
@@ -162,6 +161,16 @@ export function CatalogSidebarFilters({
     </div>
 
     <div className="kind-tabs kind-tabs--rail" role="tablist" aria-label="Tipo de venda">
+      <button
+        role="tab"
+        aria-selected={kind === 'all'}
+        aria-label={hideHousingDuplicates ? 'Todos: leilões e compra direta juntos' : undefined}
+        title="Leilões e compra direta juntos. Escolha um dos dois para ver só aquele tipo."
+        className={kind === 'all' ? 'active' : ''}
+        onClick={() => setKind('all')}
+      >
+        <div><strong>Todos</strong>{!hideHousingDuplicates && <small>leilões e compra direta juntos</small>}</div>
+      </button>
       <button
         role="tab"
         aria-selected={kind === 'auction'}
@@ -286,10 +295,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
   const setSort = (value) => setParams({ ordem: value });
   const setView = (value) => setParams({ vis: value === 'list' ? 'lista' : 'grid' });
   const setPage = (value) => setParams({ pagina: String(value) }, { replace: true });
-  const byKind = useMemo(
-    () => properties.filter(p => isDirectSaleModality(p.modalidade) === (kind === 'direct')),
-    [properties, kind],
-  );
+  const byKind = useMemo(() => filterBySaleKind(properties, kind), [properties, kind]);
   const filtered = useMemo(() => {
     let list = [...byKind];
 
@@ -327,6 +333,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
         return completeness(b) - completeness(a);
       });
+      if (kind === 'all') list = interleaveBySaleKind(list);
     }
     else if (sort === 'discount') list.sort((a, b) =>
       (b.discount ?? b.auctionDiscount ?? 0) - (a.discount ?? a.auctionDiscount ?? 0));
@@ -350,7 +357,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
     else if (sort === 'price-asc') list.sort((a, b) => a.minBid - b.minBid);
     else if (sort === 'price-desc') list.sort((a, b) => b.minBid - a.minBid);
     return list;
-  }, [filters, sort, sortNow, byKind]);
+  }, [filters, sort, sortNow, byKind, kind]);
 
   useEffect(() => {
     if (sort !== 'soonest' && sort !== 'relevance') return undefined;
@@ -473,12 +480,10 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
         </div>
       ) : (
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
-          {/* Sete colunas de cabeçalho para as sete células que PropertyRow
-              renderiza. Antes havia uma coluna "risco" sem dado embaixo, o que
-              deslocava todas as colunas seguintes. */}
+          {/* Cabeçalho alinhado às seis células da lista. */}
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
+            gridTemplateColumns: '60px 1.4fr 1fr 1fr 1.5fr 44px',
             gap: 14,
             padding: '10px 18px',
             background: 'var(--bg-2)',
@@ -492,8 +497,7 @@ export default function Feed({ watched, toggleWatch, properties, loading = false
             <span>imóvel</span>
             <span>valor inicial</span>
             <span>avaliação</span>
-            <span>imóveis parecidos</span>
-            <span>{kind === 'direct' ? 'disponível' : 'leilão em'}</span>
+            <span>{{ direct: 'disponível', auction: 'rodadas e datas' }[kind] ?? 'prazo'}</span>
             <span></span>
           </div>
           {paginated.map(p => (

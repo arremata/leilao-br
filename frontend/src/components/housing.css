@@ -141,7 +141,7 @@
 .housing-search .feed-rail-inner--compact .feed-rail-head .uppy,
 .housing-search .feed-rail-inner--compact .feed-rail-section-title,
 .housing-search .feed-filter-field-label{margin:0;color:var(--fg-1);font-family:var(--f-sans);font-size:11px;font-weight:550;letter-spacing:0;text-transform:none}
-.housing-search .kind-tabs--rail{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
+.housing-search .kind-tabs--rail{grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1.3fr);gap:3px;padding:3px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-2)}
 .housing-search .kind-tabs--rail button{align-items:center;justify-content:center;min-width:0;height:36px;padding:0 5px;border:0;border-radius:7px;background:transparent;font-size:11.5px;text-align:center}
 .housing-search .kind-tabs--rail button strong{white-space:nowrap}
 .housing-search .kind-tabs--rail button.active{border:0;background:var(--bg-1);box-shadow:0 1px 3px rgba(17,24,39,.12);color:var(--accent-strong)}

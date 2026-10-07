@@ -1293,7 +1293,7 @@ function Market({ p }) {
                   )}
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
-                      Imóveis parecidos na região
+                      <Term k="imoveis_parecidos">Imóveis parecidos na região</Term>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>mercado</div>
                   </div>
@@ -1317,7 +1317,7 @@ function Market({ p }) {
                   ></div>
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
-                      Valor de avaliação
+                      <Term>Valor de avaliação</Term>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>avaliador oficial</div>
                   </div>

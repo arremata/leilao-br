@@ -54,15 +54,15 @@ export default function Watchlist({ watched, toggleWatch, properties }) {
         <div className="card responsive-table" style={{ overflow: 'hidden' }}>
           <div className="property-row table-head" style={{
             display: 'grid',
-            gridTemplateColumns: '60px 1.6fr 1fr 1fr 1fr 1fr 32px',
+            gridTemplateColumns: '60px 1.4fr 1fr 1fr 1.5fr 44px',
             gap: 14, padding: '10px 18px',
             background: 'var(--bg-2)', fontSize: 10.5,
             textTransform: 'uppercase', letterSpacing: '0.08em',
             fontFamily: 'var(--f-mono)', color: 'var(--fg-3)',
           }}>
             <span>foto</span><span>imóvel</span>
-            <span>valor inicial</span><span>avaliação</span><span>imóveis parecidos</span>
-            <span>leilão em</span><span></span>
+            <span>valor inicial</span><span>avaliação</span>
+            <span>rodadas e datas</span><span></span>
           </div>
           {watchedItems.map(p => (
             <PropertyRow

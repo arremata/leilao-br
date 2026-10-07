@@ -4,7 +4,22 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 29 de setembro de 2026.
+Última atualização: 6 de outubro de 2026.
+
+## Em validação — lista de imóveis simplificada
+
+Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,
+com bairro, cidade e estado como localização e o endereço completo reservado à página
+do imóvel. Vistos mantém a identificação por tipo e área. Nos cards com duas
+rodadas, os preços aparecem uma única vez, em linhas alinhadas com situação e
+data; a rodada vigente é identificada. Quando a avaliação coincide com uma
+rodada, o rodapé indica essa equivalência sem repetir o número. Os blocos dos
+cards se alinham entre si mesmo quando títulos, cidades ou selos têm mais linhas.
+A diferença em reais e
+porcentagem compara a segunda rodada à primeira, sem confundir essa comparação
+com o valor de avaliação. Uma segunda rodada mais cara é apresentada como aumento.
+Os comparáveis ficam na página do imóvel. Esta versão está em revisão local,
+ainda sem publicação em produção.
 
 ## Como usar no Claude
 
@@ -63,8 +78,10 @@ usam HTTPS, e a Vercel renova os certificados automaticamente.
 O dicionário do leilão é conteúdo público do site institucional, em
 `https://www.argosleiloes.com.br/dicionario`. Explica, sem juridiquês, as
 palavras dos leilões e da venda direta da Caixa, por assunto e com busca. O menu
-da plataforma leva para esse endereço; nenhuma cópia do conteúdo fica dentro do
-app autenticado.
+da plataforma leva para esse endereço. Nos cards e na página do imóvel, os
+principais termos abrem uma explicação curta e o link para o verbete público;
+essa prévia pode ser desligada na conta. As frases são sincronizadas da mesma
+fonte editorial, sem criar um segundo dicionário mantido dentro do app.
 
 ### Endereços
 
@@ -108,8 +125,8 @@ no HTML do servidor, o que ainda não é feito.
   de venda, localização, tipo de imóvel, orçamento, disponibilidade, modalidade,
   rodada e desconto não têm uma seção separada de “preferências”, botão de
   aplicar nem ações de salvar ou restaurar perfil. A barra usa a rolagem normal
-  da página, sem área interna rolável. Compra direta não mostra opções próprias
-  de leilão.
+  da página, sem área interna rolável. Com o filtro Compra direta, rodada e
+  modalidade de leilão saem da barra.
 - A lista não oferece uma segunda busca livre por endereço, bairro e cidade. A
   localização é escolhida pelos autocompletes da lateral; acima dos resultados
   ficam apenas o total encontrado, a ordenação e o modo de visualização.
@@ -118,13 +135,17 @@ no HTML do servidor, o que ainda não é feito.
   somente o valor inicial do imóvel. Taxas, reforma, eventual desocupação e
   outras despesas continuam explicadas em cada imóvel; nenhuma das duas escolhas
   garante custo final nem aprovação de financiamento.
-- Separa **Leilões** e **Compra direta** em abas, porque são produtos com lógicas
-  opostas: um tem disputa e data, o outro é primeiro a chegar.
+- Abre com **Leilões** e **Compra direta** juntos. O tipo de venda é um filtro
+  (Todos, Leilões ou Compra direta) que a pessoa escolhe depois; cada card diz
+  de que tipo é, porque são produtos com lógicas opostas: um tem disputa e
+  data, o outro é primeiro a chegar.
 - Exibe imóveis reais do catálogo de produção, com fotos quando disponíveis. Se
   uma foto externa estiver temporariamente indisponível, a interface mantém uma
   área neutra identificada em vez de mostrar o ícone de imagem quebrada.
 - A ordenação padrão é relevância: data mais próxima primeiro, depois quanto do
-  imóvel realmente conhecemos. Desconto continua disponível, mas não é o padrão.
+  imóvel realmente conhecemos. Com os dois tipos juntos, leilões e compras
+  diretas aparecem intercalados desde o topo. Desconto continua disponível, mas
+  não é o padrão.
 - Diferenças de preço aparecem em reais, não em porcentagem.
 
 ### Página do imóvel
@@ -243,6 +264,11 @@ ação equivalente à modalidade.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
+- Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
+  A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
+  um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
+  comparável utilizável retorna, a última referência saudável é preservada em
+  vez de publicar uma estimativa baseada em uma coleta vazia.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.

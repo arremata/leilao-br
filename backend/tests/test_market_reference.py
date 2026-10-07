@@ -6,6 +6,7 @@ from db.base import get_engine, init_db, make_session_factory
 from db.models import MarketReferenceJob, Property, RegionalMarketComparable, RegionalMarketPrice
 from enrichment import market_reference
 from graph.state import ComparableProperty
+from tools.property_scraper import ComparableSourceBlockedError
 
 
 class _FakeGeocoder:
@@ -38,8 +39,8 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
             lat=-25.4284, lng=-49.2733,
         )
         for index, (price, source) in enumerate([
-            (200_000, "ZAP Imóveis"),
-            (250_000, "Viva Real"),
+            (200_000, "QuintoAndar"),
+            (250_000, "Chaves na Mão"),
             (300_000, "ImovelWeb"),
         ])
     ]
@@ -64,7 +65,7 @@ async def test_worker_persists_reference_and_comparable_snapshot(monkeypatch):
         assert reference.neighborhood == ""
         assert reference.sample_size == 3
         assert {item.source for item in snapshot} == {
-            "ZAP Imóveis", "Viva Real", "ImovelWeb",
+            "QuintoAndar", "Chaves na Mão", "ImovelWeb",
         }
 
 
@@ -101,7 +102,7 @@ async def test_worker_refreshes_fresh_legacy_snapshot_once(monkeypatch):
         session.add(RegionalMarketPrice(
             uf="PR", city="Curitiba", neighborhood="",
             property_type="Apartamento", price_per_m2=5_000, sample_size=3,
-            source="listing_median_confidence_v3", computed_at=now,
+            source="listing_median_confidence_v4", computed_at=now,
         ))
         session.add(MarketReferenceJob(
             uf="PR", city="Curitiba", neighborhood="",
@@ -134,6 +135,60 @@ async def test_worker_refreshes_fresh_legacy_snapshot_once(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_worker_preserves_reference_when_listing_source_is_blocked(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    now = datetime.now(timezone.utc)
+    with factory() as session:
+        prop = Property(
+            source="caixa", source_id="blocked-1", uf="PR", city="Curitiba",
+            neighborhood="", property_type="Apartamento", address="Rua A",
+            area_m2=50, preco=100_000, status="active",
+        )
+        session.add(prop)
+        session.flush()
+        reference = RegionalMarketPrice(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", price_per_m2=5_000, sample_size=1,
+            source="listing_median_confidence_v4", computed_at=now,
+        )
+        session.add(reference)
+        session.flush()
+        session.add(RegionalMarketComparable(
+            reference_id=reference.id, address="Rua antiga", price=250_000,
+            area_m2=50, price_per_m2=5_000, source="ImovelWeb",
+            url="https://www.imovelweb.com.br/propriedades/antiga.html",
+        ))
+        session.add(MarketReferenceJob(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", representative_property_id=prop.id,
+            status="successful", next_attempt_at=now + timedelta(days=90),
+        ))
+        session.commit()
+
+    async def blocked_scrape(metadata, **kwargs):
+        raise ComparableSourceBlockedError("ImovelWeb challenge")
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", blocked_scrape)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=1, geocoder=_FakeGeocoder(),
+    )
+
+    assert summary["failed"] == 1
+    assert summary["updated"] == 0
+    with factory() as session:
+        reference = session.query(RegionalMarketPrice).one()
+        comparable = session.query(RegionalMarketComparable).one()
+        job = session.query(MarketReferenceJob).one()
+        assert reference.source == "listing_median_confidence_v4"
+        assert reference.price_per_m2 == 5_000
+        assert comparable.url.endswith("/antiga.html")
+        assert job.status == "failed"
+        assert "ImovelWeb challenge" in job.last_error
+
+
+@pytest.mark.asyncio
 async def test_worker_does_not_scrape_land_references(monkeypatch):
     engine = get_engine("sqlite://")
     init_db(engine)
@@ -157,6 +212,42 @@ async def test_worker_does_not_scrape_land_references(monkeypatch):
     assert summary["updated"] == 0
     with factory() as session:
         assert session.query(RegionalMarketPrice).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_worker_does_not_refresh_a_legacy_job_for_an_inactive_property(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        prop = Property(
+            source="caixa", source_id="inactive-1", uf="PR", city="Curitiba",
+            neighborhood="Centro", property_type="Apartamento", address="Rua A",
+            area_m2=50, preco=100_000, status="inactive",
+        )
+        session.add(prop)
+        session.flush()
+        session.add(MarketReferenceJob(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", representative_property_id=prop.id,
+            status="pending",
+        ))
+        session.commit()
+
+    async def fail_if_called(metadata, **kwargs):
+        raise AssertionError("inactive property scraper should not be called")
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fail_if_called)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+    )
+
+    assert summary["selected"] == 0
+    assert summary["updated"] == 0
+    with factory() as session:
+        job = session.query(MarketReferenceJob).one()
+        assert job.status == "pending"
+        assert job.attempt_count == 0
 
 
 @pytest.mark.asyncio
