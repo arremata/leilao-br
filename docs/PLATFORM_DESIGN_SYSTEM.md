@@ -66,7 +66,10 @@ Seleções em cartões, controles segmentados e controles de tabelas devem mante
 - Texto principal `#1D1D1F`; auxiliares da LP `#494952`, `#5E5E65` e `#6C6C71`, conforme papel e contraste no fundo real.
 - Borda `#E8E8ED`; fundo suave `#F5F5F7`; positivo de texto `#15803D`.
 - Declarar cores no conjunto de tokens. Manter compatibilidade dos nomes antigos durante a migração para evitar mudanças parciais difíceis de verificar.
-- Hover em ações somente com `hover: hover` e `pointer: fine`: fundo/borda roxo forte, texto branco e sombra de marca, conforme variante da LP.
+- Hover em ações somente com `hover: hover` e `pointer: fine`: borda fina roxa,
+  preservando fundo e texto normais. Não preencher uma ação secundária ao passar
+  o mouse. Essa atualização foi solicitada para a plataforma e prevalece sobre
+  o hover preenchido da LP. Estado selecionado usa sinal persistente próprio.
 - Pressionamento com `scale(.97)` e duração de 160 ms. Não levantar botões ou cards.
 - Foco visível e coerente; campos com borda roxa e anel de 3 px. Não remover indicação de teclado.
 - Sem animações infinitas. Movimento reduzido elimina deslocamentos; transições devem indicar propriedades explícitas.
@@ -78,7 +81,9 @@ Seleções em cartões, controles segmentados e controles de tabelas devem mante
 - **Secundária:** fundo branco, texto principal e borda neutra de 1 px.
 - **Inversa:** fundo branco, texto roxo e borda branca de 1 px, para fundos escuros.
 - **Link de ação:** texto roxo e fundo/borda transparentes; sem caixa de altura fixa no CSS da LP. Hover escurece e revela sublinhado.
-- Principal, secundária e inversa compartilham hover roxo forte, borda roxa e texto branco. Não criar um hover distinto para cada ação.
+- Principal, secundária e inversa compartilham feedback de borda no hover,
+  mantendo a aparência normal. Abas selecionadas usam fundo roxo suave e borda
+  roxa; hover não deve simular seleção.
 - Foco em ações: contorno de 2 px e afastamento de 3 px; desabilitado: opacidade 0,5 e sem transformação. O contorno de foco é diferente da borda normal de 1 px.
 
 ## Espaçamento e estrutura

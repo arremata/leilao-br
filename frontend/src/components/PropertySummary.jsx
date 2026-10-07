@@ -8,6 +8,7 @@ export function ActionIcon({ kind = 'external', filled = false }) {
   const paths = {
     external: <><path d="M7 17 17 7M7 7h10v10" /></>,
     download: <><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4" /></>,
+    plus: <path d="M12 5v14M5 12h14" />,
     back: <path d="m10 5-7 7 7 7M3 12h18" />,
     star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" />,
   };
@@ -45,6 +46,8 @@ export default function PropertySummary({ p, schedule, isDirectSale, formatDate,
         {difference > 0 && ' Na 2ª rodada, o mínimo é a dívida com as despesas e pode superar o valor da 1ª.'}
       </p>}
       <div className="property_summary-appraisal"><span>Valor de avaliação</span><strong>{p.appraisal > 0 ? appraisalMatch ? `Igual ${isSfi ? `à ${appraisalMatch.round}ª rodada` : 'ao valor inicial'}` : `R$ ${fmtBRL(p.appraisal)}` : 'Não informado pela Caixa'}</strong></div>
+    </div>
+    <div className="property_summary-extra">
       <details className="property_summary-details"><summary>Descrição do imóvel</summary><p>{p.viability?.description || 'Descrição não disponível.'}</p></details>
       <details className="property_summary-details"><summary>Características</summary>{p.viability?.features ? <dl>{Object.entries(p.viability.features).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{String(value)}</dd></div>)}</dl> : <p>Dados não disponíveis.</p>}</details>
     </div>

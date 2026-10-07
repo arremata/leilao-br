@@ -321,8 +321,8 @@ function TopBar({ watchCount, account }) {
             </Link>
           ) : (
             <>
-              <Link to="/entrar">Entrar</Link>
-              <Link className="btn primary sm" to="/entrar">Criar conta</Link>
+              <Link className="ui-button is-sm is-secondary" to="/entrar">Entrar</Link>
+              <Link className="ui-button is-sm" to="/entrar">Criar conta</Link>
             </>
           )}
         </div>

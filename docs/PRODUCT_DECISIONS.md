@@ -30,6 +30,9 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** a padronização abrange catálogo, imóvel, conta e questionário.
   Novas medidas usam REM e tamanhos nomeados, respeitando a preferência de fonte
   do navegador. O painel da página do imóvel é a primeira etapa de implementação.
+  Na plataforma, hover usa borda fina e preserva o fundo normal; seleção tem um
+  estado persistente distinto. Essa escolha posterior prevalece sobre o hover
+  preenchido da referência da LP.
   A densidade de filtros e tabelas exige adaptação, preservando legibilidade e
   funcionamento. O diagnóstico não representa uma migração já publicada.
 

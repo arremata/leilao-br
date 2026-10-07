@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const css = readFileSync(new URL('../src/design-system.css', import.meta.url), 'utf8');
+const css = ['design-system.css', 'property-costs.css'].map(file => readFileSync(new URL('../src/' + file, import.meta.url), 'utf8')).join('\n');
 const errors = [];
 if (/\b\d*\.?\d+px\b/.test(css)) errors.push('Use REM for dimensions in design-system.css.');
 if (/transition\s*:\s*all\b/.test(css)) errors.push('List transition properties explicitly.');

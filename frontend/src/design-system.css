@@ -38,6 +38,8 @@
   --ui-warning: #9A5B00;
   --ui-warning-soft: #FFF6E5;
   --ui-error: #D70015;
+  --ui-chart-costs: #F5A623;
+  --ui-chart-left: #34C759;
   --ui-shadow-sm: 0 .0625rem .1875rem rgb(0 0 0 / .04);
   --ui-shadow-brand: 0 .25rem 1.125rem rgb(124 58 237 / .2);
   --ui-shadow-hover: 0 .5rem 1.5rem rgb(124 58 237 / .3);
@@ -112,7 +114,7 @@
 .property_summary-details dl > div { display: flex; justify-content: space-between; gap: var(--ui-space-md); padding-block: var(--ui-space-xs); border-bottom: var(--ui-border-sm) solid var(--ui-border); font-size: var(--ui-text-sm); }
 .property_summary-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 @media (hover: hover) and (pointer: fine) {
-  .ui-button:not(.is-text):hover:not(:disabled), .property_summary summary:hover { background: var(--ui-brand-hover); color: var(--ui-white); border-color: var(--ui-brand-hover); box-shadow: var(--ui-shadow-hover); }
+  .ui-button:not(.is-text):hover:not(:disabled), .property_summary summary:hover { border-color: var(--ui-brand); box-shadow: none; }
   .ui-button.is-text:hover { color: var(--ui-brand-hover); text-decoration: underline; }
 }
 @media (max-width: 64rem) { .property_summary { grid-template-columns: minmax(0,1fr); } }
@@ -129,3 +131,28 @@
 }
 @media (max-width: 22rem) { .property_detail .detail-actions { grid-template-columns: minmax(0,1fr); } }
 @media (prefers-reduced-motion: reduce) { .ui-button { transition: none; } .ui-button:active:not(:disabled) { transform: none; } }
+
+/* Hover indicates availability. Filled selection is a persistent state only. */
+.app-shell .btn, .app-shell .btn.sm, .app-shell .btn.lg { border-radius: var(--ui-radius-pill); font-family: var(--f-sans); font-weight: 600; }
+.app-shell .btn { min-height: var(--ui-control-md); }
+.app-shell .btn.sm { height: var(--ui-control-sm); font-size: var(--ui-text-sm); }
+.app-shell .btn.lg { height: var(--ui-control-lg); }
+.topbar .housing-account .ui-button { color: var(--ui-white); font-size: var(--ui-text-sm); }
+.topbar .housing-account .ui-button.is-secondary { color: var(--ui-text); }
+.property_summary-extra { grid-column: 1 / -1; padding: var(--ui-space-md) var(--ui-space-lg); background: var(--ui-white); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-lg); }
+.property_summary-extra .property_summary-details:first-child { margin-top: 0; }
+.property_detail .property_tabs { display: flex; flex-wrap: wrap; gap: var(--ui-space-xs); overflow: visible; margin-bottom: var(--ui-space-lg); border: 0; padding: 0; }
+.property_tabs .property_tab { min-height: var(--ui-control-md); white-space: normal; font-size: var(--ui-text-sm); }
+.property_tabs .property_tab.is-selected { background: var(--ui-brand-soft); border-color: var(--ui-brand); color: var(--ui-brand-hover); box-shadow: none; }
+.property_tab-number { font: 600 var(--ui-text-xs)/1 var(--f-sans); color: var(--ui-text-muted); }
+.property_tabs .ui-tag { font-size: var(--ui-text-xs); padding: var(--ui-space-2xs) var(--ui-space-xs); }
+.property_tab svg { width: var(--ui-space-md); height: var(--ui-space-md); }
+@media (hover: hover) and (pointer: fine) {
+ .app-shell .btn:not(:disabled):hover { border-color: var(--ui-brand); box-shadow: none; transform: none; background: var(--ui-white); color: var(--ui-text); }
+ .app-shell .btn.primary:not(:disabled):hover { background: var(--ui-brand); color: var(--ui-white); }
+ .app-shell .btn.ghost:not(:disabled):hover { background: transparent; }
+}
+@media (max-width: 40rem) {
+ .property_summary-extra { padding: var(--ui-space-md); }
+ .property_tabs .property_tab { flex: 1 1 calc(50% - var(--ui-space-xs)); padding: var(--ui-space-xs); }
+}

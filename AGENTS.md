@@ -11,8 +11,11 @@ All new or changed platform interface must follow
 `.0625rem` action/surface borders, and consistent interaction states. All new
 layout dimensions use REM and named tokens in `frontend/src/design-system.css`;
 do not fix the browser root font size or introduce numeric inline React lengths.
-Run `npm run lint:design` alongside frontend lint/build. Do not copy
-legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
+Run `npm run lint:design` alongside frontend lint/build.
+The user's later platform choice overrides the LP filled hover: use a thin
+brand border on hover, preserving the normal background/text. Persistent
+selection must have its own accessible state and must not be imitated by hover.
+Do not copy legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
 are migration work, not approved alternatives. Review each changed component
 at desktop/mobile sizes, including alignment of conditional content.
 
@@ -227,6 +230,14 @@ The full platform will include:
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-10-06** — Separou hover por borda de seleção persistente na plataforma;
+  padronizou Entrar/Criar conta em pill e as ações legadas com classe de botão.
+  Descrição e características passaram à largura completa abaixo da foto e dos
+  preços, evitando a coluna vazia criada ao expandir detalhes. As quatro abas
+  passaram a quebrar linhas sem rolagem interna, com estado selecionado, hover e
+  navegação por setas. Migrou a primeira aba para REM, textos legíveis, campos e
+  ações padronizados; explicações de custos abrem por clique, sem saltar no hover.
 
 - **2026-10-06** — Implementou o painel da página do imóvel com tokens em REM e
   tamanhos nomeados, ações e selos pill, superfícies com raio comum, título por

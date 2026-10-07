@@ -8,6 +8,13 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 ## Padrão visual — migração pendente
 
+A primeira aba do imóvel também está em validação com dimensões em REM, textos
+maiores e ações pill. Hover indica disponibilidade por borda, enquanto seleção
+tem estado persistente próprio. As abas quebram linhas sem rolagem interna e
+aceitam navegação por setas do teclado. Descrição e características ocupam a
+largura completa abaixo da foto/preços, sem esticar a coluna lateral. Explicações
+de custos abrem por clique, não ao passar o mouse.
+
 Primeira etapa em validação: a página do imóvel ganhou painel e ações no padrão
 da LP, com medidas em REM e tamanhos nomeados. Tipo/área identificam o título;
 o endereço completo permanece no detalhe. Rodadas têm preços e datas alinhados,

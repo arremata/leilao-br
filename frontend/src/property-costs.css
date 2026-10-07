@@ -1,0 +1,522 @@
+/* Cost-tab migration: dimensions in REM, scoped to preserve other tabs. */
+.property_costs .slider { -webkit-appearance: none; appearance: none;
+  width: 100%; height: 0.25rem;
+  background: var(--bg-3);
+  border-radius: 62.4375rem;
+  outline: none; }
+.property_costs .slider::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 1.125rem; height: 1.125rem;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0.1875rem solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,0.15); }
+.property_costs .slider::-moz-range-thumb { width: 1.125rem; height: 1.125rem;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0.1875rem solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,0.15); }
+.property_costs .cost-money-value,
+.property_costs .cost-total-value { max-width: 100%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.property_costs .cost-money-value { font-size: clamp(0.75rem, 1.15vw, 0.9375rem) !important; }
+.property_costs .cost-total-value { font-size: clamp(1.0625rem, 2vw, 1.625rem) !important; }
+.property_costs .cost-inline-action { color: var(--accent-strong);
+  font-size: 0.8125rem; }
+.property_costs .cost-inline-action.danger { color: var(--bad); }
+.property_costs .simulator-card { padding: 1.75rem 1.75rem 1.5rem !important;
+  border-radius: 0.875rem;
+  box-shadow: 0 0.0625rem 0.125rem rgba(17,24,39,.04), 0 0.25rem 1rem rgba(17,24,39,.03); }
+.property_costs .simulator-reset-btn { border-radius: 0.375rem;
+  font-family: var(--f-mono);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--fg-2); }
+.property_costs .scenario-cost-panel { margin-bottom: 1.625rem;
+  padding: 1.375rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.75rem;
+  background: var(--bg-2); }
+.property_costs .scenario-cost-panel-head { display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.125rem; }
+.property_costs .scenario-cost-panel-head .uppy { color: var(--fg-1); }
+.property_costs .scenario-cost-panel-head p { margin: 0.25rem 0 0;
+  color: var(--fg-2);
+  font-size: 0.8125rem; }
+.property_costs .scenario-cost-grid { display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem; }
+.property_costs .scenario-cost-grid.without-condominium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.property_costs .scenario-cost-pair { display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem; }
+.property_costs .scenario-money-field--reno { display: flex;
+  flex-direction: column;
+  gap: 0; }
+.property_costs .scenario-money-field { min-width: 0;
+  padding: 0.875rem 1rem;
+  background: var(--bg-1);
+  border-radius: 0.75rem;
+  border: 0.0625rem solid var(--line-1);
+  box-shadow: 0 0.0625rem 0.125rem rgba(17,24,39,.03); }
+.property_costs .scenario-money-field > label > .uppy { display: block;
+  margin-bottom: 0.5rem;
+  color: var(--fg-2);
+  letter-spacing: .06em; }
+.property_costs .scenario-money-input { display: flex;
+  align-items: center;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 0.0625rem solid var(--line-2);
+  border-radius: 0.5rem;
+  background: var(--bg-1);
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  transition: border-color .15s, box-shadow .15s; }
+.property_costs .scenario-money-input:focus-within { border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in oklch, var(--accent) 25%, transparent); }
+.property_costs .scenario-money-input input { width: 100%;
+  min-width: 0;
+  padding: 0 0.4375rem;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-feature-settings: 'tnum'; }
+.property_costs .scenario-money-suffix { flex: 0 0 auto;
+  color: var(--fg-3);
+  font-size: 0.8125rem; }
+.property_costs .scenario-money-meta { display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.0625rem;
+  margin-top: 0.5rem;
+  color: var(--fg-3);
+  font-size: 0.8125rem; }
+.property_costs .scenario-money-meta button { flex: 0 0 auto;
+  color: var(--accent-strong);
+  font-size: 0.8125rem; }
+.property_costs .scenario-cost-panel > p { padding-top: 0.875rem;
+  border-top: 0.0625rem dashed var(--line-1);
+  font-size: 0.8125rem !important;
+  line-height: 1.55;
+  color: var(--fg-2) !important; }
+.property_costs .scenario-cost-panel > p .mono { font-feature-settings: 'tnum'; }
+.property_costs .automatic-cost-tags { display: flex;
+  flex-wrap: wrap;
+  gap: 0.3125rem;
+  margin-top: 0.625rem; }
+.property_costs .automatic-cost-tags span { padding: 0.1875rem 0.375rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 62.4375rem;
+  background: var(--bg-1);
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  font-size: 0.8125rem;
+  white-space: nowrap; }
+.property_costs .slider { -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 0.25rem;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0/var(--fill, 0%) 100% no-repeat,
+    var(--bg-3);
+  border-radius: 62.4375rem;
+  outline: none;
+  cursor: pointer;
+  margin: 0.75rem 0 0; }
+.property_costs .slider::-webkit-slider-thumb { -webkit-appearance: none;
+  width: 1rem; height: 1rem;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0.1875rem solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,.18);
+  transition: transform .1s, box-shadow .15s; }
+.property_costs .slider::-webkit-slider-thumb:active { transform: scale(1.05); }
+.property_costs .slider::-moz-range-thumb { width: 1rem; height: 1rem;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 0.1875rem solid var(--bg-1);
+  cursor: pointer;
+  box-shadow: 0 0.0625rem 0.25rem rgba(17,24,39,.18);
+  transition: transform .1s, box-shadow .15s; }
+.property_costs .renovation-money-editor { display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-height: 2.25rem;
+  padding: 0 0.5rem 0 0.625rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.5rem;
+  background: var(--bg-1);
+  color: var(--accent-strong);
+  font-family: var(--f-mono);
+  transition: border-color .15s, box-shadow .15s; }
+.property_costs .renovation-money-editor:focus-within { border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
+.property_costs .renovation-money-editor input { width: 5.875rem;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  appearance: textfield;
+  background: transparent;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: right; }
+.property_costs .renovation-money-editor input::-webkit-inner-spin-button,
+.property_costs .renovation-money-editor input::-webkit-outer-spin-button { margin: 0;
+  appearance: none; }
+.property_costs .renovation-money-editor input:disabled { cursor: not-allowed;
+  opacity: .55; }
+.property_costs .renovation-money-status { padding: 0.125rem 0.3125rem;
+  border-radius: 62.4375rem;
+  background: var(--accent-soft);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: .04em; }
+.property_costs .scenario-extra-costs { margin-top: 1.125rem;
+  padding-top: 1.125rem;
+  border-top: 0.0625rem dashed var(--line-2); }
+.property_costs .scenario-extra-costs-head { display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem; }
+.property_costs .scenario-extra-costs-head .uppy { color: var(--fg-1); }
+.property_costs .scenario-extra-costs-head p { margin: 0.1875rem 0 0;
+  color: var(--fg-2);
+  font-size: 0.8125rem; }
+.property_costs .scenario-extra-costs-head > .mono { color: var(--fg-3);
+  font-size: 0.8125rem; }
+.property_costs .scenario-extra-costs-grid { display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14.375rem, 1fr));
+  gap: 0.625rem; }
+.property_costs .scenario-extra-cost-item { display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.5rem;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.625rem;
+  background: var(--bg-1); }
+.property_costs .scenario-extra-cost-item span,
+.property_costs .scenario-extra-cost-item strong { display: block; }
+.property_costs .scenario-extra-cost-item span { overflow-wrap: anywhere;
+  color: var(--fg-1);
+  font-size: 0.8125rem; }
+.property_costs .scenario-extra-cost-item strong { margin-top: 0.25rem;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: 0.8125rem;
+  font-weight: 600; }
+.property_costs .scenario-extra-cost-item > button { display: grid;
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--fg-3);
+  font-size: 1.125rem; }
+.property_costs .custom-cost-trigger { display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  min-height: 4.5rem;
+  padding: 0.75rem 0.875rem;
+  border: 0.0625rem dashed var(--accent);
+  border-radius: 0.625rem;
+  background: var(--bg-1);
+  color: var(--accent-strong);
+  text-align: left;
+  transition: background .15s; }
+.property_costs .custom-cost-plus { display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.5625rem;
+  background: var(--accent-soft);
+  font-size: 1.125rem; }
+.property_costs .custom-cost-trigger strong,
+.property_costs .custom-cost-trigger small { display: block; }
+.property_costs .custom-cost-trigger strong { font-size: 0.8125rem;
+  font-weight: 600; }
+.property_costs .custom-cost-trigger small { margin-top: 0.1875rem;
+  color: var(--fg-3);
+  font-size: 0.8125rem; }
+.property_costs .custom-cost-form { display: grid;
+  grid-template-columns: minmax(13.75rem, 1fr) minmax(11.25rem, 15rem) auto;
+  grid-column: 1 / -1;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 1rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.625rem;
+  background: var(--bg-1); }
+.property_costs .custom-cost-suggestions { grid-column: 1 / -1; }
+.property_costs .custom-cost-suggestions > .uppy { display: block;
+  margin-bottom: 0.4375rem;
+  color: var(--fg-3); }
+.property_costs .custom-cost-suggestions button { padding: 0.3125rem 0.5rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 62.4375rem;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: 0.8125rem; }
+.property_costs .custom-cost-form label > .uppy { display: block;
+  margin-bottom: 0.375rem;
+  color: var(--fg-3); }
+.property_costs .custom-cost-form label > input,
+.property_costs .custom-cost-money { width: 100%;
+  height: 2.5rem;
+  padding: 0 0.6875rem;
+  border: 0.0625rem solid var(--line-2);
+  border-radius: 0.5rem;
+  outline: 0;
+  background: var(--bg-1); }
+.property_costs .custom-cost-form label > input:focus,
+.property_costs .custom-cost-money:focus-within { border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
+.property_costs .custom-cost-money { display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--fg-2); }
+.property_costs .custom-cost-money input { width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: var(--f-mono); }
+@media (max-width: 68.75rem) and (min-width: 35.0625rem) {
+.property_costs .cost-row,
+.property_costs .cost-head { grid-template-columns: 1.25rem minmax(9.375rem, 1fr) 5.625rem minmax(10.625rem, 13.75rem) !important;
+    gap: 0.625rem !important; }
+}
+@media (max-width: 53.75rem) {
+.property_costs .cost-row { grid-template-columns: 1.25rem minmax(0, 1fr) !important; }
+.property_costs .cost-row > :nth-child(3) { display: none; }
+.property_costs .cost-row > :nth-child(4) { grid-column: 2;
+    text-align: left !important; }
+.property_costs .cost-head { display: none !important; }
+.property_costs .custom-cost-form { grid-template-columns: 1fr;
+    align-items: stretch; }
+.property_costs .custom-cost-actions { justify-content: flex-end; }
+.property_costs .cost-section-header { flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem; }
+.property_costs .cost-section-header > .row { width: 100%;
+    justify-content: flex-end; }
+.property_costs .scenario-cost-grid,
+.property_costs .scenario-cost-grid.without-condominium,
+.property_costs .scenario-cost-pair { grid-template-columns: 1fr; }
+.property_costs .simulator-card { padding: 1.25rem 1rem !important; }
+.property_costs .scenario-cost-panel { padding: 1rem; }
+.property_costs .scenario-cost-panel-head { flex-direction: column;
+    gap: 0.375rem; }
+.property_costs .scenario-extra-costs-head { flex-direction: column;
+    gap: 0.3125rem; }
+}
+.property_costs .buyer-offer { max-width: 20rem; }
+.property_costs .buyer-offer-field > .uppy { display: block;
+  margin-bottom: 0.5rem;
+  color: var(--fg-3); }
+.property_costs .buyer-offer-input { display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3.25rem;
+  padding: 0 0.875rem;
+  border: 0.0625rem solid var(--line-2);
+  border-radius: 0.625rem;
+  background: var(--bg-1);
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  transition: border-color .15s, box-shadow .15s; }
+.property_costs .buyer-offer-input:focus-within { border-color: var(--accent);
+  box-shadow: 0 0 0 0.1875rem var(--accent-soft); }
+.property_costs .buyer-offer-input input { width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  appearance: textfield;
+  background: transparent;
+  color: var(--fg-0);
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em; }
+.property_costs .buyer-offer-input input::-webkit-inner-spin-button,
+.property_costs .buyer-offer-input input::-webkit-outer-spin-button { margin: 0;
+  appearance: none; }
+.property_costs .buyer-offer-meta { display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  color: var(--fg-2);
+  font-size: 0.8125rem; }
+.property_costs .buyer-offer-meta button { color: var(--accent-strong);
+  font-size: 0.8125rem;
+  text-decoration: underline; }
+.property_costs .monthly-total { display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.875rem 1rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.625rem;
+  background: var(--bg-2); }
+.property_costs .monthly-total > .uppy { color: var(--fg-3); }
+.property_costs .monthly-total strong { margin: 0.375rem 0 0.125rem;
+  color: var(--fg-0);
+  font-family: var(--f-mono);
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -0.02em; }
+.property_costs .monthly-total > span:last-child { color: var(--fg-2);
+  font-size: 0.8125rem; }
+.property_costs .monthly-total strong.unknown { color: var(--fg-2);
+  font-family: var(--f-sans);
+  font-size: 1rem;
+  font-weight: 600; }
+.property_costs .budget-planner { display: grid;
+  gap: 1.375rem; }
+.property_costs .budget-planner-top { display: grid;
+  grid-template-columns: minmax(16.25rem, 22.5rem) 1fr;
+  gap: 1.25rem;
+  align-items: stretch; }
+.property_costs .budget-field { display: flex; flex-direction: column; gap: 0.5rem; }
+.property_costs .budget-field > .uppy { color: var(--fg-2); }
+.property_costs .budget-field-hint { font-size: 0.8125rem; color: var(--fg-2); line-height: 1.45; }
+.property_costs .budget-verdict { display: flex; flex-direction: column; justify-content: center; gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 0.0625rem solid var(--line-1);
+  background: var(--bg-2); }
+.property_costs .budget-verdict .uppy { color: var(--fg-2); }
+.property_costs .budget-verdict strong { font-family: var(--f-mono); font-feature-settings: 'tnum';
+  font-size: 1.625rem; font-weight: 650; letter-spacing: -0.02em;
+  color: var(--fg-0); }
+.property_costs .budget-verdict p { margin: 0; font-size: 0.8125rem; color: var(--fg-1); line-height: 1.45; }
+.property_costs .budget-verdict.is-fit { background: var(--good-soft); border-color: transparent; }
+.property_costs .budget-verdict.is-fit strong,
+.property_costs .budget-verdict.is-fit b { color: var(--ui-success); }
+.property_costs .budget-verdict.is-short { background: var(--bad-soft); border-color: transparent; }
+.property_costs .budget-verdict.is-short strong { color: var(--bad); }
+.property_costs .bid-simulator { padding: 1rem 1.25rem 0.875rem;
+  border: 0.0625rem solid var(--line-1);
+  border-radius: 0.75rem;
+  background: var(--bg-1); }
+.property_costs .bid-simulator-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.property_costs .bid-simulator-head .uppy { color: var(--fg-2); }
+.property_costs .bid-simulator-value { display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  border: 0.0625rem solid var(--line-2); border-radius: 0.5rem;
+  font-family: var(--f-mono); color: var(--fg-2); }
+.property_costs .bid-simulator-value:focus-within { border-color: var(--accent); }
+.property_costs .bid-simulator-value input { width: 8.125rem; border: 0; outline: 0; background: transparent;
+  font: inherit; font-size: 1rem; font-weight: 600; color: var(--fg-0); text-align: right; }
+.property_costs .bid-slider-wrap { position: relative; padding-top: 1.125rem; }
+.property_costs .bid-slider { margin-top: 0; height: 0.375rem; }
+.property_costs .bid-slider.is-over { background:
+    linear-gradient(var(--bad), var(--bad)) 0/var(--fill, 0%) 100% no-repeat,
+    var(--bg-3); }
+.property_costs .bid-slider.is-over::-webkit-slider-thumb { background: var(--bad); }
+.property_costs .bid-slider.is-over::-moz-range-thumb { background: var(--bad); }
+.property_costs .bid-slider-limit { position: absolute; top: 0.75rem; bottom: -0.375rem;
+  width: 0.125rem; margin-left: -0.0625rem;
+  background: var(--good);
+  pointer-events: none; }
+.property_costs .bid-slider-limit > span { position: absolute; top: -0.875rem; left: 50%; transform: translateX(-50%);
+  font-size: 0.8125rem; font-weight: 600; color: var(--ui-success); white-space: nowrap; }
+.property_costs .bid-slider-scale { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+  margin-top: 0.625rem; font-size: 0.8125rem; color: var(--fg-2); }
+.property_costs .bid-slider-scale button { color: var(--accent-strong); font-size: 0.8125rem; text-decoration: underline; }
+.property_costs .budget-bar { display: flex; height: 0.75rem; overflow: hidden;
+  border-radius: 62.4375rem; background: var(--bg-3); }
+.property_costs .budget-bar-seg { height: 100%; min-width: 0.125rem; transition: width .2s ease; }
+.property_costs .budget-bar-seg--bid { background: var(--accent); }
+.property_costs .budget-bar-seg--costs { background: var(--ui-chart-costs); }
+.property_costs .budget-bar-seg--left { background: var(--ui-chart-left); }
+.property_costs .budget-bar-legend { display: flex; flex-wrap: wrap; gap: 0.375rem 1.125rem; margin-top: 0.625rem;
+  font-size: 0.8125rem; color: var(--fg-2); }
+.property_costs .budget-bar-legend b { color: var(--fg-0); font-family: var(--f-mono); font-weight: 600; }
+.property_costs .budget-bar-key { display: inline-flex; align-items: center; gap: 0.375rem; }
+.property_costs .budget-bar-key::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 0.125rem; }
+.property_costs .budget-bar-key--bid::before { background: var(--accent); }
+.property_costs .budget-bar-key--costs::before { background: var(--ui-chart-costs); }
+.property_costs .budget-bar-key--left::before { background: var(--ui-chart-left); }
+.property_costs .budget-bar-total { margin-left: auto; }
+.property_costs .budget-bar-total b { color: var(--accent-strong); }
+.property_costs .budget-bar-over { flex-basis: 100%; color: var(--bad); font-weight: 600; }
+@media (max-width: 45rem) {
+.property_costs .budget-planner-top { grid-template-columns: 1fr; }
+.property_costs .budget-bar-total { margin-left: 0; }
+.property_costs .bid-simulator { padding: 0.875rem; }
+}
+.property_costs .cost-money-locked { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.5rem; color: var(--fg-3); }
+.property_costs .cost-money-blur { filter: blur(0.3125rem); color: var(--fg-0); font-weight: 500; user-select: none; }
+@media (max-width: 53.75rem) {
+.property_costs .cost-row > .cost-money-locked { justify-content: flex-start; }
+}
+.property_costs .debt-locked-cta { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.75rem 1.25rem 0.875rem; border-top: 0.0625rem dashed var(--line-2);
+  background: color-mix(in oklch, var(--accent) 5%, var(--bg-1)); }
+.property_costs .debt-locked-cta p { margin: 0; max-width: 32.5rem; font-size: 0.8125rem; line-height: 1.5; color: var(--fg-2); }
+.property_costs .debt-locked-cta strong { color: var(--fg-0); }
+.property_costs .debt-locked-cta .btn { display: inline-flex; align-items: center; gap: 0.375rem; }
+.property_costs .debt-locked-cta .btn[disabled] { opacity: .65; cursor: not-allowed; }
+.property_costs .cost-total-note { display: block; margin-top: 0.125rem; font-size: 0.8125rem; font-weight: 400; color: var(--fg-2); }
+
+/* Shared roles override legacy detail presentation. */
+.property_costs { --fg-0: var(--ui-text); --fg-1: var(--ui-text-secondary); --fg-2: var(--ui-text-muted); --fg-3: var(--ui-text-muted); --line-1: var(--ui-border); --line-2: var(--ui-border); --bg-2: var(--ui-soft); --good: var(--ui-success); font-size: var(--ui-text-lg); }
+.property_costs .card { border-radius: var(--ui-radius-lg); border-width: var(--ui-border-sm); }
+.property_costs .uppy { font-family: var(--f-sans); font-size: var(--ui-text-xs); text-transform: none; letter-spacing: normal; font-weight: 600; }
+.property_costs .h2 { font-size: var(--ui-text-2xl); line-height: 1.3; }
+.property_costs .budget-verdict, .property_costs .bid-simulator, .property_costs .scenario-money-field, .property_costs .monthly-total, .property_costs .scenario-extra-costs { border-radius: var(--ui-radius-lg); }
+.property_costs .budget-planner-top { grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: var(--ui-space-lg); }
+.property_costs .buyer-offer-input, .property_costs .bid-simulator-value, .property_costs .scenario-money-input, .property_costs .custom-cost-money, .property_costs .custom-cost-form input { border-radius: var(--ui-radius-md); }
+.property_costs input:not([type="range"]) { font-size: var(--ui-text-lg); min-height: var(--ui-control-md); }
+.property_costs .tag, .property_costs .automatic-cost-tags > span { border-radius: var(--ui-radius-pill); font-size: var(--ui-text-xs); }
+.property_costs .simulator-card > .row:first-child { gap: var(--ui-space-md); flex-wrap: wrap; }
+.property_costs .cost-row > button { min-width: var(--ui-control-sm); min-height: var(--ui-control-sm); border-radius: var(--ui-radius-pill) !important; color: var(--ui-text-muted) !important; }
+.property_costs .cost-inline-action, .property_costs .scenario-money-meta button, .property_costs .bid-slider-scale button { min-height: var(--ui-control-sm); border: var(--ui-border-sm) solid var(--ui-border); border-radius: var(--ui-radius-pill); padding: var(--ui-space-2xs) var(--ui-space-sm); font-size: var(--ui-text-xs); text-decoration: none; }
+.property_costs .cost-row, .property_costs .cost-head { grid-template-columns: 2.5rem minmax(0,1fr) 7.5rem minmax(10rem,16.25rem) !important; }
+.property_costs .budget-verdict strong { font-family: var(--f-display); }
+@media (hover: hover) and (pointer: fine) {
+}
+@media (max-width: 40rem) {
+ .property_costs .budget-planner-top { grid-template-columns: minmax(0,1fr); }
+ .property_costs .cost-row, .property_costs .cost-head { grid-template-columns: 2.5rem minmax(0,1fr) minmax(0,auto) !important; gap: var(--ui-space-xs) !important; padding: var(--ui-space-sm) !important; }
+ .property_costs .cost-row > :nth-child(3), .property_costs .cost-head > :nth-child(3) { display: none; }
+ .property_costs .cost-money-value, .property_costs .cost-total-value { font-size: var(--ui-text-sm); }
+ .property_costs .simulator-card { padding: var(--ui-space-md) !important; }
+}
+
+.property_costs .ui-button, .property_costs .simulator-reset-btn { border-radius: var(--ui-radius-pill); font: 600 var(--ui-text-sm)/1.2 var(--f-sans); min-height: var(--ui-control-sm); letter-spacing: normal; text-transform: none; }
+.property_costs .ui-button.is-secondary { background: var(--ui-white); color: var(--ui-text); border-color: var(--ui-border); }
+.property_costs .ui-button.is-selected { background: var(--ui-brand-soft); color: var(--ui-brand-hover); border-color: var(--ui-brand); }
+.property_costs .custom-cost-trigger { justify-content: center; border-style: solid; }
+@media (hover: hover) and (pointer: fine) {
+}
+
+.property_costs .cost-money-value { font-size: var(--ui-text-sm) !important; }
+@media (hover: hover) and (pointer: fine) {
+ .property_costs .ui-button:hover:not(:disabled), .property_costs .cost-row > button:hover, .property_costs .cost-inline-action:hover, .property_costs .scenario-money-meta button:hover, .property_costs .bid-slider-scale button:hover { border-color: var(--ui-brand); box-shadow: none; }
+ .property_costs .ui-button.is-secondary:hover:not(:disabled) { background: var(--ui-white); color: var(--ui-text); }
+ .property_costs .ui-button.is-selected:hover:not(:disabled) { background: var(--ui-brand-soft); color: var(--ui-brand-hover); }
+}
