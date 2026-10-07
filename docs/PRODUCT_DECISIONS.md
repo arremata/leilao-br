@@ -19,6 +19,27 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 
 ## Decisões ativas de produto
 
+### PD-024 — Usar a linguagem visual da LP em toda a plataforma
+
+- **Data:** 6 de outubro de 2026
+- **Estado:** Ativa como direção de produto; migração pendente
+- **Decisão:** a plataforma deve compartilhar o padrão Client First da LP para
+  tipografia, botões, campos, cores, tamanhos e interação.
+- **Motivo:** a pessoa deve reconhecer uma experiência consistente ao passar do
+  site institucional para as telas da plataforma.
+- **Consequências:** a padronização abrange catálogo, imóvel, conta e questionário.
+  Novas medidas usam REM e tamanhos nomeados, respeitando a preferência de fonte
+  do navegador. O painel da página do imóvel é a primeira etapa de implementação.
+  Na plataforma, hover usa borda fina e preserva o fundo normal; seleção tem um
+  estado persistente distinto. Essa escolha posterior prevalece sobre o hover
+  preenchido da referência da LP.
+  Controles selecionados têm fundo roxo; seu hover usa traço branco interno,
+  preservando o contorno roxo externo. A avaliação
+  na página do imóvel mostra o preço explícito, mesmo se coincidir com uma rodada;
+  a equivalência sem repetição continua como escolha dos cards da listagem.
+  A densidade de filtros e tabelas exige adaptação, preservando legibilidade e
+  funcionamento. As regras ficam em `docs/PLATFORM_DESIGN_SYSTEM.md`.
+
 ### PD-023 — Simplificar a identificação e as rodadas na lista
 
 - **Data:** 6 de outubro de 2026

@@ -2,6 +2,26 @@
 
 ## Plain-language product delivery
 
+### Required visual contract
+
+All new or changed platform interface must follow
+`docs/PLATFORM_DESIGN_SYSTEM.md`, inheriting the home LP contract at
+`C:/Projetos/GL2/landing-page/DESIGN-SYSTEM.md`. Use pill action buttons with
+`--ui-radius-pill` and `sm`/`md`/`lg` height variants (2.5/3/3.25rem), shared typography and color tokens,
+`.0625rem` action/surface borders, and consistent interaction states. All new
+layout dimensions use REM and named tokens in `frontend/src/design-system.css`;
+do not fix the browser root font size or introduce numeric inline React lengths.
+Run `npm run lint:design` alongside frontend lint/build.
+The user's later platform choice overrides the LP filled hover: use a thin
+brand border on hover, preserving the normal background/text. Persistent
+selection must have its own accessible state and must not be imitated by hover.
+Filled brand actions and selected controls use a thin inset white hover ring
+inside the purple fill, preserving the purple outer border;
+unselected white controls use a thin brand hover border. Navigation links are pill.
+Do not copy legacy `.btn`, `.tag` or inline styling as a new standard. Existing deviations
+are migration work, not approved alternatives. Review each changed component
+at desktop/mobile sizes, including alignment of conditional content.
+
 The people requesting changes may describe only what they want to experience in
 the product. Do not require them to provide technical specifications, file names,
 test commands, or implementation details. Translate their product language into
@@ -215,6 +235,20 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco
+  compacto: foto ao lado do tipo, endereço com bairro/cidade/UF, selos de
+  situação, avaliação da Caixa e um quadro por rodada, com a vigente destacada,
+  prazo e economia da 2ª sobre a 1ª. Documentos oficiais ficam no mesmo quadro;
+  as abas da análise vêm logo abaixo como ação principal, e “Ver leilão na
+  Caixa”/“Salvar” ficam discretos no topo. Descrição e características saíram
+  do topo. Nenhum preço, link ou regra mudou.
+
+- **2026-10-06** — Adotou o padrão visual Client First da LP como contrato da
+  plataforma: tokens em REM e classes em `frontend/src/design-system.css`,
+  regras em `docs/PLATFORM_DESIGN_SYSTEM.md` e checagem `npm run lint:design`.
+  Botões, selos e abas em pill; hover por borda e seleção persistente; todos os
+  botões da página do imóvel com a mesma altura (2.5rem); primeira aba do
+  imóvel migrada para REM.
 - **2026-10-06** — Ajustou a rotina programada de referências de mercado à
   latência observada no Bright Data. Cada execução passou de 30 para no máximo
   10 regiões, mantendo margem dentro do limite da Action. Falhas isoladas

@@ -6,6 +6,18 @@ decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
 Última atualização: 6 de outubro de 2026.
 
+## Padrão visual
+
+A plataforma segue a linguagem Client First da LP (fontes, tamanhos, botões,
+cores e interação), descrita em `docs/PLATFORM_DESIGN_SYSTEM.md`. A página do
+imóvel já está no padrão; as demais telas migram aos poucos.
+
+O topo do imóvel é um bloco compacto: foto ao lado do tipo, endereço com
+bairro/cidade/UF, selos de situação, avaliação da Caixa e um quadro por rodada,
+com a vigente destacada, prazo e economia da 2ª sobre a 1ª. Os documentos
+oficiais fecham o mesmo quadro; as abas da análise vêm logo abaixo como ação
+principal, e "Ver leilão na Caixa"/"Salvar" ficam discretos no topo.
+
 ## Em validação — lista de imóveis simplificada
 
 Os cards, a visualização em lista e Salvos apresentam tipo e área do imóvel,

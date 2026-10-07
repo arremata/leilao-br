@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { auctionSchedule } from './auctionRounds.js';
-import { listingTitle, listingLocation, listingPrice, roundDifference, listingMoney } from './listingPresentation.js';
+import { listingTitle, listingLocation, listingPrice, listingStreet, roundDifference, listingMoney } from './listingPresentation.js';
 
 const property = {
   type: 'Apartamento', area: 46.97, title: 'Apartamento, RUA ANTONIO KUSS', address: 'RUA ANTONIO KUSS, 260',
@@ -39,4 +39,14 @@ test('unpublished prices do not produce fabricated zero prices or discounts', ()
   assert.equal(roundDifference({ kind: 'none' }), null);
   assert.equal(listingMoney(null), 'A publicar');
   assert.equal(listingMoney(0), 'A publicar');
+});
+
+test('street keeps abbreviations and numbers as published', () => {
+  assert.equal(listingStreet('RUA ANTONIO KUSS, N. 260, Apto 304, BL N'), 'Rua Antonio Kuss, N. 260, Apto 304, BL N');
+  assert.equal(listingStreet('AVENIDA DAS TORRES DE SÃO JOSÉ, SN'), 'Avenida das Torres de São José, SN');
+  assert.equal(listingStreet(''), '');
+});
+
+test('location does not repeat a state already appended to the city', () => {
+  assert.equal(listingLocation({ neighborhood: 'QUEIMADA', city: 'SAO JOSE DOS PINHAIS, PR', uf: 'PR' }), 'Queimada · Sao Jose dos Pinhais · PR');
 });

@@ -8,6 +8,7 @@
     "dev:prod": "../dev-prod.sh",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:design": "node scripts/lint-design.mjs",
     "test": "node --test src/*.test.js",
     "preview": "vite preview"
   },

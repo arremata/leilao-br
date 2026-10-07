@@ -2,15 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { backLabel } from '../usePropertyLink';
-import { Countdown, ListingBadges, LockIcon, Photo, PropertyImage, Specs } from './shared';
+import { LockIcon } from './shared';
+import PropertySummary, { ActionIcon } from './PropertySummary';
+import { listingTitle } from '../listingPresentation';
 import { fmtBRL, mapsQuery } from '../utils';
-import { auctionSchedule, saleTagLabel } from '../auctionRounds';
+import { auctionSchedule } from '../auctionRounds';
 import { occupancyStatus } from '../listingFacts';
 import { budgetPlan } from '../bidBudget';
 import ConsultoriaTab from './ConsultoriaTab';
 import { Term } from './Term';
 import { analyzeCatalogItem } from '../api';
-import { sfiAuctionPricing } from '../auctionPricing';
 import { formatBidCheckedAt, officialBidStatus } from '../bidStatus';
 import { buildNextSteps, AFTER_PURCHASE_STEPS } from '../content/nextStepsContent';
 import { useStepProgress } from '../useStepProgress';
@@ -92,16 +93,6 @@ function mergeEnrichment(card, enrichment) {
     merged[key] = value;
   }
   return merged;
-}
-
-/** Formato curto usado dentro do card do imóvel: "14 de set. · 10:00". */
-function formatAuctionDayTime(value) {
-  if (!value) return '';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return String(value);
-  const dia = parsed.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', timeZone: SAO_PAULO });
-  const hora = parsed.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: SAO_PAULO });
-  return `${dia} · ${hora}`;
 }
 
 /** Formato longo, com ano, para o registro oficial na aba de documentos. */
@@ -657,222 +648,53 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
   };
 
   return (
-    <div className="page detail-page" style={{ maxWidth: 1480, margin: '0 auto', padding: '20px 24px 80px' }}>
+    <div className="page detail-page property_detail">
 
       {/* ===== Breadcrumb + actions ===== */}
-      <div className="row between detail-top" style={{ marginBottom: 18 }}>
+      <div className="row between detail-top property_detail-top">
         <Link
           to={cameFrom || '/'}
           onClick={goBack}
-          className="row gap-2"
-          style={{ color: 'var(--fg-2)', fontSize: 12.5 }}
+          className="row gap-2 property_detail-breadcrumb"
         >
-          <span className="mono">←</span>
+          <ActionIcon kind="back" />
           <span>{backLabel(cameFrom)}</span>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>/</span>
-          <span style={{ color: 'var(--fg-0)' }}>{p.title}</span>
+          <span>{listingTitle(p)}</span>
         </Link>
         <div className="row gap-2 detail-actions">
-          {auctionUrl && (
-            <a
-              /* Num imóvel que saiu do catálogo, esta deixa de ser a ação
-                 principal: seria convidar a pessoa a dar lance no que não
-                 existe mais. O link fica, para ela poder conferir. */
-              className={`btn sm${isRemoved ? '' : ' primary'}`}
-              href={auctionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {isRemoved
-                ? 'Conferir na Caixa'
-                : isDirectSale ? 'Ver na Caixa' : 'Ver o leilão na Caixa'}
-              {' '}<span aria-hidden="true">↗</span>
-            </a>
-          )}
-          {editalUrl && (
-            <a
-              className="btn sm"
-              href={editalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-            >
-              Baixar as regras <span aria-hidden="true">↓</span>
-            </a>
-          )}
-          {matriculaUrl && (
-            <a
-              className="btn sm"
-              href={matriculaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-            >
-              Baixar a certidão do imóvel <span aria-hidden="true">↓</span>
-            </a>
-          )}
-          {saleRulesUrl && (
-            <a
-              className="btn sm"
-              href={saleRulesUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Regras da venda <span aria-hidden="true">↗</span>
-            </a>
-          )}
-          <button className="btn sm" onClick={() => toggleWatch?.(p.id)}>
-            <span style={{ color: isWatched ? 'var(--accent)' : 'var(--fg-2)' }}>
-              {isWatched ? '★' : '☆'}
-            </span>
-            {isWatched ? 'Salvo' : 'Salvar'}
-          </button>
           {!isEnriched && p.canAnalyze && (
             <button
-              className="btn sm primary"
+              className="ui-button is-sm is-secondary"
               onClick={handleAnalyze}
               disabled={analyzing}
             >
               {analyzing ? 'Buscando…' : 'Buscar preço na região'}
             </button>
           )}
-        </div>
-      </div>
-
-      {/* ===== HERO: gallery + key facts ===== */}
-      <div className="detail-hero-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: '1.4fr 1fr',
-        gap: 24,
-        marginBottom: 24,
-      }}>
-        {/* Gallery */}
-        <div>
-          <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--line-1)' }}>
-            <Photo label={p.photoLabel} photoUrl={p.photoUrl} ratio="16/10" />
-            <div style={{
-              position: 'absolute', top: 14, left: 14,
-              background: 'rgba(255,255,255,0.92)', padding: '6px 10px',
-              borderRadius: 6, fontSize: 11,
-              border: '1px solid var(--line-1)',
-              fontFamily: 'var(--f-mono)',
-            }}>
-              Fachada
-            </div>
-          </div>
-          <div className="row gap-2 thumb-strip" style={{ marginTop: 10 }}>
-            <div style={{
-              width: 80, height: 56,
-              borderRadius: 6,
-              overflow: 'hidden',
-              border: '2px solid var(--accent)',
-              position: 'relative',
-              cursor: 'pointer',
-              background: '#ECEEF1',
-              backgroundImage: 'repeating-linear-gradient(135deg, #E5E7EB 0 1px, transparent 1px 8px)',
-            }}>
-              <PropertyImage
-                src={p.photoUrl}
-                alt="Fachada"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <span className="mono" style={{
-                position: 'absolute', bottom: 4, left: 4,
-                fontSize: 9, color: 'var(--fg-2)',
-                background: 'rgba(255,255,255,0.8)',
-                padding: '1px 4px', borderRadius: 3,
-              }}>
-                Fachada
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Key facts panel */}
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row gap-2 wrap" style={{ marginBottom: 14 }}>
-            <Term className="tag accent">{saleTagLabel(p, schedule)}</Term>
-            <span className="tag">{p.type}</span>
-          </div>
-
-          <h1 className="h1" style={{ marginBottom: 4 }}>{p.title}</h1>
-          <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--fg-2)' }}>
-            {p.address} · {p.neighborhood}, {p.city}
-          </p>
-
-          {/* Specs — only shows fields with real data */}
-          <Specs area={p.area} beds={p.beds} baths={p.baths} parking={p.parking} floor={p.floor} />
-
-          <ListingBadges p={p} size="lg" />
-
-          <div className="divider" style={{ margin: '16px 0' }}></div>
-
-          {/* Countdown: sempre diz de qual rodada é o prazo */}
-          <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="uppy" style={{ color: 'var(--fg-3)' }}>
-                {isDirectSale ? 'Disponibilidade' : schedule.headline.label}
-              </div>
-              <div style={{ marginTop: 4 }}>
-                {isDirectSale && !p.endsAt
-                  ? <span style={{ color: 'var(--fg-2)', fontSize: 13 }}>Sem prazo divulgado</span>
-                  : <Countdown until={schedule.headline.until} dark endedLabel={schedule.headline.short || 'Encerrado'} />}
-              </div>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', marginTop: 2 }}>
-                {schedule.headline.until
-                  ? formatAuctionDayTime(schedule.headline.until)
-                  : isDirectSale ? 'Sujeito à disponibilidade na Caixa' : '—'}
-              </div>
-              {!isDirectSale && schedule.headline.note && (
-                <div className="auction-headline-note">{schedule.headline.note}</div>
-              )}
-            </div>
-            {/* Avaliação ao lado do prazo: o quadro de preços abaixo fica só
-                com o que se paga em cada rodada. */}
-            <AppraisalFact p={p} />
-          </div>
-
-          <div className="divider" style={{ margin: '16px 0' }}></div>
-
-          <OfficialBidNotice p={p} />
-
-          {officialBidStatus(p) && (
-            <div className="divider" style={{ margin: '16px 0' }}></div>
+          {auctionUrl && (
+            /* Link de saída, não a ação principal: a página existe para a
+               pessoa usar as análises abaixo antes de ir à Caixa. */
+            <a className="ui-button is-sm is-secondary" href={auctionUrl} target="_blank" rel="noopener noreferrer">
+              {isRemoved ? 'Conferir na Caixa' : isDirectSale ? 'Ver na Caixa' : 'Ver leilão na Caixa'}
+              <ActionIcon />
+            </a>
           )}
-
-          {/* Pricing labels follow the official sale modality. */}
-          <PricingGrid p={p} />
-
-          <div className="divider" style={{ margin: '16px 0 4px' }}></div>
-
-          <Collapsible title="Descrição do imóvel">
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-1)', lineHeight: 1.5 }}>
-              {p.viability?.description || 'Descrição não disponível.'}
-            </p>
-          </Collapsible>
-
-          <Collapsible title="Características">
-            <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12.5 }}>
-              {p.viability?.features
-                ? Object.entries(p.viability.features).map(([lbl, val]) => (
-                    <Meta key={lbl} lbl={lbl} val={val} />
-                  ))
-                : <span style={{ color: 'var(--fg-2)' }}>Dados não disponíveis</span>
-              }
-            </div>
-          </Collapsible>
-
+          <button className={`ui-button is-sm is-secondary property_detail-save${isWatched ? ' is-saved' : ''}`} aria-pressed={isWatched} onClick={() => toggleWatch?.(p.id)}>
+            <ActionIcon kind="star" filled={isWatched} />
+            {isWatched ? 'Salvo' : 'Salvar'}
+          </button>
         </div>
       </div>
+
+      <PropertySummary p={p} schedule={schedule} isDirectSale={isDirectSale}
+        bidNotice={<OfficialBidNotice p={p} />}
+        editalUrl={editalUrl} matriculaUrl={matriculaUrl} saleRulesUrl={saleRulesUrl} />
 
       {isEnriched && <NextStepsDrawer p={p} done={stepsDone} onToggle={toggleStep} />}
 
       {/* ===== TABS ===== */}
-      <div className="detail-tabs" style={{
-        display: 'flex', gap: 0,
-        borderBottom: '1px solid var(--line-1)',
-        marginBottom: 24,
-      }}>
+      <div className="detail-tabs property_tabs" role="tablist" aria-label="Informações do imóvel">
         {[
           { v: 'cost', l: 'Quanto você vai pagar', ix: '01' },
           { v: 'market', l: 'Preço na região', ix: '02' },
@@ -882,27 +704,29 @@ export default function PropertyDetail({ property, watched, toggleWatch }) {
           <button
             key={t.v}
             onClick={() => setTab(t.v)}
-            style={{
-              padding: '12px 18px',
-              borderBottom: tab === t.v ? '2px solid var(--accent)' : '2px solid transparent',
-              marginBottom: -1,
-              color: tab === t.v ? 'var(--fg-0)' : 'var(--fg-2)',
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              fontSize: 13,
-              fontWeight: tab === t.v ? 600 : 400,
-              transition: 'color .15s',
+            className={`ui-button is-secondary property_tab${tab === t.v ? ' is-selected' : ''}`}
+            role="tab" aria-selected={tab === t.v} aria-controls="property-tab-panel"
+            id={`property-tab-${t.v}`} tabIndex={tab === t.v ? 0 : -1}
+            onKeyDown={event => {
+              const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+              if (!keys.includes(event.key)) return;
+              event.preventDefault();
+              const tabs = [...event.currentTarget.parentElement.querySelectorAll('[role="tab"]')];
+              const index = tabs.indexOf(event.currentTarget);
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+              tabs[next].focus(); tabs[next].click();
             }}
           >
-            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{t.ix}</span>
+            <span className="property_tab-number">{t.ix}</span>
             {t.locked && <LockIcon size={12} strokeWidth={2.2} />}
             <span>{t.l}</span>
-            {t.comingSoon && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
+            {t.comingSoon && <span className="ui-tag is-brand">em breve</span>}
           </button>
         ))}
       </div>
 
       {/* ===== TAB CONTENT ===== */}
-      <div className="fade-in" key={tab}>
+      <div className={`fade-in${tab === 'cost' ? ' property_costs' : ''}`} key={tab} role="tabpanel" id="property-tab-panel" aria-labelledby={`property-tab-${tab}`}>
         {tab === 'cost' && <CostBreakdown p={p} sim={sim} />}
         {tab === 'market' && (isEnriched
           ? <Market p={p} />
@@ -999,146 +823,6 @@ function OfficialBidNotice({ p }) {
         )}
       </div>
     </section>
-  );
-}
-
-function AppraisalFact({ p }) {
-  const appraisal = Number(p.appraisal) || 0;
-  const current = Number(p.minBid) || 0;
-  return (
-    <div className="appraisal-fact">
-      <span className="uppy" style={{ color: 'var(--fg-3)' }}><Term>Valor de avaliação</Term></span>
-      {appraisal > 0 ? (
-        <>
-          <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(appraisal)}</div>
-          {current > 0 && appraisal > current && (
-            <div className="appraisal-fact-gap">R$ {fmtBRL(appraisal - current)} abaixo da avaliação</div>
-          )}
-          {current > 0 && current > appraisal && (
-            <div className="appraisal-fact-gap is-above">Valor inicial R$ {fmtBRL(current - appraisal)} acima da avaliação</div>
-          )}
-        </>
-      ) : (
-        <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--fg-3)' }}>
-          A Caixa não informou.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PricingGrid({ p }) {
-  const modality = normalizedCostLabel(p.modalidade);
-  const isDirectSale = modality.includes('venda direta');
-  const isOpenTender = modality.includes('licitacao');
-  const isSfiAuction = modality.includes('leilao sfi');
-  const sfiPricing = sfiAuctionPricing(p);
-  const currentBidPrice = isSfiAuction
-    ? (sfiPricing.current.price || 0)
-    : (p.firstAuctionPrice || p.edital?.firstBidPrice || p.minBid);
-  const currentBidDate = isSfiAuction
-    ? sfiPricing.current.date
-    : (p.edital?.firstBidDate || p.firstAuctionAt);
-  const otherRound = sfiPricing.upcoming || sfiPricing.previous;
-  const otherRoundPrice = otherRound?.price || 0;
-  const hasOtherRound = otherRoundPrice > 0;
-  // O edital guarda a data como ISO, não como texto pronto — renderizá-la
-  // direto colocava "2026-09-14T13:00:00+00:00" na tela. formatAuctionDate
-  // converte para o fuso de São Paulo e devolve a própria string quando a fonte
-  // já vem formatada.
-  const currentDateLabel = formatAuctionDayTime(currentBidDate);
-  const otherRoundDateLabel = formatAuctionDayTime(otherRound?.date);
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16 }}>
-      <div>
-        <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-          {isDirectSale
-            ? 'Preço de venda'
-            : isOpenTender
-              ? <><Term>Valor inicial</Term> · <Term k="rodada_unica">rodada única</Term></>
-              : <><Term>Valor inicial</Term>{isSfiAuction && <> · <Term>{`${sfiPricing.current.round}ª rodada`}</Term></>}</>}
-        </span>
-        <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(currentBidPrice)}</div>
-        {isSfiAuction && sfiPricing.current.round === 2 && sfiPricing.previous?.price > 0
-          && sfiPricing.previous.price !== currentBidPrice && (
-          <div style={{ fontSize: 11, color: sfiPricing.previous.price > currentBidPrice ? 'var(--good)' : 'var(--bad)', fontWeight: 500, marginTop: 2 }}>
-            R$ {fmtBRL(Math.abs(sfiPricing.previous.price - currentBidPrice))} {sfiPricing.previous.price > currentBidPrice ? 'a menos' : 'a mais'} que a 1ª rodada
-          </div>
-        )}
-        {currentDateLabel && (
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{currentDateLabel}</div>
-        )}
-      </div>
-      {isSfiAuction && (
-        <div>
-          <span className="uppy" style={{ color: 'var(--fg-3)' }}>
-            {sfiPricing.upcoming
-              ? <>Se não vender · <Term>2ª rodada</Term></>
-              : <><Term>1ª rodada</Term> encerrada</>}
-          </span>
-          {hasOtherRound ? (
-            <>
-              <div className="num-md" style={{ marginTop: 4 }}>R$ {fmtBRL(otherRoundPrice)}</div>
-              {sfiPricing.upcoming && currentBidPrice > otherRoundPrice && (
-                <div style={{ fontSize: 11, color: 'var(--good)', fontWeight: 500, marginTop: 2 }}>
-                  R$ {fmtBRL(currentBidPrice - otherRoundPrice)} a menos
-                </div>
-              )}
-              {sfiPricing.upcoming && otherRoundPrice > currentBidPrice && (
-                <div style={{ fontSize: 11, color: 'var(--bad)', fontWeight: 500, marginTop: 2, lineHeight: 1.45 }}>
-                  R$ {fmtBRL(otherRoundPrice - currentBidPrice)} a mais. Na 2ª rodada, o mínimo é a
-                  dívida com as despesas, e aqui ela passa do valor da 1ª.
-                </div>
-              )}
-              {otherRoundDateLabel && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
-              )}
-            </>
-          ) : (
-            <>
-              <div style={{ marginTop: 4, fontSize: 13, color: 'var(--fg-3)' }}>
-                {sfiPricing.upcoming
-                  ? 'O valor da segunda rodada ainda não foi divulgado.'
-                  : 'O valor da primeira rodada não foi publicado.'}
-              </div>
-              {otherRoundDateLabel && (
-                <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 2 }}>{otherRoundDateLabel}</div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Collapsible({ title, children, last }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ borderBottom: last ? 'none' : '1px solid var(--line-1)' }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', padding: '12px 0',
-          color: 'var(--fg-0)',
-          fontSize: 13, fontWeight: 500,
-          textAlign: 'left',
-        }}
-      >
-        <span>{title}</span>
-        <span className="mono" style={{
-          fontSize: 11, color: 'var(--fg-2)',
-          transition: 'transform .2s',
-          transform: open ? 'rotate(180deg)' : 'rotate(0)',
-        }}>▾</span>
-      </button>
-      {open && (
-        <div className="fade-in" style={{ padding: '4px 0 16px' }}>
-          {children}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1474,8 +1158,8 @@ function CostBreakdown({ p, sim }) {
 
   if ((dynamicRows || []).length === 0) {
     return (
-      <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-2)', fontSize: 14 }}>Ainda não temos os custos deste imóvel.</p>
+      <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
+        <p style={{ color: 'var(--fg-2)', fontSize: 'var(--ui-text-sm)' }}>Ainda não temos os custos deste imóvel.</p>
       </div>
     );
   }
@@ -1488,15 +1172,15 @@ function CostBreakdown({ p, sim }) {
   return (
     <div>
       {/* ── Simulator ── */}
-      <div className="card simulator-card" style={{ padding: 24, marginBottom: 20 }}>
-        <div className="row between" style={{ alignItems: 'flex-start', marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--line-1)' }}>
+      <div className="card simulator-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
+        <div className="row between" style={{ alignItems: 'flex-start', marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '0.0625rem solid var(--line-1)' }}>
           <div>
             <h3 className="h2">Quanto você vai pagar até receber a chave</h3>
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--fg-2)', maxWidth: 560 }}>
+            <p style={{ margin: '0.375rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '35rem' }}>
               Diga quanto você tem para gastar no total. A conta desconta todos os custos e mostra até onde o seu lance pode ir.
             </p>
           </div>
-          <button className="btn sm simulator-reset-btn" onClick={() => {
+          <button className="ui-button is-sm is-secondary simulator-reset-btn" onClick={() => {
             setRenoPct(isLand ? 0 : 15);
             resetScenarioPreferences();
             resetExpenseEstimates();
@@ -1519,7 +1203,7 @@ function CostBreakdown({ p, sim }) {
         />
 
         {/* ── Valores que dependem de você ── */}
-        <div className="scenario-cost-panel" style={{ marginTop: 24 }}>
+        <div className="scenario-cost-panel" style={{ marginTop: '1.5rem' }}>
           <div className="scenario-cost-panel-head">
             <div>
               <span className="uppy">Valores que dependem de você</span>
@@ -1560,15 +1244,15 @@ function CostBreakdown({ p, sim }) {
                 onChange={(e) => setRenoPct(+e.target.value)}
                 disabled={isLand}
                 className="slider"
-                style={{ width: '100%', marginTop: 14, '--fill': `${renoPct}%` }}
+                style={{ width: '100%', marginTop: '0.875rem', '--fill': `${renoPct}%` }}
                 aria-label="Precisa de reforma para você se mudar?"
               />
-              <div className="row between" style={{ marginTop: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>dá para morar já</span>
-                <span style={{ fontSize: 11, color: 'var(--fg-3)' }}>precisa refazer tudo</span>
+              <div className="row between" style={{ marginTop: '0.5rem' }}>
+                <span style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-3)' }}>dá para morar já</span>
+                <span style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-3)' }}>precisa refazer tudo</span>
               </div>
               {(isLand || renovationAdjusted) && (
-                <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--fg-2)' }}>
+                <p style={{ margin: '0.625rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)' }}>
                   {isLand
                     ? 'Terreno não recebe estimativa de reforma.'
                     : 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'}
@@ -1585,11 +1269,11 @@ function CostBreakdown({ p, sim }) {
         </div>
 
         {/* ── A conta aberta, item por item ── */}
-        <div className="card" style={{ marginTop: 24 }}>
+        <div className="card" style={{ marginTop: '1.5rem' }}>
           <div className="cost-head" style={{
-            display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
-            padding: '10px 20px', background: 'var(--bg-2)',
-            fontFamily: 'var(--f-mono)', fontSize: 10.5,
+            display: 'grid', gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)', gap: '0.875rem',
+            padding: '0.625rem 1.25rem', background: 'var(--bg-2)',
+            fontFamily: 'var(--f-mono)', fontSize: 'var(--ui-text-xs)',
             textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--fg-3)',
           }}>
             <span></span><span>O que você paga</span>
@@ -1609,29 +1293,29 @@ function CostBreakdown({ p, sim }) {
           ))}
           <LockedDebtRows hasCondominium={hasCondominium} />
           <div className="cost-row" style={{
-            display: 'grid', gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)', gap: 14,
-            padding: '20px 20px', background: 'var(--bg-2)',
-            alignItems: 'baseline', borderTop: '2px solid var(--line-2)',
+            display: 'grid', gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)', gap: '0.875rem',
+            padding: '1.25rem 1.25rem', background: 'var(--bg-2)',
+            alignItems: 'baseline', borderTop: '0.125rem solid var(--line-2)',
           }}>
             <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
             <span>
-              <span style={{ fontSize: 15, fontWeight: 600 }}><Term>Total até a chave</Term></span>
+              <span style={{ fontSize: 'var(--ui-text-md)', fontWeight: 600 }}><Term>Total até a chave</Term></span>
               <small className="cost-total-note">Sem eventuais dívidas de condomínio e IPTU.</small>
             </span>
             <span></span>
-            <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: 0 }}>R$ {fmtBRL(dynamicTotal)}</span>
+            <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: '0rem' }}>R$ {fmtBRL(dynamicTotal)}</span>
           </div>
         </div>
-        <div className="automatic-cost-tags" aria-label="Somados automaticamente" style={{ marginTop: 12 }}>
+        <div className="automatic-cost-tags" aria-label="Somados automaticamente" style={{ marginTop: '0.75rem' }}>
           {externalCostTags.map(tag => <span key={tag}>{tag}</span>)}
           <span>Fora da compra: R$ {fmtBRL(externalCosts)}</span>
         </div>
       </div>
 
       {/* ── Quanto custa por mês morar aqui ── */}
-      <div className="card" style={{ padding: 24 }}>
+      <div className="card" style={{ padding: '1.5rem' }}>
         <h3 className="h2">Quanto custa por mês morar aqui</h3>
-        <p style={{ margin: '6px 0 18px', fontSize: 13, color: 'var(--fg-2)', maxWidth: 620 }}>
+        <p style={{ margin: '0.375rem 0 1.125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '38.75rem' }}>
           Isso não entra no total acima. É a conta que chega todo mês depois que você se muda.
         </p>
         <div className={`scenario-cost-grid${hasCondominium ? '' : ' without-condominium'}`}>
@@ -1672,7 +1356,7 @@ function CostBreakdown({ p, sim }) {
             )}
           </div>
         </div>
-        <p style={{ margin: '14px 0 0', fontSize: 11.5, color: 'var(--fg-2)' }}>
+        <p style={{ margin: '0.875rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)' }}>
           {expenseReference
             ? `Estimativa para ${expenseReference.city}/${expenseReference.uf}, com base em ${expenseReference.referenceYear}. Fonte: ${expenseReference.source}.${hasCondominium ? ' Confirme o condomínio com o síndico antes de decidir.' : ''}`
             : 'Ainda não temos referência de custo mensal para esta cidade. Você pode digitar os valores que descobrir; eles ficam salvos neste navegador.'}
@@ -2048,10 +1732,10 @@ function LockedDebtRows({ hasCondominium, onUnlock }) {
           consulta, liberada à parte, mostra se há dívida de{hasCondominium ? ' condomínio e' : ''} IPTU
           e quanto. Até lá, confirme{hasCondominium ? ' no condomínio e' : ''} na prefeitura antes do lance.
         </p>
-        <button type="button" className="btn sm" onClick={onUnlock} disabled={!onUnlock}>
+        <button type="button" className="ui-button is-sm is-secondary" onClick={onUnlock} disabled={!onUnlock}>
           <LockIcon size={13} />
           Ver as dívidas
-          {!onUnlock && <span className="tag accent" style={{ padding: '1px 6px', fontSize: 9 }}>em breve</span>}
+          {!onUnlock && <span className="tag accent" style={{ padding: '0.0625rem 0.375rem', fontSize: 'var(--ui-text-xs)' }}>em breve</span>}
         </button>
       </div>
     </div>
@@ -2064,14 +1748,12 @@ function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
   return (
     <div
       className="cost-row"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '24px minmax(180px, 1fr) 120px minmax(210px, 260px)',
-        gap: 14,
-        padding: '14px 20px',
-        borderTop: '1px solid var(--line-1)',
+        gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)',
+        gap: '0.875rem',
+        padding: '0.875rem 1.25rem',
+        borderTop: '0.0625rem solid var(--line-1)',
         alignItems: 'baseline',
         transition: 'background .15s',
         background: open ? 'var(--bg-2)' : 'transparent',
@@ -2083,30 +1765,30 @@ function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
         aria-label={`Explicação de ${l}`}
         aria-expanded={open}
         style={{
-        width: 16, height: 16, borderRadius: '50%',
-        border: '1px solid var(--line-2)',
-        color: 'var(--fg-3)', fontSize: 9,
+        width: '1rem', height: '1rem', borderRadius: '50%',
+        border: '0.0625rem solid var(--line-2)',
+        color: 'var(--fg-3)', fontSize: 'var(--ui-text-xs)',
         fontFamily: 'var(--f-mono)',
       }}>?</button>
       <div>
         <div className="row gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 13.5, color: 'var(--fg-0)' }}>{l}</div>
-          {custom && <span className="tag" style={{ padding: '2px 5px', fontSize: 8.5, color: 'var(--accent-strong)' }}>extra</span>}
+          <div style={{ fontSize: 'var(--ui-text-sm)', color: 'var(--fg-0)' }}>{l}</div>
+          {custom && <span className="tag" style={{ padding: '0.125rem 0.3125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--accent-strong)' }}>extra</span>}
           {custom && onDelete && (
             <button type="button" className="cost-inline-action danger" onClick={onDelete} aria-label={`Excluir ${l}`}>remover</button>
           )}
         </div>
         {open && hint && (
-          <div style={{ marginTop: 5, fontSize: 11.5, color: 'var(--fg-2)', maxWidth: 480 }}>{hint}</div>
+          <div style={{ marginTop: '0.3125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '30rem' }}>{hint}</div>
         )}
       </div>
       <div style={{ textAlign: 'right' }}>
         {v > 0 && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--bg-3)', overflow: 'hidden' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+            <div style={{ width: '2.5rem', height: '0.25rem', borderRadius: '0.125rem', background: 'var(--bg-3)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(pct * 2.5, 100)}%`, background: 'var(--fg-3)' }}></div>
             </div>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', minWidth: 32, textAlign: 'right' }}>
+            <span className="mono" style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', minWidth: '2rem', textAlign: 'right' }}>
               {pct.toFixed(1)}%
             </span>
           </div>
@@ -2120,7 +1802,7 @@ function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
         </span>
       ) : (
         <span className="mono cost-money-value" style={{
-          minWidth: 0, textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
+          minWidth: '0rem', textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
           fontWeight: 500, letterSpacing: '-0.02em',
         }}>R$ {fmtBRL(v)}</span>
       )}
@@ -2163,12 +1845,9 @@ function CustomCostForm({ onAdd }) {
 
   if (!open) {
     return (
-      <button type="button" className="custom-cost-trigger" onClick={() => setOpen(true)}>
-        <span className="custom-cost-plus" aria-hidden="true">＋</span>
-        <span>
-          <strong>Adicionar gasto</strong>
-          <small>Gasolina, transporte, diligências ou outro</small>
-        </span>
+      <button type="button" className="ui-button is-secondary custom-cost-trigger" onClick={() => setOpen(true)}>
+        <ActionIcon kind="plus" />
+        <span>Adicionar gasto</span>
       </button>
     );
   }
@@ -2189,7 +1868,7 @@ function CustomCostForm({ onAdd }) {
         <span className="uppy">Sugestões rápidas</span>
         <div className="row gap-2 wrap">
           {suggestions.map(suggestion => (
-            <button type="button" key={suggestion} onClick={() => setLabel(suggestion)}>
+            <button type="button" key={suggestion} className={`ui-button is-sm is-secondary${label === suggestion ? ' is-selected' : ''}`} aria-pressed={label === suggestion} onClick={() => setLabel(suggestion)}>
               {suggestion}
             </button>
           ))}
@@ -2221,8 +1900,8 @@ function CustomCostForm({ onAdd }) {
         </div>
       </label>
       <div className="row gap-2 custom-cost-actions">
-        <button type="button" className="btn sm" onClick={() => { setOpen(false); setLabel(''); setValue(''); }}>Cancelar</button>
-        <button type="submit" className="btn sm primary" disabled={!valid}>Adicionar</button>
+        <button type="button" className="ui-button is-sm is-secondary" onClick={() => { setOpen(false); setLabel(''); setValue(''); }}>Cancelar</button>
+        <button type="submit" className="ui-button is-sm" disabled={!valid}>Adicionar</button>
       </div>
     </form>
   );
