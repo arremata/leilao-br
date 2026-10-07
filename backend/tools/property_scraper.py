@@ -70,27 +70,6 @@ def _extract_state_from_city_field(city: str, fallback_state: str = "") -> str:
     return m.group(1) if m else fallback_state
 
 
-def _extract_street(address: str) -> str:
-    """Extract street name from a Brazilian address.
-
-    Handles patterns like:
-    - "Rua das Flores, 123, Centro, Sao Paulo - SP" -> "Rua das Flores"
-    - "Av. Paulista, 1000" -> "Av. Paulista"
-    - "Rua A, 45, Bairro" -> "Rua A"
-    - "Rua Algacyr Munhoz Maedre nº 2411, Apto 23" -> "Rua Algacyr Munhoz Maedre"
-    """
-    # Split on comma and take the first part (street name + number prefix)
-    parts = address.split(",")
-    if not parts:
-        return ""
-    street = parts[0].strip()
-    # Remove "nº" / "n." and any trailing number (house number) from the street part
-    street = re.sub(r"\s*n[ºo.]?\s*\d+$", "", street, flags=re.IGNORECASE).strip()
-    # Also remove bare trailing numbers
-    street = re.sub(r"\s+\d+$", "", street).strip()
-    return street
-
-
 def _neighborhood_slug_clean(name: str) -> str:
     """Clean neighborhood name for URL path — removes (CIC) suffixes, keeps core name.
 
@@ -847,17 +826,15 @@ async def scrape_imovelweb(
 # Dispatcher
 # ---------------------------------------------------------------------------
 
-MIN_COMPS = 3
-
-
 async def scrape_comparables(
     metadata: PropertyMetadata,
     geocoder=None,
 ) -> list[ComparableProperty]:
     """Collect from the three managed listing sources and deduplicate the snapshot.
 
-    Searches by street first (more precise comps), then falls back to
-    neighborhood if street search yields too few results.
+    Searches by neighborhood when available and otherwise by city. The three
+    managed portals model their location paths at those levels; passing a
+    street as if it were a neighborhood can return an anti-bot/error shell.
 
     Manages the complete Playwright lifecycle: launches one browser, reuses
     the page across scrapers, and stops the driver after closing the browser.
@@ -866,11 +843,14 @@ async def scrape_comparables(
         playwright, browser, page = await _launch_parser_browser()
         try:
             all_comps: list[ComparableProperty] = []
+            blocked_sources: list[str] = []
 
-            # Determine search location: prefer street, fallback to neighborhood
-            street = _extract_street(metadata.address) if metadata.address else ""
-            location = street or metadata.neighborhood
-            logger.info(f"Property scraper: searching by location '{location}' (street='{street}', neighborhood='{metadata.neighborhood}')")
+            location = metadata.neighborhood
+            logger.info(
+                "Property scraper: searching by {} '{}'",
+                "neighborhood" if location else "city",
+                location or metadata.city,
+            )
 
             scrapers = [
                 ("QuintoAndar", scrape_quintoandar),
@@ -886,12 +866,13 @@ async def scrape_comparables(
                         location_override=loc,
                         unlocker=unlocker,
                     )
-                except ComparableSourceBlockedError:
-                    logger.error(
-                        "Property scraper: {} is unavailable; preserving the previous snapshot",
-                        name,
+                except ComparableSourceBlockedError as exc:
+                    blocked_sources.append(name)
+                    logger.warning(
+                        "Property scraper: {} is unavailable; continuing with the other sources: {}",
+                        name, exc,
                     )
-                    raise
+                    return []
                 except Exception as e:
                     logger.debug(f"Property scraper: {name} failed: {e}")
                     return []
@@ -911,13 +892,6 @@ async def scrape_comparables(
                 all_comps.extend(await _run_scraper(name, scraper, location))
                 await asyncio.sleep(random.uniform(1.0, 3.0))
 
-            # If street search didn't yield enough, retry with neighborhood
-            if len(all_comps) < MIN_COMPS and street and metadata.neighborhood and street != metadata.neighborhood:
-                logger.info(f"Property scraper: street search yielded {len(all_comps)} comps, retrying with neighborhood '{metadata.neighborhood}'")
-                for name, scraper in scrapers:
-                    all_comps.extend(await _run_scraper(name, scraper, metadata.neighborhood))
-                    await asyncio.sleep(random.uniform(1.0, 3.0))
-
             deduplicated: list[ComparableProperty] = []
             seen_urls: set[str] = set()
             seen_fingerprints: set[tuple[str, int, int]] = set()
@@ -931,6 +905,11 @@ async def scrape_comparables(
                 seen_urls.add(url_key)
                 seen_fingerprints.add(fingerprint)
                 deduplicated.append(comp)
+            if not deduplicated and blocked_sources:
+                raise ComparableSourceBlockedError(
+                    "No usable comparables returned while sources were unavailable: "
+                    + ", ".join(blocked_sources)
+                )
             return await _filter_to_subject_radius(metadata, deduplicated, geocoder)
         finally:
             try:

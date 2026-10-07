@@ -215,6 +215,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Corrigiu as falhas observadas na primeira atualização com
+  Bright Data. Os três portais agora recebem somente bairro/cidade, nunca uma
+  rua disfarçada de bairro; uma fonte bloqueada não descarta comparáveis válidos
+  devolvidos pelas outras, mas a referência anterior continua preservada quando
+  nenhuma evidência utilizável retorna. A fila passou a excluir também jobs
+  legados cujo imóvel representante não está mais ativo. A versão `v7` refaz
+  gradualmente os snapshots `v6` afetados, com até metade das requisições por
+  região.
+
 - **2026-10-06** — O catálogo passou a abrir com leilões e compra direta juntos.
   O tipo de venda virou um filtro de três opções (Todos, Leilões, Compra
   direta), com Todos como padrão e fora do endereço; `aba=leiloes` e
@@ -223,6 +232,7 @@ The full platform will include:
   direta não tem data e cairia sempre depois de todos os leilões. Rodada e
   modalidade só somem no filtro Compra direta; a coluna de data da lista se
   chama “prazo” quando os dois tipos estão juntos (PD-022).
+
 - **2026-10-06** — Migrou a coleta programada de comparáveis para o Web
   Unlocker gerenciado do Bright Data, limitada a QuintoAndar, ImovelWeb e
   Chaves na Mão. ZAP e Viva Real saíram do coletor ativo e o projeto continua
@@ -231,7 +241,7 @@ The full platform will include:
   valida a configuração sem imprimi-la e preserva o retrato anterior se o
   provedor ficar indisponível. Uma sonda sem acesso ao banco confirmou anúncios
   válidos nos três portais antes da ativação; referências antigas serão refeitas
-  gradualmente sob a versão `v6` da rotina.
+  gradualmente sob a versão inicial `v6` da rotina.
 
 - **2026-10-01** — Na conta, eventuais dívidas de condomínio e IPTU aparecem
   como as demais linhas, com o valor desfocado e um cadeado no lugar dele, fora

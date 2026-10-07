@@ -215,6 +215,42 @@ async def test_worker_does_not_scrape_land_references(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_worker_does_not_refresh_a_legacy_job_for_an_inactive_property(monkeypatch):
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        prop = Property(
+            source="caixa", source_id="inactive-1", uf="PR", city="Curitiba",
+            neighborhood="Centro", property_type="Apartamento", address="Rua A",
+            area_m2=50, preco=100_000, status="inactive",
+        )
+        session.add(prop)
+        session.flush()
+        session.add(MarketReferenceJob(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", representative_property_id=prop.id,
+            status="pending",
+        ))
+        session.commit()
+
+    async def fail_if_called(metadata, **kwargs):
+        raise AssertionError("inactive property scraper should not be called")
+
+    monkeypatch.setattr(market_reference, "scrape_comparables", fail_if_called)
+    summary = await market_reference.refresh_references(
+        factory, ["PR"], limit=10, geocoder=_FakeGeocoder(),
+    )
+
+    assert summary["selected"] == 0
+    assert summary["updated"] == 0
+    with factory() as session:
+        job = session.query(MarketReferenceJob).one()
+        assert job.status == "pending"
+        assert job.attempt_count == 0
+
+
+@pytest.mark.asyncio
 async def test_empty_city_job_backs_off_without_starving_another_city(monkeypatch):
     engine = get_engine("sqlite://")
     init_db(engine)
