@@ -1173,8 +1173,8 @@ function CostBreakdown({ p, sim }) {
 
   if ((dynamicRows || []).length === 0) {
     return (
-      <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-2)', fontSize: 'var(--ui-text-sm)' }}>Ainda não temos os custos deste imóvel.</p>
+      <div className="card cost-empty">
+        <p>Ainda não temos os custos deste imóvel.</p>
       </div>
     );
   }
@@ -1187,15 +1187,15 @@ function CostBreakdown({ p, sim }) {
   return (
     <div>
       {/* ── Simulator ── */}
-      <div className="card simulator-card" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
-        <div className="row between" style={{ alignItems: 'flex-start', marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '0.0625rem solid var(--line-1)' }}>
+      <div className="card simulator-card">
+        <div className="cost-section-head">
           <div>
-            <h3 className="h2">Quanto você vai pagar até receber a chave</h3>
-            <p style={{ margin: '0.375rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '35rem' }}>
+            <h3 className="cost-title">Quanto você vai pagar até receber a chave</h3>
+            <p className="cost-lead">
               Diga quanto você tem para gastar no total. A conta desconta todos os custos e mostra até onde o seu lance pode ir.
             </p>
           </div>
-          <button className="ui-button is-sm is-secondary simulator-reset-btn" onClick={() => {
+          <button className="ui-button is-xs is-quiet" onClick={() => {
             setRenoPct(isLand ? 0 : 15);
             resetScenarioPreferences();
             resetExpenseEstimates();
@@ -1218,7 +1218,7 @@ function CostBreakdown({ p, sim }) {
         />
 
         {/* ── Valores que dependem de você ── */}
-        <div className="scenario-cost-panel" style={{ marginTop: '1.5rem' }}>
+        <div className="scenario-cost-panel">
           <div className="scenario-cost-panel-head">
             <div>
               <span className="uppy">Valores que dependem de você</span>
@@ -1244,7 +1244,7 @@ function CostBreakdown({ p, sim }) {
             {/* Reforma — a pergunta é "dá para me mudar já?" */}
             <div className="scenario-money-field scenario-money-field--reno">
               <div className="row between baseline">
-                <span className="uppy" style={{ color: 'var(--fg-2)' }}>
+                <span className="uppy">
                   Precisa de reforma para você se mudar?
                 </span>
                 <RenovationMoneyEditor
@@ -1259,15 +1259,15 @@ function CostBreakdown({ p, sim }) {
                 onChange={(e) => setRenoPct(+e.target.value)}
                 disabled={isLand}
                 className="slider"
-                style={{ width: '100%', marginTop: '0.875rem', '--fill': `${renoPct}%` }}
+                style={{ '--fill': `${renoPct}%` }}
                 aria-label="Precisa de reforma para você se mudar?"
               />
-              <div className="row between" style={{ marginTop: '0.5rem' }}>
-                <span style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-3)' }}>dá para morar já</span>
-                <span style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-3)' }}>precisa refazer tudo</span>
+              <div className="scenario-reno-scale">
+                <span>dá para morar já</span>
+                <span>precisa refazer tudo</span>
               </div>
               {(isLand || renovationAdjusted) && (
-                <p style={{ margin: '0.625rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)' }}>
+                <p className="scenario-note">
                   {isLand
                     ? 'Terreno não recebe estimativa de reforma.'
                     : 'Valor digitado por você. Arraste o controle para voltar à nossa estimativa.'}
@@ -1284,16 +1284,11 @@ function CostBreakdown({ p, sim }) {
         </div>
 
         {/* ── A conta aberta, item por item ── */}
-        <div className="card" style={{ marginTop: '1.5rem' }}>
-          <div className="cost-head" style={{
-            display: 'grid', gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)', gap: '0.875rem',
-            padding: '0.625rem 1.25rem', background: 'var(--bg-2)',
-            fontFamily: 'var(--f-mono)', fontSize: 'var(--ui-text-xs)',
-            textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--fg-3)',
-          }}>
+        <div className="cost-table">
+          <div className="cost-head">
             <span></span><span>O que você paga</span>
-            <span style={{ textAlign: 'right' }}>peso</span>
-            <span style={{ textAlign: 'right' }}>Valor</span>
+            <span className="is-end">peso</span>
+            <span className="is-end">Valor</span>
           </div>
           {dynamicRows.map(r => (
             <CostRow
@@ -1307,30 +1302,26 @@ function CostBreakdown({ p, sim }) {
             />
           ))}
           <LockedDebtRows hasCondominium={hasCondominium} />
-          <div className="cost-row" style={{
-            display: 'grid', gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)', gap: '0.875rem',
-            padding: '1.25rem 1.25rem', background: 'var(--bg-2)',
-            alignItems: 'baseline', borderTop: '0.125rem solid var(--line-2)',
-          }}>
-            <span className="mono" style={{ color: 'var(--fg-3)' }}>∑</span>
+          <div className="cost-row is-total">
+            <span className="cost-row-sum" aria-hidden="true">∑</span>
             <span>
-              <span style={{ fontSize: 'var(--ui-text-md)', fontWeight: 600 }}><Term>Total até a chave</Term></span>
+              <span className="cost-total-label"><Term>Total até a chave</Term></span>
               <small className="cost-total-note">Sem eventuais dívidas de condomínio e IPTU.</small>
             </span>
             <span></span>
-            <span className="num-xl cost-total-value" style={{ textAlign: 'right', color: 'var(--accent)', minWidth: '0rem' }}>R$ {fmtBRL(dynamicTotal)}</span>
+            <span className="cost-total-value">R$ {fmtBRL(dynamicTotal)}</span>
           </div>
         </div>
-        <div className="automatic-cost-tags" aria-label="Somados automaticamente" style={{ marginTop: '0.75rem' }}>
+        <div className="automatic-cost-tags" aria-label="Somados automaticamente">
           {externalCostTags.map(tag => <span key={tag}>{tag}</span>)}
           <span>Fora da compra: R$ {fmtBRL(externalCosts)}</span>
         </div>
       </div>
 
       {/* ── Quanto custa por mês morar aqui ── */}
-      <div className="card" style={{ padding: '1.5rem' }}>
-        <h3 className="h2">Quanto custa por mês morar aqui</h3>
-        <p style={{ margin: '0.375rem 0 1.125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '38.75rem' }}>
+      <div className="card cost-monthly">
+        <h3 className="cost-title">Quanto custa por mês morar aqui</h3>
+        <p className="cost-lead">
           Isso não entra no total acima. É a conta que chega todo mês depois que você se muda.
         </p>
         <div className={`scenario-cost-grid${hasCondominium ? '' : ' without-condominium'}`}>
@@ -1371,7 +1362,7 @@ function CostBreakdown({ p, sim }) {
             )}
           </div>
         </div>
-        <p style={{ margin: '0.875rem 0 0', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)' }}>
+        <p className="cost-footnote">
           {expenseReference
             ? `Estimativa para ${expenseReference.city}/${expenseReference.uf}, com base em ${expenseReference.referenceYear}. Fonte: ${expenseReference.source}.${hasCondominium ? ' Confirme o condomínio com o síndico antes de decidir.' : ''}`
             : 'Ainda não temos referência de custo mensal para esta cidade. Você pode digitar os valores que descobrir; eles ficam salvos neste navegador.'}
@@ -1634,7 +1625,7 @@ function BudgetPlanner({
           <div className="bid-slider-scale">
             <span>Valor inicial R$ {fmtBRL(minBid)}</span>
             {offerAdjusted && (
-              <button type="button" onClick={onResetOffer}>Voltar ao valor inicial</button>
+              <button type="button" className="ui-button is-xs is-quiet" onClick={onResetOffer}>Voltar ao valor inicial</button>
             )}
           </div>
         </div>
@@ -1689,7 +1680,7 @@ function ScenarioMoneyField({
       </label>
       <div className="scenario-money-meta">
         <span>{adjusted ? 'Valor informado por você' : defaultLabel}</span>
-        {adjusted && <button type="button" onClick={onReset}>Restaurar sugestão</button>}
+        {adjusted && <button type="button" className="ui-button is-xs is-quiet" onClick={onReset}>Restaurar sugestão</button>}
       </div>
     </div>
   );
@@ -1750,7 +1741,7 @@ function LockedDebtRows({ hasCondominium, onUnlock }) {
         <button type="button" className="ui-button is-sm is-secondary" onClick={onUnlock} disabled={!onUnlock}>
           <LockIcon size={13} />
           Ver as dívidas
-          {!onUnlock && <span className="tag accent" style={{ padding: '0.0625rem 0.375rem', fontSize: 'var(--ui-text-xs)' }}>em breve</span>}
+          {!onUnlock && <span className="ui-tag is-brand">em breve</span>}
         </button>
       </div>
     </div>
@@ -1761,65 +1752,40 @@ function CostRow({ l, v, hint, pct, custom, onDelete, locked }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className="cost-row"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1.5rem minmax(11.25rem, 1fr) 7.5rem minmax(13.125rem, 16.25rem)',
-        gap: '0.875rem',
-        padding: '0.875rem 1.25rem',
-        borderTop: '0.0625rem solid var(--line-1)',
-        alignItems: 'baseline',
-        transition: 'background .15s',
-        background: open ? 'var(--bg-2)' : 'transparent',
-      }}
-    >
+    <div className={`cost-row${open ? ' is-open' : ''}`}>
       <button
         type="button"
+        className="cost-row-help"
         onClick={() => setOpen(current => !current)}
         aria-label={`Explicação de ${l}`}
         aria-expanded={open}
-        style={{
-        width: '1rem', height: '1rem', borderRadius: '50%',
-        border: '0.0625rem solid var(--line-2)',
-        color: 'var(--fg-3)', fontSize: 'var(--ui-text-xs)',
-        fontFamily: 'var(--f-mono)',
-      }}>?</button>
+      >?</button>
       <div>
-        <div className="row gap-2" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 'var(--ui-text-sm)', color: 'var(--fg-0)' }}>{l}</div>
-          {custom && <span className="tag" style={{ padding: '0.125rem 0.3125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--accent-strong)' }}>extra</span>}
+        <div className="cost-row-title">
+          <div className="cost-row-label">{l}</div>
+          {custom && <span className="ui-tag is-brand">extra</span>}
           {custom && onDelete && (
             <button type="button" className="cost-inline-action danger" onClick={onDelete} aria-label={`Excluir ${l}`}>remover</button>
           )}
         </div>
-        {open && hint && (
-          <div style={{ marginTop: '0.3125rem', fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', maxWidth: '30rem' }}>{hint}</div>
-        )}
+        {open && hint && <div className="cost-row-hint">{hint}</div>}
       </div>
-      <div style={{ textAlign: 'right' }}>
+      <div className="cost-row-weight">
         {v > 0 && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-            <div style={{ width: '2.5rem', height: '0.25rem', borderRadius: '0.125rem', background: 'var(--bg-3)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(pct * 2.5, 100)}%`, background: 'var(--fg-3)' }}></div>
-            </div>
-            <span className="mono" style={{ fontSize: 'var(--ui-text-xs)', color: 'var(--fg-2)', minWidth: '2rem', textAlign: 'right' }}>
-              {pct.toFixed(1)}%
-            </span>
-          </div>
+          <>
+            <span className="cost-row-weight-bar"><span style={{ width: `${Math.min(pct * 2.5, 100)}%` }} /></span>
+            <span>{pct.toFixed(1)}%</span>
+          </>
         )}
       </div>
       {locked ? (
-        <span className="mono cost-money-value cost-money-locked">
+        <span className="cost-money-value cost-money-locked">
           <LockIcon size={13} />
           <span aria-hidden="true" className="cost-money-blur">R$ 0.000,00</span>
           <span className="sr-only">Valor bloqueado</span>
         </span>
       ) : (
-        <span className="mono cost-money-value" style={{
-          minWidth: '0rem', textAlign: 'right', color: v === 0 ? 'var(--fg-3)' : 'var(--fg-0)',
-          fontWeight: 500, letterSpacing: '-0.02em',
-        }}>R$ {fmtBRL(v)}</span>
+        <span className={`cost-money-value${v === 0 ? ' is-zero' : ''}`}>R$ {fmtBRL(v)}</span>
       )}
     </div>
   );
@@ -1833,7 +1799,7 @@ function CustomCostsEditor({ costs, onAdd, onRemove }) {
           <span className="uppy" id="additional-costs-title">Gastos adicionais</span>
           <p>Gasolina para visitar, transporte, o que mais você previr. Entra na conta acima.</p>
         </div>
-        {costs.length > 0 && <span className="mono">{costs.length} {costs.length === 1 ? 'item' : 'itens'}</span>}
+        {costs.length > 0 && <span className="scenario-extra-costs-count">{costs.length} {costs.length === 1 ? 'item' : 'itens'}</span>}
       </div>
       <div className="scenario-extra-costs-grid">
         {costs.map(cost => (

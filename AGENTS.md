@@ -235,6 +235,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-07** — Levou a aba "Quanto você vai pagar" ao padrão Client First.
+  Campos de valor com uma aparência só (2.5rem; o orçamento, pergunta
+  principal, com 3rem), números na fonte do texto, seções separadas por espaço
+  e linha em vez de caixas aninhadas, tabela de custos compacta com o total em
+  destaque e ações de apoio ("Recomeçar", "Restaurar sugestão", "Voltar ao
+  valor inicial") como botões discretos. O CSS da aba foi reescrito só com
+  tokens e regras antigas com `!important` saíram. Nenhum texto, cálculo ou
+  função mudou.
+
 - **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco
   compacto: foto ao lado do tipo, endereço com bairro/cidade/UF, selos de
   situação, avaliação da Caixa e um quadro por rodada, com a vigente destacada,
