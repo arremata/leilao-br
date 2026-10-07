@@ -268,7 +268,9 @@ ação equivalente à modalidade.
   A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
   um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
   comparável utilizável retorna, a última referência saudável é preservada em
-  vez de publicar uma estimativa baseada em uma coleta vazia.
+  vez de publicar uma estimativa baseada em uma coleta vazia. Cada ciclo
+  processa no máximo dez regiões; falhas parciais permanecem registradas e
+  entram em espera para nova tentativa, sem invalidar as regiões concluídas.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +17,26 @@ class _FakeGeocoder:
     def geocode(self, _address):
         self.calls.append(_address)
         return -25.4284, -49.2733
+
+
+@pytest.mark.parametrize(("summary", "expected"), [
+    ({"selected": 0, "updated": 0, "empty": 0, "failed": 0}, 0),
+    ({"selected": 18, "updated": 9, "empty": 6, "failed": 3}, 0),
+    ({"selected": 3, "updated": 0, "empty": 3, "failed": 0}, 0),
+    ({"selected": 3, "updated": 0, "empty": 0, "failed": 3}, 1),
+])
+def test_refresh_exit_code_only_fails_without_a_usable_outcome(summary, expected):
+    assert market_reference.refresh_exit_code(summary) == expected
+
+
+def test_scheduled_workflow_uses_a_safe_default_batch_size():
+    workflow = (
+        Path(__file__).resolve().parents[2]
+        / ".github" / "workflows" / "market-reference.yml"
+    ).read_text()
+
+    assert 'default: "10"' in workflow
+    assert "github.event.inputs.limit || '10'" in workflow
 
 
 @pytest.mark.asyncio

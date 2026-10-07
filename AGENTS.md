@@ -215,6 +215,13 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-06** — Ajustou a rotina programada de referências de mercado à
+  latência observada no Bright Data. Cada execução passou de 30 para no máximo
+  10 regiões, mantendo margem dentro do limite da Action. Falhas isoladas
+  continuam registradas e sujeitas a nova tentativa, mas só deixam a execução
+  vermelha quando nenhuma região selecionada produz atualização ou resultado
+  vazio válido; materialização e cobertura continuam sendo reportadas sempre.
+
 - **2026-10-06** — As principais palavras do leilão ganharam explicação nos
   cards e na página do imóvel: tipo de venda, rodadas, valor inicial, valor de
   avaliação, imóveis parecidos, total até a chave, ocupação, FGTS e

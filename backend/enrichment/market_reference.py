@@ -337,7 +337,13 @@ def main(argv=None):
     return asyncio.run(refresh_references(factory, ufs, args.limit, args.max_age_days, args.property_id))
 
 
+def refresh_exit_code(result: dict[str, int]) -> int:
+    """Fail only when selected work produced no usable regional outcome."""
+    if result["selected"] and not result["updated"] and not result["empty"]:
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
     result = main()
-    if result["failed"] or (result["selected"] and not result["updated"] and not result["empty"]):
-        sys.exit(1)
+    sys.exit(refresh_exit_code(result))
