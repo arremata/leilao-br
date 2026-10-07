@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 6 de outubro de 2026.
+Última atualização: 7 de outubro de 2026.
 
 ## Padrão visual
 
@@ -281,8 +281,11 @@ ação equivalente à modalidade.
   um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
   comparável utilizável retorna, a última referência saudável é preservada em
   vez de publicar uma estimativa baseada em uma coleta vazia. Cada ciclo
-  processa no máximo dez regiões; falhas parciais permanecem registradas e
-  entram em espera para nova tentativa, sem invalidar as regiões concluídas.
+  processa no máximo dez regiões, com concorrência limitada e sem duplicar uma
+  região entre workers; falhas parciais permanecem registradas e entram em
+  espera para nova tentativa, sem invalidar as regiões concluídas. Apenas
+  análises afetadas por referências alteradas são refeitas, e o indicador de
+  cobertura considera somente análises produzidas pela regra atual.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.

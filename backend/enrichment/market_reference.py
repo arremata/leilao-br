@@ -12,12 +12,16 @@ import asyncio
 import json
 import re
 import sys
+import threading
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from loguru import logger
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 
-from db.base import get_engine, init_db, make_session_factory
+from db.base import get_engine, make_session_factory
 from db.models import (
     MarketReferenceJob, Property, RegionalMarketComparable, RegionalMarketPrice,
 )
@@ -25,10 +29,40 @@ from enrichment.market_coverage import canonical_property_type, is_eligible_mark
 from enrichment.run import metadata_from_property
 from graph.market import calculate_market
 from ingestion.geocode import NominatimClient
-from tools.property_scraper import scrape_comparables
+from tools.market_reference_collector import (
+    MarketReferenceCollector,
+    scrape_comparables,
+)
 
 
 MARKET_REFERENCE_SOURCE = "listing_median_confidence_v7"
+DEFAULT_CONCURRENCY = 2
+LEASE_TIMEOUT = timedelta(minutes=10)
+
+
+@dataclass(frozen=True)
+class ClaimedMarketJob:
+    job_id: int
+    neighborhood: str
+    property_type: str
+    claimed_at: datetime
+    metadata: object
+
+
+class BatchGeocoder:
+    """Serialize Nominatim access and reuse normalized addresses in one run."""
+
+    def __init__(self, geocoder) -> None:
+        self._geocoder = geocoder
+        self._lock = threading.Lock()
+        self._cache: dict[str, tuple[float, float] | None] = {}
+
+    def geocode(self, address: str):
+        key = " ".join((address or "").casefold().split())
+        with self._lock:
+            if key not in self._cache:
+                self._cache[key] = self._geocoder.geocode(address)
+            return self._cache[key]
 
 
 def _now() -> datetime:
@@ -111,11 +145,14 @@ def reconcile_coverage(session_factory, ufs: list[str]) -> dict[str, int]:
         eligible = [prop for prop in props if is_eligible_market_property(prop)]
         existing_jobs = {
             (job.uf, job.city, job.neighborhood, job.property_type): job
-            for job in session.execute(select(MarketReferenceJob)).scalars().all()
+            for job in session.execute(select(MarketReferenceJob).where(
+                MarketReferenceJob.uf.in_(wanted_ufs),
+            )).scalars().all()
         }
         existing_refs = {
             (ref.uf, ref.city, ref.neighborhood, ref.property_type)
             for ref in session.execute(select(RegionalMarketPrice).where(
+                RegionalMarketPrice.uf.in_(wanted_ufs),
                 RegionalMarketPrice.price_per_m2 > 0,
             )).scalars().all()
         }
@@ -136,7 +173,7 @@ def reconcile_coverage(session_factory, ufs: list[str]) -> dict[str, int]:
         for key, prop in representatives.items():
             if key in existing_jobs:
                 existing_jobs[key].representative_property_id = prop.id
-                existing_jobs[key].priority = min(existing_jobs[key].priority, _property_priority(prop, True))
+                existing_jobs[key].priority = _property_priority(prop, True)
                 continue
             status = "successful" if key in existing_refs else "pending"
             job = MarketReferenceJob(
@@ -159,7 +196,7 @@ def reconcile_coverage(session_factory, ufs: list[str]) -> dict[str, int]:
             key = (city_key[0], city_key[1], neighborhood, city_key[2])
             if key in existing_jobs:
                 existing_jobs[key].representative_property_id = prop.id
-                existing_jobs[key].priority = min(existing_jobs[key].priority, _property_priority(prop, False))
+                existing_jobs[key].priority = _property_priority(prop, False)
                 continue
             status = "successful" if key in existing_refs else "pending"
             job = MarketReferenceJob(
@@ -181,139 +218,268 @@ def _retry_delay(attempt_count: int, empty: bool = False) -> timedelta:
     return timedelta(hours=min(base_hours * (2 ** max(attempt_count - 1, 0)), 24 * 30))
 
 
-async def refresh_references(
-    session_factory, ufs: list[str], limit: int = 10, max_age_days: int = 90,
-    property_id: int | None = None, geocoder=None,
-) -> dict[str, int]:
-    coverage = reconcile_coverage(session_factory, ufs)
-    owns_geocoder = geocoder is None
-    geocoder = geocoder or NominatimClient()
+def _claim_jobs(
+    session_factory,
+    ufs: list[str],
+    limit: int,
+    max_age_days: int,
+    property_id: int | None,
+) -> list[ClaimedMarketJob]:
+    """Claim due jobs atomically; PostgreSQL workers skip each other's rows."""
     now = _now()
     cutoff = now - timedelta(days=max_age_days)
+    lease_cutoff = now - LEASE_TIMEOUT
+    reference_join = and_(
+        RegionalMarketPrice.uf == MarketReferenceJob.uf,
+        RegionalMarketPrice.city == MarketReferenceJob.city,
+        RegionalMarketPrice.neighborhood == MarketReferenceJob.neighborhood,
+        RegionalMarketPrice.property_type == MarketReferenceJob.property_type,
+    )
+    stale_lease = and_(
+        MarketReferenceJob.status == "running",
+        MarketReferenceJob.updated_at <= lease_cutoff,
+    )
+    legacy_snapshot = and_(
+        RegionalMarketPrice.id.is_not(None),
+        MarketReferenceJob.status == "successful",
+        RegionalMarketPrice.source != MARKET_REFERENCE_SOURCE,
+    )
+    due = or_(
+        stale_lease,
+        and_(
+            MarketReferenceJob.status != "running",
+            or_(
+                MarketReferenceJob.next_attempt_at.is_(None),
+                MarketReferenceJob.next_attempt_at <= now,
+                legacy_snapshot,
+            ),
+        ),
+    )
     with session_factory() as session:
-        # Load every job in scope so successful legacy snapshots can bypass a
-        # future next_attempt_at once. Their comparables predate the confidence
-        # inputs (type, bedrooms and coordinates), so treating them as fresh
-        # would leave every rematerialized analysis artificially low until the
-        # normal 90-day expiry.
-        stmt = select(MarketReferenceJob).join(
-            Property,
-            MarketReferenceJob.representative_property_id == Property.id,
-        ).where(
-            MarketReferenceJob.uf.in_(ufs),
-            Property.status == "active",
+        stmt = (
+            select(MarketReferenceJob, Property, RegionalMarketPrice)
+            .join(Property, MarketReferenceJob.representative_property_id == Property.id)
+            .outerjoin(RegionalMarketPrice, reference_join)
+            .where(
+                MarketReferenceJob.uf.in_(ufs),
+                Property.status == "active",
+                due,
+            )
         )
         if property_id is not None:
-            stmt = stmt.where(MarketReferenceJob.representative_property_id == property_id)
-        jobs = session.execute(stmt.order_by(
-            MarketReferenceJob.priority.asc(), MarketReferenceJob.next_attempt_at.asc(),
-            MarketReferenceJob.last_attempted_at.asc(), MarketReferenceJob.id.asc(),
-        )).scalars().all()
-        candidates = []
-        for job in jobs:
-            reference = session.execute(select(RegionalMarketPrice).where(
-                RegionalMarketPrice.uf == job.uf, RegionalMarketPrice.city == job.city,
-                RegionalMarketPrice.neighborhood == job.neighborhood,
-                RegionalMarketPrice.property_type == job.property_type,
-            )).scalar_one_or_none()
-            legacy_snapshot = bool(
-                reference
-                and job.status == "successful"
-                and reference.source != MARKET_REFERENCE_SOURCE
+            stmt = stmt.where(
+                MarketReferenceJob.representative_property_id == property_id,
             )
-            attempt_due = job.next_attempt_at is None or _aware(job.next_attempt_at) <= now
-            if not attempt_due and not legacy_snapshot:
-                continue
-            fresh = reference and _aware(reference.computed_at) >= cutoff
-            if (
-                property_id is None
-                and job.status == "successful"
-                and fresh
-                and not legacy_snapshot
-            ):
-                continue
-            candidates.append(job.id)
-            if limit and len(candidates) >= limit:
+        else:
+            stmt = stmt.where(or_(
+                stale_lease,
+                legacy_snapshot,
+                MarketReferenceJob.status != "successful",
+                RegionalMarketPrice.id.is_(None),
+                RegionalMarketPrice.computed_at < cutoff,
+            ))
+        stmt = stmt.order_by(
+            MarketReferenceJob.priority.asc(),
+            MarketReferenceJob.next_attempt_at.asc(),
+            MarketReferenceJob.last_attempted_at.asc(),
+            MarketReferenceJob.id.asc(),
+        ).with_for_update(of=MarketReferenceJob, skip_locked=True)
+        if limit:
+            stmt = stmt.limit(limit)
+        rows = session.execute(stmt).all()
+        claimed = []
+        for job, prop, _reference in rows:
+            claimed_at = _now()
+            job.status = "running"
+            job.updated_at = claimed_at
+            metadata = metadata_from_property(prop)
+            metadata.property_type = job.property_type
+            metadata.neighborhood = job.neighborhood
+            claimed.append(ClaimedMarketJob(
+                job_id=job.id,
+                neighborhood=job.neighborhood,
+                property_type=job.property_type,
+                claimed_at=claimed_at,
+                metadata=metadata,
+            ))
+        session.commit()
+        return claimed
+
+
+def _lease_is_current(job, claim: ClaimedMarketJob) -> bool:
+    return bool(
+        job
+        and job.status == "running"
+        and _aware(job.updated_at) == claim.claimed_at
+    )
+
+
+def _persist_success(
+    session_factory,
+    claim: ClaimedMarketJob,
+    result,
+    max_age_days: int,
+) -> tuple[str, int | None]:
+    now = _now()
+    with session_factory() as session:
+        job = session.get(MarketReferenceJob, claim.job_id)
+        if not _lease_is_current(job, claim):
+            return "lease_lost", None
+        prop = session.get(Property, job.representative_property_id)
+        if claim.metadata.lat is not None and claim.metadata.lng is not None and prop:
+            prop.lat, prop.lng = claim.metadata.lat, claim.metadata.lng
+            prop.geocode_status = "ok"
+        job.attempt_count += 1
+        job.last_attempted_at = now
+        job.updated_at = now
+        if result.price_per_m2_neighborhood <= 0 or not result.comparable_properties:
+            job.status = "empty"
+            job.last_error = "No valid comparable listings returned"
+            job.next_attempt_at = now + _retry_delay(job.attempt_count, empty=True)
+            session.commit()
+            return "empty", None
+
+        reference = session.execute(select(RegionalMarketPrice).where(
+            RegionalMarketPrice.uf == job.uf,
+            RegionalMarketPrice.city == job.city,
+            RegionalMarketPrice.neighborhood == job.neighborhood,
+            RegionalMarketPrice.property_type == job.property_type,
+        )).scalar_one_or_none()
+        if reference is None:
+            reference = RegionalMarketPrice(
+                uf=job.uf,
+                city=job.city,
+                neighborhood=job.neighborhood,
+                property_type=job.property_type,
+                price_per_m2=0,
+            )
+            session.add(reference)
+        reference.price_per_m2 = result.price_per_m2_neighborhood
+        reference.sample_size = len(result.comparable_properties)
+        reference.source = MARKET_REFERENCE_SOURCE
+        reference.computed_at = now
+        session.flush()
+        session.execute(delete(RegionalMarketComparable).where(
+            RegionalMarketComparable.reference_id == reference.id,
+        ))
+        session.add_all([
+            RegionalMarketComparable(
+                reference_id=reference.id,
+                address=comp.address,
+                property_type=comp.property_type,
+                price=comp.price,
+                area_m2=comp.area_m2,
+                beds=comp.beds,
+                price_per_m2=comp.price_per_m2,
+                source=comp.source,
+                url=comp.url,
+                lat=comp.lat,
+                lng=comp.lng,
+            )
+            for comp in result.comparable_properties
+        ])
+        job.status = "successful"
+        job.last_error = ""
+        job.next_attempt_at = now + timedelta(days=max_age_days)
+        session.commit()
+        return "updated", reference.id
+
+
+def _persist_failure(session_factory, claim: ClaimedMarketJob, exc: Exception) -> str:
+    now = _now()
+    with session_factory() as session:
+        job = session.get(MarketReferenceJob, claim.job_id)
+        if not _lease_is_current(job, claim):
+            return "lease_lost"
+        job.attempt_count += 1
+        job.status = "failed"
+        job.last_attempted_at = now
+        job.next_attempt_at = now + _retry_delay(job.attempt_count)
+        job.last_error = str(exc)[:2000]
+        job.updated_at = now
+        session.commit()
+        return "failed"
+
+
+async def refresh_references(
+    session_factory,
+    ufs: list[str],
+    limit: int = 10,
+    max_age_days: int = 90,
+    property_id: int | None = None,
+    geocoder=None,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    collector: MarketReferenceCollector | None = None,
+) -> dict:
+    started = time.monotonic()
+    coverage = reconcile_coverage(session_factory, ufs)
+    owns_collector = collector is None
+    collector = collector or MarketReferenceCollector()
+    summary = {
+        **coverage,
+        "selected": 0,
+        "updated": 0,
+        "empty": 0,
+        "failed": 0,
+        "lease_lost": 0,
+        "updated_reference_ids": [],
+    }
+    owns_geocoder = geocoder is None
+    raw_geocoder = None
+    batch_geocoder = None
+
+    async def process(claim: ClaimedMarketJob) -> None:
+        try:
+            await _ensure_subject_coordinates(claim.metadata, batch_geocoder)
+            if not claim.neighborhood:
+                claim.metadata.address = ""
+            comparables = await scrape_comparables(
+                claim.metadata,
+                geocoder=batch_geocoder,
+                collector=collector,
+            )
+            result = calculate_market(claim.metadata, comparables)
+            outcome, reference_id = _persist_success(
+                session_factory, claim, result, max_age_days,
+            )
+            summary[outcome] += 1
+            if reference_id is not None:
+                summary["updated_reference_ids"].append(reference_id)
+        except Exception as exc:
+            outcome = _persist_failure(session_factory, claim, exc)
+            summary[outcome] += 1
+            logger.exception("Market reference job {} failed: {}", claim.job_id, exc)
+
+    async def run_batches() -> None:
+        nonlocal raw_geocoder, batch_geocoder
+        remaining = limit
+        while not limit or remaining > 0:
+            batch_limit = concurrency if not limit else min(concurrency, remaining)
+            claims = _claim_jobs(
+                session_factory, ufs, batch_limit, max_age_days, property_id,
+            )
+            if not claims:
                 break
+            summary["selected"] += len(claims)
+            if batch_geocoder is None:
+                raw_geocoder = geocoder or NominatimClient()
+                batch_geocoder = BatchGeocoder(raw_geocoder)
+            await asyncio.gather(*(process(claim) for claim in claims))
+            if limit:
+                remaining -= len(claims)
 
-    summary = {**coverage, "selected": len(candidates), "updated": 0, "empty": 0, "failed": 0}
-    for job_id in candidates:
-        with session_factory() as session:
-            job = session.get(MarketReferenceJob, job_id)
-            prop = session.get(Property, job.representative_property_id) if job else None
-            if not job or not prop:
-                continue
-            try:
-                metadata = metadata_from_property(prop)
-                metadata.property_type = job.property_type
-                metadata.neighborhood = job.neighborhood
-                await _ensure_subject_coordinates(metadata, geocoder)
-                if not job.neighborhood:  # city baseline must not accidentally search one street
-                    metadata.address = ""
-                comparables = await scrape_comparables(metadata, geocoder=geocoder)
-                if metadata.lat is not None and metadata.lng is not None:
-                    prop.lat, prop.lng = metadata.lat, metadata.lng
-                    prop.geocode_status = "ok"
-                result = calculate_market(metadata, comparables)
-                job.attempt_count += 1
-                job.last_attempted_at = now
-                job.updated_at = now
-                if result.price_per_m2_neighborhood <= 0 or not result.comparable_properties:
-                    job.status = "empty"
-                    job.last_error = "No valid comparable listings returned"
-                    job.next_attempt_at = now + _retry_delay(job.attempt_count, empty=True)
-                    session.commit()
-                    summary["empty"] += 1
-                    continue
-
-                reference = session.execute(select(RegionalMarketPrice).where(
-                    RegionalMarketPrice.uf == job.uf, RegionalMarketPrice.city == job.city,
-                    RegionalMarketPrice.neighborhood == job.neighborhood,
-                    RegionalMarketPrice.property_type == job.property_type,
-                )).scalar_one_or_none()
-                if reference is None:
-                    reference = RegionalMarketPrice(
-                        uf=job.uf, city=job.city, neighborhood=job.neighborhood,
-                        property_type=job.property_type, price_per_m2=0,
-                    )
-                    session.add(reference)
-                reference.price_per_m2 = result.price_per_m2_neighborhood
-                reference.sample_size = len(result.comparable_properties)
-                reference.source = MARKET_REFERENCE_SOURCE
-                reference.computed_at = now
-                session.flush()
-                session.execute(delete(RegionalMarketComparable).where(
-                    RegionalMarketComparable.reference_id == reference.id,
-                ))
-                for comp in result.comparable_properties:
-                    session.add(RegionalMarketComparable(
-                        reference_id=reference.id, address=comp.address,
-                        property_type=comp.property_type, price=comp.price,
-                        area_m2=comp.area_m2, beds=comp.beds,
-                        price_per_m2=comp.price_per_m2,
-                        source=comp.source, url=comp.url,
-                        lat=comp.lat, lng=comp.lng,
-                    ))
-                job.status = "successful"
-                job.last_error = ""
-                job.next_attempt_at = now + timedelta(days=max_age_days)
-                session.commit()
-                summary["updated"] += 1
-            except Exception as exc:
-                session.rollback()
-                job = session.get(MarketReferenceJob, job_id)
-                if job:
-                    job.attempt_count += 1
-                    job.status = "failed"
-                    job.last_attempted_at = now
-                    job.next_attempt_at = now + _retry_delay(job.attempt_count)
-                    job.last_error = str(exc)[:2000]
-                    job.updated_at = now
-                    session.commit()
-                summary["failed"] += 1
-                logger.exception("Market reference job {} failed: {}", job_id, exc)
-    if owns_geocoder:
-        geocoder.close()
+    try:
+        if owns_collector:
+            async with collector:
+                await run_batches()
+        else:
+            await run_batches()
+    finally:
+        if owns_geocoder and raw_geocoder is not None:
+            raw_geocoder.close()
+    summary["updated_reference_ids"].sort()
+    summary["sources"] = collector.metrics_summary()
+    summary["duration_seconds"] = round(time.monotonic() - started, 3)
     logger.info("Market coverage refresh: {}", json.dumps(summary))
     return summary
 
@@ -324,17 +490,40 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=10, help="0 means all currently due jobs")
     parser.add_argument("--max-age-days", type=int, default=90)
     parser.add_argument("--property-id", type=int, default=None)
+    parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
+    parser.add_argument("--result-file", default="")
     args = parser.parse_args(argv)
+    if args.limit < 0:
+        parser.error("--limit must be zero or greater")
+    if args.max_age_days <= 0:
+        parser.error("--max-age-days must be greater than zero")
+    if not 1 <= args.concurrency <= 4:
+        parser.error("--concurrency must be between 1 and 4")
     engine = get_engine()
-    init_db(engine)
     factory = make_session_factory(engine)
     ufs = [value.strip().upper() for value in args.ufs.split(",") if value.strip()]
+    if any(not re.fullmatch(r"[A-Z]{2}", uf) for uf in ufs):
+        parser.error("--ufs must contain comma-separated two-letter UFs")
     if not ufs:
         with factory() as session:
             ufs = list(session.execute(select(Property.uf).where(
                 Property.status == "active", Property.uf.is_not(None),
             ).distinct()).scalars())
-    return asyncio.run(refresh_references(factory, ufs, args.limit, args.max_age_days, args.property_id))
+    result = asyncio.run(refresh_references(
+        factory,
+        ufs,
+        args.limit,
+        args.max_age_days,
+        args.property_id,
+        concurrency=args.concurrency,
+    ))
+    if args.result_file:
+        Path(args.result_file).write_text(
+            json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    print(json.dumps(result, ensure_ascii=False))
+    return result
 
 
 def refresh_exit_code(result: dict[str, int]) -> int:

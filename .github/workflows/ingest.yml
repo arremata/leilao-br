@@ -80,6 +80,10 @@ jobs:
           fi
           xvfb-run -a python -m ingestion.worker "${args[@]}"
 
+      - name: Refresh analyses changed by catalog ingestion
+        working-directory: backend
+        run: timeout --signal=TERM --kill-after=30s 10m python -m enrichment.materialize --ufs "$INGEST_UFS"
+
       - name: Write failure summary
         if: failure()
         run: |

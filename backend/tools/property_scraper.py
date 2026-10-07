@@ -4,17 +4,23 @@ import asyncio
 import os
 import random
 import re
+from typing import Any
 from urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 
 import httpx
 from loguru import logger
-from playwright.async_api import (
-    async_playwright,
-    Browser,
-    Page,
-    Playwright,
-    TimeoutError as PlaywrightTimeoutError,
-)
+try:
+    from playwright.async_api import (
+        async_playwright,
+        Browser,
+        Page,
+        Playwright,
+        TimeoutError as PlaywrightTimeoutError,
+    )
+except ModuleNotFoundError:  # scheduled market worker parses Bright HTML directly
+    async_playwright = None
+    Browser = Page = Playwright = Any
+    PlaywrightTimeoutError = TimeoutError
 from graph.market_confidence import (
     MAX_COMPARABLES,
     MAX_RADIUS_KM,

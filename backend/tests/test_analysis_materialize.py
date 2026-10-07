@@ -1,3 +1,5 @@
+from sqlalchemy import event
+
 from db.base import get_engine, init_db, make_session_factory
 from db.models import (
     Enrichment, Property, PropertyEvent, RegionalMarketComparable, RegionalMarketPrice,
@@ -111,3 +113,75 @@ def test_recomputes_after_catalog_property_change():
         session.commit()
 
     assert materialize_analyses(factory, ["PR"])["updated"] == 1
+
+
+def test_materializes_only_properties_affected_by_changed_reference():
+    factory = _database()
+    with factory() as session:
+        properties = [
+            Property(
+                source="caixa", source_id=f"affected-{index}", uf="PR",
+                city=city, neighborhood="Centro", property_type="Apartamento",
+                address=f"Rua {index}", area_m2=50, preco=100_000,
+                status="active",
+            )
+            for index, city in enumerate(("Curitiba", "Londrina"))
+        ]
+        session.add_all(properties)
+        session.flush()
+        references = [
+            RegionalMarketPrice(
+                uf="PR", city=prop.city, neighborhood="",
+                property_type="Apartamento", price_per_m2=5_000,
+            )
+            for prop in properties
+        ]
+        session.add_all(references)
+        session.commit()
+        changed_reference_id = references[0].id
+        affected_property_id = properties[0].id
+
+    summary = materialize_analyses(
+        factory, ["PR"], reference_ids={changed_reference_id},
+    )
+
+    assert summary["updated"] == 1
+    assert summary["skipped_unaffected"] == 1
+    with factory() as session:
+        assert session.query(Enrichment).one().property_id == affected_property_id
+
+
+def test_noop_materialization_uses_a_fixed_number_of_queries():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(RegionalMarketPrice(
+            uf="PR", city="Curitiba", neighborhood="",
+            property_type="Apartamento", price_per_m2=5_000,
+        ))
+        session.add_all([
+            Property(
+                source="caixa", source_id=f"query-{index}", uf="PR",
+                city="Curitiba", neighborhood=f"Bairro {index}",
+                property_type="Apartamento", address=f"Rua {index}",
+                area_m2=50, preco=100_000, status="active",
+            )
+            for index in range(20)
+        ])
+        session.commit()
+    assert materialize_analyses(factory, ["PR"])["updated"] == 20
+
+    statements = []
+
+    def count_statement(*args):
+        statements.append(args[2])
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        summary = materialize_analyses(factory, ["PR"])
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert summary["current"] == 20
+    assert len(statements) <= 6

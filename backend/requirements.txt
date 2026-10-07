@@ -16,6 +16,7 @@ uvicorn>=0.30.0
 sqlalchemy>=2.0.0
 psycopg[binary]>=3.2.0
 httpx>=0.27.0
+selectolax>=0.3.0,<0.4.0
 curl_cffi>=0.11,<0.15
 # Test-only: the auth tests import vercel-backend modules which pull in
 # google-auth and PyJWT. Mirrors vercel-backend/requirements.txt.

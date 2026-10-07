@@ -229,11 +229,20 @@ The full platform will include:
 | Frontend | React 19 + Vite | React + Mapbox |
 | PDF Parsing | PyMuPDF | PyMuPDF |
 | Market research | Managed listing collection | Managed listing collection |
-| Web Scraping | Bright Data + Playwright parser | Bright Data + Playwright parser |
+| Web Scraping | Bright Data + direct HTML parser | Bright Data + direct HTML parser |
 | Persistence | JSON file | PostgreSQL |
 | Deployment | Local | Docker + AWS/GCP |
 
 ## Changelog
+
+- **2026-10-07** — Otimizou a atualização das referências de mercado sem mudar
+  as regras de preço: QuintoAndar, ImovelWeb e Chaves na Mão passam a ser
+  consultados em paralelo controlado, o HTML renderizado pela Bright Data é
+  lido sem iniciar Chromium e o mesmo cliente é reutilizado no lote. Jobs usam
+  lease recuperável e transações curtas; materialização e relatório deixaram
+  de fazer consultas por imóvel, somente análises afetadas são refeitas e a
+  cobertura conta apenas análises atuais. A Action ganhou dependências mínimas,
+  deadlines próprios, inputs validados e métricas por fonte.
 
 - **2026-10-06** — Reorganizou o topo da página do imóvel em um bloco
   compacto: foto ao lado do tipo, endereço com bairro/cidade/UF, selos de
