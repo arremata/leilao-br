@@ -41,7 +41,7 @@ function AppraisalGap({ gap }) {
 function FirstRoundComparison({ difference }) {
   if (difference === null || difference === 0) return null;
   return difference < 0
-    ? <span className="property_round-saving">Economia de {summaryMoney(-difference)} sobre a 1ª rodada</span>
+    ? <span className="property_round-saving">Economia de {summaryMoney(-difference)}</span>
     : <span className="property_round-saving is-more">{summaryMoney(difference)} a mais que a 1ª rodada. Na 2ª rodada, o mínimo é a dívida com as despesas e pode superar o valor da 1ª.</span>;
 }
 
@@ -49,25 +49,24 @@ function RoundCard({ round, model, schedule, isDirectSale, p }) {
   const isCurrent = round.state === 'current';
   const showClock = isCurrent || (!model.isSfi && round.state === 'ended');
   const gap = round.appraisalGap;
-  const dateLabel = roundDateLabel(round.date) || (isDirectSale ? '' : 'Data não informada');
+  const dateLabel = roundDateLabel(round.date) || (isDirectSale ? 'Sujeito à disponibilidade na Caixa' : 'Data não informada');
+  // Reading order follows the decision: which round, its price, how long is
+  // left, when, then the supporting detail.
   return <article className={`property_round is-${round.state}`} aria-label={roundBadge(round, isDirectSale, model.isSfi)}>
-    <div className="property_round-top">
-      <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
-      {dateLabel && <span className="property_round-date">{dateLabel}</span>}
-    </div>
+    <span className="property_round-badge"><RoundBadgeLabel round={round} isDirectSale={isDirectSale} isSfi={model.isSfi} /></span>
     <div className="property_round-price-row">
       <strong className="property_round-price" title={round.price > 0 ? `R$ ${fmtBRL(Number(round.price))}` : undefined}>{summaryMoney(round.price)}</strong>
       {gap?.tone === 'less' && <span className="property_round-discount" title={`${gap.percent}% abaixo da avaliação`} aria-label={`${gap.percent}% abaixo da avaliação`}>−{gap.percent}%</span>}
     </div>
-    <div className="property_round-notes">
-      {/* With a discount, the badge next to the price already says it. */}
-      {gap?.tone !== 'less' && <AppraisalGap gap={gap} />}
-      {round.round === 2 && <FirstRoundComparison difference={model.difference} />}
-      {showClock && (isDirectSale && !p.endsAt
-        ? <span>Sem prazo divulgado</span>
-        : <Countdown until={schedule.headline.until} words="Encerra em" dark endedLabel={schedule.headline.short || 'Encerrado'} />)}
-      {isDirectSale && !dateLabel && <span>Sujeito à disponibilidade na Caixa</span>}
-    </div>
+    {showClock && (isDirectSale && !p.endsAt
+      ? <span className="property_round-clock">Sem prazo divulgado</span>
+      : <Countdown until={schedule.headline.until} words="Encerra em" dark endedLabel={schedule.headline.short || 'Encerrado'} />)}
+    {/* For a future round the saving is the point; for the current one it is detail. */}
+    {round.round === 2 && !isCurrent && <FirstRoundComparison difference={model.difference} />}
+    <span className="property_round-date">{dateLabel}</span>
+    {round.round === 2 && isCurrent && <FirstRoundComparison difference={model.difference} />}
+    {/* With a discount, the badge next to the price already says it. */}
+    {gap?.tone !== 'less' && <AppraisalGap gap={gap} />}
   </article>;
 }
 
@@ -112,7 +111,7 @@ export default function PropertySummary({ p, schedule, isDirectSale, bidNotice, 
             <li className="property_summary-chip-group"><ListingBadges p={p} size="lg" /></li>
           </ul>
           <p className="property_summary-appraisal">
-            <Term k="valor_avaliacao">Avaliação Caixa</Term> <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
+            <Term k="valor_avaliacao">Avaliação Caixa</Term> <span aria-hidden="true">·</span> <strong>{model.appraisal ? summaryMoney(model.appraisal) : 'não informada'}</strong>
           </p>
         </div>
       </header>
