@@ -235,6 +235,15 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-19** — Separou falha real do catálogo de indisponibilidade nas
+  fontes auxiliares. A ingestão diária da Caixa continua vermelha quando o CSV,
+  banco ou uma UF falha, mas páginas de detalhes bloqueadas agora geram alerta
+  sem impedir a rematerialização das análises. O lote diário de detalhes ficou
+  limitado e alterna diariamente o ponto inicial, evitando timeout e repetição
+  eterna dos mesmos bloqueios. Nos comparáveis, falhas transitórias
+  dos portais permanecem registradas para retry e visíveis no resumo sem
+  derrubar uma rodada operacionalmente concluída.
+
 - **2026-10-07** — Tornou backfills completos de referências retomáveis sem
   cobrar novamente regiões já concluídas: uma execução forçada pode selecionar
   apenas jobs não tentados desde o início da campanha. Runs forçadas também

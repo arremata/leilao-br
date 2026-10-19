@@ -24,6 +24,10 @@ on:
         type: boolean
         required: true
         default: false
+      detail_limit:
+        description: Maximum Caixa detail pages to enrich in this run
+        required: true
+        default: "80"
   schedule:
     - cron: "50 8 * * *"
 permissions:
@@ -48,6 +52,7 @@ jobs:
       INGEST_UFS: ${{ github.event.inputs.ufs || 'PR' }}
       INGEST_LIMIT: ${{ github.event.inputs.limit || '' }}
       INGEST_GEOCODE: ${{ github.event.inputs.geocode || 'false' }}
+      INGEST_DETAIL_LIMIT: ${{ github.event.inputs.detail_limit || '80' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -65,13 +70,22 @@ jobs:
         run: python -m playwright install --with-deps chrome
 
       - name: Validate database configuration
-        run: test -n "$DATABASE_URL"
+        run: |
+          test -n "$DATABASE_URL"
+          [[ "$INGEST_UFS" =~ ^[A-Za-z]{2}(,[A-Za-z]{2})*$ ]]
+          [[ -z "$INGEST_LIMIT" || "$INGEST_LIMIT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$INGEST_GEOCODE" =~ ^(true|false)$ ]]
+          [[ "$INGEST_DETAIL_LIMIT" =~ ^[0-9]+$ ]]
 
       - name: Run ingestion worker
         working-directory: backend
         shell: bash
         run: |
-          args=(--ufs "$INGEST_UFS")
+          args=(
+            --ufs "$INGEST_UFS"
+            --date-limit "$INGEST_DETAIL_LIMIT"
+            --result-file "$RUNNER_TEMP/ingestion-result.json"
+          )
           if [[ -n "$INGEST_LIMIT" ]]; then
             args+=(--limit "$INGEST_LIMIT")
           fi
@@ -79,6 +93,15 @@ jobs:
             args+=(--geocode)
           fi
           xvfb-run -a python -m ingestion.worker "${args[@]}"
+
+      - name: Report optional detail health
+        if: ${{ always() }}
+        working-directory: backend
+        run: |
+          result_file="$RUNNER_TEMP/ingestion-result.json"
+          if [[ -s "$result_file" ]]; then
+            python -m action_health ingestion "$result_file"
+          fi
 
       - name: Refresh analyses changed by catalog ingestion
         working-directory: backend
@@ -91,5 +114,5 @@ jobs:
             echo "## Caixa ingestion failed"
             echo
             echo "UFs: \`$INGEST_UFS\`"
-            echo "Review the worker logs for a failed UF or a date-enrichment health-budget breach."
+            echo "Review the worker logs for an authoritative catalog or infrastructure failure."
           } >> "$GITHUB_STEP_SUMMARY"

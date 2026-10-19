@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 7 de outubro de 2026.
+Última atualização: 19 de outubro de 2026.
 
 ## Padrão visual
 
@@ -271,6 +271,11 @@ ação equivalente à modalidade.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
+  A importação oficial da Caixa e a leitura auxiliar de páginas de detalhes têm
+  saúdes separadas: uma indisponibilidade de datas ou documentos gera alerta e
+  preserva os fatos anteriores, sem impedir a atualização do catálogo e das
+  análises. As páginas auxiliares são processadas em lotes cujo ponto inicial
+  alterna diariamente, para que um bloqueio não monopolize as execuções.
 - O navegador acessa catálogo e dados de conta somente pelos serviços do Argos;
   as tabelas do banco não formam uma API pública paralela.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
@@ -283,7 +288,8 @@ ação equivalente à modalidade.
   vez de publicar uma estimativa baseada em uma coleta vazia. Cada ciclo
   processa no máximo dez regiões, com concorrência limitada e sem duplicar uma
   região entre workers; falhas parciais permanecem registradas e entram em
-  espera para nova tentativa, sem invalidar as regiões concluídas. Apenas
+  espera para nova tentativa, sem invalidar as regiões concluídas nem marcar
+  toda a rotina como indisponível. Apenas
   análises afetadas por referências alteradas são refeitas, e o indicador de
   cobertura considera somente análises produzidas pela regra atual.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um

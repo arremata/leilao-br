@@ -5,7 +5,7 @@ from ingestion.adapters.caixa_csv import CaixaCsvAdapter
 from ingestion.run import IngestSummary
 from ingestion.worker import (
     UFResult, date_enrichment_is_degraded, parse_ufs, report_exit_code,
-    run_worker,
+    report_payload, run_worker,
 )
 
 
@@ -132,7 +132,9 @@ def test_worker_exit_code_reflects_per_uf_failures():
         "PR": UFResult(uf="PR", summary=healthy),
         "SP": UFResult(uf="SP", error="boom"),
     }) == 1
-    assert report_exit_code({"PR": UFResult(uf="PR", summary=degraded)}) == 1
+    # Optional Caixa detail degradation is reported, but the authoritative
+    # catalog import remains a successful Action outcome.
+    assert report_exit_code({"PR": UFResult(uf="PR", summary=degraded)}) == 0
     assert report_exit_code({}) == 1
 
 
@@ -146,3 +148,18 @@ def test_date_enrichment_health_budget_requires_material_loss():
     assert date_enrichment_is_degraded(
         IngestSummary(dates_updated=89, dates_failed=11)
     )
+
+
+def test_report_payload_keeps_catalog_failures_and_detail_warnings_separate():
+    report = {
+        "PR": UFResult(
+            uf="PR", summary=IngestSummary(dates_updated=20, dates_failed=12),
+        ),
+        "SP": UFResult(uf="SP", error="CSV unavailable"),
+    }
+
+    payload = report_payload(report)
+
+    assert payload["failed_ufs"] == ["SP"]
+    assert payload["degraded_date_ufs"] == ["PR"]
+    assert payload["ufs"]["PR"]["summary"]["dates_failed"] == 12

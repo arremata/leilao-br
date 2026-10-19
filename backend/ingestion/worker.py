@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Callable, Optional
 
 from loguru import logger
@@ -57,15 +59,42 @@ def date_enrichment_is_degraded(
 
 
 def report_exit_code(report: dict[str, UFResult]) -> int:
-    """Return nonzero for UF failures or materially degraded date enrichment."""
+    """Return nonzero only when the authoritative catalog ingestion failed.
+
+    Detail-page dates and documents are best-effort enrichments. Their health
+    remains explicit in the structured report and logs, but an external Caixa
+    block must not hide a successful CSV import or prevent analysis refreshes.
+    """
     if not report:
         return 1
     for result in report.values():
         if result.error is not None or result.summary is None:
             return 1
-        if date_enrichment_is_degraded(result.summary):
-            return 1
     return 0
+
+
+def report_payload(report: dict[str, UFResult]) -> dict:
+    """Return the serializable operational result consumed by GitHub Actions."""
+    failed_ufs = sorted(
+        uf for uf, result in report.items()
+        if result.error is not None or result.summary is None
+    )
+    degraded_date_ufs = sorted(
+        uf for uf, result in report.items()
+        if result.summary is not None
+        and date_enrichment_is_degraded(result.summary)
+    )
+    return {
+        "failed_ufs": failed_ufs,
+        "degraded_date_ufs": degraded_date_ufs,
+        "ufs": {
+            uf: {
+                "error": result.error,
+                "summary": asdict(result.summary) if result.summary is not None else None,
+            }
+            for uf, result in sorted(report.items())
+        },
+    }
 
 
 def _default_adapter_factory(uf: str) -> SourceAdapter:
@@ -137,11 +166,19 @@ def build_parser() -> argparse.ArgumentParser:
             "eligible pages are fetched (0 disables)."
         ),
     )
+    parser.add_argument(
+        "--result-file", default="",
+        help="Optional JSON file for workflow health reporting.",
+    )
     return parser
 
 
 def main(argv=None) -> dict[str, UFResult]:  # pragma: no cover - thin CLI wrapper
     args = build_parser().parse_args(argv)
+    if args.limit is not None and args.limit < 1:
+        raise SystemExit("--limit must be greater than zero")
+    if args.date_limit is not None and args.date_limit < 0:
+        raise SystemExit("--date-limit must be zero or greater")
 
     from db.base import get_engine, init_db, make_session_factory
 
@@ -186,6 +223,11 @@ def main(argv=None) -> dict[str, UFResult]:  # pragma: no cover - thin CLI wrapp
         f"Worker done: {ok}/{len(report)} UFs ok; failed={failed}; "
         f"degraded_dates={degraded_dates}"
     )
+    if args.result_file:
+        Path(args.result_file).write_text(
+            json.dumps(report_payload(report), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
     return report
 
 

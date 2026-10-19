@@ -97,6 +97,14 @@ jobs:
           fi
           timeout --signal=TERM --kill-after=30s 42m \
             python -m enrichment.market_reference "${args[@]}"
+      - name: Report partial portal health
+        if: ${{ always() }}
+        working-directory: backend
+        run: |
+          result_file="$RUNNER_TEMP/market-reference-result.json"
+          if [[ -s "$result_file" ]]; then
+            python -m action_health market "$result_file"
+          fi
       - name: Materialize analyses affected by changed references
         if: ${{ always() }}
         working-directory: backend

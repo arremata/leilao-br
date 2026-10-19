@@ -19,7 +19,7 @@ from ingestion.adapters.base import NormalizedProperty, RawListing
 from ingestion.adapters.caixa_csv import CaixaCsvAdapter, build_photo_url
 from ingestion.run import (
     _needs_auction_dates, _needs_bid_status, _needs_detail_fetch, _needs_documents,
-    _validate_photos_concurrently,
+    _rotate_detail_candidates, _validate_photos_concurrently,
     ingest,
 )
 
@@ -555,6 +555,18 @@ def test_ingest_date_failure_is_non_fatal_and_retried():
     prop = _get_prop(factory, "1")
     assert attempts == 2
     assert prop.dates_fetched_at is None
+
+
+def test_bounded_detail_batches_rotate_by_one_batch_each_day():
+    candidates = [(index,) for index in range(1, 7)]
+
+    day_one = _rotate_detail_candidates(candidates, limit=2, day_ordinal=0)
+    day_two = _rotate_detail_candidates(candidates, limit=2, day_ordinal=1)
+    day_three = _rotate_detail_candidates(candidates, limit=2, day_ordinal=2)
+
+    assert [item[0] for item in day_one[:2]] == [1, 2]
+    assert [item[0] for item in day_two[:2]] == [3, 4]
+    assert [item[0] for item in day_three[:2]] == [5, 6]
 
 
 def test_ingest_recovers_http_detail_miss_with_trusted_browser():
