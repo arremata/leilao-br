@@ -235,6 +235,9 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-19** — Unificou o favicon da plataforma com o da LP: círculo roxo
+  preenchido até as bordas, com a casa branca centralizada. Atualizou o cache
+  do service worker para substituir o favicon anterior nas próximas visitas.
 - **2026-10-19** — Preparou a ingestão da Caixa para expansão controlada a SP:
   snapshots vazios, com schema inesperado ou queda abrupta agora são recusados
   antes de qualquer escrita; o lote auxiliar diário passou de 80 para 160
