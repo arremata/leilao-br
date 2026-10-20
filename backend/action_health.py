@@ -37,6 +37,24 @@ def ingestion_report(data: dict) -> tuple[list[str], str]:
         "- Detail enrichment: "
         + (f"degraded ({', '.join(degraded_ufs)})" if degraded_ufs else "healthy")
     )
+    if data.get("ufs"):
+        lines.extend([
+            "",
+            "| UF | Catálogo | Duração | Detalhes | Adiados | Fotos | Removidos |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ])
+        for uf, result in sorted(data["ufs"].items()):
+            summary = result.get("summary") or {}
+            duration = float(result.get("duration_seconds") or 0)
+            catalog = summary.get("catalog_rows", "—")
+            details = summary.get("details_attempted", "—")
+            deferred = summary.get("details_deferred", "—")
+            photos = summary.get("photos_attempted", "—")
+            removed = summary.get("removed", "—")
+            lines.append(
+                f"| {uf} | {catalog} | {duration:.1f}s | {details} | "
+                f"{deferred} | {photos} | {removed} |"
+            )
     if warnings:
         lines.extend(["", *[f"> [!WARNING]\n> {warning}" for warning in warnings]])
     return warnings, "\n".join(lines) + "\n"

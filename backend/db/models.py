@@ -62,12 +62,32 @@ class Property(Base):
     edital_data: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
     detail_fetched: Mapped[bool] = mapped_column(default=False)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    photo_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    photo_last_attempt_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     raw_payload: Mapped[Optional[dict]] = mapped_column(JSON, default=None)
+
+
+class IngestionCheckpoint(Base):
+    """Small durable cursor used by bounded source-enrichment batches."""
+
+    __tablename__ = "ingestion_checkpoints"
+    __table_args__ = (
+        UniqueConstraint("source", "uf", "name", name="uq_ingestion_checkpoint"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(32), index=True)
+    uf: Mapped[str] = mapped_column(String(2), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    cursor: Mapped[str] = mapped_column(String(128), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class PropertyEvent(Base):

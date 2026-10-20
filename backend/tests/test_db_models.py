@@ -3,7 +3,10 @@ from datetime import datetime, timezone
 from sqlalchemy import inspect, text
 
 from db.base import Base, get_engine, init_db, make_session_factory
-from db.models import Property, PropertyEvent, Enrichment, RegionalMarketComparable
+from db.models import (
+    Enrichment, IngestionCheckpoint, Property, PropertyEvent,
+    RegionalMarketComparable,
+)
 from enrichment.run import PIPELINE_VERSION
 
 
@@ -44,7 +47,15 @@ def test_init_db_adds_ingestion_fields_to_existing_properties_table():
         "first_auction_at", "second_auction_at", "dates_fetched_at",
         "first_auction_price", "second_auction_price",
         "matricula", "edital_url", "matricula_url", "edital_data",
+        "photo_attempt_count", "photo_last_attempt_at",
     }.issubset(columns)
+
+
+def test_init_db_creates_ingestion_checkpoint_table():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+
+    assert IngestionCheckpoint.__tablename__ in inspect(engine).get_table_names()
 
 
 def test_init_db_adds_confidence_inputs_to_existing_comparable_table():

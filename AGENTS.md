@@ -238,6 +238,16 @@ The full platform will include:
 - **2026-10-19** — Unificou o favicon da plataforma com o da LP: círculo roxo
   preenchido até as bordas, com a casa branca centralizada. Atualizou o cache
   do service worker para substituir o favicon anterior nas próximas visitas.
+- **2026-10-19** — Preparou a ingestão da Caixa para expansão controlada a SP:
+  snapshots vazios, com schema inesperado ou queda abrupta agora são recusados
+  antes de qualquer escrita; o lote auxiliar diário passou de 80 para 160
+  páginas por UF e usa cursor persistente, permitindo que uma reexecução no
+  mesmo dia continue do próximo imóvel. O upsert passou a carregar imóveis
+  existentes em lote, fotos ausentes ganharam espera exponencial, a Action
+  resume volume, duração e trabalho adiado por UF e uma amostra real de SP
+  cobre o contrato do CSV. A geocodificação saiu da importação principal para
+  uma Action manual, limitada e com cache por endereço, e os enriquecimentos
+  específicos da Caixa passaram a ser expostos pelo adapter da fonte.
 
 - **2026-10-19** — Passou a preencher lacunas de preço de mercado com a mediana
   das referências válidas da mesma cidade quando ainda não há amostra para o

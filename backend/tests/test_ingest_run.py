@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import pytest
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -19,8 +20,8 @@ from ingestion.adapters.base import NormalizedProperty, RawListing
 from ingestion.adapters.caixa_csv import CaixaCsvAdapter, build_photo_url
 from ingestion.run import (
     _needs_auction_dates, _needs_bid_status, _needs_detail_fetch, _needs_documents,
-    _rotate_detail_candidates, _validate_photos_concurrently,
-    ingest,
+    _order_detail_candidates, _validate_photos_concurrently,
+    SnapshotValidationError, ingest,
 )
 
 
@@ -49,6 +50,18 @@ def test_needs_detail_fetch_false_when_detail_fetched_true():
     class _Existing:
         detail_fetched = True
     assert _needs_detail_fetch(existing=_Existing(), n=_norm()) is False
+
+
+def test_needs_detail_fetch_backs_off_repeated_missing_photos():
+    now = datetime(2026, 10, 19, tzinfo=timezone.utc)
+
+    class _Existing:
+        detail_fetched = False
+        photo_attempt_count = 3
+        photo_last_attempt_at = now - timedelta(days=3)
+
+    assert _needs_detail_fetch(_Existing(), _norm(), now) is False
+    assert _needs_detail_fetch(_Existing(), _norm(), now + timedelta(days=1)) is True
 
 
 # --- build_photo_url (derived URL) -------------------------------------------
@@ -218,7 +231,7 @@ def test_ingest_skips_photo_check_when_detail_fetched_true():
 
 def test_ingest_leaves_detail_fetched_false_when_head_404():
     """HEAD says no photo (404) -> photo_url stays None, detail_fetched stays
-    False so the next run retries."""
+    False so a later run retries after backoff."""
     factory = _factory()
     adapter = _StubAdapter("PR", [_row("1")])
     calls: list[str] = []
@@ -557,16 +570,60 @@ def test_ingest_date_failure_is_non_fatal_and_retried():
     assert prop.dates_fetched_at is None
 
 
-def test_bounded_detail_batches_rotate_by_one_batch_each_day():
+def test_bounded_detail_batches_resume_after_persisted_cursor():
     candidates = [(index,) for index in range(1, 7)]
 
-    day_one = _rotate_detail_candidates(candidates, limit=2, day_ordinal=0)
-    day_two = _rotate_detail_candidates(candidates, limit=2, day_ordinal=1)
-    day_three = _rotate_detail_candidates(candidates, limit=2, day_ordinal=2)
+    first = _order_detail_candidates(candidates)
+    second = _order_detail_candidates(candidates, cursor="2")
+    wrapped = _order_detail_candidates(candidates, cursor="6")
 
-    assert [item[0] for item in day_one[:2]] == [1, 2]
-    assert [item[0] for item in day_two[:2]] == [3, 4]
-    assert [item[0] for item in day_three[:2]] == [5, 6]
+    assert [item[0] for item in first[:2]] == [1, 2]
+    assert [item[0] for item in second[:2]] == [3, 4]
+    assert [item[0] for item in wrapped[:2]] == [1, 2]
+
+
+def test_bounded_detail_batches_continue_on_same_day():
+    factory = _factory()
+    rows = [
+        _row(str(i), detail_url=f"https://x/detail/{i}") for i in range(1, 6)
+    ]
+    for row in rows:
+        row.raw["modalidade"] = "Leilão SFI"
+    calls = []
+
+    async def _fetch(urls):
+        calls.append(urls)
+        return [None] * len(urls)
+
+    for _ in range(2):
+        asyncio.run(ingest(
+            factory, _StubAdapter("PR", rows), date_limit=2,
+            validate_photo_url=_validator([], set()),
+            fetch_auction_dates=_fetch,
+        ))
+
+    assert calls == [
+        ["https://x/detail/1", "https://x/detail/2"],
+        ["https://x/detail/3", "https://x/detail/4"],
+    ]
+
+
+def test_truncated_snapshot_is_rejected_before_catalog_writes():
+    factory = _factory()
+    original = [_row(str(i)) for i in range(1, 21)]
+    asyncio.run(ingest(
+        factory, _StubAdapter("PR", original),
+        validate_photo_url=_validator([], set()),
+    ))
+
+    with pytest.raises(SnapshotValidationError, match="shrank"):
+        asyncio.run(ingest(
+            factory, _StubAdapter("PR", original[:5]),
+            validate_photo_url=_validator([], set()),
+        ))
+
+    with factory() as session:
+        assert session.query(Property).filter_by(status="active").count() == 20
 
 
 def test_ingest_recovers_http_detail_miss_with_trusted_browser():
