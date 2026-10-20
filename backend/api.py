@@ -316,14 +316,6 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     regional = resolve_market_reference(session, prop)
     if regional is None:
         queue_city_reference(session, prop)
-        session.commit()
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Referência de mercado ainda indisponível. A coleta foi priorizada "
-                "e normalmente fica disponível em até 90 minutos."
-            ),
-        )
     regional_comparables = []
     if regional and regional.scope != "city_all_types":
         regional_comparables = [
@@ -343,9 +335,9 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
     # analyzes real source data instead of running blind on empty input.
     result = run_structured_enrichment(
         metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
-        regional_price_per_m2=regional.price_per_m2,
+        regional_price_per_m2=regional.price_per_m2 if regional else None,
         regional_comparables=regional_comparables,
-        market_reference_scope=regional.scope,
+        market_reference_scope=regional.scope if regional else "none",
     )
     result.matricula = prop.matricula
     result.edital_url = prop.edital_url

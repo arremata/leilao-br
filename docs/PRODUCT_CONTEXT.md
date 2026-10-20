@@ -285,7 +285,9 @@ ação equivalente à modalidade.
   outras referências válidas, o Argos mostra a mediana municipal do preço por
   metro quadrado como estimativa de baixa confiança. A tela deixa claro que não
   encontrou imóveis equivalentes e não apresenta anúncios de outros tipos como
-  comparáveis. Sem nenhuma referência na cidade, o valor permanece indisponível.
+  comparáveis. Sem nenhuma referência na cidade, o valor permanece indisponível,
+  mas isso não bloqueia os demais componentes da análise. Assim, cobertura de
+  análise e cobertura de referência de mercado são indicadores separados.
 - Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
   A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
   um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
@@ -295,8 +297,8 @@ ação equivalente à modalidade.
   região entre workers; falhas parciais permanecem registradas e entram em
   espera para nova tentativa, sem invalidar as regiões concluídas nem marcar
   toda a rotina como indisponível. Apenas
-  análises afetadas por referências alteradas são refeitas, e o indicador de
-  cobertura considera somente análises produzidas pela regra atual.
+  análises ausentes ou desatualizadas são refeitas, e o indicador de cobertura
+  considera somente análises produzidas pela regra atual.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.

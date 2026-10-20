@@ -31,7 +31,8 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - **Consequências:** a tela não apresenta imóveis de outros tipos como
   comparáveis, identifica a origem municipal e recomenda cautela. Cidades sem
   qualquer referência continuam sem estimativa, e terrenos permanecem fora da
-  extrapolação automática.
+  extrapolação automática. Todo imóvel elegível ainda recebe os demais itens da
+  análise; cobertura analítica não é tratada como sinônimo de cobertura de preço.
 
 ### PD-024 — Usar a linguagem visual da LP em toda a plataforma
 

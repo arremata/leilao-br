@@ -37,7 +37,7 @@ def analysis_is_current(
     if existing is None or existing.pipeline_version != PIPELINE_VERSION:
         return False
     enrichment_time = _aware(existing.computed_at)
-    reference_time = _aware(reference.computed_at)
+    reference_time = _aware(reference.computed_at if reference else None)
     property_change_time = _aware(property_change_time)
     expense_reference_time = _aware(
         expense_reference.updated_at if expense_reference else None,
@@ -87,8 +87,10 @@ def load_analysis_state(
         reference = resolve_market_reference_from_index(reference_index, prop)
         if reference is None:
             no_reference += 1
-            continue
-        if reference_ids is not None and not reference_ids.intersection(reference.reference_ids):
+        if reference_ids is not None and (
+            reference is None
+            or not reference_ids.intersection(reference.reference_ids)
+        ):
             skipped_unaffected += 1
             continue
         candidates.append((prop, reference))
@@ -97,6 +99,7 @@ def load_analysis_state(
     used_reference_ids = {
         reference_id
         for _, reference in candidates
+        if reference is not None
         for reference_id in reference.reference_ids
     }
     enrichments = {
@@ -125,6 +128,9 @@ def load_analysis_state(
     return {
         "candidates": candidates,
         "eligible_count": eligible_count,
+        "with_reference_count": sum(
+            reference is not None for _, reference in candidates
+        ),
         "no_reference": no_reference,
         "skipped_unaffected": skipped_unaffected,
         "enrichments": enrichments,
@@ -169,7 +175,7 @@ def materialize_analyses(
                 # A city-wide fallback can mix apartment, house and commercial
                 # references. It supplies only the coarse municipal price; its
                 # listings must not be presented as comparable to this asset.
-                rows = [] if reference.scope == "city_all_types" else [
+                rows = [] if reference is None or reference.scope == "city_all_types" else [
                     item
                     for reference_id in reference.reference_ids
                     for item in state["comparables_by_reference"].get(reference_id, [])
@@ -187,9 +193,9 @@ def materialize_analyses(
                     metadata_from_property(prop),
                     pdf_texts=prop.descricao_raw or "",
                     auction_url=prop.detail_url or "",
-                    regional_price_per_m2=reference.price_per_m2,
+                    regional_price_per_m2=reference.price_per_m2 if reference else None,
                     regional_comparables=comparables,
-                    market_reference_scope=reference.scope,
+                    market_reference_scope=reference.scope if reference else "none",
                 )
                 apply_property_expenses(result, prop, expense_reference)
                 result_json = result.model_dump_json(by_alias=True)

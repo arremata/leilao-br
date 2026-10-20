@@ -240,7 +240,10 @@ The full platform will include:
   mesmo tipo de imóvel. O fallback aparece como estimativa de baixa confiança,
   explica que não há imóveis equivalentes e nunca apresenta anúncios de outros
   tipos como comparáveis; cidades sem qualquer referência e terrenos continuam
-  sem extrapolação automática.
+  sem extrapolação automática. Todo imóvel elegível recebe uma análise mesmo
+  sem preço de mercado, permitindo 100% de cobertura analítica sem transformar
+  ausência de evidência em valor; a rotina de mercado verifica todas as análises
+  ausentes ou desatualizadas a cada ciclo e só regrava as necessárias.
 
 - **2026-10-19** — Separou falha real do catálogo de indisponibilidade nas
   fontes auxiliares. A ingestão diária da Caixa continua vermelha quando o CSV,

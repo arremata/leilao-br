@@ -1259,19 +1259,6 @@ def analyze_catalog_item(property_id: int) -> dict:
                         "property_type": canonical_type, "property_id": property_id,
                         "updated_at": datetime.now(timezone.utc),
                     })
-                detail = (
-                    "Referência de mercado ainda indisponível neste preview. "
-                    "Nenhuma alteração foi salva."
-                    if _is_preview() and not _preview_allows_writes()
-                    else (
-                        "Referência de mercado ainda indisponível. A coleta foi priorizada "
-                        "e normalmente fica disponível em até 90 minutos."
-                    )
-                )
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": detail},
-                )
 
             comparables = []
             if reference is not None and reference["scope"] != "city_all_types":
@@ -1320,7 +1307,8 @@ def analyze_catalog_item(property_id: int) -> dict:
                 """), {"uf": row["uf"] or "", "city": row["city"] or ""}).mappings().one_or_none()
             result_json = json.dumps(
                 _build_persisted_enrichment(
-                    row, reference or {"price_per_m2": 0}, comparables, expense_reference,
+                    row, reference or {"price_per_m2": 0, "scope": "none"},
+                    comparables, expense_reference,
                 ),
                 ensure_ascii=False,
             )

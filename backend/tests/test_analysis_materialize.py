@@ -51,7 +51,7 @@ def test_materializes_and_reuses_shared_cached_analysis():
         assert '"market":250000.0' in cached.result_json
 
 
-def test_skips_property_without_market_reference():
+def test_materializes_property_without_market_reference_as_unknown():
     factory = _database()
     with factory() as session:
         session.add(Property(
@@ -63,10 +63,14 @@ def test_skips_property_without_market_reference():
 
     summary = materialize_analyses(factory, ["PR"])
 
-    assert summary["selected"] == 0
+    assert summary["selected"] == 1
+    assert summary["updated"] == 1
     assert summary["no_reference"] == 1
     with factory() as session:
-        assert session.query(Enrichment).count() == 0
+        result = json.loads(session.query(Enrichment).one().result_json)
+        assert result["market"] == 0
+        assert result["marketDetail"]["referenceScope"] == "none"
+        assert result["marketDetail"]["comparables"] == []
 
 
 def test_materializes_from_city_type_baseline_when_neighborhood_is_missing():
