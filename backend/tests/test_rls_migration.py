@@ -64,3 +64,12 @@ def test_step_progress_table_is_closed_to_the_data_api():
     assert "user_property_progress ENABLE ROW LEVEL SECURITY" in sql
     assert "REVOKE ALL PRIVILEGES ON TABLE public.user_property_progress FROM anon, authenticated" in sql
     assert "AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)" in sql
+
+
+def test_ingestion_checkpoint_is_closed_to_the_data_api():
+    sql = (MIGRATION.parent / "20261019_ingestion_scaling.sql").read_text()
+
+    assert "CREATE TABLE IF NOT EXISTS ingestion_checkpoints" in sql
+    assert "ingestion_checkpoints ENABLE ROW LEVEL SECURITY" in sql
+    assert "REVOKE ALL PRIVILEGES ON TABLE public.ingestion_checkpoints FROM anon, authenticated" in sql
+    assert "AS RESTRICTIVE FOR ALL TO anon, authenticated" in sql

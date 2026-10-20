@@ -11,9 +11,9 @@ from typing import Callable, Optional
 from urllib import request as urllib_request
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from db.models import Property, PropertyEvent
+from db.models import IngestionCheckpoint, Property, PropertyEvent
 from ingestion.adapters.base import NormalizedProperty, SourceAdapter
 
 
@@ -44,6 +44,12 @@ def _default_validate_photo_url(url: str, timeout: float = 10.0) -> bool:
 # HTTP is safe to parallelize (unlike browser detail-page fetches). Bounded so
 # we don't open hundreds of sockets at once against the Caixa origin.
 PHOTO_VALIDATION_CONCURRENCY = 16
+MIN_SAFE_SNAPSHOT_RATIO = 0.70
+PHOTO_RETRY_MAX_DAYS = 30
+
+
+class SnapshotValidationError(RuntimeError):
+    """Raised before writes when an authoritative source snapshot looks unsafe."""
 
 
 async def _validate_photos_concurrently(
@@ -70,6 +76,8 @@ async def _validate_photos_concurrently(
 
 @dataclass
 class IngestSummary:
+    catalog_rows: int = 0
+    active_before: int = 0
     inserted: int = 0
     updated: int = 0
     removed: int = 0
@@ -84,6 +92,8 @@ class IngestSummary:
     edital_data_updated: int = 0
     bids_refreshed: int = 0
     browser_details_recovered: int = 0
+    photos_attempted: int = 0
+    photos_deferred: int = 0
 
 
 def _preco_changed(old: float | None, new: float | None) -> bool:
@@ -98,7 +108,14 @@ def _preco_changed(old: float | None, new: float | None) -> bool:
     return abs(old - new) >= 0.005
 
 
-def _needs_detail_fetch(existing: "Property | None", n: NormalizedProperty) -> bool:
+def _photo_retry_delay(attempt_count: int) -> timedelta:
+    """Exponential retry delay for a missing Caixa photo, capped at 30 days."""
+    return timedelta(days=min(2 ** max(attempt_count - 1, 0), PHOTO_RETRY_MAX_DAYS))
+
+
+def _needs_detail_fetch(
+    existing: "Property | None", n: NormalizedProperty, now: datetime | None = None,
+) -> bool:
     """True when we should try to resolve this listing's photo.
 
     Resolve on first ingest (no existing row) and when a row was seen before but
@@ -108,7 +125,16 @@ def _needs_detail_fetch(existing: "Property | None", n: NormalizedProperty) -> b
     """
     if existing is None:
         return True
-    return not existing.detail_fetched
+    if existing.detail_fetched:
+        return False
+    last_attempt = getattr(existing, "photo_last_attempt_at", None)
+    attempt_count = int(getattr(existing, "photo_attempt_count", 0) or 0)
+    if last_attempt is None or attempt_count == 0:
+        return True
+    if last_attempt.tzinfo is None:
+        last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(timezone.utc)
+    return current - last_attempt >= _photo_retry_delay(attempt_count)
 
 
 AUCTION_DATES_TTL = timedelta(hours=24)
@@ -186,20 +212,63 @@ def _needs_bid_status(prop: Property, now: datetime) -> bool:
     return now - parsed.astimezone(timezone.utc) >= BID_STATUS_TTL
 
 
-def _rotate_detail_candidates(
-    candidates: list[tuple], limit: Optional[int], day_ordinal: int,
+def _order_detail_candidates(
+    candidates: list[tuple], cursor: str = "",
 ) -> list[tuple]:
-    """Order a bounded detail batch fairly without persistent scheduler state.
+    """Resume a stable detail batch immediately after its durable cursor.
 
-    Property ids provide a stable order. Moving the starting point by one full
-    batch per calendar day prevents the same blocked prefix from monopolizing
-    every scheduled run, while an unbounded manual run keeps the stable order.
+    Property ids provide a stable order. If candidates changed since the prior
+    run, the first id greater than the cursor is used, wrapping at the end.
     """
     ordered = sorted(candidates, key=lambda candidate: candidate[0])
-    if not ordered or limit is None or limit == 0:
+    if not ordered or not cursor:
         return ordered
-    offset = (day_ordinal * limit) % len(ordered)
+    try:
+        cursor_id = int(cursor)
+    except ValueError:
+        return ordered
+    offset = next(
+        (index for index, candidate in enumerate(ordered) if candidate[0] > cursor_id),
+        0,
+    )
     return ordered[offset:] + ordered[:offset]
+
+
+def _validate_snapshot_size(raw_count: int, active_count: int) -> None:
+    """Reject empty or abruptly truncated snapshots before any catalog write."""
+    if raw_count == 0:
+        raise SnapshotValidationError("authoritative snapshot returned zero rows")
+    if active_count >= 20 and raw_count / active_count < MIN_SAFE_SNAPSHOT_RATIO:
+        raise SnapshotValidationError(
+            f"authoritative snapshot shrank from {active_count} active rows to "
+            f"{raw_count} ({raw_count / active_count:.1%}); refusing catalog writes"
+        )
+
+
+def _read_detail_cursor(session_factory, source: str, uf: str) -> str:
+    with session_factory() as session:
+        checkpoint = session.execute(select(IngestionCheckpoint).where(
+            IngestionCheckpoint.source == source,
+            IngestionCheckpoint.uf == uf,
+            IngestionCheckpoint.name == "details",
+        )).scalar_one_or_none()
+        return checkpoint.cursor if checkpoint else ""
+
+
+def _save_detail_cursor(session, source: str, uf: str, cursor: str, now: datetime) -> None:
+    checkpoint = session.execute(select(IngestionCheckpoint).where(
+        IngestionCheckpoint.source == source,
+        IngestionCheckpoint.uf == uf,
+        IngestionCheckpoint.name == "details",
+    )).scalar_one_or_none()
+    if checkpoint is None:
+        checkpoint = IngestionCheckpoint(
+            source=source, uf=uf, name="details", cursor=cursor, updated_at=now,
+        )
+        session.add(checkpoint)
+    else:
+        checkpoint.cursor = cursor
+        checkpoint.updated_at = now
 
 
 def _apply_fields(prop: Property, n: NormalizedProperty) -> None:
@@ -239,6 +308,19 @@ async def ingest(
             raws = await fetch_raw_async()
         else:
             raws = adapter.fetch_raw()
+        raw_count = len(raws)
+        with session_factory() as session:
+            active_before = session.scalar(select(func.count(Property.id)).where(
+                Property.source == adapter.source,
+                Property.uf == adapter.uf,
+                Property.status == "active",
+            )) or 0
+        _validate_snapshot_size(raw_count, active_before)
+        validate_snapshot = getattr(adapter, "validate_snapshot", None)
+        if validate_snapshot is not None:
+            validate_snapshot(raws)
+        summary.catalog_rows = raw_count
+        summary.active_before = active_before
         # Optional slice for partial runs (testing the photo path on a small
         # sample without a 30+ min full-UF run). None = process all rows.
         if limit is not None:
@@ -259,15 +341,18 @@ async def ingest(
         pending_details: list[tuple[int, str, bool, bool, bool, dict]] = []
 
         with session_factory() as session:
+            raw_ids = [raw.source_id for raw in raws]
+            existing_by_id = {
+                prop.source_id: prop
+                for prop in session.execute(select(Property).where(
+                    Property.source == adapter.source,
+                    Property.source_id.in_(raw_ids),
+                )).scalars()
+            } if raw_ids else {}
             for raw in raws:
                 n = adapter.normalize(raw)
                 seen_ids.append(n.source_id)
-                existing = session.execute(
-                    select(Property).where(
-                        Property.source == adapter.source,
-                        Property.source_id == n.source_id,
-                    )
-                ).scalar_one_or_none()
+                existing = existing_by_id.get(n.source_id)
 
                 if existing is None:
                     prop = Property(
@@ -321,8 +406,10 @@ async def ingest(
                 # concurrently after the upsert loop; a 200 image persists
                 # photo_url + detail_fetched=True, a 404/failure leaves both
                 # unset so the next run retries.
-                if _needs_detail_fetch(existing, n) and n.photo_url:
+                if _needs_detail_fetch(existing, n, now) and n.photo_url:
                     pending_photos.append((prop, n.photo_url))
+                elif not prop.detail_fetched and n.photo_url:
+                    summary.photos_deferred += 1
                 requires_date = _needs_auction_dates(prop, now)
                 requires_bid = _needs_bid_status(prop, now)
                 if requires_date or _needs_documents(prop) or requires_bid:
@@ -366,13 +453,17 @@ async def ingest(
             # are applied before commit so a 404 just leaves the row unfetched
             # for a next-run retry.
             if pending_photos:
+                summary.photos_attempted = len(pending_photos)
                 urls = [url for _, url in pending_photos]
                 results = await _validate_photos_concurrently(urls, validate_photo_url)
                 for (prop, url), ok in zip(pending_photos, results):
                     if ok:
                         prop.photo_url = url
                         prop.detail_fetched = True
-                    # else: leave photo_url=None, detail_fetched=False (retry)
+                        prop.photo_attempt_count = 0
+                    else:
+                        prop.photo_attempt_count = (prop.photo_attempt_count or 0) + 1
+                    prop.photo_last_attempt_at = now
 
             session.commit()
 
@@ -383,9 +474,10 @@ async def ingest(
         # the rest of the catalog forever. The
         # adapter paces requests and opens a circuit on repeated HTTP 429s.
         if pending_details and date_limit != 0:
-            pending_details = _rotate_detail_candidates(
-                pending_details, date_limit, now.date().toordinal(),
-            )
+            detail_cursor = _read_detail_cursor(
+                session_factory, adapter.source, adapter.uf or "",
+            ) if date_limit is not None else ""
+            pending_details = _order_detail_candidates(pending_details, detail_cursor)
             selected_details = (
                 pending_details if date_limit is None else pending_details[:date_limit]
             )
@@ -396,8 +488,13 @@ async def ingest(
                 if candidate[3]
             )
             if fetch_auction_dates is None:
-                from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
-                fetch_auction_dates = fetch_auction_dates_batch
+                fetch_auction_dates = getattr(
+                    adapter, "fetch_detail_results_async", None,
+                )
+            if fetch_auction_dates is None:
+                raise RuntimeError(
+                    f"{adapter.source} has detail candidates but no detail enricher"
+                )
             urls = [candidate[1] for candidate in selected_details]
             detail_results = await fetch_auction_dates(urls)
 
@@ -459,11 +556,17 @@ async def ingest(
                 sfi_candidates.append({**metadata, "editalData": combined_edital})
             if sfi_candidates:
                 if fetch_official_bid_statuses is None:
-                    from ingestion.adapters.caixa_bids import (
-                        fetch_official_auctioneer_bid_statuses,
+                    fetch_official_bid_statuses = getattr(
+                        adapter, "fetch_official_bid_statuses_async", None,
                     )
-                    fetch_official_bid_statuses = fetch_official_auctioneer_bid_statuses
-                bid_results = await fetch_official_bid_statuses(sfi_candidates)
+                if fetch_official_bid_statuses is None:
+                    logger.warning(
+                        "{} has SFI bid candidates but no bid enricher",
+                        adapter.source,
+                    )
+                    bid_results = [None] * len(sfi_candidates)
+                else:
+                    bid_results = await fetch_official_bid_statuses(sfi_candidates)
                 for index, bid_status in zip(sfi_indexes, bid_results):
                     if bid_status is not None and detail_results[index] is not None:
                         detail_results[index].setdefault("edital_data", {})["bid"] = bid_status
@@ -535,6 +638,11 @@ async def ingest(
                         else:
                             prop.dates_fetched_at = now
                             summary.dates_updated += 1
+                if date_limit is not None and selected_details:
+                    _save_detail_cursor(
+                        session, adapter.source, adapter.uf or "",
+                        str(selected_details[-1][0]), now,
+                    )
                 session.commit()
     finally:
         # Adapters that own a browser session (CaixaCsvAdapter) expose close_async
@@ -550,6 +658,7 @@ async def ingest(
 
     logger.info(
         f"Ingest[{adapter.source}/{adapter.uf}]: "
+        f"catalog={summary.catalog_rows} active_before={summary.active_before} "
         f"+{summary.inserted} ~{summary.updated} -{summary.removed} "
         f"={summary.unchanged} events={summary.events_created} "
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
@@ -559,6 +668,8 @@ async def ingest(
         f"edital_data={summary.edital_data_updated} "
         f"bids={summary.bids_refreshed} "
         f"browser_recovered={summary.browser_details_recovered}"
+        f" photos={summary.photos_attempted}attempted/"
+        f"{summary.photos_deferred}deferred"
     )
     return summary
 

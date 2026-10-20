@@ -9,13 +9,22 @@ def test_ingestion_report_warns_without_calling_catalog_failed():
         "failed_ufs": [],
         "degraded_date_ufs": ["PR"],
         "ufs": {
-            "PR": {"summary": {"dates_updated": 72, "dates_failed": 155}},
+            "PR": {
+                "duration_seconds": 245.2,
+                "summary": {
+                    "catalog_rows": 421, "dates_updated": 72,
+                    "dates_failed": 155, "details_attempted": 160,
+                    "details_deferred": 46, "photos_attempted": 3,
+                    "removed": 0,
+                },
+            },
         },
     })
 
     assert "155/227" in warnings[0]
     assert "Authoritative catalog: completed" in markdown
     assert "Detail enrichment: degraded (PR)" in markdown
+    assert "| PR | 421 | 245.2s | 160 | 46 | 3 | 0 |" in markdown
 
 
 def test_market_report_exposes_retryable_jobs_as_a_warning():
@@ -47,6 +56,7 @@ def test_ingestion_workflow_bounds_details_and_preserves_materialization():
     ).read_text()
 
     assert "INGEST_DETAIL_LIMIT:" in workflow
+    assert "default: \"160\"" in workflow
     assert '--date-limit "$INGEST_DETAIL_LIMIT"' in workflow
     assert "Report optional detail health" in workflow
     assert "Refresh analyses changed by catalog ingestion" in workflow

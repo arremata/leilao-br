@@ -274,8 +274,10 @@ ação equivalente à modalidade.
   A importação oficial da Caixa e a leitura auxiliar de páginas de detalhes têm
   saúdes separadas: uma indisponibilidade de datas ou documentos gera alerta e
   preserva os fatos anteriores, sem impedir a atualização do catálogo e das
-  análises. As páginas auxiliares são processadas em lotes cujo ponto inicial
-  alterna diariamente, para que um bloqueio não monopolize as execuções.
+  análises. As páginas auxiliares são processadas em lotes limitados por UF e
+  retomam do ponto persistido pela execução anterior, inclusive quando a rotina
+  é repetida no mesmo dia. A importação recusa snapshots vazios, incompatíveis
+  ou muito menores que o catálogo atual antes de remover qualquer imóvel.
 - O navegador acessa catálogo e dados de conta somente pelos serviços do Argos;
   as tabelas do banco não formam uma API pública paralela.
 - Estimativas de mercado usam referências regionais e comparáveis previamente

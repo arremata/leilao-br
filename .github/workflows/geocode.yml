@@ -1,0 +1,65 @@
+name: Catalog geocoding
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Database environment
+        type: choice
+        required: true
+        default: staging
+        options: [staging, Production]
+      ufs:
+        description: Comma-separated UFs (blank covers every active UF)
+        required: false
+        default: ""
+      limit:
+        description: Maximum properties to geocode
+        required: true
+        default: "50"
+      retry_failed:
+        description: Retry addresses previously not found
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-geocoding
+  cancel-in-progress: false
+
+jobs:
+  geocode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ github.event.inputs.target_environment || 'staging' }}
+    env:
+      DATABASE_URL: ${{ secrets.INGEST_DATABASE_URL }}
+      GEOCODE_UFS: ${{ github.event.inputs.ufs || '' }}
+      GEOCODE_LIMIT: ${{ github.event.inputs.limit || '50' }}
+      GEOCODE_RETRY_FAILED: ${{ github.event.inputs.retry_failed || 'false' }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-market-worker.txt
+      - run: pip install -r backend/requirements-market-worker.txt
+      - name: Validate inputs
+        run: |
+          test -n "$DATABASE_URL"
+          [[ "$GEOCODE_UFS" =~ ^$|^[A-Za-z]{2}(,[A-Za-z]{2})*$ ]]
+          [[ "$GEOCODE_LIMIT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GEOCODE_RETRY_FAILED" =~ ^(true|false)$ ]]
+      - name: Geocode bounded catalog batch
+        working-directory: backend
+        run: |
+          args=(--ufs "$GEOCODE_UFS" --limit "$GEOCODE_LIMIT")
+          if [[ "$GEOCODE_RETRY_FAILED" == "true" ]]; then
+            args+=(--retry-failed)
+          fi
+          python -m ingestion.geocode_worker "${args[@]}"

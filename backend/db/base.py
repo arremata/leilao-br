@@ -67,6 +67,10 @@ def init_db(engine: Engine) -> None:
         "matricula_url": "TEXT",
         "edital_data": "JSONB",
     }
+    photo_retry_columns = {
+        "photo_attempt_count": "INTEGER NOT NULL DEFAULT 0",
+        "photo_last_attempt_at": "TIMESTAMP WITH TIME ZONE",
+    }
     with engine.begin() as connection:
         for name, postgres_type in date_columns.items():
             if name in existing:
@@ -109,6 +113,16 @@ def init_db(engine: Engine) -> None:
                 continue
             if name == "edital_data" and engine.dialect.name == "sqlite":
                 column_type = "JSON"
+            connection.execute(text(
+                f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
+            ))
+        for name, postgres_type in photo_retry_columns.items():
+            if name in existing:
+                continue
+            column_type = (
+                postgres_type.replace("TIMESTAMP WITH TIME ZONE", "DATETIME")
+                if engine.dialect.name == "sqlite" else postgres_type
+            )
             connection.execute(text(
                 f"ALTER TABLE properties ADD COLUMN {name} {column_type}"
             ))
