@@ -864,6 +864,8 @@ function Market({ p }) {
   const gapVsAppraisal = appraisal - bid;
 
   const comparableCount = Array.isArray(md.comparables) ? md.comparables.length : 0;
+  const isBroadCityEstimate = md.referenceScope === 'city_all_types';
+  const hasMarketEstimate = market > 0 && (comparableCount > 0 || isBroadCityEstimate);
   const filteredIndicators = md.indicators;
   // A confiança é comunicada em três estados e em linguagem comum: o que a
   // pessoa precisa saber é se a estimativa se apoia em pouca ou muita evidência.
@@ -871,7 +873,9 @@ function Market({ p }) {
     low: {
       label: 'Estimativa com pouca base',
       tone: 'bad',
-      note: comparableCount > 0
+      note: isBroadCityEstimate
+        ? 'Não encontramos imóveis do mesmo tipo para comparar. Esta estimativa usa a referência média disponível na cidade.'
+        : comparableCount > 0
         ? `Encontramos ${comparableCount} ${comparableCount === 1 ? 'imóvel parecido' : 'imóveis parecidos'} na região. É pouco para uma estimativa firme.`
         : 'Encontramos poucos imóveis parecidos na região. É pouco para uma estimativa firme.',
     },
@@ -907,8 +911,10 @@ function Market({ p }) {
               Como este preço se compara
             </span>
           <h3 className="h2" style={{ margin: 0, marginBottom: 6, lineHeight: 1.2 }}>
-            {gapVsMarket > 0 && comparableCount > 1
-              ? `Valor inicial cerca de R$ ${fmtBRL(gapVsMarket)} abaixo de imóveis parecidos`
+            {gapVsMarket > 0 && (isBroadCityEstimate || comparableCount > 1)
+              ? isBroadCityEstimate
+                ? `Valor inicial cerca de R$ ${fmtBRL(gapVsMarket)} abaixo da média da cidade`
+                : `Valor inicial cerca de R$ ${fmtBRL(gapVsMarket)} abaixo de imóveis parecidos`
               : gapVsAppraisal > 0
                 ? `Valor inicial cerca de R$ ${fmtBRL(gapVsAppraisal)} abaixo do valor de avaliação`
                 : 'Preço em linha com as referências que temos'
@@ -969,13 +975,13 @@ function Market({ p }) {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ marginBottom: 6, textAlign: 'center' }}>
                     <div className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg-0)' }}>
-                      {comparableCount === 0 ? '—' : `R$ ${fmtBRL(market)}`}
+                      {!hasMarketEstimate ? '—' : `R$ ${fmtBRL(market)}`}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                      {comparableCount === 0 ? 'não temos estimativa' : 'estimativa'}
+                      {!hasMarketEstimate ? 'não temos estimativa' : 'estimativa'}
                     </div>
                   </div>
-                  {comparableCount > 0 && (
+                  {hasMarketEstimate && (
                     <div
                       className={
                         md.confidenceLevel === 'low'
@@ -987,12 +993,14 @@ function Market({ p }) {
                       style={{
                         height: `${Math.max(marketPct / 100 * 180, 8)}px`,
                       }}
-                      aria-label={`Imóveis parecidos na região: R$ ${fmtBRL(market)}`}
+                      aria-label={`${isBroadCityEstimate ? 'Média da cidade' : 'Imóveis parecidos na região'}: R$ ${fmtBRL(market)}`}
                     ></div>
                   )}
                   <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, color: 'var(--fg-0)', fontWeight: 500 }}>
-                      <Term k="imoveis_parecidos">Imóveis parecidos na região</Term>
+                      {isBroadCityEstimate
+                        ? 'Média da cidade'
+                        : <Term k="imoveis_parecidos">Imóveis parecidos na região</Term>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>mercado</div>
                   </div>
@@ -1031,7 +1039,7 @@ function Market({ p }) {
             <div className="market-region-header">
               <div>
                 <span className="uppy">Referência de preço</span>
-                <h3 className="h2">{p.neighborhood || p.city}</h3>
+                <h3 className="h2">{isBroadCityEstimate ? p.city : (p.neighborhood || p.city)}</h3>
               </div>
               {confidence && (
                 <span className={`tag dot ${confidence.tone}`}>
@@ -1065,8 +1073,10 @@ function Market({ p }) {
           lineHeight: 1.5,
         }}>
           <span className="mono" style={{ color: 'var(--fg-3)' }}>ⓘ</span>{' '}
-          {comparableCount === 0
-            ? 'Ainda não temos anúncios comparáveis nesta região. Mostramos apenas valor inicial e avaliação.'
+          {isBroadCityEstimate
+            ? 'Ainda não temos anúncios comparáveis do mesmo tipo. A estimativa usa a mediana das referências de preço disponíveis nesta cidade e pode variar bastante para este imóvel.'
+            : comparableCount === 0
+              ? 'Ainda não temos anúncios comparáveis nesta região. Mostramos apenas valor inicial e avaliação.'
             : `Preço dos parecidos estimado pelo Argos com base em ${comparableCount === 1 ? '1 anúncio' : `${comparableCount} anúncios`}.`}
         </div>
       </div>

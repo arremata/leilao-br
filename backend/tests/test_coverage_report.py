@@ -5,6 +5,7 @@ from sqlalchemy import event
 from db.base import get_engine, init_db, make_session_factory
 from db.models import Enrichment, MarketReferenceJob, Property, RegionalMarketPrice
 from enrichment.coverage_report import build_report
+from enrichment.materialize import materialize_analyses
 from enrichment.run import PIPELINE_VERSION
 
 
@@ -89,3 +90,25 @@ def test_report_counts_only_current_pipeline_analyses_in_fixed_queries():
     assert report["properties_analyzed"] == 10
     assert report["analysis_coverage_percent"] == 50.0
     assert len(statements) <= 6
+
+
+def test_analysis_reaches_full_coverage_without_claiming_market_reference():
+    engine = get_engine("sqlite://")
+    init_db(engine)
+    factory = make_session_factory(engine)
+    with factory() as session:
+        session.add(Property(
+            source="caixa", source_id="no-market", uf="PR", city="Cidade sem base",
+            neighborhood="Centro", property_type="Casa", address="Rua A",
+            area_m2=80, preco=150_000, status="active",
+        ))
+        session.commit()
+
+    assert materialize_analyses(factory, ["PR"])["updated"] == 1
+    report = build_report(factory, ["PR"])
+
+    assert report["eligible_properties"] == 1
+    assert report["properties_with_reference"] == 0
+    assert report["reference_coverage_percent"] == 0
+    assert report["properties_analyzed"] == 1
+    assert report["analysis_coverage_percent"] == 100

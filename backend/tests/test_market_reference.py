@@ -30,10 +30,36 @@ def _bright_data_config(monkeypatch):
     ({"selected": 0, "updated": 0, "empty": 0, "failed": 0}, 0),
     ({"selected": 18, "updated": 9, "empty": 6, "failed": 3}, 0),
     ({"selected": 3, "updated": 0, "empty": 3, "failed": 0}, 0),
-    ({"selected": 3, "updated": 0, "empty": 0, "failed": 3}, 1),
+    ({"selected": 3, "updated": 0, "empty": 0, "failed": 3}, 0),
 ])
-def test_refresh_exit_code_only_fails_without_a_usable_outcome(summary, expected):
+def test_refresh_exit_code_treats_persisted_job_failures_as_retryable(summary, expected):
     assert market_reference.refresh_exit_code(summary) == expected
+
+
+def test_refresh_exit_code_fails_when_every_portal_is_unavailable():
+    summary = {
+        "selected": 2, "updated": 0, "empty": 0, "failed": 2,
+        "sources": {
+            "QuintoAndar": {"requests": 2, "failed": 2},
+            "ImovelWeb": {"requests": 2, "failed": 2},
+            "Chaves na Mão": {"requests": 2, "failed": 2},
+        },
+    }
+
+    assert market_reference.refresh_exit_code(summary) == 1
+
+
+def test_refresh_exit_code_accepts_one_blocked_portal_when_others_answered():
+    summary = {
+        "selected": 2, "updated": 0, "empty": 0, "failed": 2,
+        "sources": {
+            "QuintoAndar": {"requests": 2, "failed": 0, "empty": 2},
+            "ImovelWeb": {"requests": 2, "failed": 0, "empty": 2},
+            "Chaves na Mão": {"requests": 2, "failed": 2, "empty": 0},
+        },
+    }
+
+    assert market_reference.refresh_exit_code(summary) == 0
 
 
 def test_scheduled_workflow_uses_a_safe_default_batch_size():
@@ -47,6 +73,7 @@ def test_scheduled_workflow_uses_a_safe_default_batch_size():
     assert "MARKET_FORCE: ${{ github.event.inputs.force || 'false' }}" in workflow
     assert "MARKET_ATTEMPTED_BEFORE:" in workflow
     assert "Forced refresh: materializing every stale analysis in scope." in workflow
+    assert "Report partial portal health" in workflow
     assert 'default: false' in workflow
     assert 'timeout --signal=TERM --kill-after=30s 42m' in workflow
     assert "playwright install" not in workflow

@@ -577,8 +577,23 @@ def main(argv=None):
 
 
 def refresh_exit_code(result: dict[str, int]) -> int:
-    """Fail only when selected work produced no usable regional outcome."""
-    if result["selected"] and not result["updated"] and not result["empty"]:
+    """Keep retryable portal outcomes distinct from worker failures.
+
+    Individual jobs persist their failed state and retry schedule. A completed
+    batch therefore exits successfully when one portal was transiently blocked
+    while the others answered validly (including a valid empty result). A
+    systemic outage where every configured source failed still makes the
+    command nonzero, as do uncaught configuration, database and process errors.
+    """
+    sources = result.get("sources", {})
+    attempted_sources = [
+        metrics for metrics in sources.values()
+        if int(metrics.get("requests", 0)) > 0
+    ]
+    if attempted_sources and all(
+        int(metrics.get("failed", 0)) == int(metrics.get("requests", 0))
+        for metrics in attempted_sources
+    ):
         return 1
     return 0
 

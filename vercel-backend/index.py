@@ -37,7 +37,7 @@ import auth as auth_module
 import users_db as users_db_module
 from auth import AuthError
 
-PIPELINE_VERSION = "v15-current-auction-round"
+PIPELINE_VERSION = "v16-city-market-fallback"
 
 _MUNICIPAL_ITBI_RATES = {
     ("PR", "curitiba"): {
@@ -806,7 +806,12 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
         "indicators": ([{
             "lbl": f"Preço/m² · {'bairro' if reference.get('scope') == 'neighborhood' else 'cidade'}",
             "val": f"R$ {price_per_m2:,.0f}".replace(",", "."),
-            "delta": "mediana das referências persistidas", "pos": True,
+            "delta": (
+                "mediana municipal entre tipos de imóvel"
+                if reference.get("scope") == "city_all_types"
+                else "mediana das referências persistidas"
+            ),
+            "pos": True,
         }] if price_per_m2 else []),
         "comparables": [{
             "address": item["address"], "areaM2": item["area_m2"], "beds": item.get("beds"),
@@ -814,6 +819,7 @@ def _build_persisted_enrichment(row, reference, comparable_rows, expense_referen
             "source": item["source"], "url": item["url"],
         } for item in usable],
         "confidenceLevel": confidence_level,
+        "referenceScope": reference.get("scope", "neighborhood"),
     }
     costs = [{
         "id": "auction_bid",
@@ -1201,9 +1207,13 @@ def analyze_catalog_item(property_id: int) -> dict:
 
             is_land = _is_land_property_type(row["property_type"])
             canonical_type = _canonical_property_type(row["property_type"])
-            references = [item for item in connection.execute(text(reference_query), {
+            all_references = list(connection.execute(text(reference_query), {
                 "uf": row["uf"] or "", "city": row["city"] or "",
-            }).mappings().all() if _canonical_property_type(item["property_type"]) == canonical_type]
+            }).mappings().all())
+            references = [
+                item for item in all_references
+                if _canonical_property_type(item["property_type"]) == canonical_type
+            ]
             wanted_neighborhood = _normalize_text(row["neighborhood"])
             exact = next((item for item in references if
                 _normalize_text(item["neighborhood"]) == wanted_neighborhood
@@ -1215,6 +1225,13 @@ def analyze_catalog_item(property_id: int) -> dict:
                 reference = {
                     "id": None, "scope": "city",
                     "price_per_m2": float(median(item["price_per_m2"] for item in references)),
+                }
+            elif all_references:
+                reference = {
+                    "id": None, "scope": "city_all_types",
+                    "price_per_m2": float(median(
+                        item["price_per_m2"] for item in all_references
+                    )),
                 }
             else:
                 reference = None
@@ -1242,22 +1259,9 @@ def analyze_catalog_item(property_id: int) -> dict:
                         "property_type": canonical_type, "property_id": property_id,
                         "updated_at": datetime.now(timezone.utc),
                     })
-                detail = (
-                    "Referência de mercado ainda indisponível neste preview. "
-                    "Nenhuma alteração foi salva."
-                    if _is_preview() and not _preview_allows_writes()
-                    else (
-                        "Referência de mercado ainda indisponível. A coleta foi priorizada "
-                        "e normalmente fica disponível em até 90 minutos."
-                    )
-                )
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": detail},
-                )
 
             comparables = []
-            if reference is not None:
+            if reference is not None and reference["scope"] != "city_all_types":
                 if reference["scope"] == "neighborhood":
                     comparable_query = """
                         SELECT address, price, area_m2, price_per_m2, source, url,
@@ -1303,7 +1307,8 @@ def analyze_catalog_item(property_id: int) -> dict:
                 """), {"uf": row["uf"] or "", "city": row["city"] or ""}).mappings().one_or_none()
             result_json = json.dumps(
                 _build_persisted_enrichment(
-                    row, reference or {"price_per_m2": 0}, comparables, expense_reference,
+                    row, reference or {"price_per_m2": 0, "scope": "none"},
+                    comparables, expense_reference,
                 ),
                 ensure_ascii=False,
             )

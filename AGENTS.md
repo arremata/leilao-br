@@ -235,6 +235,25 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-19** — Passou a preencher lacunas de preço de mercado com a mediana
+  das referências válidas da mesma cidade quando ainda não há amostra para o
+  mesmo tipo de imóvel. O fallback aparece como estimativa de baixa confiança,
+  explica que não há imóveis equivalentes e nunca apresenta anúncios de outros
+  tipos como comparáveis; cidades sem qualquer referência e terrenos continuam
+  sem extrapolação automática. Todo imóvel elegível recebe uma análise mesmo
+  sem preço de mercado, permitindo 100% de cobertura analítica sem transformar
+  ausência de evidência em valor; a rotina de mercado verifica todas as análises
+  ausentes ou desatualizadas a cada ciclo e só regrava as necessárias.
+
+- **2026-10-19** — Separou falha real do catálogo de indisponibilidade nas
+  fontes auxiliares. A ingestão diária da Caixa continua vermelha quando o CSV,
+  banco ou uma UF falha, mas páginas de detalhes bloqueadas agora geram alerta
+  sem impedir a rematerialização das análises. O lote diário de detalhes ficou
+  limitado e alterna diariamente o ponto inicial, evitando timeout e repetição
+  eterna dos mesmos bloqueios. Nos comparáveis, falhas transitórias
+  dos portais permanecem registradas para retry e visíveis no resumo sem
+  derrubar uma rodada operacionalmente concluída.
+
 - **2026-10-07** — Tornou backfills completos de referências retomáveis sem
   cobrar novamente regiões já concluídas: uma execução forçada pode selecionar
   apenas jobs não tentados desde o início da campanha. Runs forçadas também

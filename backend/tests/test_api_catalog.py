@@ -269,7 +269,8 @@ def test_catalog_analyze_runs_enrichment_and_persists(monkeypatch):
 
     from graph.contracts import AuctionPropertyResult, RiskFlags
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None,
+                     regional_comparables=None, market_reference_scope="neighborhood"):
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
             neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
@@ -307,7 +308,8 @@ def test_catalog_analyze_feeds_ingested_description_as_pdf_texts(monkeypatch):
 
     captured = {}
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None,
+                     regional_comparables=None, market_reference_scope="neighborhood"):
         captured["pdf_texts"] = pdf_texts
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
@@ -341,7 +343,8 @@ def test_catalog_analyze_lazily_fetches_detail(monkeypatch):
 
     from graph.contracts import AuctionPropertyResult, RiskFlags
 
-    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None, regional_comparables=None):
+    def _fake_enrich(metadata, pdf_texts="", auction_url="", regional_price_per_m2=None,
+                     regional_comparables=None, market_reference_scope="neighborhood"):
         return AuctionPropertyResult(
             id="abc", photo_label="", title="Casa", address="Rua A", type="Casa",
             neighborhood="Centro", city="Curitiba, PR", auction_type="Extrajudicial",
@@ -386,13 +389,15 @@ def test_catalog_analyze_prioritizes_missing_city_reference():
         property_id = prop.id
 
     response = client.post(f"/catalog/{property_id}/analyze")
-    assert response.status_code == 409
-    assert "priorizada" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["market"] == 0
+    assert response.json()["marketDetail"]["referenceScope"] == "none"
     with factory() as session:
         job = session.query(MarketReferenceJob).one()
         assert (job.city, job.neighborhood, job.property_type, job.priority) == (
             "Maringá", "", "Apartamento", 0,
         )
+        assert session.query(Enrichment).filter_by(property_id=property_id).one()
     api.app.dependency_overrides.clear()
 
 

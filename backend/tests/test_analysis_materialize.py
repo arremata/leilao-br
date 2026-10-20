@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import event
 
 from db.base import get_engine, init_db, make_session_factory
@@ -49,7 +51,7 @@ def test_materializes_and_reuses_shared_cached_analysis():
         assert '"market":250000.0' in cached.result_json
 
 
-def test_skips_property_without_market_reference():
+def test_materializes_property_without_market_reference_as_unknown():
     factory = _database()
     with factory() as session:
         session.add(Property(
@@ -61,10 +63,14 @@ def test_skips_property_without_market_reference():
 
     summary = materialize_analyses(factory, ["PR"])
 
-    assert summary["selected"] == 0
+    assert summary["selected"] == 1
+    assert summary["updated"] == 1
     assert summary["no_reference"] == 1
     with factory() as session:
-        assert session.query(Enrichment).count() == 0
+        result = json.loads(session.query(Enrichment).one().result_json)
+        assert result["market"] == 0
+        assert result["marketDetail"]["referenceScope"] == "none"
+        assert result["marketDetail"]["comparables"] == []
 
 
 def test_materializes_from_city_type_baseline_when_neighborhood_is_missing():
@@ -86,6 +92,40 @@ def test_materializes_from_city_type_baseline_when_neighborhood_is_missing():
     with factory() as session:
         cached = session.query(Enrichment).one()
         assert '"market":520000.0' in cached.result_json
+
+
+def test_materializes_low_confidence_city_average_when_type_reference_is_missing():
+    factory = _database()
+    with factory() as session:
+        session.add(Property(
+            source="caixa", source_id="broad-city-fallback", uf="PR", city="Maringá",
+            neighborhood="Zona 7", property_type="Casa", address="Rua A",
+            area_m2=100, preco=300_000, status="active",
+        ))
+        reference = RegionalMarketPrice(
+            uf="PR", city="Maringá", neighborhood="",
+            property_type="Apartamento", price_per_m2=4_000, sample_size=3,
+        )
+        session.add(reference)
+        session.flush()
+        session.add(RegionalMarketComparable(
+            reference_id=reference.id, address="Apto B", property_type="Apartamento",
+            price=240_000, area_m2=60, price_per_m2=4_000,
+            source="Portal", url="https://portal/apto",
+        ))
+        session.commit()
+
+    summary = materialize_analyses(factory, ["PR"])
+
+    assert summary["updated"] == 1
+    assert summary["no_reference"] == 0
+    with factory() as session:
+        result = json.loads(session.query(Enrichment).one().result_json)
+        assert result["market"] == 400_000
+        assert result["marketDetail"]["confidenceLevel"] == "low"
+        assert result["marketDetail"]["referenceScope"] == "city_all_types"
+        assert result["marketDetail"]["comparables"] == []
+        assert result["marketDetail"]["indicators"][0]["lbl"] == "Preço/m² · cidade"
 
 
 def test_recomputes_after_catalog_property_change():

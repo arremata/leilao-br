@@ -15,7 +15,7 @@ from graph.contracts import AuctionPropertyResult
 from fiscal import get_itbi
 from auction_round import resolve_current_auction
 
-PIPELINE_VERSION = "v15-current-auction-round"
+PIPELINE_VERSION = "v16-city-market-fallback"
 
 # Legal analysis is temporarily disabled: the Tractian LLM proxy 502s on the
 # legal call, wasting ~90s per analysis retrying a doomed request. Flip back to
@@ -92,12 +92,14 @@ def run_structured_enrichment(
     metadata: PropertyMetadata, pdf_texts: str = "", auction_url: str = "",
     regional_price_per_m2: float | None = None,
     regional_comparables: list[ComparableProperty] | None = None,
+    market_reference_scope: str = "neighborhood",
 ) -> AuctionPropertyResult:
     state = AuctionState(
         property_metadata=metadata, pdf_texts=pdf_texts, auction_url=auction_url,
     )
     state.market_result = market_node(
         state, regional_price_per_m2, regional_comparables,
+        market_reference_scope,
     )["market_result"]
     if LEGAL_NODE_ENABLED:
         # Best-effort: a transient LLM/proxy failure must not sink the whole

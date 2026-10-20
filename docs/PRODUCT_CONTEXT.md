@@ -4,7 +4,7 @@ Este é o contexto curto e não técnico para conversas sobre produto. Ele descr
 o que o Argos é, o que já existe e quais limites devem ser respeitados. Para
 decisões já tomadas, consulte também `docs/PRODUCT_DECISIONS.md`.
 
-Última atualização: 7 de outubro de 2026.
+Última atualização: 19 de outubro de 2026.
 
 ## Padrão visual
 
@@ -271,11 +271,23 @@ ação equivalente à modalidade.
 - Informações ausentes devem aparecer como indisponíveis; nunca devem ser
   inventadas para preencher uma tela.
 - O catálogo é atualizado por rotinas programadas e persistido em PostgreSQL.
+  A importação oficial da Caixa e a leitura auxiliar de páginas de detalhes têm
+  saúdes separadas: uma indisponibilidade de datas ou documentos gera alerta e
+  preserva os fatos anteriores, sem impedir a atualização do catálogo e das
+  análises. As páginas auxiliares são processadas em lotes cujo ponto inicial
+  alterna diariamente, para que um bloqueio não monopolize as execuções.
 - O navegador acessa catálogo e dados de conta somente pelos serviços do Argos;
   as tabelas do banco não formam uma API pública paralela.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
+- Quando não há referência para o mesmo tipo de imóvel, mas a cidade possui
+  outras referências válidas, o Argos mostra a mediana municipal do preço por
+  metro quadrado como estimativa de baixa confiança. A tela deixa claro que não
+  encontrou imóveis equivalentes e não apresenta anúncios de outros tipos como
+  comparáveis. Sem nenhuma referência na cidade, o valor permanece indisponível,
+  mas isso não bloqueia os demais componentes da análise. Assim, cobertura de
+  análise e cobertura de referência de mercado são indicadores separados.
 - Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
   A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
   um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
@@ -283,9 +295,10 @@ ação equivalente à modalidade.
   vez de publicar uma estimativa baseada em uma coleta vazia. Cada ciclo
   processa no máximo dez regiões, com concorrência limitada e sem duplicar uma
   região entre workers; falhas parciais permanecem registradas e entram em
-  espera para nova tentativa, sem invalidar as regiões concluídas. Apenas
-  análises afetadas por referências alteradas são refeitas, e o indicador de
-  cobertura considera somente análises produzidas pela regra atual.
+  espera para nova tentativa, sem invalidar as regiões concluídas nem marcar
+  toda a rotina como indisponível. Apenas
+  análises ausentes ou desatualizadas são refeitas, e o indicador de cobertura
+  considera somente análises produzidas pela regra atual.
 - Quando há localização suficiente, a seleção busca até cinco comparáveis em um
   raio de 2 km. Quantidade, semelhança e consistência alimentam uma classificação
   interna, mas o usuário vê apenas confiança baixa, média ou alta.

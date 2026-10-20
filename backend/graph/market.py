@@ -101,6 +101,7 @@ def calculate_market(
     metadata,
     comparables: list[ComparableProperty],
     regional_price_per_m2: float | None = None,
+    reference_scope: str = "neighborhood",
 ) -> MarketResult:
     """Calculate auditable market values without an LLM.
 
@@ -145,6 +146,7 @@ def calculate_market(
         comparable_properties=usable,
         discount_percentage=discount,
         confidence_level=confidence.level,
+        reference_scope=reference_scope,
     )
 
 
@@ -152,6 +154,7 @@ def market_node(
     state: AuctionState,
     regional_price_per_m2: float | None = None,
     persisted_comparables: list[ComparableProperty] | None = None,
+    reference_scope: str = "neighborhood",
 ) -> dict:
     """Calculate instantly from the reference maintained by the market worker.
 
@@ -168,6 +171,7 @@ def market_node(
 
     result = calculate_market(
         metadata, persisted_comparables or [], regional_price_per_m2,
+        reference_scope,
     )
     logger.info(
         "Market calculator: persisted reference R$ {:.2f}/m²",

@@ -74,7 +74,7 @@ def test_metadata_uses_national_itbi_estimate_outside_reviewed_cities():
 
 def test_run_structured_enrichment_skips_discovery_planner(monkeypatch):
     # Stub the three heavy nodes so no LLM/network runs.
-    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None, scope="neighborhood": {
         "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })
@@ -109,7 +109,7 @@ def test_run_structured_enrichment_skips_legal_when_disabled(monkeypatch):
         called["legal"] = True
         return {"legal_result": LegalResult()}
 
-    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None, scope="neighborhood": {
         "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })
@@ -134,7 +134,7 @@ def test_run_structured_enrichment_tolerates_legal_failure(monkeypatch):
     # gracefully — falling back to a default LegalResult — instead of failing
     # the whole analysis.
     monkeypatch.setattr(enrich, "LEGAL_NODE_ENABLED", True)
-    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None: {
+    monkeypatch.setattr(enrich, "market_node", lambda state, regional=None, comparables=None, scope="neighborhood": {
         "market_result": MarketResult(price_per_m2_neighborhood=4000.0,
                                       discount_percentage=40.0)
     })

@@ -100,6 +100,7 @@ class MarketDetail(BaseModel):
     indicators: list[MarketIndicator]
     comparables: list[ComparableSale]
     confidence_level: Literal["low", "medium", "high"] = "low"
+    reference_scope: Literal["none", "neighborhood", "city", "city_all_types"] = "neighborhood"
 
 
 class CostLineItem(BaseModel):

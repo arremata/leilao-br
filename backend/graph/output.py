@@ -201,10 +201,15 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
 
     indicators = []
     if market.price_per_m2_neighborhood:
+        broad_city_fallback = market.reference_scope == "city_all_types"
+        scope_label = "cidade" if market.reference_scope != "neighborhood" else "bairro"
         indicators.append(MarketIndicator(
-            lbl="Preço/m² · bairro",
+            lbl=f"Preço/m² · {scope_label}",
             val=f"R$ {market.price_per_m2_neighborhood:,.0f}".replace(",", "."),
-            delta="mediana dos anúncios coletados",
+            delta=(
+                "mediana municipal entre tipos de imóvel"
+                if broad_city_fallback else "mediana dos anúncios coletados"
+            ),
             pos=True,
         ))
     price_per_m2_property = (metadata.auction_price or 0) / metadata.area_m2 if metadata.area_m2 and metadata.area_m2 > 0 else 0
@@ -231,6 +236,7 @@ def _build_market_detail(state: AuctionState) -> MarketDetail | None:
         indicators=indicators,
         comparables=comparables,
         confidence_level=market.confidence_level,
+        reference_scope=market.reference_scope,
     )
 
 

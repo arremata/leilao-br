@@ -48,7 +48,7 @@ def build_report(session_factory, ufs: list[str]) -> dict:
         statuses = dict(session.execute(job_stmt).all())
 
     total = state["eligible_count"]
-    with_reference = len(state["candidates"])
+    with_reference = state["with_reference_count"]
     return {
         "eligible_properties": total,
         "properties_with_reference": with_reference,

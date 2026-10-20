@@ -78,6 +78,8 @@ class IngestSummary:
     dates_updated: int = 0
     dates_failed: int = 0
     dates_deferred: int = 0
+    details_attempted: int = 0
+    details_deferred: int = 0
     documents_updated: int = 0
     edital_data_updated: int = 0
     bids_refreshed: int = 0
@@ -182,6 +184,22 @@ def _needs_bid_status(prop: Property, now: datetime) -> bool:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return now - parsed.astimezone(timezone.utc) >= BID_STATUS_TTL
+
+
+def _rotate_detail_candidates(
+    candidates: list[tuple], limit: Optional[int], day_ordinal: int,
+) -> list[tuple]:
+    """Order a bounded detail batch fairly without persistent scheduler state.
+
+    Property ids provide a stable order. Moving the starting point by one full
+    batch per calendar day prevents the same blocked prefix from monopolizing
+    every scheduled run, while an unbounded manual run keeps the stable order.
+    """
+    ordered = sorted(candidates, key=lambda candidate: candidate[0])
+    if not ordered or limit is None or limit == 0:
+        return ordered
+    offset = (day_ordinal * limit) % len(ordered)
+    return ordered[offset:] + ordered[:offset]
 
 
 def _apply_fields(prop: Property, n: NormalizedProperty) -> None:
@@ -360,13 +378,19 @@ async def ingest(
 
         # Date enrichment is deliberately outside the upsert transaction: a
         # slow Caixa response must not hold database locks. All Leilão SFI and
-        # Licitação Aberta rows missing/stale by 24h are selected by default. The adapter
-        # paces requests and opens a circuit on repeated HTTP 429 responses.
+        # Licitação Aberta rows missing/stale by 24h are eligible. Bounded runs
+        # rotate the starting point daily so an unavailable page cannot starve
+        # the rest of the catalog forever. The
+        # adapter paces requests and opens a circuit on repeated HTTP 429s.
         if pending_details and date_limit != 0:
-            pending_details.sort(key=lambda candidate: not candidate[2])
+            pending_details = _rotate_detail_candidates(
+                pending_details, date_limit, now.date().toordinal(),
+            )
             selected_details = (
                 pending_details if date_limit is None else pending_details[:date_limit]
             )
+            summary.details_attempted = len(selected_details)
+            summary.details_deferred = len(pending_details) - len(selected_details)
             summary.dates_deferred = sum(
                 1 for candidate in pending_details[len(selected_details):]
                 if candidate[3]
@@ -448,12 +472,12 @@ async def ingest(
                 for (property_id, _, _, requires_date, _, _), result in zip(
                     selected_details, detail_results,
                 ):
+                    prop = session.get(Property, property_id)
+                    if prop is None:
+                        continue
                     if result is None:
                         if requires_date:
                             summary.dates_failed += 1
-                        continue
-                    prop = session.get(Property, property_id)
-                    if prop is None:
                         continue
                     if isinstance(result, tuple):  # compatibility for injected adapters
                         prop.first_auction_at, prop.second_auction_at = result
@@ -530,6 +554,8 @@ async def ingest(
         f"={summary.unchanged} events={summary.events_created} "
         f"dates={summary.dates_updated}/{summary.dates_failed}failed/"
         f"{summary.dates_deferred}deferred documents={summary.documents_updated} "
+        f"details={summary.details_attempted}attempted/"
+        f"{summary.details_deferred}deferred "
         f"edital_data={summary.edital_data_updated} "
         f"bids={summary.bids_refreshed} "
         f"browser_recovered={summary.browser_details_recovered}"
