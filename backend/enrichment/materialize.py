@@ -166,7 +166,10 @@ def materialize_analyses(
                 break
             summary["selected"] += 1
             try:
-                rows = [
+                # A city-wide fallback can mix apartment, house and commercial
+                # references. It supplies only the coarse municipal price; its
+                # listings must not be presented as comparable to this asset.
+                rows = [] if reference.scope == "city_all_types" else [
                     item
                     for reference_id in reference.reference_ids
                     for item in state["comparables_by_reference"].get(reference_id, [])
@@ -186,6 +189,7 @@ def materialize_analyses(
                     auction_url=prop.detail_url or "",
                     regional_price_per_m2=reference.price_per_m2,
                     regional_comparables=comparables,
+                    market_reference_scope=reference.scope,
                 )
                 apply_property_expenses(result, prop, expense_reference)
                 result_json = result.model_dump_json(by_alias=True)

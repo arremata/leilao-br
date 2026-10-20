@@ -325,7 +325,7 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
             ),
         )
     regional_comparables = []
-    if regional:
+    if regional and regional.scope != "city_all_types":
         regional_comparables = [
             ComparableProperty(
                 address=comp.address, property_type=comp.property_type,
@@ -345,6 +345,7 @@ def analyze_catalog_item(prop_id: int, session: Session = Depends(get_session)) 
         metadata, pdf_texts=prop.descricao_raw or "", auction_url=prop.detail_url,
         regional_price_per_m2=regional.price_per_m2,
         regional_comparables=regional_comparables,
+        market_reference_scope=regional.scope,
     )
     result.matricula = prop.matricula
     result.edital_url = prop.edital_url

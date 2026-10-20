@@ -4,7 +4,7 @@ Este registro guarda decisões duráveis para que conversas futuras não reabram
 escolhas já resolvidas sem perceber. Ele complementa o contexto em
 `docs/PRODUCT_CONTEXT.md`; não substitui o changelog técnico de `AGENTS.md`.
 
-Última atualização: 6 de outubro de 2026.
+Última atualização: 19 de outubro de 2026.
 
 ## Como manter este registro
 
@@ -18,6 +18,20 @@ escolhas já resolvidas sem perceber. Ele complementa o contexto em
 - Mudanças apenas técnicas continuam somente no changelog de `AGENTS.md`.
 
 ## Decisões ativas de produto
+
+### PD-025 — Preencher lacunas de mercado com referência municipal explícita
+
+- **Data:** 19 de outubro de 2026
+- **Estado:** Ativa; implementação em validação
+- **Decisão:** quando não houver referência para o mesmo tipo de imóvel, mas
+  existirem referências válidas na mesma cidade, o Argos mostra a mediana
+  municipal de preço por metro quadrado como estimativa de baixa confiança.
+- **Motivo:** uma referência municipal imperfeita ajuda na triagem mais do que
+  deixar o valor inteiramente ausente, desde que sua limitação esteja visível.
+- **Consequências:** a tela não apresenta imóveis de outros tipos como
+  comparáveis, identifica a origem municipal e recomenda cautela. Cidades sem
+  qualquer referência continuam sem estimativa, e terrenos permanecem fora da
+  extrapolação automática.
 
 ### PD-024 — Usar a linguagem visual da LP em toda a plataforma
 

@@ -74,6 +74,11 @@ def build_market_reference_index(
             canonical_property_type(reference.property_type),
         )
         indexed.setdefault(key, []).append(reference)
+        # The empty-type bucket supports the deliberately broad city fallback.
+        # Keep the original references (instead of persisting a synthetic row)
+        # so staleness tracking still reacts to every contributing source.
+        if key[2]:
+            indexed.setdefault((key[0], key[1], ""), []).append(reference)
     return indexed
 
 
@@ -115,16 +120,22 @@ def resolve_market_reference_from_index(
             tuple(ref.id for ref in refs),
             max(refs, key=lambda ref: str(ref.computed_at or "")).computed_at,
         )
+    city_refs = references.get((key[0], key[1], ""), [])
+    if city_refs:
+        return ResolvedMarketReference(
+            float(median(ref.price_per_m2 for ref in city_refs)),
+            "city_all_types",
+            tuple(ref.id for ref in city_refs),
+            max(city_refs, key=lambda ref: str(ref.computed_at or "")).computed_at,
+        )
     return None
 
 
 def resolve_market_reference(session, prop) -> ResolvedMarketReference | None:
-    """Resolve exact neighborhood first, then the city's type median."""
-    canonical_type = canonical_property_type(prop.property_type)
+    """Resolve neighborhood/type, then type/city, then the broad city median."""
     refs = session.execute(select(RegionalMarketPrice).where(
         RegionalMarketPrice.uf == (prop.uf or "").strip().upper(),
         RegionalMarketPrice.city == (prop.city or "").strip(),
-        RegionalMarketPrice.property_type == canonical_type,
         RegionalMarketPrice.price_per_m2 > 0,
     )).scalars().all()
     return resolve_market_reference_from_index(

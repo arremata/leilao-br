@@ -159,6 +159,27 @@ def test_persisted_city_reference_is_identified_in_market_detail():
     assert "confidenceDebug" not in result["marketDetail"]
 
 
+def test_persisted_broad_city_average_is_explicit_and_low_confidence():
+    row = {
+        "id": 8, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",
+        "address": "Rua A", "property_type": "Casa", "area_m2": 100,
+        "beds": 3, "preco": 250_000, "avaliacao": 450_000,
+        "modalidade": "Venda Direta Online", "detail_url": "https://example.com/8",
+        "photo_url": None,
+    }
+
+    result = vercel_api._build_persisted_enrichment(
+        row, {"price_per_m2": 4_000, "scope": "city_all_types"}, [],
+    )
+
+    detail = result["marketDetail"]
+    assert result["market"] == 400_000
+    assert detail["referenceScope"] == "city_all_types"
+    assert detail["confidenceLevel"] == "low"
+    assert detail["comparables"] == []
+    assert detail["indicators"][0]["delta"] == "mediana municipal entre tipos de imóvel"
+
+
 def test_persisted_enrichment_exposes_only_high_confidence_level():
     row = {
         "id": 9, "uf": "PR", "city": "Curitiba", "neighborhood": "Centro",

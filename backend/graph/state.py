@@ -67,6 +67,7 @@ class MarketResult:
     comparable_properties: list[ComparableProperty] = field(default_factory=list)
     discount_percentage: float = 0.0
     confidence_level: str = "low"
+    reference_scope: str = "neighborhood"
 
 
 @dataclass

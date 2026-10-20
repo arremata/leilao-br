@@ -281,6 +281,11 @@ ação equivalente à modalidade.
 - Estimativas de mercado usam referências regionais e comparáveis previamente
   coletados. Uma visita à página não executa pesquisa aberta na web nem chama um
   LLM para inventar uma avaliação.
+- Quando não há referência para o mesmo tipo de imóvel, mas a cidade possui
+  outras referências válidas, o Argos mostra a mediana municipal do preço por
+  metro quadrado como estimativa de baixa confiança. A tela deixa claro que não
+  encontrou imóveis equivalentes e não apresenta anúncios de outros tipos como
+  comparáveis. Sem nenhuma referência na cidade, o valor permanece indisponível.
 - Os anúncios comparáveis atuais vêm de QuintoAndar, ImovelWeb e Chaves na Mão.
   A rotina atualiza somente regiões representadas por imóveis ainda ativos. Se
   um portal falhar, os demais ainda podem sustentar a referência; quando nenhum
