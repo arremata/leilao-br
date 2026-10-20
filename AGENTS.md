@@ -235,6 +235,10 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-19** — Unificou o favicon da plataforma com o da LP: círculo roxo
+  preenchido até as bordas, com a casa branca centralizada. Atualizou o cache
+  do service worker para substituir o favicon anterior nas próximas visitas.
+
 - **2026-10-19** — Passou a preencher lacunas de preço de mercado com a mediana
   das referências válidas da mesma cidade quando ainda não há amostra para o
   mesmo tipo de imóvel. O fallback aparece como estimativa de baixa confiança,

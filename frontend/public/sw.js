@@ -1,4 +1,4 @@
-const CACHE_NAME = 'argos-v3';
+const CACHE_NAME = 'argos-v4';
 const APP_SHELL = [
   '/',
   '/offline.html',
