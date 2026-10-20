@@ -19,15 +19,10 @@ on:
         description: Optional maximum listings per UF (empty means all)
         required: false
         default: ""
-      geocode:
-        description: Geocode new listings with Nominatim
-        type: boolean
-        required: true
-        default: false
       detail_limit:
         description: Maximum Caixa detail pages to enrich in this run
         required: true
-        default: "80"
+        default: "160"
   schedule:
     - cron: "50 8 * * *"
 permissions:
@@ -51,8 +46,7 @@ jobs:
       PYTHONUNBUFFERED: "1"
       INGEST_UFS: ${{ github.event.inputs.ufs || 'PR' }}
       INGEST_LIMIT: ${{ github.event.inputs.limit || '' }}
-      INGEST_GEOCODE: ${{ github.event.inputs.geocode || 'false' }}
-      INGEST_DETAIL_LIMIT: ${{ github.event.inputs.detail_limit || '80' }}
+      INGEST_DETAIL_LIMIT: ${{ github.event.inputs.detail_limit || '160' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -74,7 +68,6 @@ jobs:
           test -n "$DATABASE_URL"
           [[ "$INGEST_UFS" =~ ^[A-Za-z]{2}(,[A-Za-z]{2})*$ ]]
           [[ -z "$INGEST_LIMIT" || "$INGEST_LIMIT" =~ ^[1-9][0-9]*$ ]]
-          [[ "$INGEST_GEOCODE" =~ ^(true|false)$ ]]
           [[ "$INGEST_DETAIL_LIMIT" =~ ^[0-9]+$ ]]
 
       - name: Run ingestion worker
@@ -88,9 +81,6 @@ jobs:
           )
           if [[ -n "$INGEST_LIMIT" ]]; then
             args+=(--limit "$INGEST_LIMIT")
-          fi
-          if [[ "$INGEST_GEOCODE" == "true" ]]; then
-            args+=(--geocode)
           fi
           xvfb-run -a python -m ingestion.worker "${args[@]}"
 

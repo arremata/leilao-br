@@ -101,6 +101,7 @@ import pytest
 from pathlib import Path
 
 REAL_FIXTURE = Path(__file__).parent / "fixtures" / "caixa_PR_sample.csv"
+SP_FIXTURE = Path(__file__).parent / "fixtures" / "caixa_SP_sample.csv"
 
 
 def test_parse_real_caixa_csv_with_financiamento_column():
@@ -137,6 +138,23 @@ def test_normalize_real_terreno_uses_land_area():
     assert ter.property_type == "Terreno"
     assert ter.area_m2 == pytest.approx(197270.0)
     assert ter.beds is None
+
+
+def test_parse_real_sp_csv_snapshot_and_validate_contract():
+    rows = parse_caixa_csv(SP_FIXTURE.read_bytes())
+    adapter = CaixaCsvAdapter(uf="SP")
+
+    adapter.validate_snapshot(rows)
+
+    assert len(rows) == 4
+    assert {row.raw["uf"] for row in rows} == {"SP"}
+    assert {adapter.normalize(row).property_type for row in rows} == {"Casa", "Terreno"}
+    tender = adapter.normalize(next(
+        row for row in rows if row.source_id == "1444408501866"
+    ))
+    assert tender.city == "ADAMANTINA"
+    assert tender.preco == pytest.approx(319294.46)
+    assert tender.modalidade == "Licitação Aberta"
 
 
 # --- Adapter session lifecycle (photo fetch support) -------------------------

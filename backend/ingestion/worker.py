@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Optional
@@ -36,6 +37,7 @@ class UFResult:
     uf: str
     summary: Optional[IngestSummary] = None
     error: Optional[str] = None
+    duration_seconds: float = 0.0
 
 
 def parse_ufs(raw: str) -> list[str]:
@@ -90,6 +92,7 @@ def report_payload(report: dict[str, UFResult]) -> dict:
         "ufs": {
             uf: {
                 "error": result.error,
+                "duration_seconds": round(result.duration_seconds, 2),
                 "summary": asdict(result.summary) if result.summary is not None else None,
             }
             for uf, result in sorted(report.items())
@@ -124,6 +127,7 @@ def run_worker(
 
     report: dict[str, UFResult] = {}
     for uf in ufs:
+        started_at = time.monotonic()
         try:
             adapter = adapter_factory(uf)
             # One event loop per UF: ingest() is async so the adapter's
@@ -137,10 +141,16 @@ def run_worker(
                     date_limit=date_limit,
                 )
             )
-            report[uf] = UFResult(uf=uf, summary=summary)
+            report[uf] = UFResult(
+                uf=uf, summary=summary,
+                duration_seconds=time.monotonic() - started_at,
+            )
         except Exception as e:  # isolate: one bad UF must not abort the rest
             logger.error(f"Ingestion failed for UF {uf}: {e}")
-            report[uf] = UFResult(uf=uf, error=str(e))
+            report[uf] = UFResult(
+                uf=uf, error=str(e),
+                duration_seconds=time.monotonic() - started_at,
+            )
     return report
 
 

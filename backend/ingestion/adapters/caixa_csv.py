@@ -115,6 +115,44 @@ class CaixaCsvAdapter:
     def csv_url(self) -> str:
         return CSV_URL_TEMPLATE.format(uf=self.uf)
 
+    def validate_snapshot(self, rows: list[RawListing]) -> None:
+        """Validate the Caixa contract before the authoritative snapshot is used."""
+        if not rows:
+            raise CaixaFetchError(f"Caixa {self.uf} CSV contained no listings")
+        required = {
+            "source_id", "uf", "city", "address", "preco", "avaliacao",
+            "descricao", "modalidade", "detail_url",
+        }
+        missing = required.difference(rows[0].raw)
+        if missing:
+            raise CaixaFetchError(
+                f"Caixa {self.uf} CSV schema is missing: {', '.join(sorted(missing))}"
+            )
+        ids = [row.source_id for row in rows]
+        if len(ids) != len(set(ids)):
+            raise CaixaFetchError(f"Caixa {self.uf} CSV contains duplicate property ids")
+        foreign_ufs = sorted({
+            (row.raw.get("uf") or "").strip().upper()
+            for row in rows
+            if (row.raw.get("uf") or "").strip().upper() != self.uf
+        })
+        if foreign_ufs:
+            raise CaixaFetchError(
+                f"Caixa {self.uf} CSV contains unexpected UFs: {', '.join(foreign_ufs)}"
+            )
+
+    async def fetch_detail_results_async(self, urls: list[str]):
+        """Run the Caixa-only detail enrichment behind the source adapter."""
+        from ingestion.adapters.caixa_detail import fetch_auction_dates_batch
+
+        return await fetch_auction_dates_batch(urls)
+
+    async def fetch_official_bid_statuses_async(self, candidates: list[dict]):
+        """Run supported Caixa auctioneer lookups behind the source adapter."""
+        from ingestion.adapters.caixa_bids import fetch_official_auctioneer_bid_statuses
+
+        return await fetch_official_auctioneer_bid_statuses(candidates)
+
     def fetch_raw(self) -> list[RawListing]:
         """Sync entrypoint: parses injected csv_bytes or downloads via _download.
 
@@ -360,7 +398,10 @@ def parse_caixa_csv(raw: bytes) -> list[RawListing]:
     # Pre-normalize the map keys with NFKD so they match the NFKD-normalized CSV headers.
     _norm_map = {_norm_header(k): v for k, v in CAIXA_HEADER_MAP.items()}
 
-    text = raw.decode("latin-1", errors="replace")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1", errors="replace")
     lines = [ln for ln in text.splitlines()]
 
     header_idx = None
