@@ -235,6 +235,11 @@ The full platform will include:
 
 ## Changelog
 
+- **2026-10-20** — Corrigiu a casa da logo para seguir a logo oficial: as
+  paredes deixaram de sair por cima do telhado (os dois "calombos"). Vale para
+  a casinha do topo, o favicon, os ícones do app (192, 512 e iPhone) e o ícone
+  PWA, agora idênticos aos da LP. Atualizou o cache do service worker para
+  trocar os ícones antigos nas próximas visitas.
 - **2026-10-19** — Unificou o favicon da plataforma com o da LP: círculo roxo
   preenchido até as bordas, com a casa branca centralizada. Atualizou o cache
   do service worker para substituir o favicon anterior nas próximas visitas.
